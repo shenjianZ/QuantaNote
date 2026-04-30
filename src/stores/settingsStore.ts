@@ -14,10 +14,10 @@ export interface AppSettings {
 }
 
 const DEFAULTS: AppSettings = {
-  fontFamily: "Space Grotesk",
+  fontFamily: "Noto Sans SC",
   fontMono: "JetBrains Mono",
-  fontSize: 13,
-  accentColor: "#22d3ee",
+  fontSize: 15,
+  accentColor: "#386c5f",
   minimizeToTray: true,
   closeKeepRunning: false,
   autoBackup: true,
@@ -52,13 +52,15 @@ function applySettings(settings: AppSettings) {
   root.style.setProperty("--font-sans", `'${settings.fontFamily}', system-ui, -apple-system, sans-serif`);
   root.style.setProperty("--font-mono", `'${settings.fontMono}', monospace`);
   root.style.setProperty("--font-size-base", `${settings.fontSize}px`);
+  root.style.setProperty("--font-size-xs", `max(12px, calc(${settings.fontSize}px - 3px))`);
+  root.style.setProperty("--font-size-sm", `max(13px, calc(${settings.fontSize}px - 2px))`);
+  root.style.setProperty("--font-size-md", `${settings.fontSize}px`);
+  root.style.setProperty("--font-size-lg", `calc(${settings.fontSize}px + 2px)`);
+  root.style.setProperty("--font-size-xl", `calc(${settings.fontSize}px + 5px)`);
   root.style.setProperty("--accent", settings.accentColor);
-  root.style.setProperty("--cyan", settings.accentColor);
   const rgb = hexToRgb(settings.accentColor);
   if (rgb) {
-    root.style.setProperty("--cyan-soft", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.14)`);
-    root.style.setProperty("--border-strong", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.45)`);
-    root.style.setProperty("--text-nav-active", settings.accentColor);
+    root.style.setProperty("--accent-soft", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.14)`);
   }
   document.body.style.fontSize = `${settings.fontSize}px`;
 }

@@ -1,7 +1,5 @@
 import type { ReactNode } from "react";
 import type { AppPage } from "../../types";
-import { Sidebar } from "./Sidebar";
-import { StatusBar } from "./StatusBar";
 import { TopBar } from "./TopBar";
 
 interface AppShellProps {
@@ -18,14 +16,14 @@ export function AppShell({
   onOpenSearch,
 }: AppShellProps) {
   return (
-    <main className="desktop-stage">
-      <section className="app-window">
-        <Sidebar currentPage={currentPage} onNavigate={onNavigate} />
-        <div className="app-main">
-          <TopBar onOpenSearch={onOpenSearch} />
-          <div className="page-body">{children}</div>
-          <StatusBar />
-        </div>
+    <main className="h-screen w-screen overflow-hidden bg-[var(--app-bg)] text-[var(--text)]">
+      <section className="flex h-full min-h-0 flex-col">
+        <TopBar
+          currentPage={currentPage}
+          onNavigate={onNavigate}
+          onOpenSearch={onOpenSearch}
+        />
+        <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
       </section>
     </main>
   );

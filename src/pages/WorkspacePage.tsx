@@ -1,393 +1,112 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  Copy,
-  Edit3,
-  Grid2X2,
-  List,
-  Paperclip,
-  Plus,
-  Star,
-  Trash2,
-  X,
-} from "lucide-react";
-import { TagEditor } from "../components/common/TagEditor";
-import { TagPill } from "../components/common/TagPill";
+import { useEffect, useState } from "react";
+import { CheckCircle2, Eye, PenLine, SendHorizontal } from "lucide-react";
 import { MarkdownRenderer } from "../components/common/MarkdownRenderer";
-import { useAttachmentStore } from "../stores/attachmentStore";
-import { useItemStore } from "../stores/itemStore";
-import { useTagStore } from "../stores/tagStore";
 import { useAppStore } from "../stores/appStore";
-import { getAllItemTagMappings } from "../services/tauriCommands";
-import type { AppPage } from "../types";
-import type { Item } from "../types";
-import { open } from "@tauri-apps/plugin-dialog";
-import { openPath } from "@tauri-apps/plugin-opener";
-
-type TabKey = "pinned" | "recent" | "favorite";
-type ViewMode = "list" | "grid";
-type SortOption = "updated" | "created" | "title";
 
 interface WorkspacePageProps {
-  page: AppPage;
-  items: Item[];
-  selectedItem: Item;
-  onSelectItem: (id: string) => void;
-  onCreateItem: () => void;
-  onOpenDocument: () => void;
+  onQuickCreate: (content: string) => Promise<void>;
 }
 
-export function WorkspacePage({
-  page,
-  items,
-  selectedItem,
-  onSelectItem,
-  onCreateItem,
-  onOpenDocument,
-}: WorkspacePageProps) {
-  const [activeTab, setActiveTab] = useState<TabKey>("recent");
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
-  const [sortOrder, setSortOrder] = useState<SortOption>("updated");
-  const [copied, setCopied] = useState(false);
-  const [activeTag, setActiveTag] = useState<string>("all");
-  const [itemTagNames, setItemTagNames] = useState<Record<string, string[]>>({});
-  const deleteItem = useItemStore((s) => s.deleteItem);
-  const updateItem = useItemStore((s) => s.updateItem);
-  const selectedItemDto = useItemStore((s) => s.selectedItem);
+export function WorkspacePage({ onQuickCreate }: WorkspacePageProps) {
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const navigate = useAppStore((s) => s.navigate);
   const theme = useAppStore((s) => s.theme);
-  const attachments = useAttachmentStore((s) => s.attachments);
-  const fetchAttachments = useAttachmentStore((s) => s.fetchAttachments);
-  const addAttachmentAction = useAttachmentStore((s) => s.addAttachment);
-  const deleteAttachmentAction = useAttachmentStore((s) => s.deleteAttachment);
-  const itemTags = useTagStore((s) => s.itemTags) as { name: string; color: string }[];
-  const allTags = useTagStore((s) => s.tags) as { name: string; color: string }[];
-  const fetchTags = useTagStore((s) => s.fetchTags);
-  const fetchItemTags = useTagStore((s) => s.fetchItemTags);
-  const updateItemTagsAction = useTagStore((s) => s.updateItemTags);
 
   useEffect(() => {
-    if (selectedItem.id) {
-      fetchAttachments(selectedItem.id);
-    }
-  }, [selectedItem.id, fetchAttachments]);
+    if (!saved) return;
+    const timer = setTimeout(() => setSaved(false), 1800);
+    return () => clearTimeout(timer);
+  }, [saved]);
 
-  useEffect(() => {
-    fetchTags();
-  }, [fetchTags]);
-
-  useEffect(() => {
-    setActiveTab("recent");
-  }, [page]);
-
-  useEffect(() => {
-    if (selectedItem.id) {
-      fetchItemTags(selectedItem.id);
-    }
-  }, [selectedItem.id, fetchItemTags]);
-
-  useEffect(() => {
-    if (page !== "tags") {
-      setItemTagNames({});
-      return;
-    }
-
-    let cancelled = false;
-    getAllItemTagMappings()
-      .then((mappings) => {
-        if (cancelled) return;
-        const map: Record<string, string[]> = {};
-        for (const [itemId, tagName] of mappings) {
-          (map[itemId] ??= []).push(tagName);
-        }
-        setItemTagNames(map);
-      })
-      .catch(() => {
-        if (!cancelled) setItemTagNames({});
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [page, items]);
-
-  async function handleTagChange(tagNames: string[]) {
-    if (!selectedItem.id) return;
-    await updateItemTagsAction(selectedItem.id, tagNames);
-  }
-
-  const filteredItems = useMemo(() => {
-    const pageItems = page === "tags" && activeTag !== "all"
-      ? items.filter((item) => itemTagNames[item.id]?.includes(activeTag))
-      : items;
-    const tabFiltered = (() => {
-      switch (activeTab) {
-        case "pinned":
-          return pageItems.filter((i) => i.pinned);
-        case "favorite":
-          return pageItems.filter((i) => i.favorite);
-        default:
-          return pageItems;
-      }
-    })();
-    return [...tabFiltered].sort((a, b) => {
-      if (sortOrder === "title") return a.title.localeCompare(b.title);
-      return 0; // "updated" and "created" are already sorted by backend
-    });
-  }, [items, page, activeTag, activeTab, itemTagNames, sortOrder]);
-
-  async function handleDelete(id: string) {
-    await deleteItem(id);
-  }
-
-  async function handleToggleFavorite() {
-    if (!selectedItem.id) return;
-    await updateItem(selectedItem.id, { favorite: !selectedItem.favorite });
-  }
-
-  async function handleTogglePin() {
-    if (!selectedItem.id) return;
-    await updateItem(selectedItem.id, { pinned: !selectedItem.pinned });
-  }
-
-  async function handleCopy() {
-    const text = selectedItem.summary || selectedItem.title;
+  async function handleQuickSave() {
+    const text = draft.trim();
+    if (!text || saving) return;
+    setSaving(true);
     try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch { /* ignore */ }
-  }
-
-  function handleEdit() {
-    if (!selectedItem.id) return;
-    onSelectItem(selectedItem.id);
-    onOpenDocument();
-  }
-
-  async function handleAddAttachment() {
-    if (!selectedItem.id) return;
-    const selected = await open({ multiple: false });
-    if (selected) {
-      await addAttachmentAction(selectedItem.id, selected);
+      await onQuickCreate(text);
+      setDraft("");
+      setSaved(true);
+    } finally {
+      setSaving(false);
     }
   }
-
-  async function handleDeleteAttachment(id: string) {
-    await deleteAttachmentAction(id);
-  }
-
-  async function handleOpenAttachment(path: string) {
-    await openPath(path);
-  }
-
-  function formatFileSize(bytes: number) {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  }
-
-  const SelectedIcon = selectedItem.icon;
 
   return (
-    <div className="workspace-layout">
-      <section>
-        <div className="action-bar">
-          <button className="btn primary" type="button" onClick={onCreateItem}>
-            <Edit3 />
-            新建
-          </button>
-          <select
-            value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value as SortOption)}
-            style={{
-              background: "var(--bg-input)",
-              color: "var(--text)",
-              border: "1px solid var(--border-input)",
-              borderRadius: 6,
-              padding: "4px 8px",
-              fontSize: 12,
-            }}
-          >
-            <option value="updated">最近更新</option>
-            <option value="created">创建时间</option>
-            <option value="title">标题排序</option>
-          </select>
-          <div style={{ flex: 1 }} />
-          <button
-            className={`btn sm ${viewMode === "list" ? "active" : ""}`}
-            type="button"
-            onClick={() => setViewMode("list")}
-            title="列表视图"
-          >
-            <List />
-          </button>
-          <button
-            className={`btn sm ${viewMode === "grid" ? "active" : ""}`}
-            type="button"
-            onClick={() => setViewMode("grid")}
-            title="网格视图"
-          >
-            <Grid2X2 />
-          </button>
-        </div>
-
-        <div className="tabs-row">
-          {([
-            { key: "pinned", label: "置顶" },
-            { key: "recent", label: "最近" },
-            { key: "favorite", label: "收藏" },
-          ] as const).map((tab) => (
-            <button
-              className={`tab ${tab.key === activeTab ? "active" : ""}`}
-              key={tab.key}
-              type="button"
-              onClick={() => setActiveTab(tab.key)}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {page === "tags" && (
-          <div className="tabs-row">
-            <button
-              className={`tab ${activeTag === "all" ? "active" : ""}`}
-              type="button"
-              onClick={() => setActiveTag("all")}
-            >
-              全部标签
-            </button>
-            {allTags.map((tag) => (
-              <button
-                className={`tab ${activeTag === tag.name ? "active" : ""}`}
-                key={tag.name}
-                type="button"
-                onClick={() => setActiveTag(tag.name)}
-              >
-                #{tag.name}
-              </button>
-            ))}
+    <div className="h-full overflow-auto bg-[var(--app-bg)] px-4 py-4">
+      <section className="mx-auto flex min-h-[34rem] w-full max-w-4xl flex-col">
+        <div className="mb-4 flex shrink-0 items-start justify-between gap-4">
+          <div>
+            <h1 className="text-lg font-semibold text-[var(--text)]">随手记录</h1>
+            <p className="mt-1 text-sm text-[var(--muted)]">写下内容，右侧会即时预览 Markdown。</p>
           </div>
-        )}
+          <button
+            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full bg-[var(--field)] px-3 text-sm text-[var(--text)] hover:bg-[var(--hover)]"
+            type="button"
+            onClick={() => navigate("library")}
+          >
+            <Eye className="h-4 w-4" />
+            查看记录
+          </button>
+        </div>
 
-        <div className={`item-list ${viewMode === "grid" ? "grid-mode" : ""}`}>
-          {filteredItems.length === 0 && (
-            <div className="text-muted text-sm" style={{ padding: 12, textAlign: "center" }}>
-              暂无记录
-            </div>
-          )}
-          {filteredItems.map((item) => {
-            const Icon = item.icon;
-            const selected = item.id === selectedItem.id;
-            return (
+        <div className="grid min-h-0 flex-1 grid-rows-[minmax(18rem,1.25fr)_minmax(12rem,0.75fr)] gap-3 md:grid-cols-2 md:grid-rows-1">
+          <article className="flex min-h-72 flex-col overflow-hidden rounded-3xl border border-[var(--line)] bg-[var(--paper)] md:min-h-0">
+            <header className="flex h-11 shrink-0 items-center gap-2 border-b border-[var(--line)] px-4 text-sm font-medium text-[var(--muted)]">
+              <PenLine className="h-4 w-4" />
+              输入
+            </header>
+            <textarea
+              className="min-h-0 flex-1 resize-none overflow-auto bg-transparent px-4 py-4 text-[15px] leading-7 text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
+              value={draft}
+              placeholder={"今天想记什么？\n\n支持 Markdown，例如：\n- 想法\n- 待办\n- 片段"}
+              onChange={(e) => setDraft(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                  e.preventDefault();
+                  handleQuickSave().catch(() => {});
+                }
+              }}
+            />
+            <footer className="flex shrink-0 items-center justify-between border-t border-[var(--line)] px-3 py-3">
+              <div className="min-w-0 text-xs text-[var(--muted)]">
+                {saved ? (
+                  <span className="inline-flex items-center gap-1 text-[var(--accent)]">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    已保存
+                  </span>
+                ) : (
+                  "Ctrl/⌘ + Enter 保存"
+                )}
+              </div>
               <button
-                className={`item-card ${selected ? "selected" : ""}`}
-                key={item.id}
-                onClick={() => onSelectItem(item.id)}
+                className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent)] px-4 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-40"
                 type="button"
+                disabled={!draft.trim() || saving}
+                onClick={() => handleQuickSave().catch(() => {})}
               >
-                <div className={`item-icon accent-${item.accent}`}>
-                  <Icon />
-                </div>
-                <div className="item-info">
-                  <div className="item-title">{item.title}</div>
-                  <div className="item-summary">{item.summary}</div>
-                </div>
-                <div className="item-badges">
-                  {item.pinned && <Star style={{ width: 12, height: 12, color: 'var(--yellow)' }} />}
-                </div>
-                <span className="item-time">{item.time}</span>
+                <SendHorizontal className="h-4 w-4" />
+                {saving ? "保存中" : "记录"}
               </button>
-            );
-          })}
+            </footer>
+          </article>
+
+          <article className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-[var(--line)] bg-[var(--paper)]">
+            <header className="flex h-11 shrink-0 items-center gap-2 border-b border-[var(--line)] px-4 text-sm font-medium text-[var(--muted)]">
+              <Eye className="h-4 w-4" />
+              预览
+            </header>
+            <div className="min-h-0 flex-1 overflow-auto px-4 py-4">
+              <MarkdownRenderer
+                content={draft}
+                theme={theme === "light" ? "light" : "dark"}
+                emptyText="开始输入后，这里会显示 Markdown 预览"
+              />
+            </div>
+          </article>
         </div>
       </section>
-
-      <aside className="detail-pane">
-        <div className="detail-header">
-          <div className="flex items-center gap-6">
-            <div className={`item-icon accent-${selectedItem.accent}`}>
-              <SelectedIcon />
-            </div>
-            <h3>{selectedItem.title}</h3>
-          </div>
-          <div className="detail-meta">
-            {itemTags.map((tag) => (
-              <TagPill tag={tag} key={tag.name} />
-            ))}
-            {itemTags.length === 0 && (
-              <span className="text-faint text-sm">无标签</span>
-            )}
-          </div>
-          <div style={{ padding: '4px 0' }}>
-            <TagEditor
-              selectedTags={itemTags.map((t) => t.name)}
-              onChange={handleTagChange}
-            />
-          </div>
-        </div>
-
-        <div className="detail-body">
-          <MarkdownRenderer
-            content={selectedItemDto?.content || ""}
-            theme={theme === "light" ? "light" : "dark"}
-          />
-        </div>
-
-        {attachments.length > 0 && (
-          <div className="attachment-panel">
-            <div className="attachment-panel-header">
-              <span className="text-sm text-faint">附件 ({attachments.length})</span>
-              <button className="btn sm" type="button" onClick={handleAddAttachment}>
-                <Plus /> 添加
-              </button>
-            </div>
-            {attachments.map((att) => (
-              <div className="attachment-item" key={att.id}>
-                <Paperclip style={{ width: 12, height: 12, color: 'var(--text-muted)', flexShrink: 0 }} />
-                <button
-                  className="attachment-filename"
-                  type="button"
-                  onClick={() => handleOpenAttachment(att.file_path)}
-                  style={{ background: "none", border: "none", color: "inherit", textAlign: "left", cursor: "pointer" }}
-                >
-                  {att.filename}
-                </button>
-                <span className="attachment-size">{formatFileSize(att.file_size)}</span>
-                <button
-                  className="btn sm"
-                  type="button"
-                  onClick={() => handleDeleteAttachment(att.id)}
-                  title="删除附件"
-                >
-                  <X style={{ width: 10, height: 10 }} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="detail-actions">
-          <button className="btn sm" type="button" onClick={handleTogglePin}>
-            <Star /> {selectedItem.pinned ? "取消置顶" : "置顶"}
-          </button>
-          <button className="btn sm" type="button" onClick={handleToggleFavorite}>
-            <Star /> {selectedItem.favorite ? "取消收藏" : "收藏"}
-          </button>
-          <button className="btn sm" type="button" onClick={handleAddAttachment}>
-            <Paperclip /> 附件
-          </button>
-          <button className="btn sm" type="button" onClick={handleCopy}>
-            <Copy /> {copied ? "已复制" : "复制"}
-          </button>
-          <button className="btn sm" type="button" onClick={handleEdit}>
-            <Edit3 /> 编辑
-          </button>
-          <div style={{ flex: 1 }} />
-          <button className="btn sm" type="button" onClick={() => handleDelete(selectedItem.id)}>
-            <Trash2 /> 删除
-          </button>
-        </div>
-      </aside>
     </div>
   );
 }

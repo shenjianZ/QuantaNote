@@ -2,7 +2,14 @@ import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { useTagStore } from "../../stores/tagStore";
 
-const TAG_COLORS = ["cyan", "purple", "yellow", "blue", "green", "red"];
+const TAG_COLORS = [
+  { key: "cyan", value: "#386c5f" },
+  { key: "purple", value: "#7c3aed" },
+  { key: "yellow", value: "#c47b12" },
+  { key: "blue", value: "#2563eb" },
+  { key: "green", value: "#15803d" },
+  { key: "red", value: "#b64242" },
+];
 
 interface TagEditorProps {
   selectedTags: string[];
@@ -44,7 +51,7 @@ export function TagEditor({ selectedTags, onChange }: TagEditorProps) {
             <span className={`tag tag-${tag?.color || "cyan"}`} key={name}>
               #{name}
               <button type="button" className="tag-remove" onClick={() => handleRemoveTag(name)}>
-                <X style={{ width: 8, height: 8 }} />
+                <X />
               </button>
             </span>
           );
@@ -63,8 +70,8 @@ export function TagEditor({ selectedTags, onChange }: TagEditorProps) {
             ))}
           </select>
         )}
-        <button className="btn sm" type="button" onClick={() => setShowInput(!showInput)} title="新建标签">
-          <Plus style={{ width: 10, height: 10 }} />
+        <button className="grid h-8 w-8 place-items-center rounded-full bg-[var(--field)] text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" onClick={() => setShowInput(!showInput)} title="新建标签">
+          <Plus className="h-4 w-4" />
         </button>
       </div>
       {showInput && (
@@ -79,15 +86,15 @@ export function TagEditor({ selectedTags, onChange }: TagEditorProps) {
           <div className="tag-color-options">
             {TAG_COLORS.map((c) => (
               <button
-                key={c}
-                className={`color-swatch sm ${c === newTagColor ? "active" : ""}`}
-                style={{ background: `var(--${c})` }}
-                onClick={() => setNewTagColor(c)}
+                key={c.key}
+                className={`color-swatch ${c.key === newTagColor ? "active" : ""}`}
+                style={{ background: c.value }}
+                onClick={() => setNewTagColor(c.key)}
                 type="button"
               />
             ))}
           </div>
-          <button className="btn primary sm" type="button" onClick={handleAddTag}>添加</button>
+          <button className="h-8 rounded-full bg-[var(--accent)] px-3 text-sm text-white" type="button" onClick={handleAddTag}>添加</button>
         </div>
       )}
     </div>

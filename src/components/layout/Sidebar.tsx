@@ -1,7 +1,6 @@
 import {
   Grid2X2,
   Settings,
-  Tag,
   User,
 } from "lucide-react";
 import type { AppPage } from "../../types";
@@ -13,8 +12,7 @@ interface SidebarProps {
 }
 
 const navItems = [
-  { page: "all" as AppPage, label: "全部", icon: Grid2X2 },
-  { page: "tags" as AppPage, label: "标签", icon: Tag },
+  { page: "workspace" as AppPage, label: "工作台", icon: Grid2X2 },
   { page: "settings" as AppPage, label: "设置", icon: Settings },
 ];
 
@@ -26,7 +24,7 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
           const Icon = item.icon;
           const active =
             currentPage === item.page ||
-            (item.page === "all" && currentPage === "document");
+            (item.page === "workspace" && currentPage === "document");
           return (
             <button
               key={item.page}

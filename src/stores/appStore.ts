@@ -21,9 +21,11 @@ function applyThemeAttr(theme: ThemeMode) {
 function getInitialPage(): AppPage {
   try {
     const saved = localStorage.getItem("quantanote-current-page") as AppPage | null;
-    return saved && saved !== "document" ? saved : "all";
+    if (saved === "library") return "library";
+    if (saved === "settings") return "settings";
+    return "workspace";
   } catch {
-    return "all";
+    return "workspace";
   }
 }
 

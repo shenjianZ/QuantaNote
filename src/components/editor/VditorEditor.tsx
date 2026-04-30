@@ -89,5 +89,5 @@ export function VditorEditor({ initialValue, onChange, theme = "dark" }: VditorE
     } catch { /* ignore if not initialized yet */ }
   }, [theme]);
 
-  return <div ref={containerRef} style={{ height: "100%" }} />;
+  return <div ref={containerRef} className="vditor-container" />;
 }

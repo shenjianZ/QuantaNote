@@ -5,9 +5,10 @@ import "vditor/dist/index.css";
 interface MarkdownRendererProps {
   content: string;
   theme?: "dark" | "light";
+  emptyText?: string;
 }
 
-export function MarkdownRenderer({ content, theme = "dark" }: MarkdownRendererProps) {
+export function MarkdownRenderer({ content, theme = "dark", emptyText = "暂无内容" }: MarkdownRendererProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -19,14 +20,8 @@ export function MarkdownRenderer({ content, theme = "dark" }: MarkdownRendererPr
   }, [content, theme]);
 
   if (!content) {
-    return <div className="text-muted text-sm" style={{ padding: 8 }}>暂无内容</div>;
+    return <div className="markdown-empty">{emptyText}</div>;
   }
 
-  return (
-    <div
-      ref={ref}
-      className="markdown-preview"
-      style={{ padding: '8px 12px', fontSize: '13px', lineHeight: 1.6 }}
-    />
-  );
+  return <div ref={ref} className="markdown-preview" />;
 }

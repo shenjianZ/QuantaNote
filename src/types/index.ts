@@ -1,8 +1,8 @@
 import type { LucideIcon } from "lucide-react";
 
 export type AppPage =
-  | "all"
-  | "tags"
+  | "workspace"
+  | "library"
   | "document"
   | "settings";
 

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Star } from "lucide-react";
+import { ArrowLeft, Clock, Star } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
 import { useAppStore } from "../stores/appStore";
 import { useItemStore } from "../stores/itemStore";
 import { VditorEditor } from "../components/editor/VditorEditor";
-import { invoke } from "@tauri-apps/api/core";
 
 interface VersionDto {
   id: string;
@@ -26,8 +26,7 @@ function formatRelativeTime(dateStr: string) {
   if (minutes < 60) return `${minutes} 分钟前`;
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours} 小时前`;
-  const days = Math.floor(hours / 24);
-  return `${days} 天前`;
+  return `${Math.floor(hours / 24)} 天前`;
 }
 
 export function DocumentEditorPage() {
@@ -43,7 +42,6 @@ export function DocumentEditorPage() {
   const [saved, setSaved] = useState(true);
   const [versions, setVersions] = useState<VersionDto[]>([]);
   const [isFavorite, setIsFavorite] = useState(false);
-  const [inspectorTab, setInspectorTab] = useState<"props" | "activity">("props");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestTitle = useRef(title);
   const latestContent = useRef(content);
@@ -52,21 +50,19 @@ export function DocumentEditorPage() {
   useEffect(() => { latestContent.current = content; }, [content]);
 
   useEffect(() => {
-    if (selectedItemId) {
-      getItem(selectedItemId).catch(() => {});
-      invoke<VersionDto[]>("get_versions", { itemId: selectedItemId })
-        .then(setVersions)
-        .catch(() => {});
-    }
+    if (!selectedItemId) return;
+    getItem(selectedItemId).catch(() => {});
+    invoke<VersionDto[]>("get_versions", { itemId: selectedItemId })
+      .then(setVersions)
+      .catch(() => {});
   }, [selectedItemId, getItem]);
 
   useEffect(() => {
-    if (selectedItem) {
-      setTitle(selectedItem.title);
-      setContent(selectedItem.content || "");
-      setIsFavorite(selectedItem.favorite);
-      setSaved(true);
-    }
+    if (!selectedItem) return;
+    setTitle(selectedItem.title);
+    setContent(selectedItem.content || "");
+    setIsFavorite(selectedItem.favorite);
+    setSaved(true);
   }, [selectedItem]);
 
   const save = useCallback(async (newTitle: string, newContent: string) => {
@@ -80,7 +76,9 @@ export function DocumentEditorPage() {
         changeSummary: "自动保存",
       });
       setVersions((current) => [version, ...current].slice(0, 50));
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [selectedItemId, updateItem]);
 
   function scheduleSave(newTitle: string, newContent: string) {
@@ -106,108 +104,58 @@ export function DocumentEditorPage() {
     await updateItem(selectedItemId, { favorite: next });
   }
 
-  const resolvedTheme = resolveTheme(theme);
-  const wordCount = content.length;
-
   return (
-    <div className="editor-layout">
-      <article className="editor-surface" style={{ display: 'flex', flexDirection: 'column' }}>
-        <div className="doc-breadcrumb">
-          <button type="button" onClick={() => navigate("all")}>全部</button>
-          <span>/</span>
-          <strong>{title || "未命名"}</strong>
-          <span style={{ marginLeft: 'auto' }} className="text-faint text-sm">
-            {saved ? "已保存" : "保存中..."}
-          </span>
-        </div>
+    <div className="flex h-full min-h-0 flex-col bg-[var(--app-bg)] p-4">
+      <div className="mb-3 flex shrink-0 items-center gap-2">
+        <button
+          className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--field)] px-3 text-sm text-[var(--text)] hover:bg-[var(--hover)]"
+          type="button"
+          onClick={() => navigate("workspace")}
+        >
+          <ArrowLeft className="h-4 w-4" />
+          工作台
+        </button>
+        <span className="ml-auto text-xs text-[var(--muted)]">{saved ? "已保存" : "保存中..."}</span>
+        <button
+          className={`grid h-9 w-9 place-items-center rounded-full ${isFavorite ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "bg-[var(--field)] text-[var(--muted)] hover:text-[var(--text)]"}`}
+          type="button"
+          onClick={handleToggleFavorite}
+        >
+          <Star className="h-4 w-4" fill={isFavorite ? "currentColor" : "none"} />
+        </button>
+      </div>
 
-        <div className="doc-header">
-          <input
-            className="doc-title"
-            type="text"
-            value={title}
-            onChange={(e) => handleTitleChange(e.currentTarget.value)}
-            placeholder="文档标题"
-          />
-          <button
-            className="doc-star"
-            type="button"
-            onClick={handleToggleFavorite}
-            style={{ color: isFavorite ? 'var(--yellow)' : undefined }}
-          >
-            <Star fill={isFavorite ? "currentColor" : "none"} />
-          </button>
-        </div>
-
-        <div className="editor-content" style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
-          <VditorEditor
-            initialValue={content}
-            onChange={handleContentChange}
-            theme={resolvedTheme}
-          />
+      <article className="flex min-h-0 flex-1 flex-col rounded-3xl border border-[var(--line)] bg-[var(--paper)] p-4">
+        <input
+          className="mb-3 w-full bg-transparent text-xl font-semibold text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
+          type="text"
+          value={title}
+          onChange={(e) => handleTitleChange(e.currentTarget.value)}
+          placeholder="文档标题"
+        />
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <VditorEditor initialValue={content} onChange={handleContentChange} theme={resolveTheme(theme)} />
         </div>
       </article>
 
-      <aside className="doc-inspector">
-        <div className="inspector-tabs">
-          <button className={`inspector-tab ${inspectorTab === "props" ? "active" : ""}`} type="button" onClick={() => setInspectorTab("props")}>属性</button>
-          <button className={`inspector-tab ${inspectorTab === "activity" ? "active" : ""}`} type="button" onClick={() => setInspectorTab("activity")}>活动</button>
-        </div>
-        <div className="inspector-body">
-          {inspectorTab === "props" ? (
-            <>
-              <div style={{ marginBottom: '10px' }}>
-                <div className="text-faint text-sm" style={{ marginBottom: '4px', fontWeight: 600 }}>信息</div>
-                <div className="text-sm text-muted">类型: {selectedItem?.item_type || "note"}</div>
-                <div className="text-sm text-muted">创建: {selectedItem?.created_at ? new Date(selectedItem.created_at).toLocaleString("zh-CN") : "-"}</div>
-                <div className="text-sm text-muted">更新: {selectedItem?.updated_at ? new Date(selectedItem.updated_at).toLocaleString("zh-CN") : "-"}</div>
-                <div className="text-sm text-muted">字数: {wordCount}</div>
-              </div>
-
-              <div>
-                <div className="text-faint text-sm" style={{ marginBottom: '4px', fontWeight: 600 }}>版本</div>
-                {versions.length === 0 && (
-                  <div className="text-muted text-sm">暂无版本记录</div>
-                )}
-                {versions.slice(0, 5).map((v, i) => (
-                  <div key={v.id} style={{
-                    padding: '3px 0',
-                    fontSize: '11px',
-                    color: i === 0 ? 'var(--cyan)' : 'var(--text-muted)',
-                  }}>
-                    v{v.version_number} {v.change_summary || "更新"}
-                  </div>
-                ))}
-              </div>
-            </>
+      <details className="mt-3 shrink-0">
+        <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-full px-2 py-1 text-sm text-[var(--muted)] hover:text-[var(--text)] [&::-webkit-details-marker]:hidden">
+          <Clock className="h-4 w-4" />
+          版本记录
+        </summary>
+        <div className="mt-2 max-h-28 overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-2">
+          {versions.length === 0 ? (
+            <div className="px-2 py-3 text-sm text-[var(--muted)]">暂无版本记录</div>
           ) : (
-            <div>
-              <div className="text-faint text-sm" style={{ marginBottom: '8px', fontWeight: 600 }}>版本历史</div>
-              {versions.length === 0 && (
-                <div className="text-muted text-sm">暂无活动记录</div>
-              )}
-              {versions.map((v, i) => (
-                <div key={v.id} className="activity-item" style={{
-                  padding: '6px 0',
-                  borderBottom: i < versions.length - 1 ? '1px solid var(--border)' : 'none',
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '12px', fontWeight: 500, color: i === 0 ? 'var(--cyan)' : 'var(--text)' }}>
-                      v{v.version_number}
-                    </span>
-                    <span className="text-faint" style={{ fontSize: '10px' }}>
-                      {formatRelativeTime(v.created_at)}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 2 }}>
-                    {v.change_summary || "内容更新"}
-                  </div>
-                </div>
-              ))}
-            </div>
+            versions.slice(0, 8).map((version) => (
+              <div key={version.id} className="flex items-center justify-between gap-3 rounded-xl px-2 py-1.5 text-sm hover:bg-[var(--hover)]">
+                <span className="font-medium text-[var(--text)]">v{version.version_number} {version.change_summary || "更新"}</span>
+                <span className="shrink-0 text-xs text-[var(--muted)]">{formatRelativeTime(version.created_at)}</span>
+              </div>
+            ))
           )}
         </div>
-      </aside>
+      </details>
     </div>
   );
 }

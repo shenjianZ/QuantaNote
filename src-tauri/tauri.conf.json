@@ -13,12 +13,12 @@
     "windows": [
       {
         "title": "QuantaNote",
-        "width": 960,
-        "height": 540,
-        "minWidth": 720,
+        "width": 720,
+        "height": 560,
+        "minWidth": 520,
         "minHeight": 420,
         "decorations": false,
-        "transparent": true
+        "transparent": false
       }
     ],
     "security": {

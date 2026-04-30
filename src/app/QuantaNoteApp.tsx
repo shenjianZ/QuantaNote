@@ -3,6 +3,7 @@ import { FileText } from "lucide-react";
 import { AppShell } from "../components/layout/AppShell";
 import { CommandPalette } from "../components/search/CommandPalette";
 import { WorkspacePage } from "../pages/WorkspacePage";
+import { LibraryPage } from "../pages/LibraryPage";
 import { DocumentEditorPage } from "../pages/DocumentEditorPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import { useAppStore } from "../stores/appStore";
@@ -44,8 +45,11 @@ export function QuantaNoteApp() {
   const displayItems: Item[] = useMemo(() => dbItems.map(adaptItem), [dbItems]);
 
   const selectedItem = useMemo<Item>(() => {
+    if (selectedItemId) {
+      if (selectedDbItem?.id === selectedItemId) return adaptItem(selectedDbItem);
+      return displayItems.find((item) => item.id === selectedItemId) ?? EMPTY_ITEM;
+    }
     if (selectedDbItem) return adaptItem(selectedDbItem);
-    if (selectedItemId) return displayItems.find((item) => item.id === selectedItemId) ?? EMPTY_ITEM;
     return displayItems[0] ?? EMPTY_ITEM;
   }, [selectedDbItem, displayItems, selectedItemId]);
 
@@ -65,6 +69,16 @@ export function QuantaNoteApp() {
     await getItem(item.id);
     navigate("document");
   }, [createItem, getItem, navigate, selectItem]);
+
+  const handleQuickCreate = useCallback(async (content: string) => {
+    const text = content.trim();
+    if (!text) return;
+    const firstLine = text.split(/\r?\n/).find((line) => line.trim())?.trim() ?? "未命名笔记";
+    const title = firstLine.length > 32 ? `${firstLine.slice(0, 32)}...` : firstLine;
+    const item = await createItem(title, "note", text);
+    selectItem(item.id);
+    await getItem(item.id);
+  }, [createItem, getItem, selectItem]);
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -90,9 +104,13 @@ export function QuantaNoteApp() {
       onNavigate={navigate}
       onOpenSearch={openPalette}
     >
-      {(currentPage === "all" || currentPage === "tags") && (
+      {currentPage === "workspace" && (
         <WorkspacePage
-          page={currentPage}
+          onQuickCreate={handleQuickCreate}
+        />
+      )}
+      {currentPage === "library" && (
+        <LibraryPage
           items={displayItems}
           selectedItem={selectedItem}
           onSelectItem={handleSelectItem}
