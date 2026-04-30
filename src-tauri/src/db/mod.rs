@@ -62,6 +62,16 @@ CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
     title,
     content,
     summary,
+    tokenize = 'unicode61',
+    content=items,
+    content_rowid=rowid
+);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS items_fts_trigram USING fts5(
+    title,
+    content,
+    summary,
+    tokenize = 'trigram',
     content=items,
     content_rowid=rowid
 );
@@ -83,8 +93,27 @@ CREATE TRIGGER IF NOT EXISTS items_au AFTER UPDATE ON items BEGIN
     VALUES (new.rowid, new.title, new.content, new.summary);
 END;
 
+CREATE TRIGGER IF NOT EXISTS items_trigram_ai AFTER INSERT ON items BEGIN
+    INSERT INTO items_fts_trigram(rowid, title, content, summary)
+    VALUES (new.rowid, new.title, new.content, new.summary);
+END;
+
+CREATE TRIGGER IF NOT EXISTS items_trigram_ad AFTER DELETE ON items BEGIN
+    INSERT INTO items_fts_trigram(items_fts_trigram, rowid, title, content, summary)
+    VALUES ('delete', old.rowid, old.title, old.content, old.summary);
+END;
+
+CREATE TRIGGER IF NOT EXISTS items_trigram_au AFTER UPDATE ON items BEGIN
+    INSERT INTO items_fts_trigram(items_fts_trigram, rowid, title, content, summary)
+    VALUES ('delete', old.rowid, old.title, old.content, old.summary);
+    INSERT INTO items_fts_trigram(rowid, title, content, summary)
+    VALUES (new.rowid, new.title, new.content, new.summary);
+END;
+
 INSERT OR IGNORE INTO schema_version (version) VALUES (1);
 ";
+
+const SCHEMA_VERSION: i64 = 2;
 
 impl DbState {
     pub fn open(db_path: &str) -> Result<Self, AppError> {
@@ -107,6 +136,27 @@ impl DbState {
             .map_err(|e| AppError::Database(e.to_string()))?;
         conn.execute_batch(SCHEMA_SQL)
             .map_err(|e| AppError::Database(e.to_string()))?;
+        Self::migrate_schema(&conn)?;
+        Ok(())
+    }
+
+    fn migrate_schema(conn: &Connection) -> Result<(), AppError> {
+        let current_version: i64 = conn
+            .query_row(
+                "SELECT COALESCE(MAX(version), 0) FROM schema_version",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+
+        if current_version < SCHEMA_VERSION {
+            conn.execute_batch(
+                "INSERT INTO items_fts_trigram(items_fts_trigram) VALUES('rebuild');
+                 INSERT OR IGNORE INTO schema_version (version) VALUES (2);",
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+
         Ok(())
     }
 

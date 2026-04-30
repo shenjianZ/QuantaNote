@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { FileText } from "lucide-react";
 import { AppShell } from "../components/layout/AppShell";
 import { CommandPalette } from "../components/search/CommandPalette";
@@ -37,6 +37,10 @@ export function QuantaNoteApp() {
     selectItem,
   } = useAppStore();
   const { items: dbItems, fetchItems, selectedItem: selectedDbItem, getItem, createItem } = useItemStore();
+  const [previewRequest, setPreviewRequest] = useState<{
+    itemId: string;
+    requestId: number;
+  } | null>(null);
 
   useEffect(() => {
     fetchItems().catch(() => {});
@@ -53,16 +57,41 @@ export function QuantaNoteApp() {
     return displayItems[0] ?? EMPTY_ITEM;
   }, [selectedDbItem, displayItems, selectedItemId]);
 
-  const handleSelectItem = (id: string) => {
+  const handleSelectItem = useCallback((id: string) => {
     selectItem(id);
     getItem(id).catch(() => {});
-  };
+  }, [getItem, selectItem]);
 
   const handlePaletteSelectItem = useCallback((id: string) => {
     selectItem(id);
     getItem(id).catch(() => {});
-    navigate("document");
+    setPreviewRequest((current) => ({
+      itemId: id,
+      requestId: (current?.requestId ?? 0) + 1,
+    }));
+    navigate("library");
   }, [getItem, navigate, selectItem]);
+
+  const handlePreviewItemOpen = useCallback((id: string) => {
+    setPreviewRequest((current) => ({
+      itemId: id,
+      requestId: (current?.requestId ?? 0) + 1,
+    }));
+  }, []);
+
+  const handlePreviewRequestClear = useCallback(() => {
+    setPreviewRequest(null);
+  }, []);
+
+  const handleBackToPreview = useCallback(() => {
+    if (selectedItemId) {
+      setPreviewRequest((current) => ({
+        itemId: selectedItemId,
+        requestId: (current?.requestId ?? 0) + 1,
+      }));
+    }
+    navigate("library");
+  }, [navigate, selectedItemId]);
 
   const handleCreateNote = useCallback(async () => {
     const item = await createItem("未命名笔记", "note", "");
@@ -117,9 +146,14 @@ export function QuantaNoteApp() {
           onSelectItem={handleSelectItem}
           onCreateItem={handleCreateNote}
           onOpenDocument={() => navigate("document")}
+          previewRequest={previewRequest}
+          onPreviewItemOpen={handlePreviewItemOpen}
+          onPreviewRequestClear={handlePreviewRequestClear}
         />
       )}
-      {currentPage === "document" && <DocumentEditorPage />}
+      {currentPage === "document" && (
+        <DocumentEditorPage onBackToPreview={handleBackToPreview} />
+      )}
       {currentPage === "settings" && (
         <SettingsPage theme={theme} onThemeChange={setTheme} />
       )}
@@ -128,6 +162,7 @@ export function QuantaNoteApp() {
         open={paletteOpen}
         onClose={closePalette}
         onSelectItem={handlePaletteSelectItem}
+        items={displayItems}
       />
     </AppShell>
   );

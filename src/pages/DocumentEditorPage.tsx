@@ -29,9 +29,12 @@ function formatRelativeTime(dateStr: string) {
   return `${Math.floor(hours / 24)} 天前`;
 }
 
-export function DocumentEditorPage() {
+interface DocumentEditorPageProps {
+  onBackToPreview: () => void;
+}
+
+export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps) {
   const selectedItemId = useAppStore((s) => s.selectedItemId);
-  const navigate = useAppStore((s) => s.navigate);
   const theme = useAppStore((s) => s.theme);
   const selectedItem = useItemStore((s) => s.selectedItem);
   const getItem = useItemStore((s) => s.getItem);
@@ -110,10 +113,10 @@ export function DocumentEditorPage() {
         <button
           className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--field)] px-3 text-sm text-[var(--text)] hover:bg-[var(--hover)]"
           type="button"
-          onClick={() => navigate("workspace")}
+          onClick={onBackToPreview}
         >
           <ArrowLeft className="h-4 w-4" />
-          工作台
+          预览
         </button>
         <span className="ml-auto text-xs text-[var(--muted)]">{saved ? "已保存" : "保存中..."}</span>
         <button

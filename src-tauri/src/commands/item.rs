@@ -107,7 +107,9 @@ pub fn optimize_db(db: State<'_, DbState>) -> Result<(), AppError> {
         .lock()
         .map_err(|e| AppError::Database(e.to_string()))?;
     conn.execute_batch(
-        "PRAGMA incremental_vacuum; INSERT INTO items_fts(items_fts) VALUES('rebuild');",
+        "PRAGMA incremental_vacuum;
+         INSERT INTO items_fts(items_fts) VALUES('rebuild');
+         INSERT INTO items_fts_trigram(items_fts_trigram) VALUES('rebuild');",
     )
     .map_err(|e| AppError::Database(e.to_string()))?;
     Ok(())

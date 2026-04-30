@@ -33,6 +33,12 @@ interface LibraryPageProps {
   onSelectItem: (id: string) => void;
   onCreateItem: () => void;
   onOpenDocument: () => void;
+  previewRequest?: {
+    itemId: string;
+    requestId: number;
+  } | null;
+  onPreviewItemOpen?: (id: string) => void;
+  onPreviewRequestClear?: () => void;
 }
 
 const FILTERS: Array<{ key: TabKey; label: string }> = [
@@ -53,6 +59,9 @@ export function LibraryPage({
   onSelectItem,
   onCreateItem,
   onOpenDocument,
+  previewRequest,
+  onPreviewItemOpen,
+  onPreviewRequestClear,
 }: LibraryPageProps) {
   const [query, setQuery] = useState("");
   const [activeTab, setActiveTab] = useState<TabKey>("recent");
@@ -88,6 +97,12 @@ export function LibraryPage({
     fetchAttachments(selectedItem.id);
     fetchItemTags(selectedItem.id);
   }, [selectedItem.id, fetchAttachments, fetchItemTags]);
+
+  useEffect(() => {
+    if (!previewRequest?.itemId) return;
+    onSelectItem(previewRequest.itemId);
+    setReaderOpen(true);
+  }, [previewRequest, onSelectItem]);
 
   useEffect(() => {
     let cancelled = false;
@@ -152,7 +167,9 @@ export function LibraryPage({
   }, [activeTab, activeTag, itemTagNames, items, query, searchResults, sortOrder]);
 
   async function handleCopy() {
-    const text = selectedItemDto?.content || selectedItem.summary || selectedItem.title;
+    const selectedContent =
+      selectedItemDto?.id === selectedItem.id ? selectedItemDto.content : "";
+    const text = selectedContent || selectedItem.summary || selectedItem.title;
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
@@ -176,6 +193,7 @@ export function LibraryPage({
     if (!selectedItem.id) return;
     await deleteItem(selectedItem.id);
     setReaderOpen(false);
+    onPreviewRequestClear?.();
   }
 
   async function handleAddAttachment() {
@@ -195,10 +213,18 @@ export function LibraryPage({
 
   function handleOpenItem(id: string) {
     onSelectItem(id);
+    onPreviewItemOpen?.(id);
     setReaderOpen(true);
   }
 
+  function handleCloseReader() {
+    setReaderOpen(false);
+    onPreviewRequestClear?.();
+  }
+
   const hasSelection = readerOpen && Boolean(selectedItem.id);
+  const previewContent =
+    selectedItemDto?.id === selectedItem.id ? selectedItemDto.content : "";
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--app-bg)]">
@@ -355,17 +381,17 @@ export function LibraryPage({
                   <button className="menu-item text-red-400" type="button" onClick={handleDelete}><Trash2 className="h-4 w-4" />删除</button>
                 </div>
               </details>
-              <button className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" onClick={onCreateItem} title="新建完整笔记">
+              <button className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" onClick={onOpenDocument} title="编辑当前笔记">
                 <Edit3 className="h-4 w-4" />
               </button>
-              <button className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" onClick={() => setReaderOpen(false)} title="关闭">
+              <button className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" onClick={handleCloseReader} title="关闭">
                 <X className="h-4 w-4" />
               </button>
             </header>
 
             <div className="min-h-0 flex-1 overflow-auto px-4 py-4">
               <MarkdownRenderer
-                content={selectedItemDto?.content || selectedItem.summary || ""}
+                content={previewContent || selectedItem.summary || ""}
                 theme={theme === "light" ? "light" : "dark"}
               />
             </div>
