@@ -3,6 +3,7 @@ use std::sync::Mutex;
 use rusqlite::Connection;
 
 use crate::error::AppError;
+use crate::utils::logging;
 
 pub struct DbState {
     pub conn: Mutex<Connection>,
@@ -87,8 +88,9 @@ INSERT OR IGNORE INTO schema_version (version) VALUES (1);
 
 impl DbState {
     pub fn open(db_path: &str) -> Result<Self, AppError> {
-        let conn = Connection::open(db_path)
-            .map_err(|e| AppError::Database(e.to_string()))?;
+        let mut conn = Connection::open(db_path).map_err(|e| AppError::Database(e.to_string()))?;
+
+        conn.trace(Some(logging::log_sql));
 
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")
             .map_err(|e| AppError::Database(e.to_string()))?;
@@ -99,8 +101,21 @@ impl DbState {
     }
 
     pub fn initialize_schema(&self) -> Result<(), AppError> {
-        let conn = self.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| AppError::Database(e.to_string()))?;
         conn.execute_batch(SCHEMA_SQL)
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        Ok(())
+    }
+
+    pub fn checkpoint_wal(&self) -> Result<(), AppError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")
             .map_err(|e| AppError::Database(e.to_string()))?;
         Ok(())
     }

@@ -34,8 +34,8 @@ export function WorkspacePage({ onQuickCreate }: WorkspacePageProps) {
   }
 
   return (
-    <div className="h-full overflow-auto bg-[var(--app-bg)] px-4 py-4">
-      <section className="mx-auto flex min-h-[34rem] w-full max-w-4xl flex-col">
+    <div className="h-full overflow-auto bg-[var(--app-bg)] px-[clamp(1rem,4vw,4rem)] py-4">
+      <section className="mx-auto flex min-h-[34rem] w-full max-w-none flex-col">
         <div className="mb-4 flex shrink-0 items-start justify-between gap-4">
           <div>
             <h1 className="text-lg font-semibold text-[var(--text)]">随手记录</h1>

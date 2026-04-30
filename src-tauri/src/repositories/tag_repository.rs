@@ -5,13 +5,21 @@ use crate::error::AppError;
 use crate::models::item::TagDto;
 
 pub fn get_all_tags(db: &DbState) -> Result<Vec<TagDto>, AppError> {
-    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
     let mut stmt = conn
         .prepare("SELECT name, color FROM tags ORDER BY name")
         .map_err(|e| AppError::Database(e.to_string()))?;
 
     let tags: Vec<TagDto> = stmt
-        .query_map([], |row| Ok(TagDto { name: row.get(0)?, color: row.get(1)? }))
+        .query_map([], |row| {
+            Ok(TagDto {
+                name: row.get(0)?,
+                color: row.get(1)?,
+            })
+        })
         .map_err(|e| AppError::Database(e.to_string()))?
         .filter_map(|r| r.ok())
         .collect();
@@ -20,18 +28,27 @@ pub fn get_all_tags(db: &DbState) -> Result<Vec<TagDto>, AppError> {
 }
 
 pub fn create_tag(db: &DbState, name: &str, color: &str) -> Result<TagDto, AppError> {
-    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
     conn.execute(
         "INSERT INTO tags (name, color) VALUES (?1, ?2)",
         params![name, color],
     )
     .map_err(|e| AppError::Database(e.to_string()))?;
 
-    Ok(TagDto { name: name.to_string(), color: color.to_string() })
+    Ok(TagDto {
+        name: name.to_string(),
+        color: color.to_string(),
+    })
 }
 
 pub fn delete_tag(db: &DbState, name: &str) -> Result<(), AppError> {
-    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
     conn.execute("DELETE FROM tags WHERE name = ?1", params![name])
         .map_err(|e| AppError::Database(e.to_string()))?;
     Ok(())
@@ -42,12 +59,21 @@ pub fn get_tag_by_name(db: &DbState, name: &str) -> Option<TagDto> {
     conn.query_row(
         "SELECT name, color FROM tags WHERE name = ?1",
         params![name],
-        |row| Ok(TagDto { name: row.get(0)?, color: row.get(1)? }),
-    ).ok()
+        |row| {
+            Ok(TagDto {
+                name: row.get(0)?,
+                color: row.get(1)?,
+            })
+        },
+    )
+    .ok()
 }
 
 pub fn get_tags_for_item(db: &DbState, item_id: &str) -> Result<Vec<TagDto>, AppError> {
-    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
     let mut stmt = conn
         .prepare(
             "SELECT t.name, t.color FROM tags t
@@ -57,7 +83,12 @@ pub fn get_tags_for_item(db: &DbState, item_id: &str) -> Result<Vec<TagDto>, App
         .map_err(|e| AppError::Database(e.to_string()))?;
 
     let tags: Vec<TagDto> = stmt
-        .query_map(params![item_id], |row| Ok(TagDto { name: row.get(0)?, color: row.get(1)? }))
+        .query_map(params![item_id], |row| {
+            Ok(TagDto {
+                name: row.get(0)?,
+                color: row.get(1)?,
+            })
+        })
         .map_err(|e| AppError::Database(e.to_string()))?
         .filter_map(|r| r.ok())
         .collect();
@@ -66,7 +97,10 @@ pub fn get_tags_for_item(db: &DbState, item_id: &str) -> Result<Vec<TagDto>, App
 }
 
 pub fn get_all_item_tag_mappings(db: &DbState) -> Result<Vec<(String, String)>, AppError> {
-    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
     let mut stmt = conn
         .prepare(
             "SELECT it.item_id, t.name FROM item_tags it
@@ -85,7 +119,10 @@ pub fn get_all_item_tag_mappings(db: &DbState) -> Result<Vec<(String, String)>, 
 }
 
 pub fn set_item_tags(db: &DbState, item_id: &str, tag_names: Vec<String>) -> Result<(), AppError> {
-    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
 
     // 清除现有关联
     conn.execute("DELETE FROM item_tags WHERE item_id = ?1", params![item_id])
@@ -95,7 +132,11 @@ pub fn set_item_tags(db: &DbState, item_id: &str, tag_names: Vec<String>) -> Res
     for name in &tag_names {
         // 确保 tag 存在，获取 id
         let tag_id: i64 = conn
-            .query_row("SELECT id FROM tags WHERE name = ?1", params![name], |row| row.get(0))
+            .query_row(
+                "SELECT id FROM tags WHERE name = ?1",
+                params![name],
+                |row| row.get(0),
+            )
             .map_err(|e| AppError::Database(e.to_string()))?;
 
         conn.execute(

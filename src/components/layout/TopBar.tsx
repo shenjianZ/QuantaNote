@@ -1,4 +1,5 @@
-import { Archive, Maximize2, Minus, MoreHorizontal, Search, Settings, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Archive, Copy, Home, Minus, MoreHorizontal, Search, Settings, Square, X } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { AppPage } from "../../types";
 import { Kbd } from "../common/Kbd";
@@ -12,15 +13,40 @@ interface TopBarProps {
   onOpenSearch: () => void;
 }
 
-const pageTitle: Record<AppPage, string> = {
-  workspace: "工作台",
-  library: "记录库",
-  document: "编辑",
-  settings: "设置",
-};
-
 export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
   const settings = useSettingsStore((s) => s.settings);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    appWindow.isMaximized().then(setIsMaximized);
+    const unlisten = appWindow.onResized(() => {
+      appWindow.isMaximized().then(setIsMaximized);
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setMenuOpen(false);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [menuOpen]);
 
   function handleClose() {
     if (settings.closeKeepRunning || settings.minimizeToTray) {
@@ -30,20 +56,27 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
     appWindow.close();
   }
 
+  function navigateAndClose(page: AppPage) {
+    setMenuOpen(false);
+    onNavigate(page);
+  }
+
   return (
     <header className="flex h-12 shrink-0 items-center gap-2 border-b border-[var(--line)] bg-[var(--chrome)] px-3 [-webkit-app-region:drag]">
+      <div className="shrink-0 px-1 text-left text-sm font-semibold text-[var(--text)]">QuantaNote</div>
+
       <button
-        className="rounded-lg px-2 py-1 text-left [-webkit-app-region:no-drag] hover:bg-[var(--hover)]"
+        className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm transition [-webkit-app-region:no-drag] ${currentPage === "workspace" ? "bg-[var(--field)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"}`}
         type="button"
         onClick={() => onNavigate("workspace")}
-        title="返回记录"
+        title="打开工作台"
       >
-        <div className="text-sm font-semibold leading-none text-[var(--text)]">QuantaNote</div>
-        <div className="mt-0.5 text-[11px] leading-none text-[var(--muted)]">{pageTitle[currentPage]}</div>
+        <Home className="h-4 w-4" />
+        工作台
       </button>
 
       <button
-        className={`hidden h-8 items-center gap-1.5 rounded-full px-3 text-sm transition [-webkit-app-region:no-drag] sm:inline-flex ${currentPage === "library" ? "bg-[var(--field)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"}`}
+        className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm transition [-webkit-app-region:no-drag] ${currentPage === "library" ? "bg-[var(--field)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"}`}
         type="button"
         onClick={() => onNavigate("library")}
         title="打开记录库"
@@ -65,36 +98,55 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
         </span>
       </button>
 
-      <details className="group relative [-webkit-app-region:no-drag]">
-        <summary className="flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-lg text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)] [&::-webkit-details-marker]:hidden">
+      <div className="relative [-webkit-app-region:no-drag]" ref={menuRef}>
+        <button
+          className={`flex h-8 w-8 items-center justify-center rounded-lg ${menuOpen ? "bg-[var(--field)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"}`}
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((open) => !open)}
+        >
           <MoreHorizontal className="h-4 w-4" />
-        </summary>
-        <div className="absolute right-0 top-10 z-30 w-40 overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--popover)] p-1 shadow-xl">
-          <button
-            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-[var(--text)] hover:bg-[var(--hover)]"
-            type="button"
-            onClick={() => onNavigate("library")}
-          >
-            <Archive className="h-4 w-4" />
-            记录库
-          </button>
-          <button
-            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-[var(--text)] hover:bg-[var(--hover)]"
-            type="button"
-            onClick={() => onNavigate("settings")}
-          >
-            <Settings className="h-4 w-4" />
-            设置
-          </button>
-        </div>
-      </details>
+        </button>
+        {menuOpen && (
+          <div className="absolute right-0 top-10 z-30 w-40 overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--popover)] p-1 shadow-xl" role="menu">
+            <button
+              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-[var(--text)] hover:bg-[var(--hover)]"
+              type="button"
+              role="menuitem"
+              onClick={() => navigateAndClose("workspace")}
+            >
+              <Home className="h-4 w-4" />
+              工作台
+            </button>
+            <button
+              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-[var(--text)] hover:bg-[var(--hover)]"
+              type="button"
+              role="menuitem"
+              onClick={() => navigateAndClose("library")}
+            >
+              <Archive className="h-4 w-4" />
+              记录库
+            </button>
+            <button
+              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-[var(--text)] hover:bg-[var(--hover)]"
+              type="button"
+              role="menuitem"
+              onClick={() => navigateAndClose("settings")}
+            >
+              <Settings className="h-4 w-4" />
+              设置
+            </button>
+          </div>
+        )}
+      </div>
 
       <div className="flex items-center gap-1 [-webkit-app-region:no-drag]">
         <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" title="最小化" onClick={() => appWindow.minimize()}>
           <Minus className="h-4 w-4" />
         </button>
-        <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" title="最大化" onClick={() => appWindow.toggleMaximize()}>
-          <Maximize2 className="h-4 w-4" />
+        <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" title={isMaximized ? "恢复" : "全屏"} onClick={() => appWindow.toggleMaximize()}>
+          {isMaximized ? <Copy className="h-4 w-4" /> : <Square className="h-4 w-4" />}
         </button>
         <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-red-500/12 hover:text-red-400" type="button" title="关闭" onClick={handleClose}>
           <X className="h-4 w-4" />

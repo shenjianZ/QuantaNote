@@ -227,7 +227,7 @@ export function SettingsPage({ theme = "system", onThemeChange }: SettingsPagePr
           const Icon = item.icon;
           return (
             <button
-              className={`flex h-10 w-full items-center gap-2 rounded-full px-3 text-sm ${index === activeSection ? "bg-[var(--paper)] text-[var(--text)] shadow-sm" : "text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"}`}
+              className={`flex h-10 w-full items-center gap-2 rounded-full px-3 text-sm ${index === activeSection ? "bg-[var(--nav-active)] text-[var(--text)] font-medium" : "text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"}`}
               key={item.label}
               onClick={() => setActiveSection(index)}
               type="button"

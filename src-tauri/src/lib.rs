@@ -9,27 +9,41 @@ mod utils;
 use commands::{attachment, data_io, item, search, tag, version};
 use db::DbState;
 use tauri::Manager;
+use utils::logging::tauri_log_plugin;
+use utils::paths;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_log_plugin())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
-            let app_data_dir = app
-                .path()
-                .app_data_dir()
-                .expect("failed to resolve app data dir");
-            std::fs::create_dir_all(&app_data_dir)
-                .expect("failed to create app data dir");
+            let quantanote_dir = paths::quantanote_dir();
+            std::fs::create_dir_all(&quantanote_dir).expect("failed to create QuantaNote data dir");
 
-            let db_path = app_data_dir.join("quanta_note.sqlite");
+            let db_path = quantanote_dir.join("quanta_note.sqlite");
             let db_state =
                 DbState::open(&db_path.to_string_lossy()).expect("failed to open database");
-            db_state.initialize_schema().expect("failed to initialize schema");
+            db_state
+                .initialize_schema()
+                .expect("failed to initialize schema");
 
             app.manage(db_state);
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
+                if let Some(db_state) = window.try_state::<DbState>() {
+                    match db_state.checkpoint_wal() {
+                        Ok(()) => log::info!("SQLite WAL checkpoint completed before window close"),
+                        Err(error) => log::warn!(
+                            "SQLite WAL checkpoint failed before window close: {}",
+                            error
+                        ),
+                    }
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             item::create_item,

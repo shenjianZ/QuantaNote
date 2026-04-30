@@ -22,7 +22,12 @@ pub fn get_items(
     limit: Option<i64>,
     offset: Option<i64>,
 ) -> Result<Vec<ItemDto>, AppError> {
-    item_service::get_items(&db, item_type.as_deref(), limit.unwrap_or(50), offset.unwrap_or(0))
+    item_service::get_items(
+        &db,
+        item_type.as_deref(),
+        limit.unwrap_or(50),
+        offset.unwrap_or(0),
+    )
 }
 
 #[tauri::command]
@@ -41,15 +46,18 @@ pub fn update_item(
     favorite: Option<bool>,
     encrypted: Option<bool>,
 ) -> Result<ItemDto, AppError> {
-    item_service::update_item(&db, UpdateItemPayload {
-        id,
-        title,
-        content,
-        summary,
-        pinned,
-        favorite,
-        encrypted,
-    })
+    item_service::update_item(
+        &db,
+        UpdateItemPayload {
+            id,
+            title,
+            content,
+            summary,
+            pinned,
+            favorite,
+            encrypted,
+        },
+    )
 }
 
 #[tauri::command]
@@ -63,19 +71,25 @@ pub fn get_pinned_items(db: State<'_, DbState>) -> Result<Vec<ItemDto>, AppError
 }
 
 #[tauri::command]
-pub fn get_recent_items(db: State<'_, DbState>, limit: Option<i64>) -> Result<Vec<ItemDto>, AppError> {
+pub fn get_recent_items(
+    db: State<'_, DbState>,
+    limit: Option<i64>,
+) -> Result<Vec<ItemDto>, AppError> {
     item_service::get_recent(&db, limit.unwrap_or(20))
 }
 
 #[tauri::command]
 pub fn get_db_size(db: State<'_, DbState>) -> Result<String, AppError> {
-    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
-    let page_count: i64 = conn.query_row(
-        "PRAGMA page_count", [], |r| r.get(0)
-    ).unwrap_or(0);
-    let page_size: i64 = conn.query_row(
-        "PRAGMA page_size", [], |r| r.get(0)
-    ).unwrap_or(4096);
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    let page_count: i64 = conn
+        .query_row("PRAGMA page_count", [], |r| r.get(0))
+        .unwrap_or(0);
+    let page_size: i64 = conn
+        .query_row("PRAGMA page_size", [], |r| r.get(0))
+        .unwrap_or(4096);
     let bytes = page_count * page_size;
     if bytes < 1024 {
         Ok(format!("{} B", bytes))
@@ -88,8 +102,13 @@ pub fn get_db_size(db: State<'_, DbState>) -> Result<String, AppError> {
 
 #[tauri::command]
 pub fn optimize_db(db: State<'_, DbState>) -> Result<(), AppError> {
-    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
-    conn.execute_batch("PRAGMA incremental_vacuum; INSERT INTO items_fts(items_fts) VALUES('rebuild');")
+    let conn = db
+        .conn
+        .lock()
         .map_err(|e| AppError::Database(e.to_string()))?;
+    conn.execute_batch(
+        "PRAGMA incremental_vacuum; INSERT INTO items_fts(items_fts) VALUES('rebuild');",
+    )
+    .map_err(|e| AppError::Database(e.to_string()))?;
     Ok(())
 }

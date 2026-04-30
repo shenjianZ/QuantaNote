@@ -5,7 +5,10 @@ use crate::error::AppError;
 use crate::models::search::SearchResultDto;
 
 pub fn search(db: &DbState, query: &str) -> Result<Vec<SearchResultDto>, AppError> {
-    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
     let mut stmt = conn
         .prepare(
             "SELECT i.id, i.title, i.item_type, COALESCE(substr(i.content, 1, 100), '') as summary

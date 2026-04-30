@@ -5,7 +5,12 @@ use crate::error::AppError;
 use crate::models::attachment::AttachmentDto;
 use crate::utils::ids;
 
-pub fn add(db: &DbState, item_id: String, source_path: String, data_dir: &str) -> Result<AttachmentDto, AppError> {
+pub fn add(
+    db: &DbState,
+    item_id: String,
+    source_path: String,
+    data_dir: &str,
+) -> Result<AttachmentDto, AppError> {
     let id = ids::new_id("att");
     let now = chrono::Utc::now().to_rfc3339();
 
@@ -26,7 +31,13 @@ pub fn add(db: &DbState, item_id: String, source_path: String, data_dir: &str) -
     let file_size = std::fs::metadata(&dest_path)
         .map(|m| m.len() as i64)
         .unwrap_or(0);
-    let mime_type = match source.extension().and_then(|ext| ext.to_str()).unwrap_or("").to_ascii_lowercase().as_str() {
+    let mime_type = match source
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase()
+        .as_str()
+    {
         "png" => "image/png",
         "jpg" | "jpeg" => "image/jpeg",
         "gif" => "image/gif",
@@ -36,11 +47,15 @@ pub fn add(db: &DbState, item_id: String, source_path: String, data_dir: &str) -
         "json" => "application/json",
         "html" | "htm" => "text/html",
         _ => "application/octet-stream",
-    }.to_string();
+    }
+    .to_string();
 
     let dest_str = dest_path.to_string_lossy().to_string();
 
-    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
     conn.execute(
         "INSERT INTO attachments (id, item_id, filename, file_path, mime_type, file_size, created_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
@@ -60,7 +75,10 @@ pub fn add(db: &DbState, item_id: String, source_path: String, data_dir: &str) -
 }
 
 pub fn get_by_item(db: &DbState, item_id: &str) -> Result<Vec<AttachmentDto>, AppError> {
-    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
     let mut stmt = conn
         .prepare(
             "SELECT id, item_id, filename, file_path, mime_type, file_size, created_at
@@ -88,7 +106,10 @@ pub fn get_by_item(db: &DbState, item_id: &str) -> Result<Vec<AttachmentDto>, Ap
 }
 
 pub fn delete(db: &DbState, id: &str) -> Result<(), AppError> {
-    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
     let file_path: Option<String> = conn
         .query_row(
             "SELECT file_path FROM attachments WHERE id = ?1",

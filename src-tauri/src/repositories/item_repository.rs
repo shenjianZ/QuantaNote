@@ -21,7 +21,10 @@ fn row_to_item(row: &rusqlite::Row) -> rusqlite::Result<ItemDto> {
 }
 
 pub fn create(db: &DbState, payload: CreateItemPayload) -> Result<ItemDto, AppError> {
-    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
     let id = ids::new_id("item");
     let now = chrono::Utc::now().to_rfc3339();
     let content = payload.content.unwrap_or_default();
@@ -29,7 +32,14 @@ pub fn create(db: &DbState, payload: CreateItemPayload) -> Result<ItemDto, AppEr
     conn.execute(
         "INSERT INTO items (id, title, item_type, content, summary, created_at, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)",
-        params![id, payload.title, payload.item_type, content, payload.summary, now],
+        params![
+            id,
+            payload.title,
+            payload.item_type,
+            content,
+            payload.summary,
+            now
+        ],
     )
     .map_err(|e| AppError::Database(e.to_string()))?;
 
@@ -47,15 +57,24 @@ pub fn create(db: &DbState, payload: CreateItemPayload) -> Result<ItemDto, AppEr
     })
 }
 
-pub fn get_items(db: &DbState, item_type: Option<&str>, limit: i64, offset: i64) -> Result<Vec<ItemDto>, AppError> {
-    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
+pub fn get_items(
+    db: &DbState,
+    item_type: Option<&str>,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<ItemDto>, AppError> {
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
 
     let items: Vec<ItemDto> = if let Some(t) = item_type {
         let mut stmt = conn.prepare(
             "SELECT id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at
              FROM items WHERE item_type = ?1 ORDER BY updated_at DESC LIMIT ?2 OFFSET ?3"
         ).map_err(|e| AppError::Database(e.to_string()))?;
-        let rows: Vec<ItemDto> = stmt.query_map(params![t, limit, offset], row_to_item)
+        let rows: Vec<ItemDto> = stmt
+            .query_map(params![t, limit, offset], row_to_item)
             .map_err(|e| AppError::Database(e.to_string()))?
             .filter_map(|r| r.ok())
             .collect();
@@ -65,7 +84,8 @@ pub fn get_items(db: &DbState, item_type: Option<&str>, limit: i64, offset: i64)
             "SELECT id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at
              FROM items ORDER BY updated_at DESC LIMIT ?1 OFFSET ?2"
         ).map_err(|e| AppError::Database(e.to_string()))?;
-        let rows: Vec<ItemDto> = stmt.query_map(params![limit, offset], row_to_item)
+        let rows: Vec<ItemDto> = stmt
+            .query_map(params![limit, offset], row_to_item)
             .map_err(|e| AppError::Database(e.to_string()))?
             .filter_map(|r| r.ok())
             .collect();
@@ -76,7 +96,10 @@ pub fn get_items(db: &DbState, item_type: Option<&str>, limit: i64, offset: i64)
 }
 
 pub fn get_item(db: &DbState, id: &str) -> Result<ItemDto, AppError> {
-    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
     let mut stmt = conn.prepare(
         "SELECT id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at
          FROM items WHERE id = ?1"
@@ -87,7 +110,10 @@ pub fn get_item(db: &DbState, id: &str) -> Result<ItemDto, AppError> {
 }
 
 pub fn update(db: &DbState, payload: UpdateItemPayload) -> Result<ItemDto, AppError> {
-    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
     let now = chrono::Utc::now().to_rfc3339();
 
     let existing = conn.query_row(
@@ -125,8 +151,12 @@ pub fn update(db: &DbState, payload: UpdateItemPayload) -> Result<ItemDto, AppEr
 }
 
 pub fn delete(db: &DbState, id: &str) -> Result<(), AppError> {
-    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
-    let rows = conn.execute("DELETE FROM items WHERE id = ?1", params![id])
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    let rows = conn
+        .execute("DELETE FROM items WHERE id = ?1", params![id])
         .map_err(|e| AppError::Database(e.to_string()))?;
     if rows == 0 {
         return Err(AppError::NotFound(format!("Item {}", id)));
@@ -135,13 +165,17 @@ pub fn delete(db: &DbState, id: &str) -> Result<(), AppError> {
 }
 
 pub fn get_pinned(db: &DbState) -> Result<Vec<ItemDto>, AppError> {
-    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
     let mut stmt = conn.prepare(
         "SELECT id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at
          FROM items WHERE pinned = 1 ORDER BY updated_at DESC"
     ).map_err(|e| AppError::Database(e.to_string()))?;
 
-    let items: Vec<ItemDto> = stmt.query_map([], row_to_item)
+    let items: Vec<ItemDto> = stmt
+        .query_map([], row_to_item)
         .map_err(|e| AppError::Database(e.to_string()))?
         .filter_map(|r| r.ok())
         .collect();
@@ -150,13 +184,17 @@ pub fn get_pinned(db: &DbState) -> Result<Vec<ItemDto>, AppError> {
 }
 
 pub fn get_recent(db: &DbState, limit: i64) -> Result<Vec<ItemDto>, AppError> {
-    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
     let mut stmt = conn.prepare(
         "SELECT id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at
          FROM items ORDER BY updated_at DESC LIMIT ?1"
     ).map_err(|e| AppError::Database(e.to_string()))?;
 
-    let items: Vec<ItemDto> = stmt.query_map(params![limit], row_to_item)
+    let items: Vec<ItemDto> = stmt
+        .query_map(params![limit], row_to_item)
         .map_err(|e| AppError::Database(e.to_string()))?
         .filter_map(|r| r.ok())
         .collect();

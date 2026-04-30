@@ -6,10 +6,7 @@ use crate::models::version::VersionDto;
 use crate::services::version_service;
 
 #[tauri::command]
-pub fn get_versions(
-    db: State<'_, DbState>,
-    item_id: String,
-) -> Result<Vec<VersionDto>, AppError> {
+pub fn get_versions(db: State<'_, DbState>, item_id: String) -> Result<Vec<VersionDto>, AppError> {
     version_service::get_versions(&db, &item_id)
 }
 
@@ -20,10 +17,5 @@ pub fn create_version(
     content: String,
     change_summary: Option<String>,
 ) -> Result<VersionDto, AppError> {
-    version_service::create_version(
-        &db,
-        &item_id,
-        &content,
-        &change_summary.unwrap_or_default(),
-    )
+    version_service::create_version(&db, &item_id, &content, &change_summary.unwrap_or_default())
 }

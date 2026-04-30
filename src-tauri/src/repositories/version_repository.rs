@@ -5,8 +5,16 @@ use crate::error::AppError;
 use crate::models::version::VersionDto;
 use crate::utils::ids;
 
-pub fn create_version(db: &DbState, item_id: &str, content: &str, change_summary: &str) -> Result<VersionDto, AppError> {
-    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
+pub fn create_version(
+    db: &DbState,
+    item_id: &str,
+    content: &str,
+    change_summary: &str,
+) -> Result<VersionDto, AppError> {
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
 
     let max_ver: i32 = conn
         .query_row(
@@ -38,7 +46,10 @@ pub fn create_version(db: &DbState, item_id: &str, content: &str, change_summary
 }
 
 pub fn get_versions(db: &DbState, item_id: &str) -> Result<Vec<VersionDto>, AppError> {
-    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
     let mut stmt = conn
         .prepare(
             "SELECT id, item_id, version_number, content, change_summary, created_at
