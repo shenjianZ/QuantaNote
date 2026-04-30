@@ -13,9 +13,9 @@ import {
   X,
 } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { openPath } from "@tauri-apps/plugin-opener";
 import { MarkdownRenderer } from "../components/common/MarkdownRenderer";
-import { TagEditor } from "../components/common/TagEditor";
+import { TagPickerModal } from "../components/common/TagPickerModal";
+import { AttachmentManagerModal } from "../components/common/AttachmentManagerModal";
 import { useAppStore } from "../stores/appStore";
 import { useAttachmentStore } from "../stores/attachmentStore";
 import { useItemStore } from "../stores/itemStore";
@@ -47,12 +47,6 @@ const FILTERS: Array<{ key: TabKey; label: string }> = [
   { key: "favorite", label: "收藏" },
 ];
 
-function formatFileSize(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 export function LibraryPage({
   items,
   selectedItem,
@@ -70,6 +64,8 @@ export function LibraryPage({
   const [itemTagNames, setItemTagNames] = useState<Record<string, string[]>>({});
   const [copied, setCopied] = useState(false);
   const [readerOpen, setReaderOpen] = useState(false);
+  const [tagModalOpen, setTagModalOpen] = useState(false);
+  const [attachmentModalOpen, setAttachmentModalOpen] = useState(false);
 
   const theme = useAppStore((s) => s.theme);
   const selectedItemDto = useItemStore((s) => s.selectedItem);
@@ -78,7 +74,6 @@ export function LibraryPage({
   const attachments = useAttachmentStore((s) => s.attachments);
   const fetchAttachments = useAttachmentStore((s) => s.fetchAttachments);
   const addAttachmentAction = useAttachmentStore((s) => s.addAttachment);
-  const deleteAttachmentAction = useAttachmentStore((s) => s.deleteAttachment);
   const allTags = useTagStore((s) => s.tags) as { name: string; color: string }[];
   const itemTags = useTagStore((s) => s.itemTags) as { name: string; color: string }[];
   const fetchTags = useTagStore((s) => s.fetchTags);
@@ -200,10 +195,6 @@ export function LibraryPage({
     if (!selectedItem.id) return;
     const selected = await open({ multiple: false });
     if (selected) await addAttachmentAction(selectedItem.id, selected);
-  }
-
-  async function handleOpenAttachment(path: string) {
-    await openPath(path);
   }
 
   async function handleTagChange(tagNames: string[]) {
@@ -397,31 +388,41 @@ export function LibraryPage({
             </div>
 
             <footer className="shrink-0 border-t border-[var(--line)] px-4 py-3">
-              <details>
-                <summary className="flex cursor-pointer list-none items-center gap-2 text-sm text-[var(--muted)] hover:text-[var(--text)] [&::-webkit-details-marker]:hidden">
-                  <Tag className="h-4 w-4" />
-                  标签与附件
-                </summary>
-                <div className="mt-3 space-y-3">
-                  <TagEditor selectedTags={itemTags.map((tag) => tag.name)} onChange={handleTagChange} />
-                  {attachments.length > 0 && (
-                    <div className="space-y-1">
-                      {attachments.map((att) => (
-                        <div key={att.id} className="flex items-center gap-2 rounded-xl bg-[var(--field)] px-3 py-2 text-sm">
-                          <Paperclip className="h-4 w-4 text-[var(--muted)]" />
-                          <button className="min-w-0 flex-1 truncate text-left text-[var(--text)]" type="button" onClick={() => handleOpenAttachment(att.file_path)}>
-                            {att.filename}
-                          </button>
-                          <span className="shrink-0 text-xs text-[var(--muted)]">{formatFileSize(att.file_size)}</span>
-                          <button className="text-[var(--muted)] hover:text-red-400" type="button" onClick={() => deleteAttachmentAction(att.id)}>
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </details>
+              <div className="flex flex-wrap items-center gap-2">
+                {itemTags.map((tag) => (
+                  <span key={tag.name} className="rounded-full bg-[var(--field)] px-2 py-0.5 text-xs text-[var(--muted)]">
+                    #{tag.name}
+                  </span>
+                ))}
+                <button
+                  className="inline-flex items-center gap-1 rounded-full bg-[var(--field)] px-2.5 py-1 text-xs text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
+                  type="button"
+                  onClick={() => setTagModalOpen(true)}
+                >
+                  <Tag className="h-3.5 w-3.5" />
+                  管理标签
+                </button>
+                <button
+                  className="inline-flex items-center gap-1 rounded-full bg-[var(--field)] px-2.5 py-1 text-xs text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
+                  type="button"
+                  onClick={() => setAttachmentModalOpen(true)}
+                >
+                  <Paperclip className="h-3.5 w-3.5" />
+                  附件{attachments.length > 0 ? ` (${attachments.length})` : ""}
+                </button>
+              </div>
+
+              <TagPickerModal
+                open={tagModalOpen}
+                onClose={() => setTagModalOpen(false)}
+                selectedTags={itemTags.map((t) => t.name)}
+                onChange={handleTagChange}
+              />
+              <AttachmentManagerModal
+                open={attachmentModalOpen}
+                onClose={() => setAttachmentModalOpen(false)}
+                itemId={selectedItem.id}
+              />
             </footer>
           </div>
         </section>

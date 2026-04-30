@@ -10,6 +10,8 @@ pub fn create_version(
     item_id: &str,
     content: &str,
     change_summary: &str,
+    name: &str,
+    description: &str,
 ) -> Result<VersionDto, AppError> {
     let conn = db
         .conn
@@ -29,9 +31,9 @@ pub fn create_version(
     let version_number = max_ver + 1;
 
     conn.execute(
-        "INSERT INTO versions (id, item_id, version_number, content, change_summary, created_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params![id, item_id, version_number, content, change_summary, now],
+        "INSERT INTO versions (id, item_id, version_number, content, change_summary, name, description, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        params![id, item_id, version_number, content, change_summary, name, description, now],
     )
     .map_err(|e| AppError::Database(e.to_string()))?;
 
@@ -41,6 +43,8 @@ pub fn create_version(
         version_number,
         content: content.to_string(),
         change_summary: change_summary.to_string(),
+        name: name.to_string(),
+        description: description.to_string(),
         created_at: now,
     })
 }
@@ -52,7 +56,7 @@ pub fn get_versions(db: &DbState, item_id: &str) -> Result<Vec<VersionDto>, AppE
         .map_err(|e| AppError::Database(e.to_string()))?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, item_id, version_number, content, change_summary, created_at
+            "SELECT id, item_id, version_number, content, change_summary, name, description, created_at
              FROM versions WHERE item_id = ?1 ORDER BY version_number DESC",
         )
         .map_err(|e| AppError::Database(e.to_string()))?;
@@ -65,7 +69,9 @@ pub fn get_versions(db: &DbState, item_id: &str) -> Result<Vec<VersionDto>, AppE
                 version_number: row.get(2)?,
                 content: row.get(3)?,
                 change_summary: row.get(4)?,
-                created_at: row.get(5)?,
+                name: row.get(5)?,
+                description: row.get(6)?,
+                created_at: row.get(7)?,
             })
         })
         .map_err(|e| AppError::Database(e.to_string()))?
@@ -73,4 +79,50 @@ pub fn get_versions(db: &DbState, item_id: &str) -> Result<Vec<VersionDto>, AppE
         .collect();
 
     Ok(items)
+}
+
+pub fn get_version(db: &DbState, id: &str) -> Result<VersionDto, AppError> {
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    conn.query_row(
+        "SELECT id, item_id, version_number, content, change_summary, name, description, created_at
+         FROM versions WHERE id = ?1",
+        params![id],
+        |row| {
+            Ok(VersionDto {
+                id: row.get(0)?,
+                item_id: row.get(1)?,
+                version_number: row.get(2)?,
+                content: row.get(3)?,
+                change_summary: row.get(4)?,
+                name: row.get(5)?,
+                description: row.get(6)?,
+                created_at: row.get(7)?,
+            })
+        },
+    )
+    .map_err(|e| AppError::Database(e.to_string()))
+}
+
+pub fn update_version(
+    db: &DbState,
+    id: &str,
+    name: &str,
+    description: &str,
+) -> Result<VersionDto, AppError> {
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+    conn.execute(
+        "UPDATE versions SET name = ?1, description = ?2 WHERE id = ?3",
+        params![name, description, id],
+    )
+    .map_err(|e| AppError::Database(e.to_string()))?;
+
+    drop(conn);
+    get_version(db, id)
 }

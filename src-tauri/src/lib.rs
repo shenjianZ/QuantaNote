@@ -8,6 +8,7 @@ mod utils;
 
 use commands::{attachment, data_io, item, search, tag, version};
 use db::DbState;
+use repositories::attachment_repository;
 use tauri::Manager;
 use utils::logging::tauri_log_plugin;
 use utils::paths;
@@ -28,6 +29,20 @@ pub fn run() {
             db_state
                 .initialize_schema()
                 .expect("failed to initialize schema");
+
+            if let Ok(legacy_data_dir) = app.path().app_data_dir() {
+                match attachment_repository::migrate_legacy_app_data_attachments(
+                    &db_state,
+                    &legacy_data_dir,
+                    &quantanote_dir,
+                ) {
+                    Ok(count) if count > 0 => {
+                        log::info!("Migrated {} legacy attachments into ~/.quantanote", count);
+                    }
+                    Ok(_) => {}
+                    Err(error) => log::warn!("Legacy attachment migration failed: {}", error),
+                }
+            }
 
             app.manage(db_state);
             Ok(())
@@ -59,6 +74,8 @@ pub fn run() {
             attachment::delete_attachment,
             version::get_versions,
             version::create_version,
+            version::update_version,
+            version::restore_version,
             item::get_db_size,
             item::optimize_db,
             data_io::export_data,

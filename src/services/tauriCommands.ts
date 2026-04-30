@@ -59,8 +59,22 @@ export async function getVersions(itemId: string) {
   return invoke("get_versions", { itemId });
 }
 
-export async function createVersion(itemId: string, content: string, changeSummary?: string) {
-  return invoke("create_version", { itemId, content, changeSummary: changeSummary ?? null });
+export async function createVersion(itemId: string, content: string, changeSummary?: string, name?: string, description?: string) {
+  return invoke("create_version", {
+    itemId,
+    content,
+    changeSummary: changeSummary ?? null,
+    name: name ?? null,
+    description: description ?? null,
+  });
+}
+
+export async function updateVersion(id: string, name: string, description: string) {
+  return invoke("update_version", { id, name, description });
+}
+
+export async function restoreVersion(versionId: string) {
+  return invoke("restore_version", { versionId });
 }
 
 // Tag commands

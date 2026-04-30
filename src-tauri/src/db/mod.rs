@@ -55,6 +55,8 @@ CREATE TABLE IF NOT EXISTS versions (
     version_number INTEGER NOT NULL,
     content TEXT NOT NULL DEFAULT '',
     change_summary TEXT NOT NULL DEFAULT '',
+    name TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL
 );
 

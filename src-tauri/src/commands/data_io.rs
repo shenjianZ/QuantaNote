@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager, State};
+use tauri::State;
 
 use crate::db::DbState;
 use crate::error::AppError;
+use crate::utils::paths;
 
 #[derive(Serialize, Deserialize)]
 struct ExportData {
@@ -124,7 +125,7 @@ pub fn export_data(db: State<'_, DbState>) -> Result<String, AppError> {
 
     let versions: Vec<serde_json::Value> = {
         let mut stmt = conn.prepare(
-            "SELECT id, item_id, version_number, content, change_summary, created_at FROM versions"
+            "SELECT id, item_id, version_number, content, change_summary, name, description, created_at FROM versions"
         ).map_err(|e| AppError::Database(e.to_string()))?;
         let rows = stmt
             .query_map([], |row| {
@@ -134,7 +135,9 @@ pub fn export_data(db: State<'_, DbState>) -> Result<String, AppError> {
                     "version_number": row.get::<_, i64>(2)?,
                     "content": row.get::<_, String>(3)?,
                     "change_summary": row.get::<_, String>(4)?,
-                    "created_at": row.get::<_, String>(5)?,
+                    "name": row.get::<_, String>(5)?,
+                    "description": row.get::<_, String>(6)?,
+                    "created_at": row.get::<_, String>(7)?,
                 }))
             })
             .map_err(|e| AppError::Database(e.to_string()))?;
@@ -152,7 +155,7 @@ pub fn export_data(db: State<'_, DbState>) -> Result<String, AppError> {
 }
 
 #[tauri::command]
-pub fn import_data(app: AppHandle, db: State<'_, DbState>, json: String) -> Result<(), AppError> {
+pub fn import_data(db: State<'_, DbState>, json: String) -> Result<(), AppError> {
     let data: ExportData =
         serde_json::from_str(&json).map_err(|e| AppError::Validation(e.to_string()))?;
     let conn = db
@@ -202,10 +205,7 @@ pub fn import_data(app: AppHandle, db: State<'_, DbState>, json: String) -> Resu
         .map_err(|e| AppError::Database(e.to_string()))?;
     }
 
-    let app_data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| AppError::Io(e.to_string()))?;
+    let data_dir = paths::quantanote_dir();
 
     for attachment in data.attachments {
         let id = value_str(&attachment, "id");
@@ -220,7 +220,7 @@ pub fn import_data(app: AppHandle, db: State<'_, DbState>, json: String) -> Resu
             let bytes = BASE64
                 .decode(file_data)
                 .map_err(|e| AppError::Validation(format!("附件数据无效: {}", e)))?;
-            let attach_dir = app_data_dir.join("attachments").join(&item_id);
+            let attach_dir = data_dir.join("attachments").join(&item_id);
             std::fs::create_dir_all(&attach_dir).map_err(|e| AppError::Io(e.to_string()))?;
             let dest_path = attach_dir.join(format!(
                 "{}-{}",
@@ -248,14 +248,16 @@ pub fn import_data(app: AppHandle, db: State<'_, DbState>, json: String) -> Resu
 
     for version in data.versions {
         conn.execute(
-            "INSERT OR IGNORE INTO versions (id, item_id, version_number, content, change_summary, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT OR IGNORE INTO versions (id, item_id, version_number, content, change_summary, name, description, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             rusqlite::params![
                 value_str(&version, "id"),
                 value_str(&version, "item_id"),
                 value_i64(&version, "version_number"),
                 value_str(&version, "content"),
                 value_str(&version, "change_summary"),
+                value_str(&version, "name"),
+                value_str(&version, "description"),
                 value_str(&version, "created_at"),
             ],
         ).map_err(|e| AppError::Database(e.to_string()))?;

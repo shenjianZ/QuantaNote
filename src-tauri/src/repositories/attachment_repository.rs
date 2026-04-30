@@ -1,4 +1,5 @@
 use rusqlite::params;
+use std::path::{Path, PathBuf};
 
 use crate::db::DbState;
 use crate::error::AppError;
@@ -38,14 +39,82 @@ pub fn add(
         .to_ascii_lowercase()
         .as_str()
     {
+        // Images
         "png" => "image/png",
         "jpg" | "jpeg" => "image/jpeg",
         "gif" => "image/gif",
         "webp" => "image/webp",
+        "svg" => "image/svg+xml",
+        "bmp" => "image/bmp",
+        "ico" => "image/x-icon",
+        "tiff" | "tif" => "image/tiff",
+        "avif" => "image/avif",
+        // Audio
+        "mp3" => "audio/mpeg",
+        "wav" => "audio/wav",
+        "ogg" | "oga" => "audio/ogg",
+        "flac" => "audio/flac",
+        "aac" => "audio/aac",
+        "m4a" => "audio/mp4",
+        "wma" => "audio/x-ms-wma",
+        "mid" | "midi" => "audio/midi",
+        // Video
+        "mp4" | "m4v" => "video/mp4",
+        "webm" => "video/webm",
+        "avi" => "video/x-msvideo",
+        "mov" | "qt" => "video/quicktime",
+        "mkv" => "video/x-matroska",
+        "wmv" => "video/x-ms-wmv",
+        "flv" => "video/x-flv",
+        "mpeg" | "mpg" => "video/mpeg",
+        "3gp" => "video/3gpp",
+        // Documents
         "pdf" => "application/pdf",
-        "txt" | "md" => "text/plain",
+        "doc" => "application/msword",
+        "docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "xls" => "application/vnd.ms-excel",
+        "xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "ppt" => "application/vnd.ms-powerpoint",
+        "pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        // Text & Code
+        "txt" | "md" | "markdown" => "text/plain",
         "json" => "application/json",
         "html" | "htm" => "text/html",
+        "xml" => "text/xml",
+        "css" => "text/css",
+        "js" | "mjs" => "text/javascript",
+        "ts" => "text/typescript",
+        "jsx" => "text/jsx",
+        "tsx" => "text/tsx",
+        "py" => "text/x-python",
+        "rs" => "text/x-rust",
+        "go" => "text/x-go",
+        "java" => "text/x-java",
+        "c" | "h" => "text/x-c",
+        "cpp" | "hpp" | "cc" => "text/x-c++",
+        "cs" => "text/x-csharp",
+        "rb" => "text/x-ruby",
+        "php" => "text/x-php",
+        "swift" => "text/x-swift",
+        "kt" => "text/x-kotlin",
+        "sh" | "bash" => "text/x-shellscript",
+        "bat" | "cmd" => "text/x-bat",
+        "ps1" => "text/x-powershell",
+        "sql" => "text/x-sql",
+        "yaml" | "yml" => "text/yaml",
+        "toml" => "text/x-toml",
+        "ini" | "cfg" | "conf" => "text/x-ini",
+        "csv" => "text/csv",
+        "log" => "text/x-log",
+        // Archives
+        "zip" => "application/zip",
+        "tar" => "application/x-tar",
+        "gz" | "gzip" => "application/gzip",
+        "rar" => "application/vnd.rar",
+        "7z" => "application/x-7z-compressed",
+        // Ebooks
+        "epub" => "application/epub+zip",
+        "mobi" => "application/x-mobipocket-ebook",
         _ => "application/octet-stream",
     }
     .to_string();
@@ -72,6 +141,68 @@ pub fn add(
         file_size,
         created_at: now,
     })
+}
+
+pub fn migrate_legacy_app_data_attachments(
+    db: &DbState,
+    legacy_data_dir: &Path,
+    data_dir: &Path,
+) -> Result<usize, AppError> {
+    if legacy_data_dir == data_dir || !legacy_data_dir.exists() {
+        return Ok(0);
+    }
+
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    let attachments: Vec<(String, String, String, String)> = {
+        let mut stmt = conn
+            .prepare("SELECT id, item_id, filename, file_path FROM attachments")
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                ))
+            })
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        rows.filter_map(|r| r.ok()).collect()
+    };
+
+    let mut migrated = 0;
+    for (id, item_id, filename, file_path) in attachments {
+        let source = PathBuf::from(&file_path);
+        if !source.starts_with(legacy_data_dir) || source.starts_with(data_dir) || !source.exists()
+        {
+            continue;
+        }
+
+        let attach_dir = data_dir.join("attachments").join(&item_id);
+        std::fs::create_dir_all(&attach_dir).map_err(|e| AppError::Io(e.to_string()))?;
+        let dest_name = source
+            .file_name()
+            .map(|name| name.to_os_string())
+            .unwrap_or_else(|| {
+                format!("{}-{}", &id.chars().take(8).collect::<String>(), filename).into()
+            });
+        let dest_path = attach_dir.join(dest_name);
+        if !dest_path.exists() {
+            std::fs::copy(&source, &dest_path).map_err(|e| AppError::Io(e.to_string()))?;
+        }
+
+        conn.execute(
+            "UPDATE attachments SET file_path = ?1 WHERE id = ?2",
+            params![dest_path.to_string_lossy().to_string(), id],
+        )
+        .map_err(|e| AppError::Database(e.to_string()))?;
+        migrated += 1;
+    }
+
+    Ok(migrated)
 }
 
 pub fn get_by_item(db: &DbState, item_id: &str) -> Result<Vec<AttachmentDto>, AppError> {

@@ -7,5 +7,7 @@ pub struct VersionDto {
     pub version_number: i32,
     pub content: String,
     pub change_summary: String,
+    pub name: String,
+    pub description: String,
     pub created_at: String,
 }

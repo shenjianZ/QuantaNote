@@ -30,7 +30,8 @@ pub fn create_item(
         },
     )?;
     if !content_val.is_empty() {
-        let _ = version_repository::create_version(db, &item.id, &content_val, "创建");
+        let _ =
+            version_repository::create_version(db, &item.id, &content_val, "创建", "初始版本", "");
     }
     Ok(item)
 }
@@ -54,15 +55,7 @@ pub fn update_item(db: &DbState, payload: UpdateItemPayload) -> Result<ItemDto, 
             return Err(AppError::Validation("标题不能为空".to_string()));
         }
     }
-    let existing = item_repository::get_item(db, &payload.id)?;
-    let content_changed = payload
-        .content
-        .as_ref()
-        .is_some_and(|c| c != &existing.content);
     let updated = item_repository::update(db, payload)?;
-    if content_changed {
-        let _ = version_repository::create_version(db, &updated.id, &updated.content, "自动保存");
-    }
     Ok(updated)
 }
 
