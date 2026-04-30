@@ -61,7 +61,8 @@ export function QuantaNoteApp() {
   const handlePaletteSelectItem = useCallback((id: string) => {
     selectItem(id);
     getItem(id).catch(() => {});
-  }, [getItem, selectItem]);
+    navigate("document");
+  }, [getItem, navigate, selectItem]);
 
   const handleCreateNote = useCallback(async () => {
     const item = await createItem("未命名笔记", "note", "");
@@ -127,12 +128,6 @@ export function QuantaNoteApp() {
         open={paletteOpen}
         onClose={closePalette}
         onSelectItem={handlePaletteSelectItem}
-        onCreateNote={handleCreateNote}
-        onNavigate={navigate}
-        onOpenDocument={() => {
-          closePalette();
-          navigate("document");
-        }}
       />
     </AppShell>
   );

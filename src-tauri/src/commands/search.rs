@@ -9,6 +9,7 @@ use crate::services::search_service;
 pub fn search_items(
     db: State<'_, DbState>,
     query: String,
+    item_type: Option<String>,
 ) -> Result<Vec<SearchResultDto>, AppError> {
-    search_service::search_items(&db, &query)
+    search_service::search_items(&db, &query, item_type.as_deref())
 }

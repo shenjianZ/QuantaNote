@@ -37,8 +37,8 @@ export async function getRecentItems(limit?: number) {
 }
 
 // Search commands
-export async function searchItems(query: string) {
-  return invoke("search_items", { query });
+export async function searchItems(query: string, itemType?: string) {
+  return invoke("search_items", { query, itemType: itemType ?? null });
 }
 
 // Attachment commands

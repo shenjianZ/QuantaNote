@@ -13,7 +13,7 @@ interface SearchState {
   results: SearchResultDto[];
   searching: boolean;
   setQuery: (q: string) => void;
-  search: (q: string) => Promise<void>;
+  search: (q: string, itemType?: string) => Promise<void>;
 }
 
 export const useSearchStore = create<SearchState>((set) => ({
@@ -23,14 +23,17 @@ export const useSearchStore = create<SearchState>((set) => ({
 
   setQuery: (q) => set({ query: q }),
 
-  search: async (q) => {
+  search: async (q, itemType) => {
     if (!q.trim()) {
       set({ results: [], searching: false });
       return;
     }
     set({ searching: true });
     try {
-      const results = await invoke<SearchResultDto[]>("search_items", { query: q });
+      const results = await invoke<SearchResultDto[]>("search_items", {
+        query: q,
+        itemType: itemType ?? null,
+      });
       set({ results, searching: false });
     } catch {
       set({ results: [], searching: false });
