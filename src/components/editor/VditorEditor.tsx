@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import Vditor from "vditor";
 import "vditor/dist/index.css";
 
@@ -15,6 +15,11 @@ interface VditorEditorProps {
   theme?: "dark" | "light";
   toolbar?: string[];
   placeholder?: string;
+}
+
+export interface VditorEditorHandle {
+  getValue: () => string;
+  focus: () => void;
 }
 
 const DEFAULT_TOOLBAR = [
@@ -178,13 +183,13 @@ function normalizeToolbar(items: string[], tableItem: VditorToolbarItem): Vditor
   return items.map((item) => item === "table" ? tableItem : item);
 }
 
-export function VditorEditor({
+export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(function VditorEditor({
   initialValue,
   onChange,
   theme = "dark",
   toolbar,
   placeholder = "开始输入...",
-}: VditorEditorProps) {
+}, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const vditorRef = useRef<Vditor | null>(null);
   const onChangeRef = useRef(onChange);
@@ -194,6 +199,13 @@ export function VditorEditor({
 
   onChangeRef.current = onChange;
   initialValueRef.current = initialValue;
+
+  useImperativeHandle(ref, () => ({
+    getValue: () => vditorRef.current?.getValue() ?? initialValueRef.current,
+    focus: () => {
+      vditorRef.current?.focus();
+    },
+  }), []);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -274,4 +286,4 @@ export function VditorEditor({
   }, [theme]);
 
   return <div ref={containerRef} className="vditor-container" />;
-}
+});

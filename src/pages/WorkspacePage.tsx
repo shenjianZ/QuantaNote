@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, Edit3 } from "lucide-react";
 import { useAppStore } from "../stores/appStore";
-import { VditorEditor } from "../components/editor/VditorEditor";
+import { VditorEditor, type VditorEditorHandle } from "../components/editor/VditorEditor";
 
 interface WorkspacePageProps {
   onQuickCreate: (content: string) => Promise<void>;
@@ -11,6 +11,7 @@ export function WorkspacePage({ onQuickCreate }: WorkspacePageProps) {
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const editorRef = useRef<VditorEditorHandle>(null);
   const theme = useAppStore((s) => s.theme);
 
   useEffect(() => {
@@ -32,7 +33,8 @@ export function WorkspacePage({ onQuickCreate }: WorkspacePageProps) {
   }, [draft, saving, onQuickCreate]);
 
   async function handleQuickSave() {
-    const text = draft.trim();
+    const currentValue = editorRef.current?.getValue() ?? draft;
+    const text = currentValue.trim();
     if (!text || saving) return;
     setSaving(true);
     try {
@@ -66,6 +68,7 @@ export function WorkspacePage({ onQuickCreate }: WorkspacePageProps) {
         <article className="workspace-editor-panel flex min-h-0 flex-1 flex-col rounded-3xl border border-[var(--line)] bg-[var(--paper)] p-4">
           <div className="min-h-0 flex-1 overflow-hidden">
             <VditorEditor
+              ref={editorRef}
               initialValue={draft}
               onChange={setDraft}
               theme={theme === "light" ? "light" : "dark"}
