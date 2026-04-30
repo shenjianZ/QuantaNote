@@ -9,7 +9,6 @@ pub fn add_attachment(
     db: &DbState,
     item_id: String,
     path: String,
-    data_dir: &str,
 ) -> Result<AttachmentDto, AppError> {
     item_repository::get_item(db, &item_id)?;
 
@@ -25,7 +24,7 @@ pub fn add_attachment(
         )));
     }
 
-    attachment_repository::add(db, item_id, path, data_dir)
+    attachment_repository::add(db, item_id, path)
 }
 
 pub fn get_attachments(db: &DbState, item_id: &str) -> Result<Vec<AttachmentDto>, AppError> {

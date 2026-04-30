@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { FileText, FolderOpen, Music, Plus, Trash2, Video, X } from "lucide-react";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -110,10 +110,19 @@ export function AttachmentManagerModal({ open: isOpen, onClose, itemId }: Attach
     }
   }
 
-  function handleClosePreview() {
+  const handleClosePreview = useCallback(() => {
     setPreview(null);
     setLoadingText(false);
-  }
+  }, []);
+
+  useEffect(() => {
+    if (!preview) return;
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") handleClosePreview();
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [preview, handleClosePreview]);
 
   return (
     <>
@@ -221,88 +230,88 @@ export function AttachmentManagerModal({ open: isOpen, onClose, itemId }: Attach
       {/* Preview overlay */}
       {preview && (
         <div
-          className="fixed inset-0 z-[60] flex flex-col bg-black/70 backdrop-blur-sm"
+          className="fixed inset-0 z-[60] grid place-items-center bg-black/40 backdrop-blur-sm"
           onClick={handleClosePreview}
         >
-          {/* Header */}
-          <div className="flex shrink-0 items-center justify-between px-4 py-3" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/70">
-                {getCategoryLabel(preview.type)}
-              </span>
-              <span className="truncate text-sm font-medium text-white">{preview.filename}</span>
+          <div
+            className={`flex flex-col rounded-2xl border border-[var(--line)] bg-[var(--popover)] shadow-2xl ${
+              preview.type === "pdf" ? "h-[75vh] w-[85vw] max-w-4xl" :
+              preview.type === "video" ? "w-[85vw] max-w-3xl" :
+              preview.type === "text" ? "h-[70vh] w-[85vw] max-w-2xl" :
+              preview.type === "audio" ? "w-80" :
+              "max-h-[80vh] max-w-2xl"
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header bar */}
+            <div className="flex shrink-0 items-center justify-between border-b border-[var(--line)] px-4 py-2.5">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="shrink-0 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] font-medium text-[var(--accent)]">
+                  {getCategoryLabel(preview.type)}
+                </span>
+                <span className="truncate text-sm text-[var(--text)]">{preview.filename}</span>
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <button
+                  className="rounded-full px-2.5 py-1 text-xs text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
+                  type="button"
+                  onClick={() => openPath(preview.filePath)}
+                >
+                  用系统应用打开
+                </button>
+                <button
+                  className="grid h-7 w-7 place-items-center rounded-full bg-[var(--field)] text-[var(--text)] hover:bg-[var(--hover)]"
+                  type="button"
+                  onClick={handleClosePreview}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-1">
-              <button
-                className="rounded-full px-3 py-1 text-xs text-white/70 hover:bg-white/10 hover:text-white"
-                type="button"
-                onClick={() => openPath(preview.filePath)}
-              >
-                打开文件
-              </button>
-              <button
-                className="grid h-8 w-8 place-items-center rounded-full text-white/70 hover:bg-white/10 hover:text-white"
-                type="button"
-                onClick={handleClosePreview}
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
 
-          {/* Content */}
-          <div className="flex min-h-0 flex-1 items-center justify-center px-4 pb-4" onClick={(e) => e.stopPropagation()}>
-            {preview.type === "image" && (
-              <img
-                src={toAssetUrl(preview.filePath)}
-                alt={preview.filename}
-                className="max-h-full max-w-full rounded-xl object-contain shadow-2xl"
-              />
-            )}
+            {/* Preview content */}
+            <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-3">
+              {preview.type === "image" && (
+                <img
+                  src={toAssetUrl(preview.filePath)}
+                  alt={preview.filename}
+                  className="max-h-full max-w-full rounded-lg object-contain"
+                />
+              )}
 
-            {preview.type === "audio" && (
-              <div className="w-full max-w-md rounded-2xl bg-[var(--popover)] p-6 shadow-2xl">
-                <div className="mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-[var(--accent-soft)] mx-auto">
-                  <Music className="h-8 w-8 text-[var(--accent)]" />
+              {preview.type === "audio" && (
+                <div className="w-full py-4">
+                  <div className="mb-5 grid h-14 w-14 place-items-center rounded-2xl bg-[var(--accent-soft)] mx-auto">
+                    <Music className="h-7 w-7 text-[var(--accent)]" />
+                  </div>
+                  <p className="mb-4 text-center text-sm font-medium text-[var(--text)]">{preview.filename}</p>
+                  <audio controls src={toAssetUrl(preview.filePath)} className="mx-auto w-full" autoPlay />
                 </div>
-                <p className="mb-4 text-center text-sm font-medium text-[var(--text)]">{preview.filename}</p>
-                <audio
+              )}
+
+              {preview.type === "video" && (
+                <video
                   controls
                   src={toAssetUrl(preview.filePath)}
-                  className="w-full"
+                  className="max-h-full w-full rounded-lg"
                   autoPlay
                 />
-              </div>
-            )}
+              )}
 
-            {preview.type === "video" && (
-              <video
-                controls
-                src={toAssetUrl(preview.filePath)}
-                className="max-h-full max-w-full rounded-xl shadow-2xl"
-                autoPlay
-              />
-            )}
+              {preview.type === "pdf" && (
+                <iframe
+                  src={toAssetUrl(preview.filePath)}
+                  className="h-full w-full rounded-lg"
+                  title={preview.filename}
+                />
+              )}
 
-            {preview.type === "pdf" && (
-              <iframe
-                src={toAssetUrl(preview.filePath)}
-                className="h-full w-full max-w-4xl rounded-xl border border-white/10 shadow-2xl"
-                title={preview.filename}
-              />
-            )}
-
-            {preview.type === "text" && (
-              <div className="flex max-h-full w-full max-w-3xl flex-col rounded-2xl bg-[var(--popover)] shadow-2xl">
-                <div className="flex shrink-0 items-center gap-2 border-b border-[var(--line)] px-4 py-2">
-                  <FileText className="h-4 w-4 text-[var(--muted)]" />
-                  <span className="text-xs text-[var(--muted)]">{getExtension(preview.filename).toUpperCase() || "TEXT"}</span>
-                </div>
-                <pre className="min-h-0 flex-1 overflow-auto p-4 text-sm leading-relaxed text-[var(--text)] font-mono whitespace-pre-wrap break-all">
+              {preview.type === "text" && (
+                <pre className="h-full w-full overflow-auto p-3 text-sm leading-relaxed text-[var(--text)] font-mono whitespace-pre-wrap break-all">
                   {preview.textContent}
                 </pre>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       )}

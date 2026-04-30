@@ -102,8 +102,9 @@ pub fn export_data(db: State<'_, DbState>) -> Result<String, AppError> {
         ).map_err(|e| AppError::Database(e.to_string()))?;
         let rows = stmt
             .query_map([], |row| {
-                let file_path: String = row.get(3)?;
-                let file_data = std::fs::read(&file_path).ok().map(|bytes| {
+                let relative_path: String = row.get(3)?;
+                let full_path = paths::quantanote_dir().join(&relative_path);
+                let file_data = std::fs::read(&full_path).ok().map(|bytes| {
                     use base64::engine::general_purpose::STANDARD as BASE64;
                     use base64::Engine;
                     BASE64.encode(bytes)
@@ -112,7 +113,7 @@ pub fn export_data(db: State<'_, DbState>) -> Result<String, AppError> {
                     "id": row.get::<_, String>(0)?,
                     "item_id": row.get::<_, String>(1)?,
                     "filename": row.get::<_, String>(2)?,
-                    "file_path": file_path,
+                    "file_path": relative_path,
                     "mime_type": row.get::<_, String>(4)?,
                     "file_size": row.get::<_, i64>(5)?,
                     "created_at": row.get::<_, String>(6)?,
@@ -220,15 +221,14 @@ pub fn import_data(db: State<'_, DbState>, json: String) -> Result<(), AppError>
             let bytes = BASE64
                 .decode(file_data)
                 .map_err(|e| AppError::Validation(format!("附件数据无效: {}", e)))?;
-            let attach_dir = data_dir.join("attachments").join(&item_id);
-            std::fs::create_dir_all(&attach_dir).map_err(|e| AppError::Io(e.to_string()))?;
-            let dest_path = attach_dir.join(format!(
-                "{}-{}",
-                &id.chars().take(8).collect::<String>(),
-                filename
-            ));
+            let relative_path = std::path::PathBuf::from("attachments")
+                .join(&item_id)
+                .join(format!("{}-{}", &id.chars().take(8).collect::<String>(), filename));
+            let dest_path = data_dir.join(&relative_path);
+            std::fs::create_dir_all(dest_path.parent().unwrap())
+                .map_err(|e| AppError::Io(e.to_string()))?;
             std::fs::write(&dest_path, bytes).map_err(|e| AppError::Io(e.to_string()))?;
-            file_path = dest_path.to_string_lossy().to_string();
+            file_path = relative_path.to_string_lossy().to_string();
         }
 
         conn.execute(

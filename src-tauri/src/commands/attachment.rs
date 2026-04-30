@@ -4,7 +4,6 @@ use crate::db::DbState;
 use crate::error::AppError;
 use crate::models::attachment::AttachmentDto;
 use crate::services::attachment_service;
-use crate::utils::paths;
 
 #[tauri::command]
 pub fn add_attachment(
@@ -12,8 +11,7 @@ pub fn add_attachment(
     item_id: String,
     path: String,
 ) -> Result<AttachmentDto, AppError> {
-    let data_dir = paths::quantanote_dir();
-    attachment_service::add_attachment(&db, item_id, path, &data_dir.to_string_lossy())
+    attachment_service::add_attachment(&db, item_id, path)
 }
 
 #[tauri::command]

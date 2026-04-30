@@ -1,16 +1,19 @@
 use rusqlite::params;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crate::db::DbState;
 use crate::error::AppError;
 use crate::models::attachment::AttachmentDto;
-use crate::utils::ids;
+use crate::utils::{ids, paths};
+
+fn resolve_file_path(relative_path: &str) -> PathBuf {
+    paths::quantanote_dir().join(relative_path)
+}
 
 pub fn add(
     db: &DbState,
     item_id: String,
     source_path: String,
-    data_dir: &str,
 ) -> Result<AttachmentDto, AppError> {
     let id = ids::new_id("att");
     let now = chrono::Utc::now().to_rfc3339();
@@ -21,12 +24,12 @@ pub fn add(
         .map(|f| f.to_string_lossy().to_string())
         .unwrap_or_else(|| "unknown".to_string());
 
-    let attach_dir = std::path::PathBuf::from(data_dir)
-        .join("attachments")
-        .join(&item_id);
-    std::fs::create_dir_all(&attach_dir).map_err(|e| AppError::Io(e.to_string()))?;
-
-    let dest_path = attach_dir.join(format!("{}-{}", &id[..8], filename));
+    let relative_path = PathBuf::from("attachments")
+        .join(&item_id)
+        .join(format!("{}-{}", &id[..8], filename));
+    let dest_path = paths::quantanote_dir().join(&relative_path);
+    std::fs::create_dir_all(dest_path.parent().unwrap())
+        .map_err(|e| AppError::Io(e.to_string()))?;
     std::fs::copy(&source_path, &dest_path).map_err(|e| AppError::Io(e.to_string()))?;
 
     let file_size = std::fs::metadata(&dest_path)
@@ -119,7 +122,7 @@ pub fn add(
     }
     .to_string();
 
-    let dest_str = dest_path.to_string_lossy().to_string();
+    let relative_str = relative_path.to_string_lossy().to_string();
 
     let conn = db
         .conn
@@ -128,7 +131,7 @@ pub fn add(
     conn.execute(
         "INSERT INTO attachments (id, item_id, filename, file_path, mime_type, file_size, created_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        params![id, item_id, filename, dest_str, mime_type, file_size, now],
+        params![id, item_id, filename, relative_str, mime_type, file_size, now],
     )
     .map_err(|e| AppError::Database(e.to_string()))?;
 
@@ -136,73 +139,11 @@ pub fn add(
         id,
         item_id,
         filename,
-        file_path: dest_str,
+        file_path: dest_path.to_string_lossy().to_string(),
         mime_type,
         file_size,
         created_at: now,
     })
-}
-
-pub fn migrate_legacy_app_data_attachments(
-    db: &DbState,
-    legacy_data_dir: &Path,
-    data_dir: &Path,
-) -> Result<usize, AppError> {
-    if legacy_data_dir == data_dir || !legacy_data_dir.exists() {
-        return Ok(0);
-    }
-
-    let conn = db
-        .conn
-        .lock()
-        .map_err(|e| AppError::Database(e.to_string()))?;
-    let attachments: Vec<(String, String, String, String)> = {
-        let mut stmt = conn
-            .prepare("SELECT id, item_id, filename, file_path FROM attachments")
-            .map_err(|e| AppError::Database(e.to_string()))?;
-        let rows = stmt
-            .query_map([], |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, String>(1)?,
-                    row.get::<_, String>(2)?,
-                    row.get::<_, String>(3)?,
-                ))
-            })
-            .map_err(|e| AppError::Database(e.to_string()))?;
-        rows.filter_map(|r| r.ok()).collect()
-    };
-
-    let mut migrated = 0;
-    for (id, item_id, filename, file_path) in attachments {
-        let source = PathBuf::from(&file_path);
-        if !source.starts_with(legacy_data_dir) || source.starts_with(data_dir) || !source.exists()
-        {
-            continue;
-        }
-
-        let attach_dir = data_dir.join("attachments").join(&item_id);
-        std::fs::create_dir_all(&attach_dir).map_err(|e| AppError::Io(e.to_string()))?;
-        let dest_name = source
-            .file_name()
-            .map(|name| name.to_os_string())
-            .unwrap_or_else(|| {
-                format!("{}-{}", &id.chars().take(8).collect::<String>(), filename).into()
-            });
-        let dest_path = attach_dir.join(dest_name);
-        if !dest_path.exists() {
-            std::fs::copy(&source, &dest_path).map_err(|e| AppError::Io(e.to_string()))?;
-        }
-
-        conn.execute(
-            "UPDATE attachments SET file_path = ?1 WHERE id = ?2",
-            params![dest_path.to_string_lossy().to_string(), id],
-        )
-        .map_err(|e| AppError::Database(e.to_string()))?;
-        migrated += 1;
-    }
-
-    Ok(migrated)
 }
 
 pub fn get_by_item(db: &DbState, item_id: &str) -> Result<Vec<AttachmentDto>, AppError> {
@@ -219,11 +160,12 @@ pub fn get_by_item(db: &DbState, item_id: &str) -> Result<Vec<AttachmentDto>, Ap
 
     let items: Vec<AttachmentDto> = stmt
         .query_map(params![item_id], |row| {
+            let relative_path: String = row.get(3)?;
             Ok(AttachmentDto {
                 id: row.get(0)?,
                 item_id: row.get(1)?,
                 filename: row.get(2)?,
-                file_path: row.get(3)?,
+                file_path: resolve_file_path(&relative_path).to_string_lossy().to_string(),
                 mime_type: row.get(4)?,
                 file_size: row.get(5)?,
                 created_at: row.get(6)?,
@@ -241,7 +183,7 @@ pub fn delete(db: &DbState, id: &str) -> Result<(), AppError> {
         .conn
         .lock()
         .map_err(|e| AppError::Database(e.to_string()))?;
-    let file_path: Option<String> = conn
+    let relative_path: Option<String> = conn
         .query_row(
             "SELECT file_path FROM attachments WHERE id = ?1",
             params![id],
@@ -254,13 +196,11 @@ pub fn delete(db: &DbState, id: &str) -> Result<(), AppError> {
     if rows == 0 {
         return Err(AppError::NotFound(format!("Attachment {}", id)));
     }
-    if let Some(path) = file_path {
-        let path_ref = std::path::Path::new(&path);
-        let is_managed_attachment = path_ref
-            .components()
-            .any(|component| component.as_os_str() == "attachments");
-        if is_managed_attachment && path_ref.exists() {
-            std::fs::remove_file(path_ref).map_err(|e| AppError::Io(e.to_string()))?;
+    drop(conn);
+    if let Some(rel) = relative_path {
+        let full_path = resolve_file_path(&rel);
+        if full_path.exists() {
+            std::fs::remove_file(&full_path).map_err(|e| AppError::Io(e.to_string()))?;
         }
     }
     Ok(())
