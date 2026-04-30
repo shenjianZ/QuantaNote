@@ -1,38 +1,45 @@
-import { Bell, Cloud, Maximize2, Minus, Search, X } from "lucide-react";
+import { Maximize2, Minus, Search, X } from "lucide-react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Kbd } from "../common/Kbd";
+import { useSettingsStore } from "../../stores/settingsStore";
+
+const appWindow = getCurrentWindow();
 
 interface TopBarProps {
   onOpenSearch: () => void;
 }
 
 export function TopBar({ onOpenSearch }: TopBarProps) {
+  const settings = useSettingsStore((s) => s.settings);
+
+  function handleClose() {
+    if (settings.closeKeepRunning || settings.minimizeToTray) {
+      appWindow.minimize();
+      return;
+    }
+    appWindow.close();
+  }
+
   return (
     <header className="topbar">
       <button className="search-trigger" onClick={onOpenSearch} type="button">
-        <Search size={22} />
-        <span>搜索或记录任何东西...</span>
+        <Search />
+        <span className="search-text">搜索...</span>
         <span className="search-keys">
-          <Kbd>Ctrl</Kbd>
+          <Kbd>⌘</Kbd>
           <Kbd>K</Kbd>
         </span>
       </button>
 
       <div className="window-tools">
-        <button type="button" title="通知">
-          <Bell size={20} />
-          <i />
+        <button type="button" title="最小化" onClick={() => appWindow.minimize()}>
+          <Minus />
         </button>
-        <button type="button" title="云同步">
-          <Cloud size={22} />
+        <button type="button" title="最大化" onClick={() => appWindow.toggleMaximize()}>
+          <Maximize2 />
         </button>
-        <button type="button" title="最小化">
-          <Minus size={18} />
-        </button>
-        <button type="button" title="最大化">
-          <Maximize2 size={17} />
-        </button>
-        <button type="button" title="关闭">
-          <X size={20} />
+        <button type="button" title="关闭" onClick={handleClose}>
+          <X />
         </button>
       </div>
     </header>

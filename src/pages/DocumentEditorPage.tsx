@@ -1,176 +1,299 @@
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Bold,
   CheckSquare,
   Code2,
-  FileArchive,
   FileText,
-  Image,
   Italic,
   Link,
   List,
-  MoreHorizontal,
-  Plus,
   Quote,
-  Save,
-  Share2,
   Star,
   Underline,
 } from "lucide-react";
-import { docRelations } from "../data/mockData";
+import { useAppStore } from "../stores/appStore";
+import { useItemStore } from "../stores/itemStore";
+import { invoke } from "@tauri-apps/api/core";
+
+interface VersionDto {
+  id: string;
+  item_id: string;
+  version_number: number;
+  content: string;
+  change_summary: string;
+  created_at: string;
+}
+
+type FormatAction = "h1" | "h2" | "h3" | "bold" | "italic" | "underline" | "code" | "link" | "list" | "check" | "quote";
+
+const FORMAT_MARKS: Record<FormatAction, { prefix: string; suffix: string }> = {
+  h1: { prefix: "# ", suffix: "" },
+  h2: { prefix: "## ", suffix: "" },
+  h3: { prefix: "### ", suffix: "" },
+  bold: { prefix: "**", suffix: "**" },
+  italic: { prefix: "*", suffix: "*" },
+  underline: { prefix: "__", suffix: "__" },
+  code: { prefix: "`", suffix: "`" },
+  link: { prefix: "[", suffix: "](url)" },
+  list: { prefix: "- ", suffix: "" },
+  check: { prefix: "- [ ] ", suffix: "" },
+  quote: { prefix: "> ", suffix: "" },
+};
 
 export function DocumentEditorPage() {
+  const selectedItemId = useAppStore((s) => s.selectedItemId);
+  const navigate = useAppStore((s) => s.navigate);
+  const selectedItem = useItemStore((s) => s.selectedItem);
+  const getItem = useItemStore((s) => s.getItem);
+  const updateItem = useItemStore((s) => s.updateItem);
+  const items = useItemStore((s) => s.items);
+
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [saved, setSaved] = useState(true);
+  const [versions, setVersions] = useState<VersionDto[]>([]);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [inspectorTab, setInspectorTab] = useState<"props" | "activity">("props");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (selectedItemId) {
+      getItem(selectedItemId).catch(() => {});
+      invoke<VersionDto[]>("get_versions", { itemId: selectedItemId })
+        .then(setVersions)
+        .catch(() => {});
+    }
+  }, [selectedItemId, getItem]);
+
+  useEffect(() => {
+    if (selectedItem) {
+      setTitle(selectedItem.title);
+      setContent(selectedItem.content || "");
+      setIsFavorite(selectedItem.favorite);
+      setSaved(true);
+    }
+  }, [selectedItem]);
+
+  const save = useCallback(async (newTitle: string, newContent: string) => {
+    if (!selectedItemId) return;
+    try {
+      await updateItem(selectedItemId, { title: newTitle, content: newContent });
+      setSaved(true);
+      const version = await invoke<VersionDto>("create_version", {
+        itemId: selectedItemId,
+        content: newContent,
+        changeSummary: "自动保存",
+      });
+      setVersions((current) => [version, ...current].slice(0, 50));
+    } catch {
+      /* ignore */
+    }
+  }, [selectedItemId, updateItem]);
+
+  function scheduleSave(newTitle: string, newContent: string) {
+    setSaved(false);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => save(newTitle, newContent), 1000);
+  }
+
+  function handleTitleChange(value: string) {
+    setTitle(value);
+    scheduleSave(value, content);
+  }
+
+  function handleContentChange(value: string) {
+    setContent(value);
+    scheduleSave(title, value);
+  }
+
+  function handleFormat(action: FormatAction) {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const selected = content.substring(start, end);
+    const mark = FORMAT_MARKS[action];
+    const before = content.substring(0, start);
+    const after = content.substring(end);
+    const newContent = before + mark.prefix + selected + mark.suffix + after;
+    setContent(newContent);
+    scheduleSave(title, newContent);
+    setTimeout(() => {
+      ta.focus();
+      ta.selectionStart = start + mark.prefix.length;
+      ta.selectionEnd = start + mark.prefix.length + selected.length;
+    }, 0);
+  }
+
+  async function handleToggleFavorite() {
+    if (!selectedItemId) return;
+    const next = !isFavorite;
+    setIsFavorite(next);
+    await updateItem(selectedItemId, { favorite: next });
+  }
+
+  const relations = items.filter((i) => i.id !== selectedItemId).slice(0, 4);
+
+  function formatRelativeTime(dateStr: string) {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return "刚刚";
+    if (minutes < 60) return `${minutes} 分钟前`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} 小时前`;
+    const days = Math.floor(hours / 24);
+    return `${days} 天前`;
+  }
+
   return (
-    <div className="document-page">
-      <div className="doc-breadcrumb">
-        <span>文件</span>
-        <span>项目文档库</span>
-        <strong>项目规划文档</strong>
-        <em>已保存到 14:32</em>
-        <div>
-          <button type="button">
-            <Share2 size={18} />
-            分享
-          </button>
-          <button type="button">协作</button>
-          <button className="secure" type="button">
-            已加密
-          </button>
-          <button type="button">
-            <MoreHorizontal size={18} />
+    <div className="editor-layout">
+      <article className="editor-surface" style={{ display: 'flex', flexDirection: 'column' }}>
+        <div className="doc-breadcrumb">
+          <button type="button" onClick={() => navigate("all")}>文件</button>
+          <span>/</span>
+          <strong>{title || "未命名"}</strong>
+          <span style={{ marginLeft: 'auto' }} className="text-faint text-sm">
+            {saved ? "已保存" : "保存中..."}
+          </span>
+        </div>
+
+        <div className="doc-header">
+          <input
+            className="doc-title"
+            type="text"
+            value={title}
+            onChange={(e) => handleTitleChange(e.currentTarget.value)}
+            placeholder="文档标题"
+          />
+          <button
+            className="doc-star"
+            type="button"
+            onClick={handleToggleFavorite}
+            style={{ color: isFavorite ? 'var(--yellow)' : undefined }}
+          >
+            <Star fill={isFavorite ? "currentColor" : "none"} />
           </button>
         </div>
-      </div>
 
-      <div className="document-grid">
-        <article className="editor-surface">
-          <div className="doc-title">
-            <button type="button">←</button>
-            <h1>项目规划文档</h1>
-            <Star size={18} />
-          </div>
-          <div className="tag-row">
-            <span className="tag tag-green">#项目</span>
-            <span className="tag tag-blue">#规划</span>
-            <span className="tag tag-purple">#文档</span>
-            <button type="button">+ 添加标签</button>
-          </div>
+        <div className="format-toolbar">
+          {(["h1", "h2", "h3"] as FormatAction[]).map((action) => (
+            <button type="button" key={action} className="btn sm" onClick={() => handleFormat(action)}>
+              {action.toUpperCase()}
+            </button>
+          ))}
+          {([
+            { action: "bold" as FormatAction, Icon: Bold },
+            { action: "italic" as FormatAction, Icon: Italic },
+            { action: "underline" as FormatAction, Icon: Underline },
+            { action: "code" as FormatAction, Icon: Code2 },
+            { action: "link" as FormatAction, Icon: Link },
+            { action: "list" as FormatAction, Icon: List },
+            { action: "check" as FormatAction, Icon: CheckSquare },
+            { action: "quote" as FormatAction, Icon: Quote },
+          ]).map(({ action, Icon }) => (
+            <button type="button" key={action} onClick={() => handleFormat(action)} title={action}>
+              <Icon />
+            </button>
+          ))}
+        </div>
 
-          <div className="format-toolbar">
-            {["H1", "H2", "H3"].map((item) => (
-              <button type="button" key={item}>
-                {item}
-              </button>
-            ))}
-            {[Bold, Italic, Underline, Code2, Link, List, CheckSquare, Quote, MoreHorizontal].map(
-              (Icon, index) => (
-                <button type="button" key={index}>
-                  <Icon size={18} />
-                </button>
-              ),
-            )}
-          </div>
+        <div className="editor-content" style={{ flex: 1, overflow: 'auto', padding: '8px 0' }}>
+          <textarea
+            ref={textareaRef}
+            value={content}
+            onChange={(e) => handleContentChange(e.currentTarget.value)}
+            placeholder="开始输入内容..."
+            style={{
+              width: '100%',
+              height: '100%',
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--text)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '12px',
+              lineHeight: 1.6,
+              resize: 'none',
+              outline: 'none',
+            }}
+          />
+        </div>
+      </article>
 
-          <section className="doc-content">
-            <h2># 1. 项目背景与目标</h2>
-            <p>
-              本项目旨在搭建一套高可用、高性能的后端服务体系，支持核心业务的稳定运行，
-              并为未来的功能扩展和技术演进提供良好的基础设施和工程化支撑。
-            </p>
-            <h2># 2. 主要目标</h2>
-            <label><input type="checkbox" defaultChecked /> 完成高可用架构设计与部署</label>
-            <label><input type="checkbox" defaultChecked /> 支持水平扩展与弹性伸缩</label>
-            <label><input type="checkbox" /> 提升系统可观测性</label>
-            <label><input type="checkbox" /> 降低运维复杂度</label>
-            <h2># 3. 技术栈</h2>
-            <pre>{`1  docker-compose up -d
-2  # 查看服务状态
-3  docker-compose ps
-4  # 查看日志
-5  docker-compose logs -f app`}</pre>
-            <h2># 4. 架构图</h2>
-            <div className="architecture-strip">
-              <span>客户端</span>
-              <span>负载均衡 Nginx</span>
-              <span>API 网关</span>
-              <span>用户服务</span>
-              <span>订单服务</span>
-              <span>MySQL</span>
-            </div>
-            <blockquote>设计的核心在于权衡复杂度与可维护性，优先保证系统的可演进性。</blockquote>
-            <div className="related-doc">
-              <Link size={19} />
-              相关文档：《系统架构设计规范 v1.0》
-            </div>
-          </section>
-
-          <div className="editor-input">
-            <span>输入 / 呼出命令菜单，输入内容或粘贴链接，或拖拽文件到此处</span>
-            {[Save, Code2, Image, Link, FileText].map((Icon, index) => (
-              <button type="button" key={index}>
-                <Icon size={18} />
-              </button>
-            ))}
-          </div>
-        </article>
-
-        <aside className="doc-inspector">
-          <div className="inspector-tabs">
-            <button className="active" type="button">属性</button>
-            <button type="button">活动</button>
-          </div>
-          <section>
-            <h3>标签</h3>
-            <div className="tag-row">
-              <span className="tag tag-green">#项目</span>
-              <span className="tag tag-blue">#规划</span>
-              <span className="tag tag-purple">#文档</span>
-              <button type="button"><Plus size={16} /></button>
-            </div>
-          </section>
-          <section>
-            <h3>关联记录 (4)</h3>
-            {docRelations.map((relation) => {
-              const Icon = relation.icon;
-              return (
-                <div className="relation-row" key={relation.title}>
-                  <Icon size={18} />
-                  <span>{relation.title}</span>
-                  <small>{relation.tag}</small>
-                </div>
-              );
-            })}
-          </section>
-          <section>
-            <h3>版本历史</h3>
-            {["v1.3 张三 更新了文档内容", "v1.2 李四 更新了文档内容", "v1.1 张三 创建了文档"].map(
-              (version, index) => (
-                <div className={`version-row ${index === 0 ? "active" : ""}`} key={version}>
-                  {version}
-                </div>
-              ),
-            )}
-          </section>
-          <section>
-            <h3>附件 (3)</h3>
-            {[
-              ["架构图 v1.0.png", "PNG · 2.4 MB", Image],
-              ["项目规划草案.xlsx", "Excel · 1.8 MB", FileText],
-              ["技术选型对比表.pdf", "PDF · 1.2 MB", FileArchive],
-            ].map(([name, meta, Icon]) => (
-              <div className="relation-row" key={name as string}>
-                {typeof Icon !== "string" && <Icon size={18} />}
-                <span>{name as string}</span>
-                <small>{meta as string}</small>
+      <aside className="doc-inspector">
+        <div className="inspector-tabs">
+          <button className={`inspector-tab ${inspectorTab === "props" ? "active" : ""}`} type="button" onClick={() => setInspectorTab("props")}>属性</button>
+          <button className={`inspector-tab ${inspectorTab === "activity" ? "active" : ""}`} type="button" onClick={() => setInspectorTab("activity")}>活动</button>
+        </div>
+        <div className="inspector-body">
+          {inspectorTab === "props" ? (
+            <>
+              <div style={{ marginBottom: '10px' }}>
+                <div className="text-faint text-sm" style={{ marginBottom: '4px', fontWeight: 600 }}>信息</div>
+                <div className="text-sm text-muted">类型: {selectedItem?.item_type || "note"}</div>
+                <div className="text-sm text-muted">创建: {selectedItem?.created_at ? new Date(selectedItem.created_at).toLocaleString("zh-CN") : "-"}</div>
+                <div className="text-sm text-muted">更新: {selectedItem?.updated_at ? new Date(selectedItem.updated_at).toLocaleString("zh-CN") : "-"}</div>
               </div>
-            ))}
-          </section>
-          <section className="ai-summary">
-            <h3>AI 摘要</h3>
-            <p>本文档为项目规划文档，明确了项目背景、目标、技术栈、架构设计和里程碑计划。</p>
-            <button type="button">重新生成摘要</button>
-          </section>
-        </aside>
-      </div>
+
+              <div style={{ marginBottom: '10px' }}>
+                <div className="text-faint text-sm" style={{ marginBottom: '4px', fontWeight: 600 }}>关联记录</div>
+                <div className="doc-relations">
+                  {relations.map((rel) => (
+                    <div className="doc-relation" key={rel.id}>
+                      <FileText />
+                      <span className="rel-title">{rel.title}</span>
+                    </div>
+                  ))}
+                  {relations.length === 0 && (
+                    <div className="text-muted text-sm">暂无关联</div>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '10px' }}>
+                <div className="text-faint text-sm" style={{ marginBottom: '4px', fontWeight: 600 }}>版本</div>
+                {versions.length === 0 && (
+                  <div className="text-muted text-sm">暂无版本记录</div>
+                )}
+                {versions.slice(0, 5).map((v, i) => (
+                  <div key={v.id} style={{
+                    padding: '3px 0',
+                    fontSize: '11px',
+                    color: i === 0 ? 'var(--cyan)' : 'var(--text-muted)',
+                  }}>
+                    v{v.version_number} {v.change_summary || "更新"}
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div>
+              <div className="text-faint text-sm" style={{ marginBottom: '8px', fontWeight: 600 }}>版本历史</div>
+              {versions.length === 0 && (
+                <div className="text-muted text-sm">暂无活动记录</div>
+              )}
+              {versions.map((v, i) => (
+                <div key={v.id} className="activity-item" style={{
+                  padding: '6px 0',
+                  borderBottom: i < versions.length - 1 ? '1px solid var(--border)' : 'none',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 500, color: i === 0 ? 'var(--cyan)' : 'var(--text)' }}>
+                      v{v.version_number}
+                    </span>
+                    <span className="text-faint" style={{ fontSize: '10px' }}>
+                      {formatRelativeTime(v.created_at)}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 2 }}>
+                    {v.change_summary || "内容更新"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </aside>
     </div>
   );
 }

@@ -1,18 +1,34 @@
+use rusqlite::params;
+
+use crate::db::DbState;
+use crate::error::AppError;
 use crate::models::search::SearchResultDto;
 
-pub fn search(query: &str) -> Vec<SearchResultDto> {
-    vec![
-        SearchResultDto {
-            id: "project-start".to_string(),
-            title: format!("{}启动资料", query),
-            item_type: "note".to_string(),
-            summary: "项目概述、需求、技术栈与附件".to_string(),
-        },
-        SearchResultDto {
-            id: "deploy-command".to_string(),
-            title: "服务器部署命令".to_string(),
-            item_type: "command".to_string(),
-            summary: "docker compose up -d".to_string(),
-        },
-    ]
+pub fn search(db: &DbState, query: &str) -> Result<Vec<SearchResultDto>, AppError> {
+    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT i.id, i.title, i.item_type, COALESCE(substr(i.content, 1, 100), '') as summary
+             FROM items_fts f
+             JOIN items i ON i.rowid = f.rowid
+             WHERE items_fts MATCH ?1
+             ORDER BY rank
+             LIMIT 50",
+        )
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+    let results: Vec<SearchResultDto> = stmt
+        .query_map(params![query], |row| {
+            Ok(SearchResultDto {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                item_type: row.get(2)?,
+                summary: row.get(3)?,
+            })
+        })
+        .map_err(|e| AppError::Database(e.to_string()))?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    Ok(results)
 }

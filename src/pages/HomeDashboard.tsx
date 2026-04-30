@@ -1,162 +1,140 @@
-import {
-  CheckSquare,
-  GitBranch,
-  Link,
-  Network,
-  Pencil,
-  UploadCloud,
-} from "lucide-react";
-import { activities, metrics, pinnedItems } from "../data/mockData";
+import { useEffect, useMemo } from "react";
+import { FileText } from "lucide-react";
+import { useItemStore } from "../stores/itemStore";
+import { adaptItem } from "../adapters/itemAdapter";
 import type { AppPage } from "../types";
-import { TagPill } from "../components/common/TagPill";
 
 interface HomeDashboardProps {
   onNavigate: (page: AppPage) => void;
+  onCreateNote: () => void;
+  onOpenItem: (id: string, page?: AppPage) => void;
 }
 
-export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
+export function HomeDashboard({ onNavigate, onCreateNote, onOpenItem }: HomeDashboardProps) {
+  const items = useItemStore((s) => s.items);
+  const pinnedItems = useItemStore((s) => s.pinnedItems);
+  const recentItems = useItemStore((s) => s.recentItems);
+  const fetchItems = useItemStore((s) => s.fetchItems);
+  const fetchPinned = useItemStore((s) => s.fetchPinned);
+  const fetchRecent = useItemStore((s) => s.fetchRecent);
+
+  useEffect(() => {
+    fetchItems().catch(() => {});
+    fetchPinned().catch(() => {});
+    fetchRecent(10).catch(() => {});
+  }, [fetchItems, fetchPinned, fetchRecent]);
+
+  const metrics = useMemo(() => [
+    { label: "全部记录", value: String(items.length), delta: "本应用数据", tone: "cyan" },
+    { label: "置顶内容", value: String(pinnedItems.length), delta: "快速访问", tone: "purple" },
+    { label: "最近更新", value: String(recentItems.length), delta: "活跃记录", tone: "blue" },
+  ], [items, pinnedItems, recentItems]);
+
+  const adaptedPinned = useMemo(() => pinnedItems.map(adaptItem), [pinnedItems]);
+  const adaptedRecent = useMemo(() => recentItems.map(adaptItem), [recentItems]);
+
   return (
     <div className="dashboard-layout">
       <section className="dashboard-main">
-        <div className="hero-panel">
-          <div>
-            <h1>晚上好，octocat</h1>
-            <p>专注记录，安全同行。你今天已经记录了 12 条内容。</p>
-            <div className="quick-actions">
-              {[
-                { icon: Pencil, label: "新建笔记", page: "document" as AppPage },
-                { icon: UploadCloud, label: "上传文件", page: "files" as AppPage },
-                { icon: Link, label: "录入链接", page: "all" as AppPage },
-                { icon: CheckSquare, label: "新建待办", page: "all" as AppPage },
-                { icon: GitBranch, label: "创建思维导图", page: "versions" as AppPage },
-              ].map((action) => {
-                const Icon = action.icon;
-                return (
-                  <button key={action.label} onClick={() => onNavigate(action.page)} type="button">
-                    <Icon size={27} />
-                    <span>{action.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <div className="orbit-card">
-            <div className="orbital-rings" />
-            <blockquote>记录是为了更好地思考，思考是为了更好地行动。</blockquote>
-            <span>知识守护舱</span>
-          </div>
-        </div>
-
         <div className="metric-grid">
           {metrics.map((metric) => (
-            <article className={`metric-card metric-${metric.tone}`} key={metric.label}>
-              <span>{metric.label}</span>
-              <strong>{metric.value}</strong>
-              <small>{metric.delta}</small>
-              <div className="sparkline" />
+            <article className={`metric-card tone-${metric.tone}`} key={metric.label}>
+              <div className="metric-label">{metric.label}</div>
+              <div className="metric-value">{metric.value}</div>
+              <div className="metric-delta">{metric.delta}</div>
             </article>
           ))}
         </div>
 
-        <section className="content-panel">
-          <div className="panel-heading">
-            <h2>置顶内容</h2>
-            <button type="button" onClick={() => onNavigate("all")}>
-              查看全部 (6)
+        <section>
+          <div className="section-header">
+            <h3>置顶内容</h3>
+            <button className="section-action" onClick={() => onNavigate("all")} type="button">
+              查看全部
             </button>
           </div>
           <div className="pinned-grid">
-            {pinnedItems.map((item) => {
+            {adaptedPinned.length === 0 && (
+              <div className="text-muted text-sm" style={{ padding: 8 }}>暂无置顶内容</div>
+            )}
+            {adaptedPinned.map((item) => {
               const Icon = item.icon;
               return (
                 <button
                   className="pinned-card"
                   key={item.id}
                   type="button"
-                  onClick={() => onNavigate(item.id === "project-start" ? "document" : "all")}
+                  onClick={() => onOpenItem(item.id, "document")}
                 >
-                  <Icon size={22} />
-                  <strong>{item.title}</strong>
-                  <div>
-                    {item.tags.map((tag) => (
-                      <TagPill key={tag.name} tag={tag} />
-                    ))}
+                  <div className={`pinned-icon accent-${item.accent}`}>
+                    <Icon />
                   </div>
-                  <p>{item.summary}</p>
-                  <small>{item.time}</small>
+                  <div className="pinned-info">
+                    <div className="pinned-title">{item.title}</div>
+                    <div className="pinned-summary">{item.summary}</div>
+                  </div>
                 </button>
               );
             })}
           </div>
         </section>
 
-        <div className="dashboard-bottom">
-          <section className="content-panel activity-panel">
-            <h2>最近活动</h2>
-            {activities.map((activity) => (
-              <div className="activity-row" key={activity.title}>
-                <span className={`dot ${activity.tone}`} />
-                <div>
-                  <strong>{activity.title}</strong>
-                  <small>{activity.detail}</small>
+        <section>
+          <div className="section-header">
+            <h3>最近活动</h3>
+          </div>
+          <div className="activity-list">
+            {adaptedRecent.length === 0 && (
+              <div className="text-muted text-sm" style={{ padding: 8 }}>暂无活动记录</div>
+            )}
+            {adaptedRecent.map((item) => (
+                <div className="activity-item" key={item.id}>
+                  <span className={`activity-dot tone-${item.accent}`} />
+                  <span className="activity-title">{item.title}</span>
+                  <span className="activity-time">{item.time}</span>
                 </div>
-                <time>{activity.time}</time>
-              </div>
-            ))}
-          </section>
-
-          <section className="content-panel graph-panel">
-            <h2>知识图谱概览</h2>
-            <div className="graph">
-              <Network size={110} />
-              <i />
-              <i />
-              <i />
-            </div>
-            <button type="button" onClick={() => onNavigate("versions")}>
-              进入知识图谱
-            </button>
-          </section>
-        </div>
+              ))}
+          </div>
+        </section>
       </section>
 
       <aside className="dashboard-aside">
-        <section className="content-panel">
-          <h2>今日概览</h2>
+        <div className="today-card">
+          <h4>数据概览</h4>
           {[
-            ["创建记录", "12"],
-            ["更新记录", "8"],
-            ["附件数量", "36"],
-            ["待办完成", "5"],
+            ["总记录", String(items.length)],
+            ["置顶", String(pinnedItems.length)],
+            ["收藏", String(items.filter((i) => i.favorite).length)],
           ].map(([label, value]) => (
-            <div className="summary-row" key={label}>
-              <span>{label}</span>
-              <strong>{value}</strong>
+            <div className="todo-item" key={label}>
+              <span className="flex-1 text-muted text-sm">{label}</span>
+              <span className="mono">{value}</span>
             </div>
           ))}
-        </section>
+        </div>
 
-        <section className="content-panel">
-          <h2>最近使用标签</h2>
-          {["项目", "文档", "架构", "设计", "法务", "服务器"].map((tag, index) => (
-            <div className="summary-row tag-summary" key={tag}>
-              <span>#{tag}</span>
-              <strong>{[24, 18, 12, 10, 8, 7][index]}</strong>
-            </div>
+        <div className="today-card" style={{ marginTop: 4 }}>
+          <h4>快捷操作</h4>
+          {[
+            { label: "新建笔记", action: onCreateNote },
+            { label: "浏览全部", page: "all" as AppPage },
+            { label: "打开设置", page: "settings" as AppPage },
+          ].map((action) => (
+            <button
+              className="todo-item"
+              key={action.label}
+              type="button"
+              onClick={() => {
+                if (action.action) action.action();
+                else if (action.page) onNavigate(action.page);
+              }}
+              style={{ background: "none", border: "none", cursor: "pointer", width: "100%", textAlign: "left" }}
+            >
+              <FileText style={{ width: 14, height: 14 }} />
+              <span>{action.label}</span>
+            </button>
           ))}
-        </section>
-
-        <section className="content-panel">
-          <h2>待办事项</h2>
-          {["完成系统架构设计评审", "更新部署文档", "准备周会汇报材料", "整理客户反馈"].map(
-            (todo, index) => (
-              <label className="todo-row" key={todo}>
-                <input type="checkbox" defaultChecked={index === 3} />
-                <span>{todo}</span>
-              </label>
-            ),
-          )}
-        </section>
+        </div>
       </aside>
     </div>
   );

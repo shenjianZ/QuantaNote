@@ -1,199 +1,197 @@
+import { useEffect, useRef, useState } from "react";
 import {
-  FileArchive,
+  BookOpen,
+  Braces,
   FileText,
-  FolderPlus,
-  KeyRound,
+  Folder,
   Link,
-  LockKeyhole,
   Search,
-  Settings,
-  Star,
   Terminal,
-  Tag,
 } from "lucide-react";
-import { commandRows } from "../../data/mockData";
 import { Kbd } from "../common/Kbd";
+import { useSearchStore } from "../../stores/searchStore";
+import type { SearchResultDto } from "../../stores/searchStore";
+import type { AppPage } from "../../types";
+
+const TYPE_ICON: Record<string, typeof FileText> = {
+  note: FileText,
+  link: Link,
+  file: Folder,
+  image: Folder,
+  code: Braces,
+  task: BookOpen,
+  command: Terminal,
+};
+
+const TYPE_LABEL: Record<string, string> = {
+  note: "笔记",
+  link: "链接",
+  file: "文件",
+  image: "图片",
+  code: "代码",
+  task: "任务",
+  command: "命令",
+};
+
+const TAB_FILTERS = [
+  { key: "all", label: "全部" },
+  { key: "note", label: "记录" },
+  { key: "file", label: "文件" },
+  { key: "command", label: "命令" },
+];
 
 interface CommandPaletteProps {
   open: boolean;
   onClose: () => void;
   onOpenDocument: () => void;
+  onCreateNote: () => void;
+  onNavigate: (page: AppPage) => void;
+  onSelectItem?: (id: string) => void;
 }
+
+const COMMANDS: SearchResultDto[] = [
+  { id: "command:new-note", title: "新建笔记", item_type: "command", summary: "创建一条新的本地笔记" },
+  { id: "command:settings", title: "打开设置", item_type: "command", summary: "调整外观与备份" },
+  { id: "command:all", title: "打开全部", item_type: "command", summary: "查看全部记录" },
+];
 
 export function CommandPalette({
   open,
   onClose,
   onOpenDocument,
+  onCreateNote,
+  onNavigate,
+  onSelectItem,
 }: CommandPaletteProps) {
+  const query = useSearchStore((s) => s.query);
+  const results = useSearchStore((s) => s.results);
+  const search = useSearchStore((s) => s.search);
+  const setQuery = useSearchStore((s) => s.setQuery);
+  const [activeTab, setActiveTab] = useState("all");
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setTimeout(() => inputRef.current?.focus(), 50);
+      search("");
+    } else {
+      setQuery("");
+      setSelectedIdx(0);
+    }
+  }, [open, setQuery, search]);
+
+  const commandResults = COMMANDS.filter((command) => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return true;
+    return `${command.title} ${command.summary}`.toLowerCase().includes(normalized);
+  });
+
+  const combinedResults = query.trim() ? [...commandResults, ...results] : commandResults;
+  const filtered = activeTab === "all"
+    ? combinedResults
+    : combinedResults.filter((r) => r.item_type === activeTab);
+
+  useEffect(() => {
+    setSelectedIdx(0);
+  }, [filtered.length]);
+
+  function handleChange(value: string) {
+    setQuery(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      search(value);
+    }, 200);
+  }
+
+  function handleSelect(result: SearchResultDto) {
+    onClose();
+    if (result.id === "command:new-note") {
+      onCreateNote();
+      return;
+    }
+    if (result.id === "command:settings") {
+      onNavigate("settings");
+      return;
+    }
+    if (result.id === "command:all") {
+      onNavigate("all");
+      return;
+    }
+    if (result.id && onSelectItem) {
+      onSelectItem(result.id);
+    }
+    onOpenDocument();
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelectedIdx((i) => Math.min(i + 1, filtered.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelectedIdx((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter" && filtered[selectedIdx]) {
+      handleSelect(filtered[selectedIdx]);
+    }
+  }
+
   if (!open) return null;
 
   return (
-    <div className="palette-backdrop" onClick={onClose}>
-      <section className="command-palette" onClick={(event) => event.stopPropagation()}>
-        <div className="palette-caption">
-          <span>全局搜索 / Command Palette</span>
-          <button type="button" onClick={onClose}>
-            <Kbd>Esc</Kbd>
-            关闭
-          </button>
+    <div className="palette-overlay" onClick={onClose}>
+      <section className="command-palette" onClick={(e) => e.stopPropagation()}>
+        <div className="palette-search">
+          <Search />
+          <input
+            ref={inputRef}
+            placeholder="搜索记录、命令、文件..."
+            value={query}
+            onChange={(e) => handleChange(e.currentTarget.value)}
+            onKeyDown={handleKeyDown}
+            autoFocus
+          />
+          <Kbd>Esc</Kbd>
         </div>
-        <div className="palette-input">
-          <Search size={30} />
-          <span>项目</span>
-          <Settings size={20} />
-        </div>
+
         <div className="palette-tabs">
-          {["全部 (68)", "记录 (23)", "文件 (18)", "命令 (9)", "密码 (6)", "标签 (5)", "建议 (7)"].map(
-            (tab, index) => (
-              <button className={index === 0 ? "active" : ""} key={tab} type="button">
-                {tab}
-              </button>
-            ),
+          {TAB_FILTERS.map((tab) => (
+            <button
+              className={`palette-tab ${tab.key === activeTab ? "active" : ""}`}
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="palette-results">
+          {filtered.length === 0 && query.trim() && (
+            <div className="text-muted text-sm" style={{ padding: 12, textAlign: "center" }}>
+              未找到匹配结果
+            </div>
           )}
-        </div>
-
-        <div className="palette-grid">
-          <div className="palette-results">
-            <section>
-              <div className="section-title">最近记录</div>
-              {[
-                { icon: FileText, title: "项目启动资料", type: "笔记", meta: "#项目 #文档", time: "1 分钟前" },
-                { icon: FileArchive, title: "项目需求文档（PRD）.pdf", type: "文件", meta: "#项目 #文档", time: "2 分钟前" },
-                { icon: Terminal, title: "项目服务器部署命令", type: "命令", meta: "#服务器 #部署", time: "15 分钟前" },
-              ].map((row, index) => {
-                const Icon = row.icon;
-                return (
-                  <button
-                    className={`result-row ${index === 0 ? "active" : ""}`}
-                    key={row.title}
-                    onClick={index === 0 ? onOpenDocument : undefined}
-                    type="button"
-                  >
-                    <Icon size={20} />
-                    <strong>{row.title}</strong>
-                    <span>{row.type}</span>
-                    <em>{row.meta}</em>
-                    <small>{row.time}</small>
-                    {index === 0 && <Star size={17} />}
-                  </button>
-                );
-              })}
-            </section>
-
-            <section>
-              <div className="section-title">命令操作</div>
-              <div className="command-grid">
-                {[
-                  { icon: FileText, title: "新建项目需求文档", mark: "快速新建" },
-                  { icon: FolderPlus, title: "新建项目文件夹", mark: "快速新建" },
-                  { icon: LockKeyhole, title: "项目归档", mark: "记录管理" },
-                  { icon: Tag, title: "项目标签：#项目", mark: "标签操作" },
-                ].map((cmd) => {
-                  const Icon = cmd.icon;
-                  return (
-                    <button type="button" key={cmd.title}>
-                      <Icon size={19} />
-                      <span>{cmd.title}</span>
-                      <small>{cmd.mark}</small>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-
-            <section>
-              <div className="section-title">文件资料</div>
-              <div className="compact-list">
-                <span>项目合同-终版.docx</span>
-                <span>DOCX · 568 KB · 2024-05-19</span>
-                <span>项目汇报模板.pptx</span>
-                <span>PPTX · 2.4 MB · 2024-05-12</span>
-              </div>
-            </section>
-
-            <section>
-              <div className="section-title">密码保险箱</div>
-              <div className="secret-list">
-                <span>项目管理系统账号</span>
-                <small>admin@project.com</small>
-                <span>项目服务器 SSH 账号</span>
-                <small>root@10.0.0.12</small>
-                <span>项目数据库账号</span>
-                <small>db_project@prod</small>
-              </div>
-            </section>
-
-            <section>
-              <div className="section-title">命令快捷方式</div>
-              {commandRows.map((row) => (
-                <div className="command-row" key={row.title}>
-                  <span>{row.title}</span>
-                  <small>{row.desc}</small>
-                  <Kbd>{row.keys}</Kbd>
+          {filtered.map((item, index) => {
+            const Icon = TYPE_ICON[item.item_type] ?? FileText;
+            return (
+              <button
+                className={`palette-result ${index === selectedIdx ? "selected" : ""}`}
+                key={item.id}
+                onClick={() => handleSelect(item)}
+                type="button"
+              >
+                <div className="pr-icon accent-cyan">
+                  <Icon />
                 </div>
-              ))}
-            </section>
-          </div>
-
-          <aside className="palette-preview">
-            <div className="preview-type">
-              <FileText size={20} />
-              笔记
-              <span>加密</span>
-            </div>
-            <h2>项目启动资料</h2>
-            <div className="tag-row">
-              <span className="tag tag-green">#项目</span>
-              <span className="tag tag-blue">#文档</span>
-              <button type="button">+</button>
-            </div>
-            <p>
-              本项目旨在搭建一套高可用、高性能的后端服务体系，支持核心业务的稳定运行。
-              项目将分三个阶段交付，包含需求评审、方案设计、开发测试与上线部署。
-            </p>
-            <dl>
-              <dt>创建时间</dt>
-              <dd>2024-05-20 14:32</dd>
-              <dt>更新时间</dt>
-              <dd>1 分钟前</dd>
-              <dt>位置</dt>
-              <dd>全部 / 笔记</dd>
-              <dt>大小</dt>
-              <dd>8.6 MB</dd>
-            </dl>
-            <div className="preview-actions">
-              <button type="button" onClick={onOpenDocument}>
-                <Link size={17} />
-                打开
+                <span className="pr-title">{item.title}</span>
+                <span className="pr-desc">{TYPE_LABEL[item.item_type] ?? item.item_type}</span>
               </button>
-              <button type="button">
-                <KeyRound size={17} />
-                复制
-              </button>
-              <button type="button">
-                <Star size={17} />
-                收藏
-              </button>
-            </div>
-            <div className="related-box">
-              <strong>相关内容</strong>
-              <span>项目需求文档（PRD）.pdf</span>
-              <span>项目服务器部署命令</span>
-              <span>项目合同-终版.docx</span>
-            </div>
-          </aside>
+            );
+          })}
         </div>
-
-        <footer className="palette-footer">
-          <Kbd>↑ ↓</Kbd>
-          <span>选择</span>
-          <Kbd>Enter</Kbd>
-          <span>打开</span>
-          <Kbd>Ctrl + C</Kbd>
-          <span>复制</span>
-          <Kbd>Tab</Kbd>
-          <span>切换</span>
-        </footer>
       </section>
     </div>
   );

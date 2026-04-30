@@ -1,0 +1,244 @@
+/* ── QuantaNote Theme System ── */
+
+/* ── Dark Theme (Default) ── */
+:root,
+[data-theme="dark"] {
+  --bg-base: #06111f;
+  --bg-body:
+    radial-gradient(circle at 28% 38%, rgba(34, 211, 238, 0.36), transparent 26%),
+    radial-gradient(circle at 78% 64%, rgba(251, 113, 133, 0.24), transparent 24%),
+    linear-gradient(145deg, #061426 0%, #0a1f35 45%, #0a1324 100%);
+
+  --bg-app:
+    linear-gradient(135deg, rgba(11, 20, 35, 0.92), rgba(12, 25, 43, 0.78)),
+    rgba(8, 15, 28, 0.9);
+  --bg-sidebar: linear-gradient(180deg, rgba(8, 17, 31, 0.82), rgba(13, 23, 38, 0.56));
+  --bg-panel: rgba(18, 29, 48, 0.68);
+  --bg-panel-strong: rgba(21, 33, 55, 0.86);
+  --bg-panel-soft: rgba(255, 255, 255, 0.045);
+  --bg-input: rgba(9, 17, 31, 0.58);
+  --bg-button: rgba(255, 255, 255, 0.045);
+  --bg-button-hover: rgba(255, 255, 255, 0.08);
+  --bg-nav-active: linear-gradient(135deg, rgba(34, 211, 238, 0.22), rgba(17, 24, 39, 0.18));
+  --bg-overlay: rgba(0, 0, 0, 0.6);
+
+  --border: rgba(151, 179, 211, 0.16);
+  --border-strong: rgba(125, 211, 252, 0.42);
+  --border-app: rgba(197, 216, 238, 0.22);
+  --border-input: rgba(151, 179, 211, 0.16);
+  --border-kbd: rgba(194, 213, 235, 0.12);
+
+  --text: #f1f5fa;
+  --text-secondary: #d8e2ee;
+  --text-muted: #a8b9cc;
+  --text-faint: #7a90a8;
+  --text-on-accent: #e0faff;
+  --text-nav: #a8b9cc;
+  --text-nav-active: #67e8f9;
+
+  --shadow-app: 0 30px 90px rgba(0, 0, 0, 0.45);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --shadow-glow-cyan: 0 0 26px rgba(34, 211, 238, 0.12);
+  --shadow-panel: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+
+  --backdrop: blur(28px);
+  --backdrop-soft: blur(16px);
+
+  --cyan: #22d3ee;
+  --green: #39e5a4;
+  --blue: #60a5fa;
+  --purple: #a78bfa;
+  --yellow: #fbbf24;
+  --red: #fb7185;
+  --cyan-soft: rgba(34, 211, 238, 0.14);
+  --green-soft: rgba(34, 197, 94, 0.13);
+  --blue-soft: rgba(59, 130, 246, 0.14);
+  --purple-soft: rgba(139, 92, 246, 0.16);
+  --yellow-soft: rgba(234, 179, 8, 0.14);
+  --red-soft: rgba(244, 63, 94, 0.14);
+
+  --radius: 12px;
+  --radius-lg: 20px;
+
+  --font-sans: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-size-base: 13px;
+}
+
+/* ── Light Theme ── */
+[data-theme="light"] {
+  --bg-base: #f0f4f8;
+  --bg-body:
+    radial-gradient(circle at 28% 38%, rgba(34, 211, 238, 0.12), transparent 26%),
+    radial-gradient(circle at 78% 64%, rgba(251, 113, 133, 0.08), transparent 24%),
+    linear-gradient(145deg, #f0f4f8 0%, #e8eef6 45%, #eef1f8 100%);
+
+  --bg-app:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.88)),
+    rgba(255, 255, 255, 0.9);
+  --bg-sidebar: linear-gradient(180deg, rgba(240, 244, 248, 0.9), rgba(235, 240, 248, 0.85));
+  --bg-panel: rgba(255, 255, 255, 0.7);
+  --bg-panel-strong: rgba(248, 250, 252, 0.9);
+  --bg-panel-soft: rgba(0, 0, 0, 0.03);
+  --bg-input: rgba(241, 245, 249, 0.8);
+  --bg-button: rgba(0, 0, 0, 0.04);
+  --bg-button-hover: rgba(0, 0, 0, 0.07);
+  --bg-nav-active: linear-gradient(135deg, rgba(34, 211, 238, 0.12), rgba(17, 24, 39, 0.04));
+  --bg-overlay: rgba(0, 0, 0, 0.3);
+
+  --border: rgba(148, 163, 184, 0.25);
+  --border-strong: rgba(34, 211, 238, 0.45);
+  --border-app: rgba(148, 163, 184, 0.3);
+  --border-input: rgba(148, 163, 184, 0.25);
+  --border-kbd: rgba(148, 163, 184, 0.2);
+
+  --text: #0f172a;
+  --text-secondary: #1e293b;
+  --text-muted: #475569;
+  --text-faint: #64748b;
+  --text-on-accent: #042f2e;
+  --text-nav: #475569;
+  --text-nav-active: #0891b2;
+
+  --shadow-app: 0 20px 60px rgba(0, 0, 0, 0.1);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  --shadow-glow-cyan: 0 0 20px rgba(34, 211, 238, 0.08);
+  --shadow-panel: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+
+  --backdrop: blur(20px);
+  --backdrop-soft: blur(12px);
+
+  --cyan: #0891b2;
+  --green: #059669;
+  --blue: #2563eb;
+  --purple: #7c3aed;
+  --yellow: #d97706;
+  --red: #dc2626;
+  --cyan-soft: rgba(8, 145, 178, 0.1);
+  --green-soft: rgba(5, 150, 105, 0.1);
+  --blue-soft: rgba(37, 99, 235, 0.1);
+  --purple-soft: rgba(124, 58, 237, 0.1);
+  --yellow-soft: rgba(217, 119, 6, 0.1);
+  --red-soft: rgba(220, 38, 38, 0.1);
+
+  --radius: 12px;
+  --radius-lg: 20px;
+}
+
+/* ── System Theme ── */
+[data-theme="system"] {
+  --bg-base: #06111f;
+  --bg-body:
+    radial-gradient(circle at 28% 38%, rgba(34, 211, 238, 0.36), transparent 26%),
+    radial-gradient(circle at 78% 64%, rgba(251, 113, 133, 0.24), transparent 24%),
+    linear-gradient(145deg, #061426 0%, #0a1f35 45%, #0a1324 100%);
+
+  --bg-app:
+    linear-gradient(135deg, rgba(11, 20, 35, 0.92), rgba(12, 25, 43, 0.78)),
+    rgba(8, 15, 28, 0.9);
+  --bg-sidebar: linear-gradient(180deg, rgba(8, 17, 31, 0.82), rgba(13, 23, 38, 0.56));
+  --bg-panel: rgba(18, 29, 48, 0.68);
+  --bg-panel-strong: rgba(21, 33, 55, 0.86);
+  --bg-panel-soft: rgba(255, 255, 255, 0.045);
+  --bg-input: rgba(9, 17, 31, 0.58);
+  --bg-button: rgba(255, 255, 255, 0.045);
+  --bg-button-hover: rgba(255, 255, 255, 0.08);
+  --bg-nav-active: linear-gradient(135deg, rgba(34, 211, 238, 0.22), rgba(17, 24, 39, 0.18));
+  --bg-overlay: rgba(0, 0, 0, 0.6);
+
+  --border: rgba(151, 179, 211, 0.16);
+  --border-strong: rgba(125, 211, 252, 0.42);
+  --border-app: rgba(197, 216, 238, 0.22);
+  --border-input: rgba(151, 179, 211, 0.16);
+  --border-kbd: rgba(194, 213, 235, 0.12);
+
+  --text: #f1f5fa;
+  --text-secondary: #d8e2ee;
+  --text-muted: #a8b9cc;
+  --text-faint: #7a90a8;
+  --text-on-accent: #e0faff;
+  --text-nav: #a8b9cc;
+  --text-nav-active: #67e8f9;
+
+  --shadow-app: 0 30px 90px rgba(0, 0, 0, 0.45);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --shadow-glow-cyan: 0 0 26px rgba(34, 211, 238, 0.12);
+  --shadow-panel: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+
+  --backdrop: blur(28px);
+  --backdrop-soft: blur(16px);
+
+  --cyan: #22d3ee;
+  --green: #39e5a4;
+  --blue: #60a5fa;
+  --purple: #a78bfa;
+  --yellow: #fbbf24;
+  --red: #fb7185;
+  --cyan-soft: rgba(34, 211, 238, 0.14);
+  --green-soft: rgba(34, 197, 94, 0.13);
+  --blue-soft: rgba(59, 130, 246, 0.14);
+  --purple-soft: rgba(139, 92, 246, 0.16);
+  --yellow-soft: rgba(234, 179, 8, 0.14);
+  --red-soft: rgba(244, 63, 94, 0.14);
+
+  --radius: 12px;
+  --radius-lg: 20px;
+}
+
+@media (prefers-color-scheme: light) {
+  [data-theme="system"] {
+    --bg-base: #f0f4f8;
+    --bg-body:
+      radial-gradient(circle at 28% 38%, rgba(34, 211, 238, 0.12), transparent 26%),
+      radial-gradient(circle at 78% 64%, rgba(251, 113, 133, 0.08), transparent 24%),
+      linear-gradient(145deg, #f0f4f8 0%, #e8eef6 45%, #eef1f8 100%);
+
+    --bg-app:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.88)),
+      rgba(255, 255, 255, 0.9);
+    --bg-sidebar: linear-gradient(180deg, rgba(240, 244, 248, 0.9), rgba(235, 240, 248, 0.85));
+    --bg-panel: rgba(255, 255, 255, 0.7);
+    --bg-panel-strong: rgba(248, 250, 252, 0.9);
+    --bg-panel-soft: rgba(0, 0, 0, 0.03);
+    --bg-input: rgba(241, 245, 249, 0.8);
+    --bg-button: rgba(0, 0, 0, 0.04);
+    --bg-button-hover: rgba(0, 0, 0, 0.07);
+    --bg-nav-active: linear-gradient(135deg, rgba(34, 211, 238, 0.12), rgba(17, 24, 39, 0.04));
+    --bg-overlay: rgba(0, 0, 0, 0.3);
+
+    --border: rgba(148, 163, 184, 0.25);
+    --border-strong: rgba(34, 211, 238, 0.45);
+    --border-app: rgba(148, 163, 184, 0.3);
+    --border-input: rgba(148, 163, 184, 0.25);
+    --border-kbd: rgba(148, 163, 184, 0.2);
+
+    --text: #0f172a;
+    --text-secondary: #1e293b;
+    --text-muted: #475569;
+    --text-faint: #64748b;
+    --text-on-accent: #042f2e;
+    --text-nav: #475569;
+    --text-nav-active: #0891b2;
+
+    --shadow-app: 0 20px 60px rgba(0, 0, 0, 0.1);
+    --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    --shadow-glow-cyan: 0 0 20px rgba(34, 211, 238, 0.08);
+    --shadow-panel: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+
+    --backdrop: blur(20px);
+    --backdrop-soft: blur(12px);
+
+    --cyan: #0891b2;
+    --green: #059669;
+    --blue: #2563eb;
+    --purple: #7c3aed;
+    --yellow: #d97706;
+    --red: #dc2626;
+    --cyan-soft: rgba(8, 145, 178, 0.1);
+    --green-soft: rgba(5, 150, 105, 0.1);
+    --blue-soft: rgba(37, 99, 235, 0.1);
+    --purple-soft: rgba(124, 58, 237, 0.1);
+    --yellow-soft: rgba(217, 119, 6, 0.1);
+    --red-soft: rgba(220, 38, 38, 0.1);
+  }
+}

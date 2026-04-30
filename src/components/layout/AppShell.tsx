@@ -19,12 +19,6 @@ export function AppShell({
 }: AppShellProps) {
   return (
     <main className="desktop-stage">
-      <div className="hotkey-hint">
-        <span>Ctrl</span>
-        <span>Shift</span>
-        <span>Space</span>
-        呼出
-      </div>
       <section className="app-window">
         <Sidebar currentPage={currentPage} onNavigate={onNavigate} />
         <div className="app-main">

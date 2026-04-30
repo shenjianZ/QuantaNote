@@ -4,23 +4,16 @@ export type AppPage =
   | "home"
   | "all"
   | "tags"
-  | "vault"
-  | "files"
   | "document"
-  | "sync"
-  | "versions"
   | "settings";
 
 export type ItemType =
   | "note"
-  | "password"
   | "link"
   | "file"
   | "image"
   | "code"
-  | "task"
-  | "command"
-  | "secret";
+  | "task";
 
 export interface Tag {
   name: string;
@@ -36,21 +29,6 @@ export interface Item {
   time: string;
   icon: LucideIcon;
   accent: string;
-  encrypted?: boolean;
   pinned?: boolean;
   favorite?: boolean;
-}
-
-export interface Metric {
-  label: string;
-  value: string;
-  delta: string;
-  tone: "cyan" | "purple" | "yellow" | "blue";
-}
-
-export interface Activity {
-  title: string;
-  detail: string;
-  time: string;
-  tone: string;
 }

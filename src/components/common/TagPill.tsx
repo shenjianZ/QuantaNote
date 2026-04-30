@@ -1,7 +1,5 @@
-import type { Tag } from "../../types";
-
 interface TagPillProps {
-  tag: Tag;
+  tag: { name: string; color: string };
 }
 
 export function TagPill({ tag }: TagPillProps) {

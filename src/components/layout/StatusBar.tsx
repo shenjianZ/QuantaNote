@@ -1,20 +1,29 @@
-import { CheckCircle2, Cloud, LockKeyhole, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Database } from "lucide-react";
+import { useItemStore } from "../../stores/itemStore";
+import { useAppStore } from "../../stores/appStore";
+
+const PAGE_NAMES: Record<string, string> = {
+  home: "首页",
+  all: "全部记录",
+  tags: "标签",
+  document: "文档编辑",
+  settings: "设置",
+};
 
 export function StatusBar() {
+  const itemCount = useItemStore((s) => s.items.length);
+  const currentPage = useAppStore((s) => s.currentPage);
+
   return (
     <footer className="statusbar">
       <div>
-        <Cloud size={18} />
-        <span>已同步 1 分钟前</span>
-        <CheckCircle2 size={17} className="ok" />
+        <Database />
+        <span>{PAGE_NAMES[currentPage] || currentPage}</span>
+        <span style={{ color: 'var(--text-faint)' }}>· {itemCount} 条记录</span>
+        <CheckCircle2 className="ok" />
       </div>
       <div>
-        <LockKeyhole size={17} />
-        <span>端到端加密已开启</span>
-      </div>
-      <div>
-        <ShieldCheck size={17} className="ok" />
-        <span>安全评分 95 分</span>
+        <span className="text-faint text-sm">本地模式</span>
       </div>
     </footer>
   );
