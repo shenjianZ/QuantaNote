@@ -5,6 +5,7 @@ pub struct CreateItemPayload {
     pub title: String,
     pub item_type: String,
     pub content: Option<String>,
+    pub summary: String,
 }
 
 #[derive(Debug, Deserialize)]

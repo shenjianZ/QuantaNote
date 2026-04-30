@@ -23,6 +23,9 @@ dependencies:
   react-dom:
     specifier: ^19.1.0
     version: 19.2.5(react@19.2.5)
+  vditor:
+    specifier: ^3.11.2
+    version: 3.11.2
   zustand:
     specifier: ^5.0.12
     version: 5.0.12(@types/react@19.2.14)(react@19.2.5)
@@ -930,6 +933,10 @@ packages:
       ms: 2.1.3
     dev: true
 
+  /diff-match-patch@1.0.5:
+    resolution: {integrity: sha512-IayShXAgj/QMXgB0IWmKx+rOPuGMhqm5w6jvFxmVenXKIzRqTAAsbBPT3kWQeGANj3jGgvcvv4yK6SxqYmikgw==}
+    dev: false
+
   /electron-to-chromium@1.5.344:
     resolution: {integrity: sha512-4MxfbmNDm+KPh066EZy+eUnkcDPcZ35wNmOWzFuh/ijvHsve6kbLTLURy88uCNK5FbpN+yk2nQY6BYh1GEt+wg==}
     dev: true
@@ -1152,6 +1159,12 @@ packages:
       escalade: 3.2.0
       picocolors: 1.1.1
     dev: true
+
+  /vditor@3.11.2:
+    resolution: {integrity: sha512-8QguQQUPWbBFocnfQmWjz4jiykQnvsmCuhOomGIVVK7vc+dQq2h8w9qQQuEjUTZpnZT5fEdYbj4aLr1NGdAZaA==}
+    dependencies:
+      diff-match-patch: 1.0.5
+    dev: false
 
   /vite@7.3.2:
     resolution: {integrity: sha512-Bby3NOsna2jsjfLVOHKes8sGwgl4TT0E6vvpYgnAYDIF/tie7MRaFthmKuHx1NSXjiTueXH3do80FMQgvEktRg==}

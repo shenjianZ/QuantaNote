@@ -4,5 +4,13 @@ use crate::models::search::SearchResultDto;
 use crate::repositories::search_repository;
 
 pub fn search_items(db: &DbState, query: &str) -> Result<Vec<SearchResultDto>, AppError> {
-    search_repository::search(db, query)
+    let cleaned: String = query
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == ' ')
+        .collect();
+    let cleaned = cleaned.trim();
+    if cleaned.is_empty() {
+        return Ok(vec![]);
+    }
+    search_repository::search(db, cleaned)
 }

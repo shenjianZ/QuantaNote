@@ -28,8 +28,8 @@ pub fn create(db: &DbState, payload: CreateItemPayload) -> Result<ItemDto, AppEr
 
     conn.execute(
         "INSERT INTO items (id, title, item_type, content, summary, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, '', ?5, ?5)",
-        params![id, payload.title, payload.item_type, content, now],
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)",
+        params![id, payload.title, payload.item_type, content, payload.summary, now],
     )
     .map_err(|e| AppError::Database(e.to_string()))?;
 
@@ -38,7 +38,7 @@ pub fn create(db: &DbState, payload: CreateItemPayload) -> Result<ItemDto, AppEr
         title: payload.title,
         item_type: payload.item_type,
         content,
-        summary: String::new(),
+        summary: payload.summary,
         pinned: false,
         favorite: false,
         encrypted: false,

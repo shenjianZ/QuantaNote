@@ -20,12 +20,10 @@ function applyThemeAttr(theme: ThemeMode) {
 
 function getInitialPage(): AppPage {
   try {
-    const settings = JSON.parse(localStorage.getItem("quantanote-settings") || "{}") as { openHomePage?: boolean };
-    if (settings.openHomePage !== false) return "home";
     const saved = localStorage.getItem("quantanote-current-page") as AppPage | null;
     return saved && saved !== "document" ? saved : "all";
   } catch {
-    return "home";
+    return "all";
   }
 }
 

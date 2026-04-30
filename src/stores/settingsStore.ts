@@ -10,7 +10,6 @@ export interface AppSettings {
   accentColor: string;
   minimizeToTray: boolean;
   closeKeepRunning: boolean;
-  openHomePage: boolean;
   autoBackup: boolean;
 }
 
@@ -21,7 +20,6 @@ const DEFAULTS: AppSettings = {
   accentColor: "#22d3ee",
   minimizeToTray: true,
   closeKeepRunning: false,
-  openHomePage: true,
   autoBackup: true,
 };
 

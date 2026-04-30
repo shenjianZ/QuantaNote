@@ -2,9 +2,29 @@ use crate::db::DbState;
 use crate::error::AppError;
 use crate::models::item::*;
 use crate::repositories::item_repository;
+use crate::repositories::version_repository;
 
 pub fn create_item(db: &DbState, title: String, item_type: String, content: Option<String>) -> Result<ItemDto, AppError> {
-    item_repository::create(db, CreateItemPayload { title, item_type, content })
+    if title.trim().is_empty() {
+        return Err(AppError::Validation("标题不能为空".to_string()));
+    }
+    let content_val = content.unwrap_or_default();
+    let summary = if content_val.is_empty() {
+        String::new()
+    } else {
+        let s: String = content_val.chars().take(100).collect();
+        s
+    };
+    let item = item_repository::create(db, CreateItemPayload {
+        title: title.trim().to_string(),
+        item_type,
+        content: Some(content_val.clone()),
+        summary,
+    })?;
+    if !content_val.is_empty() {
+        let _ = version_repository::create_version(db, &item.id, &content_val, "创建");
+    }
+    Ok(item)
 }
 
 pub fn get_items(db: &DbState, item_type: Option<&str>, limit: i64, offset: i64) -> Result<Vec<ItemDto>, AppError> {
@@ -16,7 +36,18 @@ pub fn get_item(db: &DbState, id: &str) -> Result<ItemDto, AppError> {
 }
 
 pub fn update_item(db: &DbState, payload: UpdateItemPayload) -> Result<ItemDto, AppError> {
-    item_repository::update(db, payload)
+    if let Some(ref title) = payload.title {
+        if title.trim().is_empty() {
+            return Err(AppError::Validation("标题不能为空".to_string()));
+        }
+    }
+    let existing = item_repository::get_item(db, &payload.id)?;
+    let content_changed = payload.content.as_ref().is_some_and(|c| c != &existing.content);
+    let updated = item_repository::update(db, payload)?;
+    if content_changed {
+        let _ = version_repository::create_version(db, &updated.id, &updated.content, "自动保存");
+    }
+    Ok(updated)
 }
 
 pub fn delete_item(db: &DbState, id: &str) -> Result<(), AppError> {

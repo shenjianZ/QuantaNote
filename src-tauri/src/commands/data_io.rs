@@ -139,7 +139,7 @@ pub fn import_data(app: AppHandle, db: State<'_, DbState>, json: String) -> Resu
 
     for item in data.items {
         conn.execute(
-            "INSERT OR REPLACE INTO items (id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at)
+            "INSERT OR IGNORE INTO items (id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             rusqlite::params![
                 value_str(&item, "id"),
@@ -212,7 +212,7 @@ pub fn import_data(app: AppHandle, db: State<'_, DbState>, json: String) -> Resu
 
     for version in data.versions {
         conn.execute(
-            "INSERT OR REPLACE INTO versions (id, item_id, version_number, content, change_summary, created_at)
+            "INSERT OR IGNORE INTO versions (id, item_id, version_number, content, change_summary, created_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             rusqlite::params![
                 value_str(&version, "id"),

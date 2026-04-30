@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo } from "react";
 import { FileText } from "lucide-react";
 import { AppShell } from "../components/layout/AppShell";
 import { CommandPalette } from "../components/search/CommandPalette";
-import { HomeDashboard } from "../pages/HomeDashboard";
 import { WorkspacePage } from "../pages/WorkspacePage";
 import { DocumentEditorPage } from "../pages/DocumentEditorPage";
 import { SettingsPage } from "../pages/SettingsPage";
@@ -67,19 +66,6 @@ export function QuantaNoteApp() {
     navigate("document");
   }, [createItem, getItem, navigate, selectItem]);
 
-  const handleCreateItemForCurrentPage = useCallback(async () => {
-    const item = await createItem("未命名笔记", "note", "");
-    selectItem(item.id);
-    await getItem(item.id);
-    navigate("document");
-  }, [createItem, getItem, navigate, selectItem]);
-
-  const handleOpenItem = useCallback((id: string, page: AppPage = "document") => {
-    selectItem(id);
-    getItem(id).catch(() => {});
-    navigate(page);
-  }, [getItem, navigate, selectItem]);
-
   // Global keyboard shortcuts
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -104,20 +90,13 @@ export function QuantaNoteApp() {
       onNavigate={navigate}
       onOpenSearch={openPalette}
     >
-      {currentPage === "home" && (
-        <HomeDashboard
-          onNavigate={navigate}
-          onCreateNote={handleCreateNote}
-          onOpenItem={handleOpenItem}
-        />
-      )}
       {(currentPage === "all" || currentPage === "tags") && (
         <WorkspacePage
           page={currentPage}
           items={displayItems}
           selectedItem={selectedItem}
           onSelectItem={handleSelectItem}
-          onCreateItem={handleCreateItemForCurrentPage}
+          onCreateItem={handleCreateNote}
           onOpenDocument={() => navigate("document")}
         />
       )}

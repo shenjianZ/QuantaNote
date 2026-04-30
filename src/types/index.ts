@@ -1,7 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 
 export type AppPage =
-  | "home"
   | "all"
   | "tags"
   | "document"

@@ -3,7 +3,6 @@ import { useItemStore } from "../../stores/itemStore";
 import { useAppStore } from "../../stores/appStore";
 
 const PAGE_NAMES: Record<string, string> = {
-  home: "首页",
   all: "全部记录",
   tags: "标签",
   document: "文档编辑",

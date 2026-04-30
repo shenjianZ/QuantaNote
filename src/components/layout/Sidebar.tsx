@@ -1,6 +1,5 @@
 import {
   Grid2X2,
-  Home,
   Settings,
   Tag,
   User,
@@ -14,7 +13,6 @@ interface SidebarProps {
 }
 
 const navItems = [
-  { page: "home" as AppPage, label: "首页", icon: Home },
   { page: "all" as AppPage, label: "全部", icon: Grid2X2 },
   { page: "tags" as AppPage, label: "标签", icon: Tag },
   { page: "settings" as AppPage, label: "设置", icon: Settings },

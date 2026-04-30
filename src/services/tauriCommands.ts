@@ -88,3 +88,7 @@ export async function getItemTags(itemId: string) {
 export async function setItemTags(itemId: string, tagNames: string[]) {
   return invoke("set_item_tags", { itemId, tagNames });
 }
+
+export async function getAllItemTagMappings() {
+  return invoke<[string, string][]>("get_all_item_tag_mappings");
+}

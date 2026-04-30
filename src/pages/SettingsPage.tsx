@@ -124,7 +124,6 @@ export function SettingsPage({ theme = "system", onThemeChange }: SettingsPagePr
               {([
                 { key: "minimizeToTray" as const, label: "最小化到托盘" },
                 { key: "closeKeepRunning" as const, label: "关闭时保持运行" },
-                { key: "openHomePage" as const, label: "启动时打开首页" },
               ]).map((item) => (
                 <div className="setting-row" key={item.key}>
                   <div className="setting-label">{item.label}</div>

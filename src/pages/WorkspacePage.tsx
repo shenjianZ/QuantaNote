@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Copy,
   Edit3,
@@ -12,10 +12,12 @@ import {
 } from "lucide-react";
 import { TagEditor } from "../components/common/TagEditor";
 import { TagPill } from "../components/common/TagPill";
+import { MarkdownRenderer } from "../components/common/MarkdownRenderer";
 import { useAttachmentStore } from "../stores/attachmentStore";
 import { useItemStore } from "../stores/itemStore";
 import { useTagStore } from "../stores/tagStore";
-import { getItemTags as getItemTagsCmd } from "../services/tauriCommands";
+import { useAppStore } from "../stores/appStore";
+import { getAllItemTagMappings } from "../services/tauriCommands";
 import type { AppPage } from "../types";
 import type { Item } from "../types";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -23,6 +25,7 @@ import { openPath } from "@tauri-apps/plugin-opener";
 
 type TabKey = "pinned" | "recent" | "favorite";
 type ViewMode = "list" | "grid";
+type SortOption = "updated" | "created" | "title";
 
 interface WorkspacePageProps {
   page: AppPage;
@@ -43,12 +46,14 @@ export function WorkspacePage({
 }: WorkspacePageProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("recent");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [sortOrder, setSortOrder] = useState<SortOption>("updated");
   const [copied, setCopied] = useState(false);
-  const [showAttachments, setShowAttachments] = useState(false);
   const [activeTag, setActiveTag] = useState<string>("all");
   const [itemTagNames, setItemTagNames] = useState<Record<string, string[]>>({});
   const deleteItem = useItemStore((s) => s.deleteItem);
   const updateItem = useItemStore((s) => s.updateItem);
+  const selectedItemDto = useItemStore((s) => s.selectedItem);
+  const theme = useAppStore((s) => s.theme);
   const attachments = useAttachmentStore((s) => s.attachments);
   const fetchAttachments = useAttachmentStore((s) => s.fetchAttachments);
   const addAttachmentAction = useAttachmentStore((s) => s.addAttachment);
@@ -60,10 +65,10 @@ export function WorkspacePage({
   const updateItemTagsAction = useTagStore((s) => s.updateItemTags);
 
   useEffect(() => {
-    if (selectedItem.id && showAttachments) {
+    if (selectedItem.id) {
       fetchAttachments(selectedItem.id);
     }
-  }, [selectedItem.id, showAttachments, fetchAttachments]);
+  }, [selectedItem.id, fetchAttachments]);
 
   useEffect(() => {
     fetchTags();
@@ -80,20 +85,20 @@ export function WorkspacePage({
   }, [selectedItem.id, fetchItemTags]);
 
   useEffect(() => {
-    if (page !== "tags" || items.length === 0) {
+    if (page !== "tags") {
       setItemTagNames({});
       return;
     }
 
     let cancelled = false;
-    Promise.all(
-      items.map(async (item) => {
-        const tags = await getItemTagsCmd(item.id) as { name: string; color: string }[];
-        return [item.id, tags.map((tag) => tag.name)] as const;
-      }),
-    )
-      .then((entries) => {
-        if (!cancelled) setItemTagNames(Object.fromEntries(entries));
+    getAllItemTagMappings()
+      .then((mappings) => {
+        if (cancelled) return;
+        const map: Record<string, string[]> = {};
+        for (const [itemId, tagName] of mappings) {
+          (map[itemId] ??= []).push(tagName);
+        }
+        setItemTagNames(map);
       })
       .catch(() => {
         if (!cancelled) setItemTagNames({});
@@ -102,26 +107,32 @@ export function WorkspacePage({
     return () => {
       cancelled = true;
     };
-  }, [items, page]);
+  }, [page, items]);
 
   async function handleTagChange(tagNames: string[]) {
     if (!selectedItem.id) return;
     await updateItemTagsAction(selectedItem.id, tagNames);
   }
 
-  const filteredItems = (() => {
+  const filteredItems = useMemo(() => {
     const pageItems = page === "tags" && activeTag !== "all"
       ? items.filter((item) => itemTagNames[item.id]?.includes(activeTag))
       : items;
-    switch (activeTab) {
-      case "pinned":
-        return pageItems.filter((i) => i.pinned);
-      case "favorite":
-        return pageItems.filter((i) => i.favorite);
-      default:
-        return pageItems;
-    }
-  })();
+    const tabFiltered = (() => {
+      switch (activeTab) {
+        case "pinned":
+          return pageItems.filter((i) => i.pinned);
+        case "favorite":
+          return pageItems.filter((i) => i.favorite);
+        default:
+          return pageItems;
+      }
+    })();
+    return [...tabFiltered].sort((a, b) => {
+      if (sortOrder === "title") return a.title.localeCompare(b.title);
+      return 0; // "updated" and "created" are already sorted by backend
+    });
+  }, [items, page, activeTag, activeTab, itemTagNames, sortOrder]);
 
   async function handleDelete(id: string) {
     await deleteItem(id);
@@ -184,10 +195,22 @@ export function WorkspacePage({
             <Edit3 />
             新建
           </button>
-          <button className={`btn ${showAttachments ? "active" : ""}`} type="button" title="附件" onClick={() => setShowAttachments(!showAttachments)}>
-            <Paperclip />
-            附件
-          </button>
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value as SortOption)}
+            style={{
+              background: "var(--bg-input)",
+              color: "var(--text)",
+              border: "1px solid var(--border-input)",
+              borderRadius: 6,
+              padding: "4px 8px",
+              fontSize: 12,
+            }}
+          >
+            <option value="updated">最近更新</option>
+            <option value="created">创建时间</option>
+            <option value="title">标题排序</option>
+          </select>
           <div style={{ flex: 1 }} />
           <button
             className={`btn sm ${viewMode === "list" ? "active" : ""}`}
@@ -304,10 +327,13 @@ export function WorkspacePage({
         </div>
 
         <div className="detail-body">
-          <pre>{selectedItem.summary || "暂无内容"}</pre>
+          <MarkdownRenderer
+            content={selectedItemDto?.content || ""}
+            theme={theme === "light" ? "light" : "dark"}
+          />
         </div>
 
-        {showAttachments && (
+        {attachments.length > 0 && (
           <div className="attachment-panel">
             <div className="attachment-panel-header">
               <span className="text-sm text-faint">附件 ({attachments.length})</span>
@@ -315,9 +341,6 @@ export function WorkspacePage({
                 <Plus /> 添加
               </button>
             </div>
-            {attachments.length === 0 && (
-              <div className="text-muted text-sm" style={{ padding: '8px 0' }}>暂无附件</div>
-            )}
             {attachments.map((att) => (
               <div className="attachment-item" key={att.id}>
                 <Paperclip style={{ width: 12, height: 12, color: 'var(--text-muted)', flexShrink: 0 }} />
@@ -349,6 +372,9 @@ export function WorkspacePage({
           </button>
           <button className="btn sm" type="button" onClick={handleToggleFavorite}>
             <Star /> {selectedItem.favorite ? "取消收藏" : "收藏"}
+          </button>
+          <button className="btn sm" type="button" onClick={handleAddAttachment}>
+            <Paperclip /> 附件
           </button>
           <button className="btn sm" type="button" onClick={handleCopy}>
             <Copy /> {copied ? "已复制" : "复制"}

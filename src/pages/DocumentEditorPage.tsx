@@ -1,18 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  Bold,
-  CheckSquare,
-  Code2,
-  FileText,
-  Italic,
-  Link,
-  List,
-  Quote,
-  Star,
-  Underline,
-} from "lucide-react";
+import { Star } from "lucide-react";
 import { useAppStore } from "../stores/appStore";
 import { useItemStore } from "../stores/itemStore";
+import { VditorEditor } from "../components/editor/VditorEditor";
 import { invoke } from "@tauri-apps/api/core";
 
 interface VersionDto {
@@ -24,29 +14,29 @@ interface VersionDto {
   created_at: string;
 }
 
-type FormatAction = "h1" | "h2" | "h3" | "bold" | "italic" | "underline" | "code" | "link" | "list" | "check" | "quote";
+function resolveTheme(mode: string): "dark" | "light" {
+  if (mode === "light" || mode === "dark") return mode;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
 
-const FORMAT_MARKS: Record<FormatAction, { prefix: string; suffix: string }> = {
-  h1: { prefix: "# ", suffix: "" },
-  h2: { prefix: "## ", suffix: "" },
-  h3: { prefix: "### ", suffix: "" },
-  bold: { prefix: "**", suffix: "**" },
-  italic: { prefix: "*", suffix: "*" },
-  underline: { prefix: "__", suffix: "__" },
-  code: { prefix: "`", suffix: "`" },
-  link: { prefix: "[", suffix: "](url)" },
-  list: { prefix: "- ", suffix: "" },
-  check: { prefix: "- [ ] ", suffix: "" },
-  quote: { prefix: "> ", suffix: "" },
-};
+function formatRelativeTime(dateStr: string) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "刚刚";
+  if (minutes < 60) return `${minutes} 分钟前`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} 小时前`;
+  const days = Math.floor(hours / 24);
+  return `${days} 天前`;
+}
 
 export function DocumentEditorPage() {
   const selectedItemId = useAppStore((s) => s.selectedItemId);
   const navigate = useAppStore((s) => s.navigate);
+  const theme = useAppStore((s) => s.theme);
   const selectedItem = useItemStore((s) => s.selectedItem);
   const getItem = useItemStore((s) => s.getItem);
   const updateItem = useItemStore((s) => s.updateItem);
-  const items = useItemStore((s) => s.items);
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -55,7 +45,11 @@ export function DocumentEditorPage() {
   const [isFavorite, setIsFavorite] = useState(false);
   const [inspectorTab, setInspectorTab] = useState<"props" | "activity">("props");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const latestTitle = useRef(title);
+  const latestContent = useRef(content);
+
+  useEffect(() => { latestTitle.current = title; }, [title]);
+  useEffect(() => { latestContent.current = content; }, [content]);
 
   useEffect(() => {
     if (selectedItemId) {
@@ -86,9 +80,7 @@ export function DocumentEditorPage() {
         changeSummary: "自动保存",
       });
       setVersions((current) => [version, ...current].slice(0, 50));
-    } catch {
-      /* ignore */
-    }
+    } catch { /* ignore */ }
   }, [selectedItemId, updateItem]);
 
   function scheduleSave(newTitle: string, newContent: string) {
@@ -99,31 +91,12 @@ export function DocumentEditorPage() {
 
   function handleTitleChange(value: string) {
     setTitle(value);
-    scheduleSave(value, content);
+    scheduleSave(value, latestContent.current);
   }
 
   function handleContentChange(value: string) {
     setContent(value);
-    scheduleSave(title, value);
-  }
-
-  function handleFormat(action: FormatAction) {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd;
-    const selected = content.substring(start, end);
-    const mark = FORMAT_MARKS[action];
-    const before = content.substring(0, start);
-    const after = content.substring(end);
-    const newContent = before + mark.prefix + selected + mark.suffix + after;
-    setContent(newContent);
-    scheduleSave(title, newContent);
-    setTimeout(() => {
-      ta.focus();
-      ta.selectionStart = start + mark.prefix.length;
-      ta.selectionEnd = start + mark.prefix.length + selected.length;
-    }, 0);
+    scheduleSave(latestTitle.current, value);
   }
 
   async function handleToggleFavorite() {
@@ -133,24 +106,14 @@ export function DocumentEditorPage() {
     await updateItem(selectedItemId, { favorite: next });
   }
 
-  const relations = items.filter((i) => i.id !== selectedItemId).slice(0, 4);
-
-  function formatRelativeTime(dateStr: string) {
-    const diff = Date.now() - new Date(dateStr).getTime();
-    const minutes = Math.floor(diff / 60000);
-    if (minutes < 1) return "刚刚";
-    if (minutes < 60) return `${minutes} 分钟前`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours} 小时前`;
-    const days = Math.floor(hours / 24);
-    return `${days} 天前`;
-  }
+  const resolvedTheme = resolveTheme(theme);
+  const wordCount = content.length;
 
   return (
     <div className="editor-layout">
       <article className="editor-surface" style={{ display: 'flex', flexDirection: 'column' }}>
         <div className="doc-breadcrumb">
-          <button type="button" onClick={() => navigate("all")}>文件</button>
+          <button type="button" onClick={() => navigate("all")}>全部</button>
           <span>/</span>
           <strong>{title || "未命名"}</strong>
           <span style={{ marginLeft: 'auto' }} className="text-faint text-sm">
@@ -176,46 +139,11 @@ export function DocumentEditorPage() {
           </button>
         </div>
 
-        <div className="format-toolbar">
-          {(["h1", "h2", "h3"] as FormatAction[]).map((action) => (
-            <button type="button" key={action} className="btn sm" onClick={() => handleFormat(action)}>
-              {action.toUpperCase()}
-            </button>
-          ))}
-          {([
-            { action: "bold" as FormatAction, Icon: Bold },
-            { action: "italic" as FormatAction, Icon: Italic },
-            { action: "underline" as FormatAction, Icon: Underline },
-            { action: "code" as FormatAction, Icon: Code2 },
-            { action: "link" as FormatAction, Icon: Link },
-            { action: "list" as FormatAction, Icon: List },
-            { action: "check" as FormatAction, Icon: CheckSquare },
-            { action: "quote" as FormatAction, Icon: Quote },
-          ]).map(({ action, Icon }) => (
-            <button type="button" key={action} onClick={() => handleFormat(action)} title={action}>
-              <Icon />
-            </button>
-          ))}
-        </div>
-
-        <div className="editor-content" style={{ flex: 1, overflow: 'auto', padding: '8px 0' }}>
-          <textarea
-            ref={textareaRef}
-            value={content}
-            onChange={(e) => handleContentChange(e.currentTarget.value)}
-            placeholder="开始输入内容..."
-            style={{
-              width: '100%',
-              height: '100%',
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--text)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: '12px',
-              lineHeight: 1.6,
-              resize: 'none',
-              outline: 'none',
-            }}
+        <div className="editor-content" style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
+          <VditorEditor
+            initialValue={content}
+            onChange={handleContentChange}
+            theme={resolvedTheme}
           />
         </div>
       </article>
@@ -233,24 +161,10 @@ export function DocumentEditorPage() {
                 <div className="text-sm text-muted">类型: {selectedItem?.item_type || "note"}</div>
                 <div className="text-sm text-muted">创建: {selectedItem?.created_at ? new Date(selectedItem.created_at).toLocaleString("zh-CN") : "-"}</div>
                 <div className="text-sm text-muted">更新: {selectedItem?.updated_at ? new Date(selectedItem.updated_at).toLocaleString("zh-CN") : "-"}</div>
+                <div className="text-sm text-muted">字数: {wordCount}</div>
               </div>
 
-              <div style={{ marginBottom: '10px' }}>
-                <div className="text-faint text-sm" style={{ marginBottom: '4px', fontWeight: 600 }}>关联记录</div>
-                <div className="doc-relations">
-                  {relations.map((rel) => (
-                    <div className="doc-relation" key={rel.id}>
-                      <FileText />
-                      <span className="rel-title">{rel.title}</span>
-                    </div>
-                  ))}
-                  {relations.length === 0 && (
-                    <div className="text-muted text-sm">暂无关联</div>
-                  )}
-                </div>
-              </div>
-
-              <div style={{ marginBottom: '10px' }}>
+              <div>
                 <div className="text-faint text-sm" style={{ marginBottom: '4px', fontWeight: 600 }}>版本</div>
                 {versions.length === 0 && (
                   <div className="text-muted text-sm">暂无版本记录</div>

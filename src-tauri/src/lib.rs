@@ -55,6 +55,7 @@ pub fn run() {
             tag::create_tag,
             tag::delete_tag,
             tag::get_item_tags,
+            tag::get_all_item_tag_mappings,
             tag::set_item_tags,
         ])
         .run(tauri::generate_context!())

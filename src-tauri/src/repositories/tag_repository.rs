@@ -37,6 +37,15 @@ pub fn delete_tag(db: &DbState, name: &str) -> Result<(), AppError> {
     Ok(())
 }
 
+pub fn get_tag_by_name(db: &DbState, name: &str) -> Option<TagDto> {
+    let conn = db.conn.lock().ok()?;
+    conn.query_row(
+        "SELECT name, color FROM tags WHERE name = ?1",
+        params![name],
+        |row| Ok(TagDto { name: row.get(0)?, color: row.get(1)? }),
+    ).ok()
+}
+
 pub fn get_tags_for_item(db: &DbState, item_id: &str) -> Result<Vec<TagDto>, AppError> {
     let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
     let mut stmt = conn
@@ -54,6 +63,25 @@ pub fn get_tags_for_item(db: &DbState, item_id: &str) -> Result<Vec<TagDto>, App
         .collect();
 
     Ok(tags)
+}
+
+pub fn get_all_item_tag_mappings(db: &DbState) -> Result<Vec<(String, String)>, AppError> {
+    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT it.item_id, t.name FROM item_tags it
+             JOIN tags t ON t.id = it.tag_id
+             ORDER BY it.item_id, t.name",
+        )
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+    let rows: Vec<(String, String)> = stmt
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+        .map_err(|e| AppError::Database(e.to_string()))?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    Ok(rows)
 }
 
 pub fn set_item_tags(db: &DbState, item_id: &str, tag_names: Vec<String>) -> Result<(), AppError> {

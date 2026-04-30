@@ -26,6 +26,11 @@ pub fn get_item_tags(db: State<'_, DbState>, item_id: String) -> Result<Vec<TagD
 }
 
 #[tauri::command]
+pub fn get_all_item_tag_mappings(db: State<'_, DbState>) -> Result<Vec<(String, String)>, AppError> {
+    tag_service::get_all_item_tag_mappings(&db)
+}
+
+#[tauri::command]
 pub fn set_item_tags(db: State<'_, DbState>, item_id: String, tag_names: Vec<String>) -> Result<(), AppError> {
     tag_service::set_item_tags(&db, &item_id, tag_names)
 }
