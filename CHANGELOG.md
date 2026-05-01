@@ -62,3 +62,7 @@
 - E2E 测试覆盖 (Playwright + Page Object 模式)
 - Rust 后端单元测试 (commands/services/repositories)
 - SQL 日志可配置输出 (控制台/文件/pretty 格式)
+
+### Fixed
+
+- 修复发布构建产物缺少 Vditor 本地资源导致编辑器加载中文语言包 404 的问题
