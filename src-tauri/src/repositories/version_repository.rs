@@ -126,3 +126,75 @@ pub fn update_version(
     drop(conn);
     get_version(db, id)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::repositories::item_repository;
+    use crate::models::item::CreateItemPayload;
+
+    fn create_test_item(db: &DbState) -> String {
+        let dto = item_repository::create(
+            db,
+            CreateItemPayload {
+                title: "Test".to_string(),
+                item_type: "note".to_string(),
+                content: None,
+                summary: String::new(),
+            },
+        )
+        .unwrap();
+        dto.id
+    }
+
+    #[test]
+    fn create_version_auto_increments() {
+        let db = crate::test_support::test_db();
+        let item_id = create_test_item(&db);
+
+        let v1 = create_version(&db, &item_id, "content 1", "", "", "").unwrap();
+        let v2 = create_version(&db, &item_id, "content 2", "", "", "").unwrap();
+
+        assert_eq!(v1.version_number, 1);
+        assert_eq!(v2.version_number, 2);
+    }
+
+    #[test]
+    fn get_versions_returns_descending() {
+        let db = crate::test_support::test_db();
+        let item_id = create_test_item(&db);
+        create_version(&db, &item_id, "v1", "", "", "").unwrap();
+        create_version(&db, &item_id, "v2", "", "", "").unwrap();
+        create_version(&db, &item_id, "v3", "", "", "").unwrap();
+
+        let versions = get_versions(&db, &item_id).unwrap();
+        assert_eq!(versions.len(), 3);
+        assert_eq!(versions[0].version_number, 3);
+        assert_eq!(versions[2].version_number, 1);
+    }
+
+    #[test]
+    fn get_version_by_id() {
+        let db = crate::test_support::test_db();
+        let item_id = create_test_item(&db);
+        let created = create_version(&db, &item_id, "content", "summary", "name", "desc").unwrap();
+
+        let fetched = get_version(&db, &created.id).unwrap();
+        assert_eq!(fetched.content, "content");
+        assert_eq!(fetched.change_summary, "summary");
+        assert_eq!(fetched.name, "name");
+        assert_eq!(fetched.description, "desc");
+    }
+
+    #[test]
+    fn update_version_changes_metadata() {
+        let db = crate::test_support::test_db();
+        let item_id = create_test_item(&db);
+        let created = create_version(&db, &item_id, "content", "", "old", "old desc").unwrap();
+
+        let updated = update_version(&db, &created.id, "new name", "new desc").unwrap();
+        assert_eq!(updated.name, "new name");
+        assert_eq!(updated.description, "new desc");
+        assert_eq!(updated.content, "content");
+    }
+}

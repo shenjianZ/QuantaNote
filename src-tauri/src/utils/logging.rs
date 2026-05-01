@@ -266,3 +266,37 @@ fn trim_end_spaces(value: &mut String) {
         value.pop();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn format_sql_simple_select() {
+        let result = format_sql("SELECT * FROM items");
+        assert!(result.contains("SELECT"));
+        assert!(result.contains("FROM"));
+        assert!(result.contains("items"));
+    }
+
+    #[test]
+    fn format_sql_preserves_quoted_strings() {
+        let result = format_sql("SELECT * FROM items WHERE title = 'hello world'");
+        assert!(result.contains("'hello world'"));
+    }
+
+    #[test]
+    fn tokenize_sql_handles_punctuation() {
+        let tokens = tokenize_sql("a, b(c)");
+        assert!(tokens.contains(&",".to_string()));
+        assert!(tokens.contains(&"(".to_string()));
+        assert!(tokens.contains(&")".to_string()));
+    }
+
+    #[test]
+    fn keyword_text_uppercases_known_keywords() {
+        assert_eq!(keyword_text("select"), "SELECT");
+        assert_eq!(keyword_text("from"), "FROM");
+        assert_eq!(keyword_text(" tablename "), " tablename ");
+    }
+}

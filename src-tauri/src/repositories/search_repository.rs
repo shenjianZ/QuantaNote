@@ -233,3 +233,54 @@ fn escape_like(term: &str) -> String {
     }
     escaped
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::repositories::item_repository;
+    use crate::models::item::CreateItemPayload;
+
+    fn seed_item(db: &DbState, title: &str, content: &str) {
+        item_repository::create(
+            db,
+            CreateItemPayload {
+                title: title.to_string(),
+                item_type: "note".to_string(),
+                content: Some(content.to_string()),
+                summary: String::new(),
+            },
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn search_fts_finds_matching_items() {
+        let db = crate::test_support::test_db();
+        seed_item(&db, "Rust Guide", "Learn Rust programming");
+        seed_item(&db, "Cooking Tips", "How to bake bread");
+
+        let results = search(&db, "rust*", None).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].title, "Rust Guide");
+    }
+
+    #[test]
+    fn search_trigram_finds_substring() {
+        let db = crate::test_support::test_db();
+        seed_item(&db, "笔记", "全文检索系统测试");
+
+        let results = search_trigram(&db, "全文检", None).unwrap();
+        assert!(!results.is_empty());
+        assert_eq!(results[0].title, "笔记");
+    }
+
+    #[test]
+    fn search_like_finds_partial_match() {
+        let db = crate::test_support::test_db();
+        seed_item(&db, "My Document", "Some important content here");
+
+        let results = search_like(&db, "important", None).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].title, "My Document");
+    }
+}

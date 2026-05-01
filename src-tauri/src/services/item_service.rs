@@ -178,4 +178,50 @@ mod tests {
         assert_eq!(mappings, 0);
         assert_eq!(versions, 0);
     }
+
+    #[test]
+    fn get_items_returns_created_items() {
+        let db = crate::test_support::test_db();
+        create_item(&db, "A".to_string(), "note".to_string(), None).unwrap();
+        create_item(&db, "B".to_string(), "note".to_string(), None).unwrap();
+
+        let items = get_items(&db, None, 50, 0).unwrap();
+        assert_eq!(items.len(), 2);
+    }
+
+    #[test]
+    fn get_item_returns_full_dto() {
+        let db = crate::test_support::test_db();
+        let created = create_item(&db, "详情".to_string(), "note".to_string(), Some("正文".to_string())).unwrap();
+
+        let fetched = get_item(&db, &created.id).unwrap();
+        assert_eq!(fetched.title, "详情");
+        assert_eq!(fetched.content, "正文");
+    }
+
+    #[test]
+    fn get_pinned_returns_only_pinned() {
+        let db = crate::test_support::test_db();
+        let pinned = create_item(&db, "置顶".to_string(), "note".to_string(), None).unwrap();
+        create_item(&db, "普通".to_string(), "note".to_string(), None).unwrap();
+        update_item(&db, UpdateItemPayload {
+            id: pinned.id,
+            pinned: Some(true),
+            ..Default::default()
+        }).unwrap();
+
+        let pinned_items = get_pinned(&db).unwrap();
+        assert_eq!(pinned_items.len(), 1);
+    }
+
+    #[test]
+    fn get_recent_respects_limit() {
+        let db = crate::test_support::test_db();
+        create_item(&db, "A".to_string(), "note".to_string(), None).unwrap();
+        create_item(&db, "B".to_string(), "note".to_string(), None).unwrap();
+        create_item(&db, "C".to_string(), "note".to_string(), None).unwrap();
+
+        let recent = get_recent(&db, 2).unwrap();
+        assert_eq!(recent.len(), 2);
+    }
 }

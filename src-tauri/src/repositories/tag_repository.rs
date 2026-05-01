@@ -148,3 +148,110 @@ pub fn set_item_tags(db: &DbState, item_id: &str, tag_names: Vec<String>) -> Res
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::repositories::item_repository;
+    use crate::models::item::CreateItemPayload;
+
+    fn create_test_item(db: &DbState) -> String {
+        let dto = item_repository::create(
+            db,
+            CreateItemPayload {
+                title: "Test".to_string(),
+                item_type: "note".to_string(),
+                content: None,
+                summary: String::new(),
+            },
+        )
+        .unwrap();
+        dto.id
+    }
+
+    #[test]
+    fn create_and_get_all_tags() {
+        let db = crate::test_support::test_db();
+        create_tag(&db, "rust", "cyan").unwrap();
+        create_tag(&db, "react", "blue").unwrap();
+
+        let tags = get_all_tags(&db).unwrap();
+        assert_eq!(tags.len(), 2);
+        assert_eq!(tags[0].name, "react");
+        assert_eq!(tags[1].name, "rust");
+    }
+
+    #[test]
+    fn get_tag_by_name_found_and_missing() {
+        let db = crate::test_support::test_db();
+        create_tag(&db, "rust", "cyan").unwrap();
+
+        let found = get_tag_by_name(&db, "rust");
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().color, "cyan");
+
+        assert!(get_tag_by_name(&db, "missing").is_none());
+    }
+
+    #[test]
+    fn delete_tag_removes_from_list() {
+        let db = crate::test_support::test_db();
+        create_tag(&db, "rust", "cyan").unwrap();
+        create_tag(&db, "go", "green").unwrap();
+
+        delete_tag(&db, "rust").unwrap();
+        let tags = get_all_tags(&db).unwrap();
+        assert_eq!(tags.len(), 1);
+        assert_eq!(tags[0].name, "go");
+    }
+
+    #[test]
+    fn get_tags_for_item_after_set() {
+        let db = crate::test_support::test_db();
+        let item_id = create_test_item(&db);
+        create_tag(&db, "rust", "cyan").unwrap();
+
+        set_item_tags(&db, &item_id, vec!["rust".to_string()]).unwrap();
+        let tags = get_tags_for_item(&db, &item_id).unwrap();
+        assert_eq!(tags.len(), 1);
+        assert_eq!(tags[0].name, "rust");
+    }
+
+    #[test]
+    fn all_item_tag_mappings_returns_pairs() {
+        let db = crate::test_support::test_db();
+        let id1 = create_test_item(&db);
+        let id2 = create_test_item(&db);
+        create_tag(&db, "rust", "cyan").unwrap();
+
+        set_item_tags(&db, &id1, vec!["rust".to_string()]).unwrap();
+        set_item_tags(&db, &id2, vec!["rust".to_string()]).unwrap();
+
+        let mappings = get_all_item_tag_mappings(&db).unwrap();
+        assert_eq!(mappings.len(), 2);
+    }
+
+    #[test]
+    fn set_item_tags_replaces_existing() {
+        let db = crate::test_support::test_db();
+        let item_id = create_test_item(&db);
+        create_tag(&db, "rust", "cyan").unwrap();
+        create_tag(&db, "go", "green").unwrap();
+
+        set_item_tags(&db, &item_id, vec!["rust".to_string()]).unwrap();
+        set_item_tags(&db, &item_id, vec!["go".to_string()]).unwrap();
+
+        let tags = get_tags_for_item(&db, &item_id).unwrap();
+        assert_eq!(tags.len(), 1);
+        assert_eq!(tags[0].name, "go");
+    }
+
+    #[test]
+    fn set_item_tags_fails_for_nonexistent_tag() {
+        let db = crate::test_support::test_db();
+        let item_id = create_test_item(&db);
+
+        let result = set_item_tags(&db, &item_id, vec!["nonexistent".to_string()]);
+        assert!(result.is_err());
+    }
+}

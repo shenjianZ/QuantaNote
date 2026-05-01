@@ -201,3 +201,135 @@ pub fn get_recent(db: &DbState, limit: i64) -> Result<Vec<ItemDto>, AppError> {
 
     Ok(items)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::item::{CreateItemPayload, UpdateItemPayload};
+
+    fn create_test_item(db: &DbState, title: &str, item_type: &str) -> ItemDto {
+        create(
+            db,
+            CreateItemPayload {
+                title: title.to_string(),
+                item_type: item_type.to_string(),
+                content: Some("test content".to_string()),
+                summary: "test summary".to_string(),
+            },
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn create_inserts_and_returns_full_dto() {
+        let db = crate::test_support::test_db();
+        let dto = create_test_item(&db, "Test Note", "note");
+
+        assert!(dto.id.starts_with("item-"));
+        assert_eq!(dto.title, "Test Note");
+        assert_eq!(dto.item_type, "note");
+        assert_eq!(dto.content, "test content");
+        assert_eq!(dto.summary, "test summary");
+        assert!(!dto.pinned);
+        assert!(!dto.favorite);
+        assert!(!dto.encrypted);
+        assert!(!dto.created_at.is_empty());
+        assert_eq!(dto.created_at, dto.updated_at);
+    }
+
+    #[test]
+    fn get_items_returns_all_unfiltered() {
+        let db = crate::test_support::test_db();
+        create_test_item(&db, "Note 1", "note");
+        create_test_item(&db, "Note 2", "note");
+
+        let items = get_items(&db, None, 10, 0).unwrap();
+        assert_eq!(items.len(), 2);
+    }
+
+    #[test]
+    fn get_items_filters_by_type() {
+        let db = crate::test_support::test_db();
+        create_test_item(&db, "Note A", "note");
+        create_test_item(&db, "Task B", "task");
+
+        let notes = get_items(&db, Some("note"), 10, 0).unwrap();
+        assert_eq!(notes.len(), 1);
+        assert_eq!(notes[0].item_type, "note");
+
+        let tasks = get_items(&db, Some("task"), 10, 0).unwrap();
+        assert_eq!(tasks.len(), 1);
+        assert_eq!(tasks[0].item_type, "task");
+    }
+
+    #[test]
+    fn get_items_paginates_with_limit_and_offset() {
+        let db = crate::test_support::test_db();
+        create_test_item(&db, "A", "note");
+        create_test_item(&db, "B", "note");
+        create_test_item(&db, "C", "note");
+
+        let page1 = get_items(&db, None, 2, 0).unwrap();
+        assert_eq!(page1.len(), 2);
+
+        let page2 = get_items(&db, None, 2, 2).unwrap();
+        assert_eq!(page2.len(), 1);
+    }
+
+    #[test]
+    fn update_merges_partial_fields() {
+        let db = crate::test_support::test_db();
+        let created = create_test_item(&db, "Original", "note");
+
+        let updated = update(
+            &db,
+            UpdateItemPayload {
+                id: created.id.clone(),
+                title: Some("Updated".to_string()),
+                pinned: Some(true),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(updated.title, "Updated");
+        assert_eq!(updated.content, "test content");
+        assert!(updated.pinned);
+        assert!(!updated.favorite);
+    }
+
+    #[test]
+    fn delete_removes_item_and_not_found_for_missing() {
+        let db = crate::test_support::test_db();
+        let created = create_test_item(&db, "To Delete", "note");
+
+        delete(&db, &created.id).unwrap();
+        assert!(get_item(&db, &created.id).is_err());
+
+        let err = delete(&db, "nonexistent-id");
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn get_pinned_and_get_recent() {
+        let db = crate::test_support::test_db();
+        let pinned = create_test_item(&db, "Pinned", "note");
+        update(
+            &db,
+            UpdateItemPayload {
+                id: pinned.id.clone(),
+                pinned: Some(true),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        create_test_item(&db, "Normal", "note");
+
+        let pinned_items = get_pinned(&db).unwrap();
+        assert_eq!(pinned_items.len(), 1);
+        assert!(pinned_items[0].pinned);
+
+        let recent = get_recent(&db, 5).unwrap();
+        assert_eq!(recent.len(), 2);
+    }
+}

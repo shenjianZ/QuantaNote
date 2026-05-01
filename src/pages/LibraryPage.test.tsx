@@ -1,0 +1,115 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { screen, waitFor } from "@testing-library/react";
+import { setup, createMockItem } from "../test/test-utils";
+import { LibraryPage } from "./LibraryPage";
+import { useAppStore } from "../stores/appStore";
+import { useItemStore } from "../stores/itemStore";
+import { useAttachmentStore } from "../stores/attachmentStore";
+import { useTagStore } from "../stores/tagStore";
+import { useSearchStore } from "../stores/searchStore";
+
+vi.mock("@tauri-apps/plugin-dialog", () => ({
+  open: vi.fn(),
+}));
+
+vi.mock("../services/tauriCommands", () => ({
+  getAllItemTagMappings: vi.fn(async () => []),
+}));
+
+const defaultSelectedItem = createMockItem();
+
+function makeProps(overrides = {}) {
+  return {
+    items: [createMockItem({ id: "item-1", title: "Note A" }), createMockItem({ id: "item-2", title: "Note B" })],
+    selectedItem: defaultSelectedItem,
+    onSelectItem: vi.fn(),
+    onCreateItem: vi.fn(),
+    onOpenDocument: vi.fn(),
+    ...overrides,
+  };
+}
+
+function setupStores() {
+  useAppStore.setState({ theme: "light" });
+  useItemStore.setState({
+    selectedItem: null,
+    deleteItem: vi.fn(async () => {}),
+    updateItem: vi.fn(async () => {}),
+  });
+  useAttachmentStore.setState({
+    attachments: [],
+    fetchAttachments: vi.fn(),
+    addAttachment: vi.fn(),
+    deleteAttachment: vi.fn(),
+  });
+  useTagStore.setState({
+    tags: [],
+    itemTags: [],
+    fetchTags: vi.fn(),
+    fetchItemTags: vi.fn(),
+    updateItemTags: vi.fn(),
+  });
+  useSearchStore.setState({
+    results: [],
+    searching: false,
+    search: vi.fn(async () => {}),
+  });
+}
+
+describe("LibraryPage", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupStores();
+  });
+
+  it("renders item list from props", () => {
+    const props = makeProps();
+    setup(<LibraryPage {...props} />);
+    expect(screen.getByText("Note A")).toBeInTheDocument();
+    expect(screen.getByText("Note B")).toBeInTheDocument();
+  });
+
+  it("filters items by pinned tab", async () => {
+    const pinnedItem = createMockItem({ id: "p-1", title: "Pinned Note", pinned: true });
+    const normalItem = createMockItem({ id: "n-1", title: "Normal Note", pinned: false });
+    const props = makeProps({ items: [pinnedItem, normalItem] });
+    const { user } = setup(<LibraryPage {...props} />);
+
+    await user.click(screen.getByText("置顶"));
+    expect(screen.getByText("Pinned Note")).toBeInTheDocument();
+    expect(screen.queryByText("Normal Note")).not.toBeInTheDocument();
+  });
+
+  it("filters items by favorite tab", async () => {
+    const favItem = createMockItem({ id: "f-1", title: "Fav Note", favorite: true });
+    const normalItem = createMockItem({ id: "n-1", title: "Normal Note", favorite: false });
+    const props = makeProps({ items: [favItem, normalItem] });
+    const { user } = setup(<LibraryPage {...props} />);
+
+    await user.click(screen.getByText("收藏"));
+    expect(screen.getByText("Fav Note")).toBeInTheDocument();
+    expect(screen.queryByText("Normal Note")).not.toBeInTheDocument();
+  });
+
+  it("selects item on click and opens reader", async () => {
+    const props = makeProps();
+    const { user } = setup(<LibraryPage {...props} />);
+
+    await user.click(screen.getByText("Note A"));
+    expect(props.onSelectItem).toHaveBeenCalledWith("item-1");
+  });
+
+  it("calls onCreateItem when new button clicked", async () => {
+    const props = makeProps();
+    const { user } = setup(<LibraryPage {...props} />);
+
+    await user.click(screen.getByText("新建"));
+    expect(props.onCreateItem).toHaveBeenCalled();
+  });
+
+  it("shows empty state when no items match", () => {
+    const props = makeProps({ items: [] });
+    setup(<LibraryPage {...props} />);
+    expect(screen.getByText("还没有可显示的记录")).toBeInTheDocument();
+  });
+});

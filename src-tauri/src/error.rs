@@ -20,3 +20,36 @@ impl Serialize for AppError {
         serializer.serialize_str(&self.to_string())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn app_error_database_message() {
+        let err = AppError::Database("连接失败".to_string());
+        assert!(err.to_string().contains("数据库错误"));
+        assert!(err.to_string().contains("连接失败"));
+    }
+
+    #[test]
+    fn app_error_not_found_message() {
+        let err = AppError::NotFound("Item xxx".to_string());
+        assert!(err.to_string().contains("未找到"));
+    }
+
+    #[test]
+    fn app_error_serializes_to_string() {
+        let errors = vec![
+            AppError::Database("db".to_string()),
+            AppError::NotFound("nf".to_string()),
+            AppError::Validation("val".to_string()),
+            AppError::Io("io".to_string()),
+        ];
+        for err in &errors {
+            let json = serde_json::to_string(err).unwrap();
+            assert!(json.starts_with('"'));
+            assert!(json.ends_with('"'));
+        }
+    }
+}

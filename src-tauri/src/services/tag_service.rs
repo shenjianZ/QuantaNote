@@ -87,4 +87,39 @@ mod tests {
         let tags = get_tags_for_item(&db, &item.id).expect("item tags");
         assert!(tags.is_empty());
     }
+
+    #[test]
+    fn get_all_tags_returns_empty_initially() {
+        let db = crate::test_support::test_db();
+        let tags = get_all_tags(&db).unwrap();
+        assert!(tags.is_empty());
+    }
+
+    #[test]
+    fn create_tag_returns_dto() {
+        let db = crate::test_support::test_db();
+        let tag = create_tag(&db, "rust", "cyan").unwrap();
+        assert_eq!(tag.name, "rust");
+        assert_eq!(tag.color, "cyan");
+    }
+
+    #[test]
+    fn get_tags_for_item_after_set() {
+        let db = crate::test_support::test_db();
+        let item = crate::services::item_service::create_item(
+            &db, "T".to_string(), "note".to_string(), None,
+        ).unwrap();
+        set_item_tags(&db, &item.id, vec!["go".to_string()]).unwrap();
+
+        let tags = get_tags_for_item(&db, &item.id).unwrap();
+        assert_eq!(tags.len(), 1);
+        assert_eq!(tags[0].name, "go");
+    }
+
+    #[test]
+    fn get_all_mappings_returns_empty_initially() {
+        let db = crate::test_support::test_db();
+        let mappings = get_all_item_tag_mappings(&db).unwrap();
+        assert!(mappings.is_empty());
+    }
 }

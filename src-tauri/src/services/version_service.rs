@@ -124,4 +124,29 @@ mod tests {
         assert!(restored.pinned);
         assert!(restored.favorite);
     }
+
+    #[test]
+    fn get_versions_returns_all_for_item() {
+        let db = crate::test_support::test_db();
+        let item = crate::services::item_service::create_item(
+            &db, "V".to_string(), "note".to_string(), Some("c1".to_string()),
+        ).unwrap();
+        create_version(&db, &item.id, "c2", "", None, None).unwrap();
+
+        let versions = get_versions(&db, &item.id).unwrap();
+        assert_eq!(versions.len(), 2);
+    }
+
+    #[test]
+    fn update_version_changes_metadata() {
+        let db = crate::test_support::test_db();
+        let item = crate::services::item_service::create_item(
+            &db, "V".to_string(), "note".to_string(), Some("c".to_string()),
+        ).unwrap();
+        let v = create_version(&db, &item.id, "c", "", Some("old"), Some("old desc")).unwrap();
+
+        let updated = update_version(&db, &v.id, "new name", "new desc").unwrap();
+        assert_eq!(updated.name, "new name");
+        assert_eq!(updated.description, "new desc");
+    }
 }

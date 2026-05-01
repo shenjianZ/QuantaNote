@@ -204,3 +204,64 @@ pub fn delete(db: &DbState, id: &str) -> Result<(), AppError> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::repositories::item_repository;
+    use crate::models::item::CreateItemPayload;
+
+    fn setup() -> (DbState, String, std::sync::MutexGuard<'static, ()>) {
+        let data_dir = crate::test_support::unique_temp_dir("att-repo");
+        let _guard = crate::test_support::lock_test_data_dir(&data_dir);
+        let db = crate::test_support::test_db();
+        let dto = item_repository::create(
+            &db,
+            CreateItemPayload {
+                title: "Test".to_string(),
+                item_type: "note".to_string(),
+                content: None,
+                summary: String::new(),
+            },
+        )
+        .unwrap();
+        (db, dto.id, _guard)
+    }
+
+    #[test]
+    fn add_and_get_by_item() {
+        let (db, item_id, _guard) = setup();
+        let temp_dir = crate::test_support::unique_temp_dir("att-src");
+        let src = temp_dir.join("test.txt");
+        std::fs::write(&src, "hello").unwrap();
+
+        let att = add(&db, item_id.clone(), src.to_string_lossy().to_string()).unwrap();
+        assert_eq!(att.filename, "test.txt");
+        assert_eq!(att.mime_type, "text/plain");
+        assert!(att.file_size > 0);
+
+        let list = get_by_item(&db, &item_id).unwrap();
+        assert_eq!(list.len(), 1);
+    }
+
+    #[test]
+    fn delete_removes_record() {
+        let (db, item_id, _guard) = setup();
+        let temp_dir = crate::test_support::unique_temp_dir("att-src2");
+        let src = temp_dir.join("del.txt");
+        std::fs::write(&src, "bye").unwrap();
+
+        let att = add(&db, item_id.clone(), src.to_string_lossy().to_string()).unwrap();
+        delete(&db, &att.id).unwrap();
+
+        let list = get_by_item(&db, &item_id).unwrap();
+        assert!(list.is_empty());
+    }
+
+    #[test]
+    fn get_by_item_empty_for_unlinked() {
+        let (db, _item_id, _guard) = setup();
+        let list = get_by_item(&db, "nonexistent-item").unwrap();
+        assert!(list.is_empty());
+    }
+}
