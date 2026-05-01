@@ -32,11 +32,31 @@ const DEFAULTS: AppSettings = {
     autostart: false,
 };
 
+const AVAILABLE_FONT_FAMILIES = new Set(["Noto Sans SC", "system-ui"]);
+const AVAILABLE_MONO_FAMILIES = new Set([
+    "JetBrains Mono",
+    "Consolas",
+    "monospace",
+]);
+
+function normalizeSettings(settings: AppSettings): AppSettings {
+    return {
+        ...settings,
+        fontFamily: AVAILABLE_FONT_FAMILIES.has(settings.fontFamily)
+            ? settings.fontFamily
+            : DEFAULTS.fontFamily,
+        fontMono: AVAILABLE_MONO_FAMILIES.has(settings.fontMono)
+            ? settings.fontMono
+            : DEFAULTS.fontMono,
+        fontSize: Math.min(18, Math.max(14, Number(settings.fontSize) || DEFAULTS.fontSize)),
+    };
+}
+
 function loadSettings(): AppSettings {
     try {
         const saved = localStorage.getItem("quantanote-settings");
         if (saved) {
-            return { ...DEFAULTS, ...JSON.parse(saved) };
+            return normalizeSettings({ ...DEFAULTS, ...JSON.parse(saved) });
         }
     } catch {
         /* ignore */
@@ -60,19 +80,32 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
 
 function applySettings(settings: AppSettings) {
     const root = document.documentElement;
+    const sansStack =
+        settings.fontFamily === "system-ui"
+            ? "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+            : `'${settings.fontFamily}', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`;
+    const monoStack =
+        settings.fontMono === "monospace"
+            ? "'SFMono-Regular', Consolas, monospace"
+            : `'${settings.fontMono}', 'SFMono-Regular', Consolas, monospace`;
+
+    root.style.setProperty("--font-sans", sansStack);
+    root.style.setProperty("--font-mono", monoStack);
     root.style.setProperty(
-        "--font-sans",
-        `'${settings.fontFamily}', system-ui, -apple-system, sans-serif`,
+        "--font-size-base",
+        `${settings.fontSize}px`,
     );
-    root.style.setProperty("--font-mono", `'${settings.fontMono}', monospace`);
-    root.style.setProperty("--font-size-base", `${settings.fontSize}px`);
+    root.style.setProperty(
+        "--font-size-2xs",
+        `max(11px, calc(${settings.fontSize}px - 3px))`,
+    );
     root.style.setProperty(
         "--font-size-xs",
-        `max(12px, calc(${settings.fontSize}px - 3px))`,
+        `max(12px, calc(${settings.fontSize}px - 2px))`,
     );
     root.style.setProperty(
         "--font-size-sm",
-        `max(13px, calc(${settings.fontSize}px - 2px))`,
+        `${settings.fontSize}px`,
     );
     root.style.setProperty("--font-size-md", `${settings.fontSize}px`);
     root.style.setProperty(
@@ -82,6 +115,26 @@ function applySettings(settings: AppSettings) {
     root.style.setProperty(
         "--font-size-xl",
         `calc(${settings.fontSize}px + 5px)`,
+    );
+    root.style.setProperty(
+        "--font-size-2xl",
+        `calc(${settings.fontSize}px + 9px)`,
+    );
+    root.style.setProperty(
+        "--font-size-3xl",
+        `calc(${settings.fontSize}px + 13px)`,
+    );
+    root.style.setProperty(
+        "--font-size-md-h1",
+        `calc(${settings.fontSize}px + 13px)`,
+    );
+    root.style.setProperty(
+        "--font-size-md-h2",
+        `calc(${settings.fontSize}px + 7px)`,
+    );
+    root.style.setProperty(
+        "--font-size-md-h3",
+        `calc(${settings.fontSize}px + 3px)`,
     );
     root.style.setProperty("--accent", settings.accentColor);
     const rgb = hexToRgb(settings.accentColor);

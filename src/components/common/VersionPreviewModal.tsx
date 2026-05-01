@@ -1,17 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Modal } from "./Modal";
 import { MarkdownRenderer } from "./MarkdownRenderer";
-
-interface VersionDto {
-  id: string;
-  item_id: string;
-  version_number: number;
-  content: string;
-  change_summary: string;
-  name: string;
-  description: string;
-  created_at: string;
-}
+import type { VersionDto } from "../../types";
 
 interface VersionPreviewModalProps {
   open: boolean;
@@ -23,19 +13,23 @@ interface VersionPreviewModalProps {
 
 export function VersionPreviewModal({ open, version, onClose, onRestore, theme }: VersionPreviewModalProps) {
   const [confirming, setConfirming] = useState(false);
+  const confirmingRef = useRef(false);
 
   if (!version) return null;
 
   function handleRestore() {
-    if (!confirming) {
+    if (!confirmingRef.current) {
+      confirmingRef.current = true;
       setConfirming(true);
       return;
     }
     onRestore(version!);
+    confirmingRef.current = false;
     setConfirming(false);
   }
 
   function handleClose() {
+    confirmingRef.current = false;
     setConfirming(false);
     onClose();
   }

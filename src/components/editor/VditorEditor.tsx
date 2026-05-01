@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import Vditor from "vditor";
 import "vditor/dist/index.css";
+import { VDITOR_CDN, VDITOR_LANG } from "../../utils/vditorConfig";
 
 type VditorToolbarItem = string | {
   name: string;
@@ -220,6 +221,8 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
     containerRef.current.dataset.vditorReady = "false";
 
     const vditor = new Vditor(containerRef.current, {
+      cdn: VDITOR_CDN,
+      lang: VDITOR_LANG,
       mode: "ir",
       height: "100%",
       theme: theme === "dark" ? "dark" : "classic",

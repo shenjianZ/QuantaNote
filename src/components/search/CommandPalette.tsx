@@ -39,14 +39,11 @@ export function CommandPalette({
 
   const effectiveResults = useMemo<SearchResultDto[]>(() => {
     if (results.length > 0) {
-      console.log(
-        `[CommandPalette] 使用后端搜索结果 | query="${query}" | results=${results.length}`
-      );
       return results;
     }
     const q = query.trim().toLowerCase();
     if (!q) return [];
-    const filtered = items
+    return items
       .filter((item) => {
         const haystack = `${item.title} ${item.summary}`.toLowerCase();
         return haystack.includes(q);
@@ -57,10 +54,6 @@ export function CommandPalette({
         item_type: item.type,
         summary: item.summary,
       }));
-    console.log(
-      `[CommandPalette] 后端无结果，客户端 includes 兜底 | query="${query}" | results=${filtered.length}`
-    );
-    return filtered;
   }, [results, query, items]);
 
   useEffect(() => {
@@ -75,6 +68,13 @@ export function CommandPalette({
   useEffect(() => {
     setSelectedIdx(0);
   }, [effectiveResults.length]);
+
+  // 组件卸载时清理防抖定时器
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
 
   function handleChange(value: string) {
     setQuery(value);
@@ -114,6 +114,10 @@ export function CommandPalette({
     >
       <section
         className="mx-auto flex max-h-[72vh] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-[var(--line)] bg-[var(--popover)] shadow-2xl"
+        role="combobox"
+        aria-expanded={true}
+        aria-haspopup="listbox"
+        aria-label="搜索笔记"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--line)] px-4">
@@ -123,6 +127,10 @@ export function CommandPalette({
             className="min-w-0 flex-1 bg-transparent text-base text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
             placeholder="搜索笔记"
             data-testid="palette-search-input"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-controls="palette-results"
+            aria-activedescendant={effectiveResults.length > 0 ? `palette-result-${selectedIdx}` : undefined}
             value={query}
             onChange={(e) => handleChange(e.currentTarget.value)}
             onKeyDown={handleKeyDown}
@@ -131,7 +139,7 @@ export function CommandPalette({
           <Kbd>Esc</Kbd>
         </div>
 
-        <div className="min-h-0 overflow-auto p-2">
+        <div className="min-h-0 overflow-auto p-2" id="palette-results" role="listbox">
           {effectiveResults.length === 0 ? (
             <div className="px-4 py-10 text-center text-sm text-[var(--muted)]">
               {query.trim() ? "没有匹配的笔记" : "输入关键词搜索笔记"}
@@ -143,7 +151,10 @@ export function CommandPalette({
                   index === selectedIdx ? "bg-[var(--hover)]" : "hover:bg-[var(--hover)]"
                 }`}
                 key={item.id}
+                id={`palette-result-${index}`}
                 data-testid="palette-result"
+                role="option"
+                aria-selected={index === selectedIdx}
                 onClick={() => handleSelect(item)}
                 type="button"
               >

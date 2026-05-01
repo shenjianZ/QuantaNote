@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import Vditor from "vditor";
 import "vditor/dist/index.css";
+import { VDITOR_CDN, VDITOR_LANG } from "../../utils/vditorConfig";
 
 interface MarkdownRendererProps {
   content: string;
@@ -14,6 +15,8 @@ export function MarkdownRenderer({ content, theme = "dark", emptyText = "暂无�
   useEffect(() => {
     if (!ref.current || !content) return;
     Vditor.preview(ref.current, content, {
+      cdn: VDITOR_CDN,
+      lang: VDITOR_LANG,
       mode: theme,
       theme: { current: theme },
     });

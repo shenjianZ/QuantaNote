@@ -24,6 +24,8 @@ const EMPTY_ITEM: Item = {
     time: "",
     icon: FileText,
     accent: "cyan",
+    createdAt: "",
+    updatedAt: "",
 };
 
 type TrayCommand =

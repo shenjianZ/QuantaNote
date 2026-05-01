@@ -11,13 +11,39 @@ interface ModalProps {
 
 export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg" }: ModalProps) {
   const backdropRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
+      // 焦点陷阱：Tab 键循环在模态框内
+      if (e.key === "Tab" && dialogRef.current) {
+        const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     }
     document.addEventListener("keydown", handleKey);
+    // 自动聚焦第一个可聚焦元素
+    setTimeout(() => {
+      if (dialogRef.current) {
+        const first = dialogRef.current.querySelector<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        first?.focus();
+      }
+    }, 50);
     return () => document.removeEventListener("keydown", handleKey);
   }, [open, onClose]);
 
@@ -32,6 +58,10 @@ export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg" }:
       }}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         className={`flex max-h-[85vh] w-full ${maxWidth} flex-col rounded-3xl border border-[var(--line)] bg-[var(--popover)] shadow-2xl`}
         onClick={(e) => e.stopPropagation()}
       >
@@ -40,6 +70,7 @@ export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg" }:
           <button
             className="grid h-8 w-8 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
             type="button"
+            aria-label="关闭"
             data-testid="modal-close-btn"
             onClick={onClose}
           >

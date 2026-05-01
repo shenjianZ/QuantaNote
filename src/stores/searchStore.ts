@@ -16,6 +16,8 @@ interface SearchState {
   search: (q: string, itemType?: string) => Promise<void>;
 }
 
+let _searchSeq = 0;
+
 export const useSearchStore = create<SearchState>((set) => ({
   query: "",
   results: [],
@@ -28,14 +30,18 @@ export const useSearchStore = create<SearchState>((set) => ({
       set({ results: [], searching: false });
       return;
     }
+    const seq = ++_searchSeq;
     set({ searching: true });
     try {
       const results = await invoke<SearchResultDto[]>("search_items", {
         query: q,
         itemType: itemType ?? null,
       });
+      // 如果已有更新的搜索请求，丢弃本次结果
+      if (seq !== _searchSeq) return;
       set({ results, searching: false });
     } catch {
+      if (seq !== _searchSeq) return;
       set({ results: [], searching: false });
     }
   },

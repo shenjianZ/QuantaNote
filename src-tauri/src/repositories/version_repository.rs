@@ -24,7 +24,7 @@ pub fn create_version(
             params![item_id],
             |row| row.get(0),
         )
-        .unwrap_or(0);
+        .map_err(|e| AppError::Database(e.to_string()))?;
 
     let id = ids::new_id("ver");
     let now = chrono::Utc::now().to_rfc3339();
@@ -75,8 +75,8 @@ pub fn get_versions(db: &DbState, item_id: &str) -> Result<Vec<VersionDto>, AppE
             })
         })
         .map_err(|e| AppError::Database(e.to_string()))?
-        .filter_map(|r| r.ok())
-        .collect();
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| AppError::Database(e.to_string()))?;
 
     Ok(items)
 }

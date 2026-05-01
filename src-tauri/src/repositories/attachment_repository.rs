@@ -10,9 +10,17 @@ fn resolve_file_path(relative_path: &str) -> PathBuf {
     paths::quantanote_dir().join(relative_path)
 }
 
+/// 清洗路径组件，仅保留安全字符，防止路径穿越
+fn sanitize_path_component(s: &str) -> String {
+    s.chars()
+        .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
+        .collect()
+}
+
 pub fn add(db: &DbState, item_id: String, source_path: String) -> Result<AttachmentDto, AppError> {
     let id = ids::new_id("att");
     let now = chrono::Utc::now().to_rfc3339();
+    let safe_item_id = sanitize_path_component(&item_id);
 
     let source = std::path::Path::new(&source_path);
     let filename = source
@@ -22,11 +30,15 @@ pub fn add(db: &DbState, item_id: String, source_path: String) -> Result<Attachm
 
     let relative_path =
         PathBuf::from("attachments")
-            .join(&item_id)
+            .join(&safe_item_id)
             .join(format!("{}-{}", &id[..8], filename));
     let dest_path = paths::quantanote_dir().join(&relative_path);
-    std::fs::create_dir_all(dest_path.parent().unwrap())
-        .map_err(|e| AppError::Io(e.to_string()))?;
+    std::fs::create_dir_all(
+        dest_path
+            .parent()
+            .ok_or_else(|| AppError::Validation("附件路径无效".to_string()))?,
+    )
+    .map_err(|e| AppError::Io(e.to_string()))?;
     std::fs::copy(&source_path, &dest_path).map_err(|e| AppError::Io(e.to_string()))?;
 
     let file_size = std::fs::metadata(&dest_path)
@@ -171,36 +183,45 @@ pub fn get_by_item(db: &DbState, item_id: &str) -> Result<Vec<AttachmentDto>, Ap
             })
         })
         .map_err(|e| AppError::Database(e.to_string()))?
-        .filter_map(|r| r.ok())
-        .collect();
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| AppError::Database(e.to_string()))?;
 
     Ok(items)
 }
 
 pub fn delete(db: &DbState, id: &str) -> Result<(), AppError> {
-    let conn = db
-        .conn
-        .lock()
-        .map_err(|e| AppError::Database(e.to_string()))?;
-    let relative_path: Option<String> = conn
-        .query_row(
+    // 先查询文件路径
+    let relative_path: Option<String> = {
+        let conn = db
+            .conn
+            .lock()
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        conn.query_row(
             "SELECT file_path FROM attachments WHERE id = ?1",
             params![id],
             |row| row.get(0),
         )
-        .ok();
+        .ok()
+    };
+
+    // 先删除文件（在 DB 记录之前）
+    if let Some(rel) = &relative_path {
+        let full_path = resolve_file_path(rel);
+        if full_path.exists() {
+            std::fs::remove_file(&full_path).map_err(|e| AppError::Io(e.to_string()))?;
+        }
+    }
+
+    // 再删除 DB 记录
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
     let rows = conn
         .execute("DELETE FROM attachments WHERE id = ?1", params![id])
         .map_err(|e| AppError::Database(e.to_string()))?;
     if rows == 0 {
         return Err(AppError::NotFound(format!("Attachment {}", id)));
-    }
-    drop(conn);
-    if let Some(rel) = relative_path {
-        let full_path = resolve_file_path(&rel);
-        if full_path.exists() {
-            std::fs::remove_file(&full_path).map_err(|e| AppError::Io(e.to_string()))?;
-        }
     }
     Ok(())
 }

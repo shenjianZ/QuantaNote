@@ -61,7 +61,7 @@ describe("QuantaNote desktop smoke", () => {
 
     await $("//button[contains(., '新建')]").click();
     await expect($("input[placeholder='文档标题']")).toBeDisplayed();
-    await expect($("//summary[contains(., '版本记录')]")).toBeDisplayed();
+    await expect($("[data-testid='doc-version-toggle']")).toBeDisplayed();
   });
 
   it("switches to settings and changes theme", async () => {

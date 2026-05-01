@@ -169,7 +169,7 @@ export function AttachmentManagerModal({ open: isOpen, onClose, itemId }: Attach
                         title={category === "other" ? "用系统应用打开" : "预览"}
                       >
                         {ext ? (
-                          <span className="text-[10px] font-bold uppercase text-[var(--muted)]">{ext}</span>
+                          <span className="text-2xs font-bold uppercase text-[var(--muted)]">{ext}</span>
                         ) : Icon ? (
                           <Icon className="h-5 w-5 text-[var(--muted)]" />
                         ) : (
@@ -247,7 +247,7 @@ export function AttachmentManagerModal({ open: isOpen, onClose, itemId }: Attach
             {/* Header bar */}
             <div className="flex shrink-0 items-center justify-between border-b border-[var(--line)] px-4 py-2.5">
               <div className="flex min-w-0 items-center gap-2">
-                <span className="shrink-0 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] font-medium text-[var(--accent)]">
+                <span className="shrink-0 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-2xs font-medium text-[var(--accent)]">
                   {getCategoryLabel(preview.type)}
                 </span>
                 <span className="truncate text-sm text-[var(--text)]">{preview.filename}</span>

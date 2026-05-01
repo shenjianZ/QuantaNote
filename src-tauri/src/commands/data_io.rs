@@ -1,9 +1,18 @@
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use tauri::State;
 
 use crate::db::DbState;
 use crate::error::AppError;
 use crate::utils::paths;
+
+fn resolve_user_path(path: &str) -> Result<PathBuf, AppError> {
+    let target = PathBuf::from(path);
+    if target.as_os_str().is_empty() {
+        return Err(AppError::Validation("路径无效".to_string()));
+    }
+    Ok(target)
+}
 
 #[derive(Serialize, Deserialize)]
 struct ExportData {
@@ -33,6 +42,13 @@ fn value_bool(value: &serde_json::Value, key: &str) -> i32 {
     } else {
         0
     }
+}
+
+/// 清洗路径组件，仅保留安全字符，防止路径穿越
+fn sanitize_path_component(s: &str) -> String {
+    s.chars()
+        .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
+        .collect()
 }
 
 #[tauri::command]
@@ -66,7 +82,8 @@ fn export_data_from_db(db: &DbState) -> Result<String, AppError> {
                 }))
             })
             .map_err(|e| AppError::Database(e.to_string()))?;
-        rows.filter_map(|r| r.ok()).collect()
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| AppError::Database(e.to_string()))?
     };
 
     let tags: Vec<serde_json::Value> = {
@@ -82,7 +99,8 @@ fn export_data_from_db(db: &DbState) -> Result<String, AppError> {
                 }))
             })
             .map_err(|e| AppError::Database(e.to_string()))?;
-        rows.filter_map(|r| r.ok()).collect()
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| AppError::Database(e.to_string()))?
     };
 
     let item_tags: Vec<serde_json::Value> = {
@@ -97,7 +115,8 @@ fn export_data_from_db(db: &DbState) -> Result<String, AppError> {
                 }))
             })
             .map_err(|e| AppError::Database(e.to_string()))?;
-        rows.filter_map(|r| r.ok()).collect()
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| AppError::Database(e.to_string()))?
     };
 
     let attachments: Vec<serde_json::Value> = {
@@ -125,7 +144,8 @@ fn export_data_from_db(db: &DbState) -> Result<String, AppError> {
                 }))
             })
             .map_err(|e| AppError::Database(e.to_string()))?;
-        rows.filter_map(|r| r.ok()).collect()
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| AppError::Database(e.to_string()))?
     };
 
     let versions: Vec<serde_json::Value> = {
@@ -146,7 +166,8 @@ fn export_data_from_db(db: &DbState) -> Result<String, AppError> {
                 }))
             })
             .map_err(|e| AppError::Database(e.to_string()))?;
-        rows.filter_map(|r| r.ok()).collect()
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| AppError::Database(e.to_string()))?
     };
 
     let data = ExportData {
@@ -167,13 +188,17 @@ pub fn import_data(db: State<'_, DbState>, json: String) -> Result<(), AppError>
 fn import_data_into_db(db: &DbState, json: String) -> Result<(), AppError> {
     let data: ExportData =
         serde_json::from_str(&json).map_err(|e| AppError::Validation(e.to_string()))?;
-    let conn = db
+    let mut conn = db
         .conn
         .lock()
         .map_err(|e| AppError::Database(e.to_string()))?;
 
+    let tx = conn
+        .transaction()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
     for item in data.items {
-        conn.execute(
+        tx.execute(
             "INSERT OR IGNORE INTO items (id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             rusqlite::params![
@@ -192,7 +217,7 @@ fn import_data_into_db(db: &DbState, json: String) -> Result<(), AppError> {
     }
 
     for tag in data.tags {
-        conn.execute(
+        tx.execute(
             "INSERT OR REPLACE INTO tags (id, name, color) VALUES (?1, ?2, ?3)",
             rusqlite::params![
                 value_i64(&tag, "id"),
@@ -204,7 +229,7 @@ fn import_data_into_db(db: &DbState, json: String) -> Result<(), AppError> {
     }
 
     for item_tag in data.item_tags {
-        conn.execute(
+        tx.execute(
             "INSERT OR IGNORE INTO item_tags (item_id, tag_id) VALUES (?1, ?2)",
             rusqlite::params![
                 value_str(&item_tag, "item_id"),
@@ -218,9 +243,14 @@ fn import_data_into_db(db: &DbState, json: String) -> Result<(), AppError> {
 
     for attachment in data.attachments {
         let id = value_str(&attachment, "id");
-        let item_id = value_str(&attachment, "item_id");
+        let item_id = sanitize_path_component(&value_str(&attachment, "item_id"));
         let filename = value_str(&attachment, "filename");
         let mut file_path = value_str(&attachment, "file_path");
+
+        // 验证导入的 file_path 不包含路径穿越
+        if !file_path.is_empty() && (file_path.contains("..") || file_path.contains('\0')) {
+            file_path = String::new();
+        }
 
         if let Some(file_data) = attachment["file_data"].as_str() {
             use base64::engine::general_purpose::STANDARD as BASE64;
@@ -238,13 +268,17 @@ fn import_data_into_db(db: &DbState, json: String) -> Result<(), AppError> {
                         filename
                     ));
             let dest_path = data_dir.join(&relative_path);
-            std::fs::create_dir_all(dest_path.parent().unwrap())
-                .map_err(|e| AppError::Io(e.to_string()))?;
+            std::fs::create_dir_all(
+                dest_path
+                    .parent()
+                    .ok_or_else(|| AppError::Validation("附件路径无效".to_string()))?,
+            )
+            .map_err(|e| AppError::Io(e.to_string()))?;
             std::fs::write(&dest_path, bytes).map_err(|e| AppError::Io(e.to_string()))?;
             file_path = relative_path.to_string_lossy().to_string();
         }
 
-        conn.execute(
+        tx.execute(
             "INSERT OR REPLACE INTO attachments (id, item_id, filename, file_path, mime_type, file_size, created_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             rusqlite::params![
@@ -260,7 +294,7 @@ fn import_data_into_db(db: &DbState, json: String) -> Result<(), AppError> {
     }
 
     for version in data.versions {
-        conn.execute(
+        tx.execute(
             "INSERT OR IGNORE INTO versions (id, item_id, version_number, content, change_summary, name, description, created_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             rusqlite::params![
@@ -276,17 +310,20 @@ fn import_data_into_db(db: &DbState, json: String) -> Result<(), AppError> {
         ).map_err(|e| AppError::Database(e.to_string()))?;
     }
 
+    tx.commit().map_err(|e| AppError::Database(e.to_string()))?;
     Ok(())
 }
 
 #[tauri::command]
 pub fn save_to_file(path: String, content: String) -> Result<(), AppError> {
-    std::fs::write(&path, content).map_err(|e| AppError::Io(e.to_string()))
+    let validated = resolve_user_path(&path)?;
+    std::fs::write(&validated, content).map_err(|e| AppError::Io(e.to_string()))
 }
 
 #[tauri::command]
 pub fn read_from_file(path: String) -> Result<String, AppError> {
-    std::fs::read_to_string(&path).map_err(|e| AppError::Io(e.to_string()))
+    let validated = resolve_user_path(&path)?;
+    std::fs::read_to_string(&validated).map_err(|e| AppError::Io(e.to_string()))
 }
 
 #[cfg(test)]
@@ -296,6 +333,7 @@ mod tests {
     #[test]
     fn save_and_read_file_round_trip() {
         let dir = crate::test_support::unique_temp_dir("data-io");
+        let _guard = crate::test_support::lock_test_data_dir(&dir);
         let file = dir.join("backup.json");
 
         save_to_file(
@@ -306,15 +344,33 @@ mod tests {
         let content = read_from_file(file.to_string_lossy().to_string()).expect("read file");
 
         assert_eq!(content, "{\"items\":[]}");
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn read_missing_file_returns_io_error() {
-        let error = read_from_file("Z:\\missing\\quantanote.json".to_string())
+        let dir = crate::test_support::unique_temp_dir("data-io-missing");
+        let _guard = crate::test_support::lock_test_data_dir(&dir);
+        let file = dir.join("missing.json");
+
+        let error = read_from_file(file.to_string_lossy().to_string())
             .expect_err("missing file should fail");
 
         assert!(matches!(error, AppError::Io(_)));
+    }
+
+    #[test]
+    fn save_and_read_file_outside_data_dir() {
+        let data_dir = crate::test_support::unique_temp_dir("data-io-app-data");
+        let _guard = crate::test_support::lock_test_data_dir(&data_dir);
+        let outside_dir = crate::test_support::unique_temp_dir("data-io-outside");
+        let file = outside_dir.join("external.txt");
+
+        save_to_file(file.to_string_lossy().to_string(), "external".to_string())
+            .expect("save outside data dir");
+        let content = read_from_file(file.to_string_lossy().to_string())
+            .expect("read outside data dir");
+
+        assert_eq!(content, "external");
     }
 
     #[test]

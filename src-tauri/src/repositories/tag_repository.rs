@@ -21,8 +21,8 @@ pub fn get_all_tags(db: &DbState) -> Result<Vec<TagDto>, AppError> {
             })
         })
         .map_err(|e| AppError::Database(e.to_string()))?
-        .filter_map(|r| r.ok())
-        .collect();
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| AppError::Database(e.to_string()))?;
 
     Ok(tags)
 }
@@ -90,8 +90,8 @@ pub fn get_tags_for_item(db: &DbState, item_id: &str) -> Result<Vec<TagDto>, App
             })
         })
         .map_err(|e| AppError::Database(e.to_string()))?
-        .filter_map(|r| r.ok())
-        .collect();
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| AppError::Database(e.to_string()))?;
 
     Ok(tags)
 }
@@ -112,26 +112,29 @@ pub fn get_all_item_tag_mappings(db: &DbState) -> Result<Vec<(String, String)>, 
     let rows: Vec<(String, String)> = stmt
         .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
         .map_err(|e| AppError::Database(e.to_string()))?
-        .filter_map(|r| r.ok())
-        .collect();
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| AppError::Database(e.to_string()))?;
 
     Ok(rows)
 }
 
 pub fn set_item_tags(db: &DbState, item_id: &str, tag_names: Vec<String>) -> Result<(), AppError> {
-    let conn = db
+    let mut conn = db
         .conn
         .lock()
         .map_err(|e| AppError::Database(e.to_string()))?;
 
+    let tx = conn
+        .transaction()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
     // 清除现有关联
-    conn.execute("DELETE FROM item_tags WHERE item_id = ?1", params![item_id])
+    tx.execute("DELETE FROM item_tags WHERE item_id = ?1", params![item_id])
         .map_err(|e| AppError::Database(e.to_string()))?;
 
     // 添加新关联
     for name in &tag_names {
-        // 确保 tag 存在，获取 id
-        let tag_id: i64 = conn
+        let tag_id: i64 = tx
             .query_row(
                 "SELECT id FROM tags WHERE name = ?1",
                 params![name],
@@ -139,13 +142,14 @@ pub fn set_item_tags(db: &DbState, item_id: &str, tag_names: Vec<String>) -> Res
             )
             .map_err(|e| AppError::Database(e.to_string()))?;
 
-        conn.execute(
+        tx.execute(
             "INSERT OR IGNORE INTO item_tags (item_id, tag_id) VALUES (?1, ?2)",
             params![item_id, tag_id],
         )
         .map_err(|e| AppError::Database(e.to_string()))?;
     }
 
+    tx.commit().map_err(|e| AppError::Database(e.to_string()))?;
     Ok(())
 }
 
@@ -221,8 +225,8 @@ pub fn get_tag_item_counts(db: &DbState) -> Result<Vec<(String, String, i64)>, A
     let rows: Vec<(String, String, i64)> = stmt
         .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
         .map_err(|e| AppError::Database(e.to_string()))?
-        .filter_map(|r| r.ok())
-        .collect();
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| AppError::Database(e.to_string()))?;
 
     Ok(rows)
 }

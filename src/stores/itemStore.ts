@@ -62,29 +62,47 @@ export const useItemStore = create<ItemState>((set) => ({
   },
 
   createItem: async (title, itemType, content) => {
-    const item = await invoke<ItemDto>("create_item", {
-      title,
-      itemType,
-      content: content ?? null,
-    });
-    set((state) => ({ items: [item, ...state.items] }));
-    return item;
+    set({ error: null });
+    try {
+      const item = await invoke<ItemDto>("create_item", {
+        title,
+        itemType,
+        content: content ?? null,
+      });
+      set((state) => ({ items: [item, ...state.items] }));
+      return item;
+    } catch (e) {
+      set({ error: String(e) });
+      throw e;
+    }
   },
 
   updateItem: async (id, updates) => {
-    const updated = await invoke<ItemDto>("update_item", { id, ...updates });
-    set((state) => ({
-      items: state.items.map((i) => (i.id === id ? updated : i)),
-      selectedItem: state.selectedItem?.id === id ? updated : state.selectedItem,
-    }));
+    set({ error: null });
+    try {
+      const updated = await invoke<ItemDto>("update_item", { id, ...updates });
+      set((state) => ({
+        items: state.items.map((i) => (i.id === id ? updated : i)),
+        selectedItem: state.selectedItem?.id === id ? updated : state.selectedItem,
+      }));
+    } catch (e) {
+      set({ error: String(e) });
+      throw e;
+    }
   },
 
   deleteItem: async (id) => {
-    await invoke("delete_item", { id });
-    set((state) => ({
-      items: state.items.filter((i) => i.id !== id),
-      selectedItem: state.selectedItem?.id === id ? null : state.selectedItem,
-    }));
+    set({ error: null });
+    try {
+      await invoke("delete_item", { id });
+      set((state) => ({
+        items: state.items.filter((i) => i.id !== id),
+        selectedItem: state.selectedItem?.id === id ? null : state.selectedItem,
+      }));
+    } catch (e) {
+      set({ error: String(e) });
+      throw e;
+    }
   },
 
   fetchPinned: async () => {

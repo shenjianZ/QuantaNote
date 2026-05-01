@@ -11,6 +11,8 @@ const appBinary = process.platform === "win32"
   : path.join(rootDir, "src-tauri", "target", "debug", "quanta-note");
 const dataDir = path.join(os.tmpdir(), `quantanote-e2e-${process.pid}`);
 const isHeaded = process.env.E2E_HEADED === "1" || process.env.E2E_HEADED === "true";
+const maxInstances = Number(process.env.WDIO_MAX_INSTANCES || "1");
+const specFileRetries = Number(process.env.WDIO_SPEC_RETRIES || "0");
 
 let tauriDriver;
 let expectedExit = false;
@@ -27,6 +29,18 @@ function killExistingDriver() {
   }
 }
 
+function killExistingApp() {
+  try {
+    if (process.platform === "win32") {
+      spawnSync("taskkill", ["/F", "/T", "/IM", "quanta-note.exe"], { stdio: "ignore", shell: true });
+    } else {
+      spawnSync("pkill", ["-f", "quanta-note"], { stdio: "ignore", shell: true });
+    }
+  } catch {
+    // ignore — no existing process
+  }
+}
+
 function closeTauriDriver() {
   expectedExit = true;
   tauriDriver?.kill();
@@ -34,6 +48,7 @@ function closeTauriDriver() {
 
 function onShutdown() {
   closeTauriDriver();
+  killExistingApp();
   try {
     fs.rmSync(dataDir, { force: true, recursive: true });
   } catch {
@@ -60,10 +75,10 @@ export const config = {
   hostname: "127.0.0.1",
   port: 4444,
   specs: [path.join(__dirname, "specs", "**", "*.e2e.js")],
-  maxInstances: 1,
+  maxInstances,
   capabilities: [
     {
-      maxInstances: 1,
+      maxInstances,
       "tauri:options": {
         application: appBinary,
       },
@@ -79,7 +94,14 @@ export const config = {
     ui: "bdd",
     timeout: 120000,
   },
+  specFileRetries,
   onPrepare() {
+    killExistingDriver();
+    killExistingApp();
+    if (process.env.E2E_SKIP_BUILD === "1" || process.env.E2E_SKIP_BUILD === "true") {
+      return;
+    }
+
     const result = spawnSync(
       "pnpm",
       ["tauri", "build", "--debug", "--no-bundle"],
@@ -97,6 +119,8 @@ export const config = {
   },
   beforeSession() {
     killExistingDriver();
+    killExistingApp();
+    expectedExit = false;
     tauriDriver = spawn("tauri-driver", [], {
       env: { ...process.env, QUANTANOTE_DATA_DIR: dataDir },
       stdio: ["ignore", "pipe", "pipe"],
@@ -119,5 +143,6 @@ export const config = {
   },
   afterSession() {
     closeTauriDriver();
+    killExistingApp();
   },
 };

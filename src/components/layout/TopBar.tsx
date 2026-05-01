@@ -143,6 +143,7 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
         <button
           className={`flex h-8 w-8 items-center justify-center rounded-lg ${menuOpen ? "bg-[var(--field)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"}`}
           type="button"
+          aria-label="菜单"
           aria-haspopup="menu"
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((open) => !open)}
@@ -193,13 +194,13 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
         >
           <Pin className={`h-4 w-4 ${alwaysOnTop ? "fill-current" : ""}`} />
         </button>
-        <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="window-minimize" title="最小化" onClick={handleMinimize}>
+        <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="window-minimize" aria-label="最小化" title="最小化" onClick={handleMinimize}>
           <Minus className="h-4 w-4" />
         </button>
-        <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="window-maximize" title={isMaximized ? "恢复" : "全屏"} onClick={() => appWindow.toggleMaximize()}>
+        <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="window-maximize" aria-label={isMaximized ? "恢复" : "全屏"} title={isMaximized ? "恢复" : "全屏"} onClick={() => appWindow.toggleMaximize()}>
           {isMaximized ? <Copy className="h-4 w-4" /> : <Square className="h-4 w-4" />}
         </button>
-        <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-red-500/12 hover:text-red-400" type="button" data-testid="window-close" title="关闭" onClick={handleClose}>
+        <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-red-500/12 hover:text-red-400" type="button" data-testid="window-close" aria-label="关闭" title="关闭" onClick={handleClose}>
           <X className="h-4 w-4" />
         </button>
       </div>

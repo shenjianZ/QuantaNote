@@ -30,4 +30,17 @@ export interface Item {
   accent: string;
   pinned?: boolean;
   favorite?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VersionDto {
+  id: string;
+  item_id: string;
+  version_number: number;
+  content: string;
+  change_summary: string;
+  name: string;
+  description: string;
+  created_at: string;
 }

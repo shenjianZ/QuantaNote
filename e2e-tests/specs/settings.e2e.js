@@ -17,14 +17,14 @@ describe("Settings deep coverage", () => {
 
     it("changes font family", async () => {
         await SettingsPage.selectSection("字体");
-        await SettingsPage.selectFont("Inter");
+        await SettingsPage.selectFont("系统默认");
 
         const fontVar = await browser.execute(() =>
             getComputedStyle(document.documentElement)
                 .getPropertyValue("--font-sans")
                 .trim(),
         );
-        expect(fontVar).toContain("Inter");
+        expect(fontVar).toContain("system-ui");
     });
 
     it("changes font size with slider", async () => {

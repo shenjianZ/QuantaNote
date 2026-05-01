@@ -45,6 +45,18 @@ describe("settingsStore", () => {
     expect(document.documentElement.style.getPropertyValue("--accent")).toBe("#2563eb");
   });
 
+  it("applies interface font size scale from settings", () => {
+    useSettingsStore.getState().updateSetting("fontSize", 16);
+
+    const rootStyle = document.documentElement.style;
+    expect(rootStyle.getPropertyValue("--font-size-base")).toBe("16px");
+    expect(rootStyle.getPropertyValue("--font-size-md")).toBe("16px");
+    expect(rootStyle.getPropertyValue("--font-size-sm")).toBe("16px");
+    expect(rootStyle.getPropertyValue("--font-size-xs")).toBe("max(12px, calc(16px - 2px))");
+    expect(rootStyle.getPropertyValue("--font-size-2xl")).toBe("calc(16px + 9px)");
+    expect(rootStyle.getPropertyValue("--font-size-md-h1")).toBe("calc(16px + 13px)");
+  });
+
   it("exports data through dialog and save_to_file command", async () => {
     const calls: Array<{ cmd: string; args: unknown }> = [];
     saveMock.mockResolvedValue("D:\\backup.json");

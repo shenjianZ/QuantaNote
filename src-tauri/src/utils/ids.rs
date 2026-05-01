@@ -1,6 +1,6 @@
 pub fn new_id(prefix: &str) -> String {
     let uuid = uuid::Uuid::new_v4();
-    let short = &uuid.to_string().replace('-', "")[..12];
+    let short = &uuid.to_string().replace('-', "")[..16];
     format!("{}-{}", prefix, short)
 }
 
@@ -18,7 +18,7 @@ mod tests {
     #[test]
     fn new_id_has_correct_length() {
         let id = new_id("item");
-        assert_eq!(id.len(), "item-".len() + 12);
+        assert_eq!(id.len(), "item-".len() + 16);
     }
 
     #[test]

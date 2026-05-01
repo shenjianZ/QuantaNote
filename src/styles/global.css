@@ -1,5 +1,46 @@
-@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
+
+/* JetBrains Mono - latin subset (variable weight) */
+@font-face {
+    font-family: "JetBrains Mono";
+    font-style: normal;
+    font-weight: 400 600;
+    font-display: swap;
+    src: url("../assets/fonts/JetBrainsMono-Latin.woff2") format("woff2");
+}
+
+/* Noto Sans SC - 3500 common Chinese characters subset */
+@font-face {
+    font-family: "Noto Sans SC";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("../assets/fonts/NotoSansSC-400.woff2") format("woff2");
+}
+
+@font-face {
+    font-family: "Noto Sans SC";
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url("../assets/fonts/NotoSansSC-500.woff2") format("woff2");
+}
+
+@font-face {
+    font-family: "Noto Sans SC";
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url("../assets/fonts/NotoSansSC-600.woff2") format("woff2");
+}
+
+@font-face {
+    font-family: "Noto Sans SC";
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url("../assets/fonts/NotoSansSC-700.woff2") format("woff2");
+}
 
 :root,
 [data-theme="light"],
@@ -43,6 +84,17 @@
         "Segoe UI", sans-serif;
     --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
     --font-size-base: 15px;
+    --font-size-2xs: 12px;
+    --font-size-xs: 13px;
+    --font-size-sm: 15px;
+    --font-size-md: 15px;
+    --font-size-lg: 17px;
+    --font-size-xl: 20px;
+    --font-size-2xl: 24px;
+    --font-size-3xl: 28px;
+    --font-size-md-h1: 28px;
+    --font-size-md-h2: 22px;
+    --font-size-md-h3: 18px;
     color-scheme: light;
 }
 
@@ -146,6 +198,72 @@ body {
     text-rendering: optimizeLegibility;
 }
 
+.font-mono {
+    font-family: var(--font-mono) !important;
+}
+
+.font-sans {
+    font-family: var(--font-sans) !important;
+}
+
+.text-2xs {
+    font-size: var(--font-size-2xs) !important;
+    line-height: 1.25 !important;
+}
+
+.text-xs {
+    font-size: var(--font-size-xs) !important;
+    line-height: 1.35 !important;
+}
+
+.text-sm {
+    font-size: var(--font-size-sm) !important;
+    line-height: 1.45 !important;
+}
+
+.text-base {
+    font-size: var(--font-size-md) !important;
+    line-height: 1.5 !important;
+}
+
+.text-lg {
+    font-size: var(--font-size-lg) !important;
+    line-height: 1.45 !important;
+}
+
+.text-xl {
+    font-size: var(--font-size-xl) !important;
+    line-height: 1.35 !important;
+}
+
+.text-2xl {
+    font-size: var(--font-size-2xl) !important;
+    line-height: 1.25 !important;
+}
+
+.text-3xl {
+    font-size: var(--font-size-3xl) !important;
+    line-height: 1.18 !important;
+}
+
+.app-page-title {
+    font-size: var(--font-size-lg);
+    line-height: 1.35;
+    font-weight: 600;
+}
+
+.app-hero-title {
+    font-size: var(--font-size-2xl);
+    line-height: 1.25;
+    font-weight: 600;
+}
+
+.app-editor-title {
+    font-size: var(--font-size-xl);
+    line-height: 1.35;
+    font-weight: 600;
+}
+
 button,
 input,
 textarea,
@@ -185,7 +303,7 @@ kbd {
     background: var(--field);
     color: var(--muted);
     font-family: var(--font-mono);
-    font-size: 0.7rem;
+    font-size: var(--font-size-2xs);
     line-height: 1;
 }
 
@@ -197,7 +315,7 @@ kbd {
     border-radius: 0.75rem;
     padding: 0.55rem 0.65rem;
     text-align: left;
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     color: var(--text);
 }
 
@@ -207,7 +325,7 @@ kbd {
 
 .markdown-preview {
     color: var(--text);
-    font-size: 0.95rem;
+    font-size: var(--font-size-md);
     line-height: 1.85;
 }
 
@@ -216,7 +334,7 @@ kbd {
     min-height: 9rem;
     place-items: center;
     color: var(--muted);
-    font-size: 0.9rem;
+    font-size: var(--font-size-sm);
 }
 
 .markdown-preview :where(h1, h2, h3, h4, h5, h6),
@@ -232,7 +350,7 @@ kbd {
     margin: 1.2em 0 0.65em !important;
     padding-bottom: 0.35em !important;
     border-bottom: 1px solid var(--line) !important;
-    font-size: 1.75rem !important;
+    font-size: var(--font-size-md-h1) !important;
 }
 
 .markdown-preview h2,
@@ -240,19 +358,19 @@ kbd {
     margin: 1.1em 0 0.55em !important;
     padding-bottom: 0.28em !important;
     border-bottom: 1px solid color-mix(in srgb, var(--line) 68%, transparent) !important;
-    font-size: 1.38rem !important;
+    font-size: var(--font-size-md-h2) !important;
 }
 
 .markdown-preview h3,
 .vditor-reset h3 {
     margin: 1em 0 0.45em !important;
-    font-size: 1.15rem !important;
+    font-size: var(--font-size-md-h3) !important;
 }
 
 .markdown-preview :where(h4, h5, h6),
 .vditor-reset :where(h4, h5, h6) {
     margin: 0.9em 0 0.4em !important;
-    font-size: 1rem !important;
+    font-size: var(--font-size-lg) !important;
 }
 
 .markdown-preview p,
@@ -475,7 +593,7 @@ kbd {
     background: var(--paper) !important;
     color: var(--text) !important;
     font-family: var(--font-sans) !important;
-    font-size: 0.98rem !important;
+    font-size: var(--font-size-md) !important;
     line-height: 1.8 !important;
 }
 
@@ -537,7 +655,7 @@ kbd {
     color: var(--code-block-text) !important;
     padding: 0.78rem 0.9rem !important;
     font-family: var(--font-mono) !important;
-    font-size: 0.9rem !important;
+    font-size: var(--font-size-sm) !important;
     line-height: 1.7 !important;
     tab-size: 2;
 }
@@ -673,7 +791,7 @@ kbd {
 
 .quantanote-vditor-table-panel__title {
     margin-bottom: 0.65rem;
-    font-size: 0.86rem;
+    font-size: var(--font-size-sm);
     font-weight: 700;
 }
 
@@ -688,7 +806,7 @@ kbd {
     align-items: center;
     gap: 0.5rem;
     color: var(--muted);
-    font-size: 0.82rem;
+    font-size: var(--font-size-xs);
 }
 
 .quantanote-vditor-table-panel__form input {
@@ -721,7 +839,7 @@ kbd {
     color: var(--text);
     padding: 0.36rem 0.7rem;
     font: inherit;
-    font-size: 0.82rem;
+    font-size: var(--font-size-xs);
     cursor: pointer;
 }
 
@@ -738,7 +856,7 @@ kbd {
     border-radius: 999px;
     background: var(--field);
     color: var(--text);
-    font-size: 0.8rem;
+    font-size: var(--font-size-xs);
 }
 
 .tag {

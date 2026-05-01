@@ -56,7 +56,7 @@ pub fn tauri_log_plugin<R: Runtime>() -> TauriPlugin<R> {
             file_name: Some("quanta-note".to_string()),
         }))
         .level(LevelFilter::Debug)
-        .rotation_strategy(RotationStrategy::KeepAll)
+        .rotation_strategy(RotationStrategy::KeepSome(10))
         .timezone_strategy(TimezoneStrategy::UseLocal)
         .max_file_size(5_000_000)
         .format(|out, message, record| {

@@ -89,10 +89,7 @@ describe("DocumentEditorPage", () => {
 
   it("toggles favorite on star click", async () => {
     const { user } = setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
-    const starBtn = screen.getByRole("button", { name: "" });
-    const starButtons = screen.getAllByRole("button");
-    const starButton = starButtons.find((b) => b.querySelector("svg[data-lucide='star'], svg"));
-    await user.click(screen.getByText("预览"));
-    expect(onBackToPreview).toHaveBeenCalled();
+    await user.click(screen.getByRole("switch", { name: "收藏" }));
+    expect(updateItemMock).toHaveBeenCalledWith("item-1", { favorite: true });
   });
 });

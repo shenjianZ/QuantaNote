@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { setup } from "../../test/test-utils";
 import { TagPickerModal } from "./TagPickerModal";
 import { useTagStore } from "../../stores/tagStore";
@@ -38,15 +38,17 @@ describe("TagPickerModal", () => {
   });
 
   it("filters tags by search", async () => {
-    const { user } = setup(
+    setup(
       <TagPickerModal open={true} onClose={onClose} selectedTags={[]} onChange={onChange} />
     );
 
     const input = screen.getByPlaceholderText("搜索标签");
-    await user.type(input, "rust");
+    fireEvent.change(input, { target: { value: "rust" } });
 
     expect(screen.getByText("#rust")).toBeInTheDocument();
-    expect(screen.queryByText("#react")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText("#react")).not.toBeInTheDocument();
+    });
   });
 
   it("calls onOpenManager when manage button clicked", async () => {

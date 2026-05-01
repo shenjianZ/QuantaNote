@@ -59,5 +59,7 @@ export function adaptItem(dto: ItemDto): Item {
     accent: TYPE_TO_ACCENT[dto.item_type] ?? "cyan",
     pinned: dto.pinned,
     favorite: dto.favorite,
+    createdAt: dto.created_at,
+    updatedAt: dto.updated_at,
   };
 }

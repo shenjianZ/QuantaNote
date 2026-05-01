@@ -60,14 +60,15 @@ pub fn run() {
         })
         .setup(|app| {
             let quantanote_dir = paths::quantanote_dir();
-            std::fs::create_dir_all(&quantanote_dir).expect("failed to create QuantaNote data dir");
+            std::fs::create_dir_all(&quantanote_dir)
+                .map_err(|e| format!("创建数据目录失败: {}", e))?;
 
             let db_path = quantanote_dir.join("quanta_note.sqlite");
-            let db_state =
-                DbState::open(&db_path.to_string_lossy()).expect("failed to open database");
+            let db_state = DbState::open(&db_path.to_string_lossy())
+                .map_err(|e| format!("打开数据库失败: {}", e))?;
             db_state
                 .initialize_schema()
-                .expect("failed to initialize schema");
+                .map_err(|e| format!("初始化数据库表结构失败: {}", e))?;
 
             app.manage(db_state);
 
@@ -96,7 +97,11 @@ pub fn run() {
             )?;
 
             let _tray = TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
+                .icon(
+                    app.default_window_icon()
+                        .ok_or_else(|| "未配置窗口图标".to_string())?
+                        .clone(),
+                )
                 .menu(&menu)
                 .tooltip("QuantaNote")
                 .on_tray_icon_event(|tray, event| {
@@ -120,9 +125,10 @@ pub fn run() {
                         "library" => emit_tray_command(app, "open-library"),
                         "settings" => emit_tray_command(app, "open-settings"),
                         "quit" => {
-                            if let Some(window) = app.get_webview_window("main") {
-                                if let Some(db_state) = window.try_state::<DbState>() {
-                                    let _ = db_state.checkpoint_wal();
+                            if let Some(db_state) = app.try_state::<DbState>() {
+                                match db_state.checkpoint_wal() {
+                                    Ok(()) => log::info!("退出时 WAL checkpoint 完成"),
+                                    Err(e) => log::warn!("退出时 WAL checkpoint 失败: {}", e),
                                 }
                             }
                             app.exit(0);

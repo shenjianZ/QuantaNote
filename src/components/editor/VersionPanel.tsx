@@ -2,17 +2,9 @@ import { useMemo, useState } from "react";
 import { Eye, Pencil, Search } from "lucide-react";
 import { Modal } from "../common/Modal";
 import { VersionPreviewModal } from "../common/VersionPreviewModal";
+import type { VersionDto } from "../../types";
 
-export interface VersionDto {
-  id: string;
-  item_id: string;
-  version_number: number;
-  content: string;
-  change_summary: string;
-  name: string;
-  description: string;
-  created_at: string;
-}
+export type { VersionDto };
 
 function formatRelativeTime(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -170,6 +162,7 @@ export function VersionPanel({ open, versions, onClose, onRestore, onUpdateMeta,
         onRestore={(v) => {
           onRestore(v);
           setPreviewVersion(null);
+          onClose();
         }}
         theme={theme}
       />

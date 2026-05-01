@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from "react";
-import { CheckCircle2, Edit3 } from "lucide-react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { CheckCircle2, Edit3, Loader2 } from "lucide-react";
 import { useAppStore } from "../stores/appStore";
-import { VditorEditor, type VditorEditorHandle } from "../components/editor/VditorEditor";
+import type { VditorEditorHandle } from "../components/editor/VditorEditor";
+
+const VditorEditor = lazy(() => import("../components/editor/VditorEditor").then((m) => ({ default: m.VditorEditor })));
 
 interface WorkspacePageProps {
   onQuickCreate: (content: string) => Promise<void>;
@@ -13,6 +15,11 @@ export function WorkspacePage({ onQuickCreate }: WorkspacePageProps) {
   const [saved, setSaved] = useState(false);
   const editorRef = useRef<VditorEditorHandle>(null);
   const theme = useAppStore((s) => s.theme);
+  const savingRef = useRef(saving);
+  const onQuickCreateRef = useRef(onQuickCreate);
+
+  useEffect(() => { savingRef.current = saving; }, [saving]);
+  useEffect(() => { onQuickCreateRef.current = onQuickCreate; }, [onQuickCreate]);
 
   useEffect(() => {
     if (!saved) return;
@@ -30,18 +37,18 @@ export function WorkspacePage({ onQuickCreate }: WorkspacePageProps) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [draft, saving, onQuickCreate]);
+  }, [onQuickCreate]);
 
   async function handleQuickSave() {
     const currentValue = editorRef.current?.getValue() ?? draft;
     const text = currentValue.trim();
-    if (!text || saving) {
+    if (!text || savingRef.current) {
       setSaved(false);
       return;
     }
     setSaving(true);
     try {
-      await onQuickCreate(text);
+      await onQuickCreateRef.current(text);
       editorRef.current?.setValue("");
       setDraft("");
       setSaved(true);
@@ -55,7 +62,7 @@ export function WorkspacePage({ onQuickCreate }: WorkspacePageProps) {
       <section className="mx-auto flex min-h-0 w-full max-w-none flex-1 flex-col">
         <div className="mb-4 flex shrink-0 items-center justify-between gap-4">
           <div>
-            <h1 className="text-lg font-semibold text-[var(--text)]">随手记录</h1>
+            <h1 className="app-hero-title text-[var(--text)]">随手记录</h1>
             <p className="mt-1 text-sm text-[var(--muted)]">写下内容，保存为新的笔记。</p>
           </div>
           <button
@@ -72,17 +79,19 @@ export function WorkspacePage({ onQuickCreate }: WorkspacePageProps) {
 
         <article className="workspace-editor-panel flex min-h-0 flex-1 flex-col rounded-3xl border border-[var(--line)] bg-[var(--paper)] p-4" data-testid="workspace-editor">
           <div className="min-h-0 flex-1 overflow-hidden">
-            <VditorEditor
-              ref={editorRef}
-              initialValue={draft}
-              onChange={(value) => {
-                setDraft(value);
-                if (saved) setSaved(false);
-              }}
-              theme={theme === "light" ? "light" : "dark"}
-              toolbar={["table", "link", "code"]}
-              placeholder="今天想记什么？"
-            />
+            <Suspense fallback={<div className="flex h-full items-center justify-center text-[var(--muted)]"><Loader2 className="mr-2 h-4 w-4 animate-spin" />加载编辑器...</div>}>
+              <VditorEditor
+                ref={editorRef}
+                initialValue={draft}
+                onChange={(value) => {
+                  setDraft(value);
+                  if (saved) setSaved(false);
+                }}
+                theme={theme === "light" ? "light" : "dark"}
+                toolbar={["table", "link", "code"]}
+                placeholder="今天想记什么？"
+              />
+            </Suspense>
           </div>
           <footer className="mt-3 flex shrink-0 items-center justify-between">
             <div className="min-w-0 text-xs text-[var(--muted)]" data-testid="workspace-status">

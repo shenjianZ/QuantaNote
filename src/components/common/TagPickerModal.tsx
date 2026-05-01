@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, Search } from "lucide-react";
 import { Modal } from "./Modal";
 import { useTagStore } from "../../stores/tagStore";
@@ -23,6 +23,11 @@ interface TagPickerModalProps {
 export function TagPickerModal({ open, onClose, selectedTags, onChange, onOpenManager }: TagPickerModalProps) {
   const allTags = useTagStore((s) => s.tags);
   const [search, setSearch] = useState("");
+  const [localSelectedTags, setLocalSelectedTags] = useState(selectedTags);
+
+  useEffect(() => {
+    if (open) setLocalSelectedTags(selectedTags);
+  }, [open, selectedTags]);
 
   const filteredTags = useMemo(() => {
     if (!search.trim()) return allTags;
@@ -31,11 +36,11 @@ export function TagPickerModal({ open, onClose, selectedTags, onChange, onOpenMa
   }, [allTags, search]);
 
   function toggleTag(name: string) {
-    if (selectedTags.includes(name)) {
-      onChange(selectedTags.filter((t) => t !== name));
-    } else {
-      onChange([...selectedTags, name]);
-    }
+    const next = localSelectedTags.includes(name)
+      ? localSelectedTags.filter((t) => t !== name)
+      : [...localSelectedTags, name];
+    setLocalSelectedTags(next);
+    Promise.resolve(onChange(next)).catch(() => setLocalSelectedTags(selectedTags));
   }
 
   return (
@@ -56,7 +61,7 @@ export function TagPickerModal({ open, onClose, selectedTags, onChange, onOpenMa
         {/* Tag grid */}
         <div className="flex flex-wrap gap-2">
           {filteredTags.map((tag) => {
-            const isSelected = selectedTags.includes(tag.name);
+            const isSelected = localSelectedTags.includes(tag.name);
             return (
               <button
                 key={tag.name}

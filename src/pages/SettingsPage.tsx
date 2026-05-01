@@ -22,17 +22,14 @@ const settingsMenu = [
 ];
 
 const FONT_OPTIONS = [
-    { value: "Noto Sans SC", label: "Noto Sans SC" },
-    { value: "Inter", label: "Inter" },
-    { value: "LXGW WenKai", label: "霞鹜文楷" },
+    { value: "Noto Sans SC", label: "Noto Sans SC（本地）" },
     { value: "system-ui", label: "系统默认" },
 ];
 
 const MONO_OPTIONS = [
-    { value: "JetBrains Mono", label: "JetBrains Mono" },
-    { value: "Fira Code", label: "Fira Code" },
-    { value: "Source Code Pro", label: "Source Code Pro" },
+    { value: "JetBrains Mono", label: "JetBrains Mono（本地）" },
     { value: "Consolas", label: "Consolas" },
+    { value: "monospace", label: "系统等宽" },
 ];
 
 const ACCENT_COLORS = [
@@ -121,6 +118,9 @@ export function SettingsPage({
                                         className={`inline-flex h-9 items-center gap-2 rounded-full border px-3 text-sm ${theme === opt.value ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--text)]" : "border-[var(--line)] bg-[var(--field)] text-[var(--muted)] hover:text-[var(--text)]"}`}
                                         key={opt.value}
                                         data-testid={`theme-${opt.value}`}
+                                        role="radio"
+                                        aria-checked={theme === opt.value}
+                                        aria-label={opt.label}
                                         onClick={() =>
                                             onThemeChange?.(opt.value)
                                         }

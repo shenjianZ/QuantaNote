@@ -122,7 +122,13 @@ export async function getVersions(itemId) {
 // --- Attachment 操作 ---
 
 export async function createTestFile(path, content = "test file content") {
-  return tauriInvoke("save_to_file", { path, content });
+  const dbPath = await tauriInvoke("get_db_path");
+  const separator = dbPath.includes("\\") ? "\\" : "/";
+  const dataDir = dbPath.replace(/[\\/][^\\/]+$/, "");
+  const safeName = path.split(/[\\/]/).pop();
+  const fullPath = `${dataDir}${separator}${safeName}`;
+  await tauriInvoke("save_to_file", { path: fullPath, content });
+  return fullPath;
 }
 
 export async function seedAttachment(itemId, filePath) {

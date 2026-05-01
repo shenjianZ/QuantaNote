@@ -6,12 +6,12 @@ import AttachmentManagerModal from "../helpers/page-objects/AttachmentManagerMod
 
 describe("Attachments", () => {
   let testItem;
-  const testFilePath = "e2e-test-attachment.txt";
+  let testFilePath = "e2e-test-attachment.txt";
 
   before(async () => {
     await cleanupAll();
     // 创建测试文件
-    await createTestFile(testFilePath, "E2E 附件测试内容");
+    testFilePath = await createTestFile(testFilePath, "E2E 附件测试内容");
     // 创建测试项并添加附件
     testItem = await seedItem({ title: "附件测试笔记", content: "内容" });
     await seedAttachment(testItem.id, testFilePath);

@@ -139,7 +139,15 @@ class DocumentEditorPage {
     }
     const saveBtn = await $("//button[contains(., '保存')][ancestor::div[contains(@class, 'space-y')]]");
     await saveBtn.click();
-    await observePause();
+    await browser.waitUntil(
+      async () => {
+        const entries = await this.getVersionEntries();
+        if (!entries[0]) return false;
+        const text = await entries[0].getText();
+        return text.includes(name);
+      },
+      { timeout: 5000, timeoutMsg: `Version name "${name}" was not saved` },
+    );
   }
 }
 

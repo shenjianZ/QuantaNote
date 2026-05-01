@@ -76,8 +76,8 @@ pub fn get_items(
         let rows: Vec<ItemDto> = stmt
             .query_map(params![t, limit, offset], row_to_item)
             .map_err(|e| AppError::Database(e.to_string()))?
-            .filter_map(|r| r.ok())
-            .collect();
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| AppError::Database(e.to_string()))?;
         rows
     } else {
         let mut stmt = conn.prepare(
@@ -87,8 +87,8 @@ pub fn get_items(
         let rows: Vec<ItemDto> = stmt
             .query_map(params![limit, offset], row_to_item)
             .map_err(|e| AppError::Database(e.to_string()))?
-            .filter_map(|r| r.ok())
-            .collect();
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| AppError::Database(e.to_string()))?;
         rows
     };
 

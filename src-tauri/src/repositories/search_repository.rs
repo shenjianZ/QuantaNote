@@ -44,8 +44,8 @@ pub fn search(
             })
         })
         .map_err(|e| AppError::Database(e.to_string()))?
-        .filter_map(|r| r.ok())
-        .collect()
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| AppError::Database(e.to_string()))?
     } else {
         stmt.query_map(params![query], |row| {
             Ok(SearchResultDto {
@@ -56,8 +56,8 @@ pub fn search(
             })
         })
         .map_err(|e| AppError::Database(e.to_string()))?
-        .filter_map(|r| r.ok())
-        .collect()
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| AppError::Database(e.to_string()))?
     };
 
     Ok(results)
@@ -103,8 +103,8 @@ pub fn search_trigram(
             })
         })
         .map_err(|e| AppError::Database(e.to_string()))?
-        .filter_map(|r| r.ok())
-        .collect()
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| AppError::Database(e.to_string()))?
     } else {
         stmt.query_map(params![query], |row| {
             Ok(SearchResultDto {
@@ -115,8 +115,8 @@ pub fn search_trigram(
             })
         })
         .map_err(|e| AppError::Database(e.to_string()))?
-        .filter_map(|r| r.ok())
-        .collect()
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| AppError::Database(e.to_string()))?
     };
 
     Ok(results)

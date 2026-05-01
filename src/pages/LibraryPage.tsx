@@ -153,13 +153,15 @@ export function LibraryPage({
       const byId = new Map(items.map((item) => [item.id, item]));
       base = searchResults.map((result) => byId.get(result.id) ?? {
         id: result.id,
-        type: "note",
+        type: "note" as const,
         title: result.title,
         summary: result.summary,
         tags: [],
         time: "搜索结果",
         icon: FileText,
         accent: "cyan",
+        createdAt: "",
+        updatedAt: "",
       });
     } else if (normalized) {
       base = items.filter((item) => {
@@ -177,6 +179,8 @@ export function LibraryPage({
 
     return [...base].sort((a, b) => {
       if (sortOrder === "title") return a.title.localeCompare(b.title);
+      if (sortOrder === "updated") return (b.updatedAt || "").localeCompare(a.updatedAt || "");
+      if (sortOrder === "created") return (b.createdAt || "").localeCompare(a.createdAt || "");
       return 0;
     });
   }, [activeTab, activeTag, itemTagNames, items, query, searchResults, sortOrder]);
@@ -242,13 +246,12 @@ export function LibraryPage({
     selectedItemDto?.id === selectedItem.id ? selectedItemDto.content : "";
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[var(--app-bg)]">
-      <section className="flex min-h-0 flex-1 flex-col px-4 py-4">
-        <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col">
-          <div className="mb-3 flex items-center justify-between gap-3">
+    <div className="flex h-full min-h-0 flex-col bg-[var(--app-bg)] px-[clamp(1rem,4vw,4rem)] py-4">
+      <section className="mx-auto flex min-h-0 w-full max-w-none flex-1 flex-col">
+          <div className="mb-4 flex shrink-0 items-center justify-between gap-4">
             <div>
-              <h1 className="text-base font-semibold text-[var(--text)]">记录库</h1>
-              <p className="text-sm text-[var(--muted)]">搜索、查看和管理已经保存的记录。</p>
+              <h1 className="app-hero-title text-[var(--text)]">记录库</h1>
+              <p className="mt-1 text-sm text-[var(--muted)]">搜索、查看和管理已经保存的记录。</p>
             </div>
             <button
               className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full bg-[var(--accent)] px-3 text-sm font-medium text-white hover:opacity-90"
@@ -260,6 +263,7 @@ export function LibraryPage({
               新建
             </button>
           </div>
+          <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col">
           <div className="mb-3 flex items-center gap-2">
             <div className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--field)] px-3 text-[var(--muted)]">
               <Search className="h-4 w-4 shrink-0" />
@@ -354,7 +358,7 @@ export function LibraryPage({
                         <div className="truncate text-sm font-semibold text-[var(--text)]">{item.title || "未命名"}</div>
                         {item.pinned && <Star className="h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />}
                       </div>
-                      <div className="mt-1 line-clamp-2 text-sm leading-6 text-[var(--muted)]">{item.summary || "无正文预览"}</div>
+                      <div className="mt-1 line-clamp-2 text-sm leading-relaxed text-[var(--muted)]">{item.summary || "无正文预览"}</div>
                     </div>
                     <span className="mt-1 shrink-0 text-xs text-[var(--muted)]">{item.time}</span>
                   </button>
@@ -362,7 +366,7 @@ export function LibraryPage({
               </div>
             )}
           </div>
-        </div>
+          </div>
       </section>
 
       {hasSelection && (
@@ -387,7 +391,7 @@ export function LibraryPage({
                 </div>
               </div>
               <details className="relative shrink-0">
-                <summary className="grid h-8 w-8 cursor-pointer list-none place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)] [&::-webkit-details-marker]:hidden" data-testid="reader-menu-btn">
+                <summary className="grid h-8 w-8 cursor-pointer list-none place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)] [&::-webkit-details-marker]:hidden" data-testid="reader-menu-btn" aria-label="更多操作">
                   <MoreHorizontal className="h-4 w-4" />
                 </summary>
                 <div className="absolute right-0 top-10 z-40 w-48 overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--popover)] p-1 shadow-xl">
@@ -399,10 +403,10 @@ export function LibraryPage({
                   <button className="menu-item text-red-400" type="button" onClick={handleDelete}><Trash2 className="h-4 w-4" />删除</button>
                 </div>
               </details>
-              <button className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="reader-edit-btn" onClick={onOpenDocument} title="编辑当前笔记">
+              <button className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="reader-edit-btn" aria-label="编辑当前笔记" onClick={onOpenDocument} title="编辑当前笔记">
                 <Edit3 className="h-4 w-4" />
               </button>
-              <button className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="reader-close-btn" onClick={handleCloseReader} title="关闭">
+              <button className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="reader-close-btn" aria-label="关闭" onClick={handleCloseReader} title="关闭">
                 <X className="h-4 w-4" />
               </button>
             </header>

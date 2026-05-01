@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Clock, Save, Star } from "lucide-react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { ArrowLeft, Clock, Loader2, Save, Star } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAppStore } from "../stores/appStore";
 import { useItemStore } from "../stores/itemStore";
-import { VditorEditor } from "../components/editor/VditorEditor";
 import { VersionPanel, type VersionDto } from "../components/editor/VersionPanel";
+
+const VditorEditor = lazy(() => import("../components/editor/VditorEditor").then((m) => ({ default: m.VditorEditor })));
 
 function resolveTheme(mode: string): "dark" | "light" {
   if (mode === "light" || mode === "dark") return mode;
@@ -41,6 +42,13 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
   useEffect(() => { latestTitle.current = title; }, [title]);
   useEffect(() => { latestContent.current = content; }, [content]);
 
+  // 组件卸载时清理防抖定时器
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
   useEffect(() => {
     if (!selectedItemId) return;
     getItem(selectedItemId).catch(() => {});
@@ -62,7 +70,9 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
     try {
       await updateItem(selectedItemId, { title: newTitle, content: newContent });
       setSaved(true);
-    } catch { /* ignore */ }
+    } catch (e) {
+      console.error("保存失败:", e);
+    }
   }, [selectedItemId, updateItem]);
 
   function scheduleSave(newTitle: string, newContent: string) {
@@ -85,7 +95,13 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
     if (!selectedItemId) return;
     const next = !isFavorite;
     setIsFavorite(next);
-    await updateItem(selectedItemId, { favorite: next });
+    try {
+      await updateItem(selectedItemId, { favorite: next });
+    } catch (e) {
+      // 回滚乐观更新
+      setIsFavorite(!next);
+      console.error("切换收藏失败:", e);
+    }
   }
 
   async function handleSaveVersion() {
@@ -98,14 +114,18 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
         name: formatNowAsName(),
       });
       setVersions((current) => [version, ...current].slice(0, 50));
-    } catch { /* ignore */ }
+    } catch (e) {
+      console.error("创建版本失败:", e);
+    }
   }
 
   async function handleUpdateVersionMeta(versionId: string, name: string, description: string) {
     try {
       const updated = await invoke<VersionDto>("update_version", { id: versionId, name, description });
       setVersions((current) => current.map((v) => (v.id === versionId ? updated : v)));
-    } catch { /* ignore */ }
+    } catch (e) {
+      console.error("更新版本信息失败:", e);
+    }
   }
 
   async function handleRestore(version: VersionDto) {
@@ -113,7 +133,9 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
       const updatedItem = await invoke<{ id: string; title: string; content: string }>("restore_version", { versionId: version.id });
       setContent(updatedItem.content);
       setTitle(updatedItem.title);
-    } catch { /* ignore */ }
+    } catch (e) {
+      console.error("恢复版本失败:", e);
+    }
   }
 
   const charCount = content.replace(/\s/g, "").length;
@@ -136,6 +158,9 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
           className={`grid h-9 w-9 place-items-center rounded-full ${isFavorite ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "bg-[var(--field)] text-[var(--muted)] hover:text-[var(--text)]"}`}
           type="button"
           data-testid="doc-favorite-btn"
+          role="switch"
+          aria-checked={isFavorite}
+          aria-label={isFavorite ? "取消收藏" : "收藏"}
           onClick={handleToggleFavorite}
         >
           <Star className="h-4 w-4" fill={isFavorite ? "currentColor" : "none"} />
@@ -145,7 +170,7 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
       {/* Editor */}
       <article className="flex min-h-0 flex-1 flex-col rounded-3xl border border-[var(--line)] bg-[var(--paper)] p-4">
         <input
-          className="mb-3 w-full bg-transparent text-xl font-semibold text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
+          className="app-editor-title mb-3 w-full bg-transparent text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
           type="text"
           data-testid="doc-title-input"
           value={title}
@@ -153,7 +178,9 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
           placeholder="文档标题"
         />
         <div className="min-h-0 flex-1 overflow-hidden">
-          <VditorEditor initialValue={content} onChange={handleContentChange} theme={resolveTheme(theme)} />
+          <Suspense fallback={<div className="flex h-full items-center justify-center text-[var(--muted)]"><Loader2 className="mr-2 h-4 w-4 animate-spin" />加载编辑器...</div>}>
+            <VditorEditor initialValue={content} onChange={handleContentChange} theme={resolveTheme(theme)} />
+          </Suspense>
         </div>
       </article>
 
