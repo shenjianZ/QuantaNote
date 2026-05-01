@@ -26,7 +26,6 @@ describe("Document editor", () => {
 
   it("auto-saves after 1 second debounce", async () => {
     await DocumentEditorPage.setTitle("自动保存测试");
-    // 等待 1.5 秒自动保存
     await DocumentEditorPage.waitForSaved(3000);
 
     const updated = await getItemById(testItem.id);
@@ -41,7 +40,6 @@ describe("Document editor", () => {
     const updated = await getItemById(testItem.id);
     expect(updated.favorite).toBe(true);
 
-    // 再次切换
     await DocumentEditorPage.toggleFavorite();
     const isFav2 = await DocumentEditorPage.isFavorite();
     expect(isFav2).toBe(false);
@@ -51,7 +49,6 @@ describe("Document editor", () => {
     const countBefore = await DocumentEditorPage.getVersionCount();
     await DocumentEditorPage.clickSaveVersion();
 
-    // 等待版本数量增加
     await browser.waitUntil(
       async () => {
         const count = await DocumentEditorPage.getVersionCount();
@@ -65,17 +62,19 @@ describe("Document editor", () => {
   });
 
   it("edits version name and description", async () => {
+    // 打开版本面板
+    await DocumentEditorPage.openVersionPanel();
+
     await DocumentEditorPage.clickVersionEdit(0);
     await DocumentEditorPage.editVersionMeta("测试版本名", "测试版本描述");
 
-    // 验证版本名已更新
     const entries = await DocumentEditorPage.getVersionEntries();
     const text = await entries[0].getText();
     expect(text).toContain("测试版本名");
   });
 
   it("opens version preview modal", async () => {
-    await DocumentEditorPage.clickVersionRestore(0);
+    await DocumentEditorPage.clickVersionView(0);
 
     const modal = await $("[data-testid='version-restore-btn']");
     await expect(modal).toBeDisplayed();
@@ -83,14 +82,11 @@ describe("Document editor", () => {
 
   it("restores version content", async () => {
     const restoreBtn = await $("[data-testid='version-restore-btn']");
-    // 第一次点击进入确认状态
     await restoreBtn.click();
     await observePause();
-    // 第二次点击确认恢复
     await restoreBtn.click();
     await pause(500);
 
-    // 编辑器内容应恢复为版本内容
     const content = await DocumentEditorPage.getContent();
     expect(content).toContain("初始内容");
   });

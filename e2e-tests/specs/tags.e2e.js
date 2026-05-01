@@ -2,6 +2,7 @@ import { cleanupAll, seedItem, getAllTags } from "../helpers/commands.js";
 import TopBar from "../helpers/page-objects/TopBar.js";
 import LibraryPage from "../helpers/page-objects/LibraryPage.js";
 import TagPickerModal from "../helpers/page-objects/TagPickerModal.js";
+import TagManagerModal from "../helpers/page-objects/TagManagerModal.js";
 
 describe("Tag management", () => {
   before(async () => {
@@ -20,13 +21,27 @@ describe("Tag management", () => {
     await expect(TagPickerModal.isOpen()).resolves.toBe(true);
   });
 
-  it("creates a new tag", async () => {
-    await TagPickerModal.createTag("E2E标签");
-    const tags = await TagPickerModal.getTagNames();
-    expect(tags).toContain("E2E标签");
+  it("creates a new tag via manager", async () => {
+    // 打开标签管理器
+    await TagPickerModal.openManager();
+    await expect(TagManagerModal.isOpen()).resolves.toBe(true);
+
+    // 在管理器中创建标签
+    await TagManagerModal.createTag("E2E标签");
+
+    // 关闭管理器
+    await TagManagerModal.close();
+
+    // 验证标签已创建
+    const allTags = await getAllTags();
+    const found = allTags.some((t) => t.name === "E2E标签");
+    expect(found).toBe(true);
   });
 
   it("toggles tag assignment", async () => {
+    // 重新打开 picker
+    await LibraryPage.openTagPicker();
+
     await TagPickerModal.toggleTag("E2E标签");
     const selected = await TagPickerModal.isTagSelected("E2E标签");
     expect(selected).toBe(true);
@@ -41,11 +56,6 @@ describe("Tag management", () => {
     // 先选中标签
     await TagPickerModal.toggleTag("E2E标签");
     await TagPickerModal.close();
-
-    // 验证后端有标签
-    const allTags = await getAllTags();
-    const found = allTags.some((t) => t.name === "E2E标签");
-    expect(found).toBe(true);
 
     // 关闭阅读器，用标签筛选
     await LibraryPage.closeReader();

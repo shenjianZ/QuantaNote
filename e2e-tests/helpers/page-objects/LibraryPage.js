@@ -153,7 +153,7 @@ class LibraryPage {
 
   async openTagPicker() {
     await $(this.readerTagsBtn).then(b => b.click());
-    await waitForDisplayed("[data-testid='tag-create-input']");
+    await waitForDisplayed("[data-testid='tag-picker-search']");
   }
 
   async openAttachmentManager() {

@@ -73,6 +73,9 @@ pub fn run() {
             tag::get_item_tags,
             tag::get_all_item_tag_mappings,
             tag::set_item_tags,
+            tag::rename_tag,
+            tag::update_tag_color,
+            tag::get_tag_item_counts,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

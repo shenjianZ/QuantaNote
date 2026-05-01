@@ -40,3 +40,28 @@ pub fn set_item_tags(
 ) -> Result<(), AppError> {
     tag_service::set_item_tags(&db, &item_id, tag_names)
 }
+
+#[tauri::command]
+pub fn rename_tag(
+    db: State<'_, DbState>,
+    old_name: String,
+    new_name: String,
+) -> Result<TagDto, AppError> {
+    tag_service::rename_tag(&db, &old_name, &new_name)
+}
+
+#[tauri::command]
+pub fn update_tag_color(
+    db: State<'_, DbState>,
+    name: String,
+    color: String,
+) -> Result<TagDto, AppError> {
+    tag_service::update_tag_color(&db, &name, &color)
+}
+
+#[tauri::command]
+pub fn get_tag_item_counts(
+    db: State<'_, DbState>,
+) -> Result<Vec<(String, String, i64)>, AppError> {
+    tag_service::get_tag_item_counts(&db)
+}

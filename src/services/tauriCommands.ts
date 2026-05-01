@@ -106,3 +106,15 @@ export async function setItemTags(itemId: string, tagNames: string[]) {
 export async function getAllItemTagMappings() {
   return invoke<[string, string][]>("get_all_item_tag_mappings");
 }
+
+export async function renameTag(oldName: string, newName: string) {
+  return invoke<TagDto>("rename_tag", { oldName, newName });
+}
+
+export async function updateTagColor(name: string, color: string) {
+  return invoke<TagDto>("update_tag_color", { name, color });
+}
+
+export async function getTagItemCounts() {
+  return invoke<[string, string, number][]>("get_tag_item_counts");
+}

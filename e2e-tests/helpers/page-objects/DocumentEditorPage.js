@@ -2,7 +2,7 @@
  * DocumentEditorPage Page Object — 全屏文档编辑器
  */
 
-import { waitForDisplayed, waitForSavedStatus, waitForText } from "../waits.js";
+import { waitForDisplayed, waitForSavedStatus } from "../waits.js";
 import { typeInVditor, clearVditor, getVditorText } from "../vditor.js";
 import { pause, observePause } from "../config.js";
 
@@ -12,7 +12,8 @@ class DocumentEditorPage {
   get saveVersionBtn() { return "[data-testid='doc-save-version-btn']"; }
   get favoriteBtn() { return "[data-testid='doc-favorite-btn']"; }
   get backBtn() { return "[data-testid='doc-back-btn']"; }
-  get versionList() { return "[data-testid='doc-version-list']"; }
+  get versionToggle() { return "[data-testid='doc-version-toggle']"; }
+  get versionPanel() { return "[data-testid='version-panel']"; }
 
   async isDisplayed() {
     const input = await $(this.titleInput);
@@ -62,7 +63,6 @@ class DocumentEditorPage {
   }
 
   async isFavorite() {
-    // 检查按钮样式中是否包含 accent-soft
     const btn = await $(this.favoriteBtn);
     const cls = await btn.getAttribute("class");
     return cls.includes("accent-soft");
@@ -72,16 +72,35 @@ class DocumentEditorPage {
     await $(this.backBtn).then(b => b.click());
   }
 
+  // --- Version Panel ---
+
+  async openVersionPanel() {
+    await $(this.versionToggle).then(b => b.click());
+    await waitForDisplayed(this.versionPanel);
+  }
+
+  async closeVersionPanel() {
+    const closeBtn = await $(`${this.versionPanel} button[title]`);
+    // 找到面板头部的 X 关闭按钮
+    const panel = await $(this.versionPanel);
+    const header = await panel.$("div:first-child");
+    const btns = await header.$$("button");
+    if (btns.length > 0) {
+      await btns[btns.length - 1].click();
+    }
+    await observePause();
+  }
+
   async getVersionCount() {
-    const summary = await $(`${this.versionList} summary`);
-    const text = await summary.getText();
-    // "版本记录 (N)"
+    const btn = await $(this.versionToggle);
+    const text = await btn.getText();
+    // "版本 (N)"
     const match = text.match(/\((\d+)\)/);
     return match ? parseInt(match[1], 10) : 0;
   }
 
   async getVersionEntries() {
-    const entries = await $$(`${this.versionList} .group.rounded-xl`);
+    const entries = await $$("[data-testid='version-panel-entry']");
     return entries;
   }
 
@@ -93,16 +112,20 @@ class DocumentEditorPage {
     }
   }
 
-  async clickVersionRestore(index) {
+  async clickVersionView(index) {
     await this.hoverVersion(index);
-    const btn = await $(`${this.versionList} .group.rounded-xl:nth-child(${index + 1}) button[title='预览并恢复']`);
-    await btn.click();
+    const btn = await $$("[data-testid='version-panel-view-btn']");
+    if (btn[index]) {
+      await btn[index].click();
+    }
   }
 
   async clickVersionEdit(index) {
     await this.hoverVersion(index);
-    const btn = await $(`${this.versionList} .group.rounded-xl:nth-child(${index + 1}) button[title='编辑']`);
-    await btn.click();
+    const btn = await $$("[data-testid='version-panel-edit-btn']");
+    if (btn[index]) {
+      await btn[index].click();
+    }
   }
 
   async editVersionMeta(name, description) {

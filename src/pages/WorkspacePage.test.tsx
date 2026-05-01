@@ -11,6 +11,7 @@ vi.mock("../components/editor/VditorEditor", () => ({
     const [value, setValue] = useState(initialValue);
     useImperativeHandle(ref, () => ({
       getValue: () => value,
+      setValue: (v: string) => setValue(v),
       focus: vi.fn(),
     }), [value]);
 

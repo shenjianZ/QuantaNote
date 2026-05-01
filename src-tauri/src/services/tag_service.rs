@@ -39,6 +39,22 @@ pub fn set_item_tags(db: &DbState, item_id: &str, tag_names: Vec<String>) -> Res
     tag_repository::set_item_tags(db, item_id, tag_names)
 }
 
+pub fn rename_tag(db: &DbState, old_name: &str, new_name: &str) -> Result<TagDto, AppError> {
+    let new_name = new_name.trim().to_string();
+    if new_name.is_empty() {
+        return Err(AppError::Validation("标签名不能为空".to_string()));
+    }
+    tag_repository::rename_tag(db, old_name, &new_name)
+}
+
+pub fn update_tag_color(db: &DbState, name: &str, color: &str) -> Result<TagDto, AppError> {
+    tag_repository::update_tag_color(db, name, color)
+}
+
+pub fn get_tag_item_counts(db: &DbState) -> Result<Vec<(String, String, i64)>, AppError> {
+    tag_repository::get_tag_item_counts(db)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -121,5 +137,41 @@ mod tests {
         let db = crate::test_support::test_db();
         let mappings = get_all_item_tag_mappings(&db).unwrap();
         assert!(mappings.is_empty());
+    }
+
+    #[test]
+    fn rename_tag_trims_name() {
+        let db = crate::test_support::test_db();
+        create_tag(&db, "rust", "cyan").unwrap();
+
+        let renamed = rename_tag(&db, "rust", "  rust-lang  ").unwrap();
+        assert_eq!(renamed.name, "rust-lang");
+    }
+
+    #[test]
+    fn rename_tag_rejects_empty_name() {
+        let db = crate::test_support::test_db();
+        create_tag(&db, "rust", "cyan").unwrap();
+
+        let result = rename_tag(&db, "rust", "  ");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn update_tag_color_works() {
+        let db = crate::test_support::test_db();
+        create_tag(&db, "rust", "cyan").unwrap();
+
+        let updated = update_tag_color(&db, "rust", "purple").unwrap();
+        assert_eq!(updated.color, "purple");
+    }
+
+    #[test]
+    fn get_tag_item_counts_works() {
+        let db = crate::test_support::test_db();
+        create_tag(&db, "rust", "cyan").unwrap();
+        let counts = get_tag_item_counts(&db).unwrap();
+        assert_eq!(counts.len(), 1);
+        assert_eq!(counts[0].2, 0);
     }
 }

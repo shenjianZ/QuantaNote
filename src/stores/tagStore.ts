@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { getAllTags, createTag as createTagCmd, deleteTag as deleteTagCmd, getItemTags, setItemTags } from "../services/tauriCommands";
+import { getAllTags, createTag as createTagCmd, deleteTag as deleteTagCmd, getItemTags, setItemTags, renameTag as renameTagCmd, updateTagColor as updateTagColorCmd } from "../services/tauriCommands";
 
 export interface TagDto {
   name: string;
@@ -16,6 +16,8 @@ interface TagState {
   removeTag: (name: string) => Promise<void>;
   fetchItemTags: (itemId: string) => Promise<void>;
   updateItemTags: (itemId: string, tagNames: string[]) => Promise<void>;
+  renameTag: (oldName: string, newName: string) => Promise<void>;
+  updateTagColor: (name: string, color: string) => Promise<void>;
 }
 
 export const useTagStore = create<TagState>((set, get) => ({
@@ -45,7 +47,10 @@ export const useTagStore = create<TagState>((set, get) => ({
   removeTag: async (name: string) => {
     try {
       await deleteTagCmd(name);
-      set({ tags: get().tags.filter((t) => t.name !== name) });
+      set({
+        tags: get().tags.filter((t) => t.name !== name),
+        itemTags: get().itemTags.filter((t) => t.name !== name),
+      });
     } catch (e) {
       set({ error: String(e) });
     }
@@ -66,6 +71,30 @@ export const useTagStore = create<TagState>((set, get) => ({
       // 重新获取更新后的标签
       const itemTags = await getItemTags(itemId);
       set({ itemTags });
+    } catch (e) {
+      set({ error: String(e) });
+    }
+  },
+
+  renameTag: async (oldName: string, newName: string) => {
+    try {
+      const updated = await renameTagCmd(oldName, newName);
+      set({
+        tags: get().tags.map((t) => (t.name === oldName ? updated : t)),
+        itemTags: get().itemTags.map((t) => (t.name === oldName ? updated : t)),
+      });
+    } catch (e) {
+      set({ error: String(e) });
+    }
+  },
+
+  updateTagColor: async (name: string, color: string) => {
+    try {
+      const updated = await updateTagColorCmd(name, color);
+      set({
+        tags: get().tags.map((t) => (t.name === name ? updated : t)),
+        itemTags: get().itemTags.map((t) => (t.name === name ? updated : t)),
+      });
     } catch (e) {
       set({ error: String(e) });
     }

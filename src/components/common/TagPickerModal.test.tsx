@@ -37,35 +37,25 @@ describe("TagPickerModal", () => {
     expect(onChange).toHaveBeenCalledWith([]);
   });
 
-  it("creates new tag and selects it", async () => {
-    const createTagMock = vi.fn(async () => {});
-    useTagStore.setState({ createTag: createTagMock });
-
+  it("filters tags by search", async () => {
     const { user } = setup(
       <TagPickerModal open={true} onClose={onClose} selectedTags={[]} onChange={onChange} />
     );
 
-    const input = screen.getByPlaceholderText("标签名");
-    await user.type(input, "新标签");
-    await user.click(screen.getByText("添加"));
+    const input = screen.getByPlaceholderText("搜索标签");
+    await user.type(input, "rust");
 
-    expect(createTagMock).toHaveBeenCalledWith("新标签", "cyan");
-    expect(onChange).toHaveBeenCalledWith(["新标签"]);
+    expect(screen.getByText("#rust")).toBeInTheDocument();
+    expect(screen.queryByText("#react")).not.toBeInTheDocument();
   });
 
-  it("prevents duplicate tag creation but still selects", async () => {
-    const createTagMock = vi.fn(async () => {});
-    useTagStore.setState({ createTag: createTagMock });
-
+  it("calls onOpenManager when manage button clicked", async () => {
+    const onOpenManager = vi.fn();
     const { user } = setup(
-      <TagPickerModal open={true} onClose={onClose} selectedTags={[]} onChange={onChange} />
+      <TagPickerModal open={true} onClose={onClose} selectedTags={[]} onChange={onChange} onOpenManager={onOpenManager} />
     );
 
-    const input = screen.getByPlaceholderText("标签名");
-    await user.type(input, "rust");
-    await user.click(screen.getByText("添加"));
-
-    expect(createTagMock).not.toHaveBeenCalled();
-    expect(onChange).toHaveBeenCalledWith(["rust"]);
+    await user.click(screen.getByText("管理标签..."));
+    expect(onOpenManager).toHaveBeenCalled();
   });
 });

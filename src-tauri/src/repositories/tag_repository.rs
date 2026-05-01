@@ -149,6 +149,84 @@ pub fn set_item_tags(db: &DbState, item_id: &str, tag_names: Vec<String>) -> Res
     Ok(())
 }
 
+pub fn rename_tag(db: &DbState, old_name: &str, new_name: &str) -> Result<TagDto, AppError> {
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+    // 检查新名称是否已存在
+    let existing: Option<String> = conn
+        .query_row(
+            "SELECT name FROM tags WHERE name = ?1",
+            params![new_name],
+            |row| row.get(0),
+        )
+        .ok();
+
+    if existing.is_some() {
+        return Err(AppError::Validation(format!("标签 '{}' 已存在", new_name)));
+    }
+
+    conn.execute(
+        "UPDATE tags SET name = ?1 WHERE name = ?2",
+        params![new_name, old_name],
+    )
+    .map_err(|e| AppError::Database(e.to_string()))?;
+
+    Ok(TagDto {
+        name: new_name.to_string(),
+        color: conn
+            .query_row(
+                "SELECT color FROM tags WHERE name = ?1",
+                params![new_name],
+                |row| row.get(0),
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?,
+    })
+}
+
+pub fn update_tag_color(db: &DbState, name: &str, color: &str) -> Result<TagDto, AppError> {
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+    conn.execute(
+        "UPDATE tags SET color = ?1 WHERE name = ?2",
+        params![color, name],
+    )
+    .map_err(|e| AppError::Database(e.to_string()))?;
+
+    Ok(TagDto {
+        name: name.to_string(),
+        color: color.to_string(),
+    })
+}
+
+pub fn get_tag_item_counts(db: &DbState) -> Result<Vec<(String, String, i64)>, AppError> {
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT t.name, t.color, COUNT(it.item_id) FROM tags t
+             LEFT JOIN item_tags it ON it.tag_id = t.id
+             GROUP BY t.id ORDER BY t.name",
+        )
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+    let rows: Vec<(String, String, i64)> = stmt
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+        .map_err(|e| AppError::Database(e.to_string()))?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    Ok(rows)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -253,5 +331,57 @@ mod tests {
 
         let result = set_item_tags(&db, &item_id, vec!["nonexistent".to_string()]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn rename_tag_changes_name() {
+        let db = crate::test_support::test_db();
+        create_tag(&db, "rust", "cyan").unwrap();
+
+        let renamed = rename_tag(&db, "rust", "rust-lang").unwrap();
+        assert_eq!(renamed.name, "rust-lang");
+        assert_eq!(renamed.color, "cyan");
+
+        assert!(get_tag_by_name(&db, "rust").is_none());
+        assert!(get_tag_by_name(&db, "rust-lang").is_some());
+    }
+
+    #[test]
+    fn rename_tag_fails_on_duplicate() {
+        let db = crate::test_support::test_db();
+        create_tag(&db, "rust", "cyan").unwrap();
+        create_tag(&db, "go", "green").unwrap();
+
+        let result = rename_tag(&db, "rust", "go");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn update_tag_color_changes_color() {
+        let db = crate::test_support::test_db();
+        create_tag(&db, "rust", "cyan").unwrap();
+
+        let updated = update_tag_color(&db, "rust", "red").unwrap();
+        assert_eq!(updated.name, "rust");
+        assert_eq!(updated.color, "red");
+
+        let tag = get_tag_by_name(&db, "rust").unwrap();
+        assert_eq!(tag.color, "red");
+    }
+
+    #[test]
+    fn get_tag_item_counts_returns_counts() {
+        let db = crate::test_support::test_db();
+        let item_id = create_test_item(&db);
+        create_tag(&db, "rust", "cyan").unwrap();
+        create_tag(&db, "go", "green").unwrap();
+        set_item_tags(&db, &item_id, vec!["rust".to_string()]).unwrap();
+
+        let counts = get_tag_item_counts(&db).unwrap();
+        assert_eq!(counts.len(), 2);
+        let rust_count = counts.iter().find(|(n, _, _)| n == "rust").unwrap();
+        assert_eq!(rust_count.2, 1);
+        let go_count = counts.iter().find(|(n, _, _)| n == "go").unwrap();
+        assert_eq!(go_count.2, 0);
     }
 }

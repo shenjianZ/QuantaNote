@@ -1,12 +1,14 @@
 import type { ReactNode } from "react";
 import type { AppPage } from "../../types";
 import { TopBar } from "./TopBar";
+import { StatusBar } from "./StatusBar";
 
 interface AppShellProps {
   children: ReactNode;
   currentPage: AppPage;
   onNavigate: (page: AppPage) => void;
   onOpenSearch: () => void;
+  itemCount?: number;
 }
 
 export function AppShell({
@@ -14,6 +16,7 @@ export function AppShell({
   currentPage,
   onNavigate,
   onOpenSearch,
+  itemCount,
 }: AppShellProps) {
   return (
     <main className="h-screen w-screen overflow-hidden bg-[var(--app-bg)] text-[var(--text)]">
@@ -24,6 +27,7 @@ export function AppShell({
           onOpenSearch={onOpenSearch}
         />
         <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
+        <StatusBar currentPage={currentPage} itemCount={itemCount} />
       </section>
     </main>
   );

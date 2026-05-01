@@ -143,6 +143,7 @@ export function QuantaNoteApp() {
       currentPage={currentPage as AppPage}
       onNavigate={navigate}
       onOpenSearch={openPalette}
+      itemCount={dbItems.length}
     >
       {currentPage === "workspace" && (
         <WorkspacePage

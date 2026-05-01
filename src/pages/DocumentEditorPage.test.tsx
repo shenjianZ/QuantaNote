@@ -84,7 +84,7 @@ describe("DocumentEditorPage", () => {
   it("creates version on save version click", async () => {
     const { user } = setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
     await user.click(screen.getByTitle("保存为新版本"));
-    expect(screen.getByText(/版本记录 \(1\)/)).toBeInTheDocument();
+    expect(screen.getByText(/版本 \(1\)/)).toBeInTheDocument();
   });
 
   it("toggles favorite on star click", async () => {

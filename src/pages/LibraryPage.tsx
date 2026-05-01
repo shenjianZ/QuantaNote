@@ -15,6 +15,7 @@ import {
 import { open } from "@tauri-apps/plugin-dialog";
 import { MarkdownRenderer } from "../components/common/MarkdownRenderer";
 import { TagPickerModal } from "../components/common/TagPickerModal";
+import { TagManagerModal } from "../components/common/TagManagerModal";
 import { AttachmentManagerModal } from "../components/common/AttachmentManagerModal";
 import { useAppStore } from "../stores/appStore";
 import { useAttachmentStore } from "../stores/attachmentStore";
@@ -65,6 +66,7 @@ export function LibraryPage({
   const [copied, setCopied] = useState(false);
   const [readerOpen, setReaderOpen] = useState(false);
   const [tagModalOpen, setTagModalOpen] = useState(false);
+  const [tagManagerOpen, setTagManagerOpen] = useState(false);
   const [attachmentModalOpen, setAttachmentModalOpen] = useState(false);
 
   const theme = useAppStore((s) => s.theme);
@@ -364,7 +366,7 @@ export function LibraryPage({
       </section>
 
       {hasSelection && (
-        <section className="fixed inset-x-3 bottom-3 top-14 z-30 overflow-hidden rounded-3xl border border-[var(--line)] bg-[var(--paper)] shadow-2xl" data-testid="reader-drawer">
+        <section className="fixed inset-x-3 bottom-8 top-14 z-30 overflow-hidden rounded-3xl border border-[var(--line)] bg-[var(--paper)] shadow-2xl" data-testid="reader-drawer">
           <div className="flex h-full min-h-0 flex-col">
             <header className="flex shrink-0 items-start gap-3 border-b border-[var(--line)] px-4 py-3">
               <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--field)] text-[var(--muted)]">
@@ -426,7 +428,7 @@ export function LibraryPage({
                   onClick={() => setTagModalOpen(true)}
                 >
                   <Tag className="h-3.5 w-3.5" />
-                  管理标签
+                  标签
                 </button>
                 <button
                   className="inline-flex items-center gap-1 rounded-full bg-[var(--field)] px-2.5 py-1 text-xs text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
@@ -444,6 +446,21 @@ export function LibraryPage({
                 onClose={() => setTagModalOpen(false)}
                 selectedTags={itemTags.map((t) => t.name)}
                 onChange={handleTagChange}
+                onOpenManager={() => {
+                  setTagModalOpen(false);
+                  setTagManagerOpen(true);
+                }}
+              />
+              <TagManagerModal
+                open={tagManagerOpen}
+                onClose={() => {
+                  setTagManagerOpen(false);
+                  fetchTags();
+                  refreshItemTagMappings();
+                  if (selectedItem.id) {
+                    fetchItemTags(selectedItem.id);
+                  }
+                }}
               />
               <AttachmentManagerModal
                 open={attachmentModalOpen}
