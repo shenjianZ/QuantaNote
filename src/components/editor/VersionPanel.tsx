@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { Eye, Pencil, Search } from "lucide-react";
+import { Eye, GitCompare, Pencil, Search } from "lucide-react";
 import { Modal } from "../common/Modal";
 import { VersionPreviewModal } from "../common/VersionPreviewModal";
+import { VersionDiffModal } from "../version/VersionDiffModal";
 import type { VersionDto } from "../../types";
 
 export type { VersionDto };
@@ -31,6 +32,8 @@ export function VersionPanel({ open, versions, onClose, onRestore, onUpdateMeta,
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
+  const [selectedForDiff, setSelectedForDiff] = useState<string[]>([]);
+  const [diffVersions, setDiffVersions] = useState<{ a: VersionDto; b: VersionDto } | null>(null);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return versions;
@@ -42,6 +45,24 @@ export function VersionPanel({ open, versions, onClose, onRestore, onUpdateMeta,
         `v${v.version_number}`.includes(q)
     );
   }, [versions, search]);
+
+  function toggleVersionSelect(id: string) {
+    setSelectedForDiff((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.length >= 2) return [prev[1], id];
+      return [...prev, id];
+    });
+  }
+
+  function handleCompare() {
+    if (selectedForDiff.length !== 2) return;
+    const a = versions.find((v) => v.id === selectedForDiff[0]);
+    const b = versions.find((v) => v.id === selectedForDiff[1]);
+    if (a && b) {
+      const [older, newer] = new Date(a.created_at) < new Date(b.created_at) ? [a, b] : [b, a];
+      setDiffVersions({ a: older, b: newer });
+    }
+  }
 
   function startEdit(v: VersionDto) {
     setEditingId(v.id);
@@ -58,17 +79,35 @@ export function VersionPanel({ open, versions, onClose, onRestore, onUpdateMeta,
     <>
       <Modal open={open} onClose={onClose} title={`版本记录 (${versions.length})`} maxWidth="max-w-lg">
         <div className="space-y-3" data-testid="version-panel">
-          {/* Search */}
-          <div className="flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--field)] px-3 py-1.5">
-            <Search className="h-4 w-4 text-[var(--muted)]" />
-            <input
-              className="flex-1 bg-transparent text-sm text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="搜索版本"
-              data-testid="version-panel-search"
-            />
+          {/* Search + Compare */}
+          <div className="flex items-center gap-2">
+            <div className="flex flex-1 items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--field)] px-3 py-1.5">
+              <Search className="h-4 w-4 text-[var(--muted)]" />
+              <input
+                className="flex-1 bg-transparent text-sm text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="搜索版本"
+                data-testid="version-panel-search"
+              />
+            </div>
+            {selectedForDiff.length === 2 && (
+              <button
+                className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[var(--accent)] px-3 text-xs font-medium text-white hover:opacity-90"
+                type="button"
+                onClick={handleCompare}
+                data-testid="version-panel-compare-btn"
+              >
+                <GitCompare className="h-3.5 w-3.5" />
+                对比
+              </button>
+            )}
           </div>
+          {selectedForDiff.length > 0 && selectedForDiff.length < 2 && (
+            <div className="text-xs text-[var(--muted)]">
+              已选择 1 个版本，请再选择 1 个进行对比
+            </div>
+          )}
 
           {/* Version list */}
           <div className="max-h-64 space-y-1 overflow-auto">
@@ -79,6 +118,16 @@ export function VersionPanel({ open, versions, onClose, onRestore, onUpdateMeta,
             ) : (
               filtered.map((version) => (
                 <div key={version.id} className="group rounded-xl px-3 py-2 hover:bg-[var(--hover)]" data-testid="version-panel-entry">
+                  <label className="mb-1 flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      className="h-3.5 w-3.5 rounded border-[var(--line)] accent-[var(--accent)]"
+                      checked={selectedForDiff.includes(version.id)}
+                      onChange={() => toggleVersionSelect(version.id)}
+                      data-testid="version-panel-checkbox"
+                    />
+                    <span className="text-[10px] text-[var(--muted)]">选择对比</span>
+                  </label>
                   {editingId === version.id ? (
                     <div className="space-y-1.5">
                       <input
@@ -165,6 +214,16 @@ export function VersionPanel({ open, versions, onClose, onRestore, onUpdateMeta,
           onClose();
         }}
         theme={theme}
+      />
+
+      <VersionDiffModal
+        open={diffVersions !== null}
+        versionA={diffVersions?.a ?? null}
+        versionB={diffVersions?.b ?? null}
+        onClose={() => {
+          setDiffVersions(null);
+          setSelectedForDiff([]);
+        }}
       />
     </>
   );

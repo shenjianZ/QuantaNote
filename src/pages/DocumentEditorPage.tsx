@@ -1,10 +1,10 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Clock, Loader2, Save, Star } from "lucide-react";
-import { invoke } from "@tauri-apps/api/core";
 import { useAppStore } from "../stores/appStore";
 import { useItemStore } from "../stores/itemStore";
 import { useToastStore } from "../stores/toastStore";
 import { VersionPanel, type VersionDto } from "../components/editor/VersionPanel";
+import { getVersions, createVersion, updateVersion, restoreVersion } from "../services/tauriCommands";
 
 const VditorEditor = lazy(() => import("../components/editor/VditorEditor").then((m) => ({ default: m.VditorEditor })));
 
@@ -53,8 +53,8 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
   useEffect(() => {
     if (!selectedItemId) return;
     getItem(selectedItemId).catch(() => {});
-    invoke<VersionDto[]>("get_versions", { itemId: selectedItemId })
-      .then(setVersions)
+    getVersions(selectedItemId)
+      .then((v) => setVersions(v as VersionDto[]))
       .catch(() => {});
   }, [selectedItemId, getItem]);
 
@@ -110,13 +110,13 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
   async function handleSaveVersion() {
     if (!selectedItemId) return;
     try {
-      const version = await invoke<VersionDto>("create_version", {
-        itemId: selectedItemId,
-        content: latestContent.current,
-        changeSummary: "手动保存",
-        name: formatNowAsName(),
-      });
-      setVersions((current) => [version, ...current].slice(0, 50));
+      const version = await createVersion(
+        selectedItemId,
+        latestContent.current,
+        "手动保存",
+        formatNowAsName(),
+      );
+      setVersions((current) => [version as VersionDto, ...current].slice(0, 50));
       useToastStore.getState().addToast("success", "版本已保存");
     } catch (e) {
       console.error("创建版本失败:", e);
@@ -126,8 +126,8 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
 
   async function handleUpdateVersionMeta(versionId: string, name: string, description: string) {
     try {
-      const updated = await invoke<VersionDto>("update_version", { id: versionId, name, description });
-      setVersions((current) => current.map((v) => (v.id === versionId ? updated : v)));
+      const updated = await updateVersion(versionId, name, description);
+      setVersions((current) => current.map((v) => (v.id === versionId ? (updated as VersionDto) : v)));
     } catch (e) {
       console.error("更新版本信息失败:", e);
       useToastStore.getState().addToast("error", "更新版本信息失败");
@@ -136,7 +136,7 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
 
   async function handleRestore(version: VersionDto) {
     try {
-      const updatedItem = await invoke<{ id: string; title: string; content: string }>("restore_version", { versionId: version.id });
+      const updatedItem = await restoreVersion(version.id) as { id: string; title: string; content: string };
       setContent(updatedItem.content);
       setTitle(updatedItem.title);
       useToastStore.getState().addToast("success", "版本已恢复");

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FileText, Search } from "lucide-react";
+import { FileText, Loader2, Search } from "lucide-react";
 import { Kbd } from "../common/Kbd";
 import { useSearchStore } from "../../stores/searchStore";
 import type { SearchResultDto } from "../../stores/searchStore";
@@ -31,6 +31,7 @@ export function CommandPalette({
 }: CommandPaletteProps) {
   const query = useSearchStore((s) => s.query);
   const results = useSearchStore((s) => s.results);
+  const searching = useSearchStore((s) => s.searching);
   const search = useSearchStore((s) => s.search);
   const setQuery = useSearchStore((s) => s.setQuery);
   const [selectedIdx, setSelectedIdx] = useState(0);
@@ -121,7 +122,11 @@ export function CommandPalette({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--line)] px-4">
-          <Search className="h-5 w-5 text-[var(--muted)]" />
+          {searching ? (
+            <Loader2 className="h-5 w-5 animate-spin text-[var(--muted)]" />
+          ) : (
+            <Search className="h-5 w-5 text-[var(--muted)]" />
+          )}
           <input
             ref={inputRef}
             className="min-w-0 flex-1 bg-transparent text-base text-[var(--text)] outline-none placeholder:text-[var(--muted)]"

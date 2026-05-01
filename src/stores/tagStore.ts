@@ -12,6 +12,7 @@ interface TagState {
   itemTags: TagDto[];
   loading: boolean;
   error: string | null;
+  setTags: (tags: TagDto[]) => void;
   fetchTags: () => Promise<void>;
   createTag: (name: string, color: string) => Promise<void>;
   removeTag: (name: string) => Promise<void>;
@@ -26,6 +27,8 @@ export const useTagStore = create<TagState>((set, get) => ({
   itemTags: [],
   loading: false,
   error: null,
+
+  setTags: (tags) => set({ tags }),
 
   fetchTags: async () => {
     try {

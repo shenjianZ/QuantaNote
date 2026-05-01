@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Copy,
   Edit3,
@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { MarkdownRenderer } from "../components/common/MarkdownRenderer";
+import { Select } from "../components/common/Select";
+import { SkeletonList } from "../components/common/Skeleton";
 import { TagPickerModal } from "../components/common/TagPickerModal";
 import { TagManagerModal } from "../components/common/TagManagerModal";
 import { AttachmentManagerModal } from "../components/common/AttachmentManagerModal";
@@ -22,7 +24,6 @@ import { useAttachmentStore } from "../stores/attachmentStore";
 import { useItemStore } from "../stores/itemStore";
 import { useSearchStore } from "../stores/searchStore";
 import { useTagStore } from "../stores/tagStore";
-import { getAllItemTagMappings } from "../services/tauriCommands";
 import { useToastStore } from "../stores/toastStore";
 import type { Item } from "../types";
 
@@ -63,55 +64,57 @@ export function LibraryPage({
   const [activeTab, setActiveTab] = useState<TabKey>("recent");
   const [activeTag, setActiveTag] = useState("all");
   const [sortOrder, setSortOrder] = useState<SortOption>("updated");
-  const [itemTagNames, setItemTagNames] = useState<Record<string, string[]>>({});
   const [readerOpen, setReaderOpen] = useState(false);
   const [tagModalOpen, setTagModalOpen] = useState(false);
   const [tagManagerOpen, setTagManagerOpen] = useState(false);
   const [attachmentModalOpen, setAttachmentModalOpen] = useState(false);
+  const filterDetailsRef = useRef<HTMLDetailsElement>(null);
 
   const theme = useAppStore((s) => s.theme);
   const selectedItemDto = useItemStore((s) => s.selectedItem);
+  const loading = useItemStore((s) => s.loading);
   const deleteItem = useItemStore((s) => s.deleteItem);
   const updateItem = useItemStore((s) => s.updateItem);
+  const fetchLibraryData = useItemStore((s) => s.fetchLibraryData);
+  const itemTagNames = useItemStore((s) => s.itemTagNames);
+  const setItemTagNames = useItemStore((s) => s.setItemTagNames);
   const attachments = useAttachmentStore((s) => s.attachments);
   const fetchAttachments = useAttachmentStore((s) => s.fetchAttachments);
   const addAttachmentAction = useAttachmentStore((s) => s.addAttachment);
   const allTags = useTagStore((s) => s.tags) as { name: string; color: string }[];
   const itemTags = useTagStore((s) => s.itemTags) as { name: string; color: string }[];
-  const fetchTags = useTagStore((s) => s.fetchTags);
+  const setTags = useTagStore((s) => s.setTags);
   const fetchItemTags = useTagStore((s) => s.fetchItemTags);
   const updateItemTagsAction = useTagStore((s) => s.updateItemTags);
   const searchResults = useSearchStore((s) => s.results);
   const searching = useSearchStore((s) => s.searching);
   const search = useSearchStore((s) => s.search);
 
-  const refreshItemTagMappings = useCallback(() => {
-    let cancelled = false;
-    getAllItemTagMappings()
-      .then((mappings) => {
-        if (cancelled) return;
-        const map: Record<string, string[]> = {};
-        for (const [itemId, tagName] of mappings) {
-          (map[itemId] ??= []).push(tagName);
-        }
-        setItemTagNames(map);
-      })
-      .catch(() => {
-        if (!cancelled) setItemTagNames({});
-      });
-    return () => {
-      cancelled = true;
-    };
+  const loadLibraryData = useCallback(() => {
+    fetchLibraryData().then((result) => {
+      setTags(result.tags);
+    });
+  }, [fetchLibraryData, setTags]);
+
+  useEffect(() => {
+    loadLibraryData();
+  }, [loadLibraryData]);
+
+  // 点击外部关闭筛选下拉菜单
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      const details = filterDetailsRef.current;
+      if (details && details.open && !details.contains(e.target as Node)) {
+        details.open = false;
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   useEffect(() => {
-    fetchTags();
-  }, [fetchTags]);
-
-  useEffect(() => {
     function handleE2eDataChanged() {
-      fetchTags();
-      refreshItemTagMappings();
+      loadLibraryData();
       if (selectedItem.id) {
         fetchAttachments(selectedItem.id);
         fetchItemTags(selectedItem.id);
@@ -120,7 +123,7 @@ export function LibraryPage({
 
     window.addEventListener("quantanote:e2e-data-changed", handleE2eDataChanged);
     return () => window.removeEventListener("quantanote:e2e-data-changed", handleE2eDataChanged);
-  }, [fetchAttachments, fetchItemTags, fetchTags, refreshItemTagMappings, selectedItem.id]);
+  }, [fetchAttachments, fetchItemTags, loadLibraryData, selectedItem.id]);
 
   useEffect(() => {
     if (!selectedItem.id) return;
@@ -133,10 +136,6 @@ export function LibraryPage({
     onSelectItem(previewRequest.itemId);
     setReaderOpen(true);
   }, [previewRequest, onSelectItem]);
-
-  useEffect(() => {
-    return refreshItemTagMappings();
-  }, [items, refreshItemTagMappings]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -228,10 +227,7 @@ export function LibraryPage({
   async function handleTagChange(tagNames: string[]) {
     if (!selectedItem.id) return;
     await updateItemTagsAction(selectedItem.id, tagNames);
-    setItemTagNames((current) => ({
-      ...current,
-      [selectedItem.id]: tagNames,
-    }));
+    setItemTagNames(selectedItem.id, tagNames);
   }
 
   function handleOpenItem(id: string) {
@@ -280,55 +276,55 @@ export function LibraryPage({
               {searching && <span className="text-xs">搜索中</span>}
             </div>
 
-            <details className="relative">
+            <details ref={filterDetailsRef} className="relative">
               <summary className="grid h-10 w-10 cursor-pointer list-none place-items-center rounded-full border border-[var(--line)] bg-[var(--field)] text-[var(--muted)] hover:text-[var(--text)] [&::-webkit-details-marker]:hidden" data-testid="library-filter-btn">
                 <SlidersHorizontal className="h-4 w-4" />
               </summary>
-              <div className="absolute right-0 top-12 z-20 w-64 rounded-2xl border border-[var(--line)] bg-[var(--popover)] p-3 shadow-xl" data-testid="library-filter-panel">
-                <div className="mb-3 text-xs font-medium uppercase tracking-wide text-[var(--muted)]">筛选</div>
-                <div className="mb-3 grid grid-cols-3 gap-1 rounded-xl bg-[var(--field)] p-1">
+              <div className="absolute right-0 top-12 z-20 w-64 rounded-2xl border border-[var(--line)] bg-[var(--popover)] p-4 shadow-2xl" data-testid="library-filter-panel">
+                <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">筛选</div>
+                <div className="mb-4 grid grid-cols-3 gap-1 rounded-xl bg-[var(--field)] p-1">
                   {FILTERS.map((filter) => (
                     <button
                       key={filter.key}
                       type="button"
-                      className={`rounded-lg px-2 py-1.5 text-sm ${activeTab === filter.key ? "bg-[var(--paper)] text-[var(--text)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--text)]"}`}
+                      className={`rounded-lg px-2 py-1.5 text-sm font-medium transition-colors ${activeTab === filter.key ? "bg-[var(--paper)] text-[var(--accent)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--text)]"}`}
                       onClick={() => setActiveTab(filter.key)}
                     >
                       {filter.label}
                     </button>
                   ))}
                 </div>
-                <label className="mb-3 block">
-                  <span className="mb-1 block text-xs text-[var(--muted)]">排序</span>
-                  <select
-                    className="h-9 w-full rounded-xl border border-[var(--line)] bg-[var(--field)] px-3 text-sm text-[var(--text)] outline-none"
+                <label className="mb-4 block">
+                  <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">排序</span>
+                  <Select
                     value={sortOrder}
-                    onChange={(e) => setSortOrder(e.target.value as SortOption)}
-                  >
-                    <option value="updated">最近更新</option>
-                    <option value="created">创建时间</option>
-                    <option value="title">标题排序</option>
-                  </select>
+                    onChange={(v) => setSortOrder(v as SortOption)}
+                    options={[
+                      { value: "updated", label: "最近更新" },
+                      { value: "created", label: "创建时间" },
+                      { value: "title", label: "标题排序" },
+                    ]}
+                  />
                 </label>
                 <label className="block">
-                  <span className="mb-1 block text-xs text-[var(--muted)]">标签</span>
-                  <select
-                    className="h-9 w-full rounded-xl border border-[var(--line)] bg-[var(--field)] px-3 text-sm text-[var(--text)] outline-none"
+                  <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">标签</span>
+                  <Select
                     value={activeTag}
-                    onChange={(e) => setActiveTag(e.target.value)}
-                  >
-                    <option value="all">全部标签</option>
-                    {allTags.map((tag) => (
-                      <option key={tag.name} value={tag.name}>{tag.name}</option>
-                    ))}
-                  </select>
+                    onChange={setActiveTag}
+                    options={[
+                      { value: "all", label: "全部标签" },
+                      ...allTags.map((tag) => ({ value: tag.name, label: tag.name })),
+                    ]}
+                  />
                 </label>
               </div>
             </details>
           </div>
 
           <div className="min-h-0 flex-1 overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--paper)]">
-            {visibleItems.length === 0 ? (
+            {loading && visibleItems.length === 0 ? (
+              <SkeletonList count={6} />
+            ) : visibleItems.length === 0 ? (
               <div className="grid h-full place-items-center px-8 text-center">
                 <div>
                   <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-full bg-[var(--field)] text-[var(--muted)]">
@@ -362,6 +358,20 @@ export function LibraryPage({
                         {item.pinned && <Star className="h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />}
                       </div>
                       <div className="mt-1 line-clamp-2 text-sm leading-relaxed text-[var(--muted)]">{item.summary || "无正文预览"}</div>
+                      <div className="mt-1.5 min-h-[1.25rem]">
+                        {itemTagNames[item.id] && itemTagNames[item.id].length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1">
+                            {itemTagNames[item.id].slice(0, 3).map((tagName) => (
+                              <span key={tagName} className="rounded-full bg-[var(--field)] px-1.5 py-0.5 text-[10px] text-[var(--muted)]">
+                                #{tagName}
+                              </span>
+                            ))}
+                            {itemTagNames[item.id].length > 3 && (
+                              <span className="text-[10px] text-[var(--muted)]">+{itemTagNames[item.id].length - 3}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <span className="mt-1 shrink-0 text-xs text-[var(--muted)]">{item.time}</span>
                   </button>
@@ -461,8 +471,7 @@ export function LibraryPage({
                 open={tagManagerOpen}
                 onClose={() => {
                   setTagManagerOpen(false);
-                  fetchTags();
-                  refreshItemTagMappings();
+                  loadLibraryData();
                   if (selectedItem.id) {
                     fetchItemTags(selectedItem.id);
                   }

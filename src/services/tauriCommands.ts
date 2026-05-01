@@ -99,8 +99,22 @@ export async function restoreVersion(versionId: string) {
     return invoke("restore_version", { versionId });
 }
 
+// Item DTO
+export interface ItemDto {
+    id: string;
+    title: string;
+    item_type: string;
+    content: string;
+    summary: string;
+    pinned: boolean;
+    favorite: boolean;
+    encrypted: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
 // Tag commands
-interface TagDto {
+export interface TagDto {
     name: string;
     color: string;
 }
@@ -167,4 +181,15 @@ export async function updateWindowBehavior(
         minimizeToTray,
         closeKeepRunning,
     });
+}
+
+// Library data (combined fetch)
+export interface LibraryData {
+    items: ItemDto[];
+    tags: TagDto[];
+    mappings: [string, string][];
+}
+
+export async function getLibraryData() {
+    return invoke<LibraryData>("get_library_data");
 }

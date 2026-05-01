@@ -1,10 +1,18 @@
+use serde::Serialize;
 use tauri::State;
 
 use crate::db::DbState;
 use crate::error::AppError;
-use crate::models::item::{ItemDto, UpdateItemPayload};
-use crate::services::item_service;
+use crate::models::item::{ItemDto, TagDto, UpdateItemPayload};
+use crate::services::{item_service, tag_service};
 use crate::utils::paths;
+
+#[derive(Serialize)]
+pub struct LibraryData {
+    pub items: Vec<ItemDto>,
+    pub tags: Vec<TagDto>,
+    pub mappings: Vec<(String, String)>,
+}
 
 #[tauri::command]
 pub fn create_item(
@@ -122,4 +130,12 @@ pub fn get_db_path() -> Result<String, AppError> {
         .join("quanta_note.sqlite")
         .to_string_lossy()
         .to_string())
+}
+
+#[tauri::command]
+pub fn get_library_data(db: State<'_, DbState>) -> Result<LibraryData, AppError> {
+    let items = item_service::get_items(&db, None, 200, 0)?;
+    let tags = tag_service::get_all_tags(&db)?;
+    let mappings = tag_service::get_all_item_tag_mappings(&db)?;
+    Ok(LibraryData { items, tags, mappings })
 }

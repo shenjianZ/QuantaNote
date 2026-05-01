@@ -10,11 +10,17 @@ import {
     updateWindowBehavior,
 } from "../services/tauriCommands";
 
+export interface CustomColor {
+    hex: string;
+    name: string;
+}
+
 export interface AppSettings {
     fontFamily: string;
     fontMono: string;
     fontSize: number;
     accentColor: string;
+    customAccentColors: CustomColor[];
     minimizeToTray: boolean;
     closeKeepRunning: boolean;
     autoBackup: boolean;
@@ -26,6 +32,7 @@ const DEFAULTS: AppSettings = {
     fontMono: "JetBrains Mono",
     fontSize: 15,
     accentColor: "#386c5f",
+    customAccentColors: [],
     minimizeToTray: true,
     closeKeepRunning: false,
     autoBackup: true,
@@ -157,6 +164,8 @@ interface SettingsState {
         value: AppSettings[K],
     ) => void;
     updateSettings: (partial: Partial<AppSettings>) => void;
+    addCustomColor: (hex: string, name: string) => void;
+    removeCustomColor: (hex: string) => void;
     refreshDbSize: () => Promise<void>;
     fetchDbPath: () => Promise<void>;
     optimizeDb: () => Promise<void>;
@@ -261,6 +270,24 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             settings.minimizeToTray,
             settings.closeKeepRunning,
         ).catch(() => {});
+    },
+
+    addCustomColor: (hex, name) => {
+        const settings = get().settings;
+        if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return;
+        const colors = settings.customAccentColors.filter((c) => c.hex !== hex);
+        colors.push({ hex, name: name.trim() || hex.toUpperCase() });
+        const updated = { ...settings, customAccentColors: colors };
+        persist(updated);
+        set({ settings: updated });
+    },
+
+    removeCustomColor: (hex) => {
+        const settings = get().settings;
+        const colors = settings.customAccentColors.filter((c) => c.hex !== hex);
+        const updated = { ...settings, customAccentColors: colors };
+        persist(updated);
+        set({ settings: updated });
     },
 
     refreshDbSize: async () => {

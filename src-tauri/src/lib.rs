@@ -193,6 +193,7 @@ pub fn run() {
             tag::update_tag_color,
             tag::get_tag_item_counts,
             item::get_db_path,
+            item::get_library_data,
             update_window_behavior,
         ])
         .run(tauri::generate_context!())

@@ -4,6 +4,7 @@ import { FileText } from "lucide-react";
 import { AppShell } from "../components/layout/AppShell";
 import { CommandPalette } from "../components/search/CommandPalette";
 import { ToastContainer } from "../components/common/ToastContainer";
+import { ErrorBoundary } from "../components/common/ErrorBoundary";
 import { WorkspacePage } from "../pages/WorkspacePage";
 import { LibraryPage } from "../pages/LibraryPage";
 import { DocumentEditorPage } from "../pages/DocumentEditorPage";
@@ -59,8 +60,11 @@ export function QuantaNoteApp() {
     } | null>(null);
 
     useEffect(() => {
-        fetchItems().catch(() => {});
-    }, [fetchItems]);
+        // LibraryPage 通过 fetchLibraryData 统一加载，这里只在非 library 页面加载
+        if (currentPage !== "library") {
+            fetchItems().catch(() => {});
+        }
+    }, [fetchItems, currentPage]);
 
     useEffect(() => {
         function handleE2eDataChanged() {
@@ -170,6 +174,32 @@ export function QuantaNoteApp() {
         function handleKeyDown(e: KeyboardEvent) {
             const mod = e.metaKey || e.ctrlKey;
             const key = e.key.toLowerCase();
+
+            // 禁用浏览器默认快捷键，只保留 F12 (DevTools)
+            // 注意：Ctrl+F 和 Ctrl+H 保留给应用内搜索，仅阻止浏览器默认行为
+            if (mod) {
+                // 这些快捷键只阻止浏览器默认行为，不阻止事件传播
+                const preventOnlyKeys = ["f", "h"];
+                if (preventOnlyKeys.includes(key)) {
+                    e.preventDefault();
+                    return; // 不阻止传播，让 VditorEditor 处理
+                }
+
+                // 其他快捷键完全阻止
+                const blockedKeys = ["p", "s", "u", "a", "r", "g", "j", "d", "e", "q", "w", "t", "i", "o", "z", "x", "c", "v"];
+                if (blockedKeys.includes(key)) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            }
+
+            // 禁用 F1-F11, F12 保留
+            if (e.key.startsWith("F") && e.key !== "F12") {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            // 应用内快捷键
             if (mod && key === "k") {
                 e.preventDefault();
                 if (paletteOpen) closePalette();
@@ -220,7 +250,17 @@ export function QuantaNoteApp() {
         };
     }, [handleCreateNote, navigate]);
 
+    // 禁用右键菜单（作为 Tauri 配置的补充）
+    useEffect(() => {
+        function handleContextMenu(e: MouseEvent) {
+            e.preventDefault();
+        }
+        document.addEventListener("contextmenu", handleContextMenu);
+        return () => document.removeEventListener("contextmenu", handleContextMenu);
+    }, []);
+
     return (
+        <ErrorBoundary>
         <AppShell
             currentPage={currentPage as AppPage}
             onNavigate={navigate}
@@ -257,5 +297,6 @@ export function QuantaNoteApp() {
             />
             <ToastContainer />
         </AppShell>
+        </ErrorBoundary>
     );
 }

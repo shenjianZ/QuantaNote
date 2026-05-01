@@ -9,8 +9,11 @@ import {
     Palette,
     Sun,
     Upload,
+    X,
 } from "lucide-react";
 import type { ThemeMode } from "../hooks/useTheme";
+import { ColorPickerModal } from "../components/common/ColorPickerModal";
+import { Select } from "../components/common/Select";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useToastStore } from "../stores/toastStore";
 
@@ -22,12 +25,12 @@ const settingsMenu = [
 ];
 
 const FONT_OPTIONS = [
-    { value: "Noto Sans SC", label: "Noto Sans SC（本地）" },
+    { value: "Noto Sans SC", label: "Noto Sans SC" },
     { value: "system-ui", label: "系统默认" },
 ];
 
 const MONO_OPTIONS = [
-    { value: "JetBrains Mono", label: "JetBrains Mono（本地）" },
+    { value: "JetBrains Mono", label: "JetBrains Mono" },
     { value: "Consolas", label: "Consolas" },
     { value: "monospace", label: "系统等宽" },
 ];
@@ -38,6 +41,13 @@ const ACCENT_COLORS = [
     { value: "#7c3aed", label: "紫色" },
     { value: "#c47b12", label: "琥珀" },
     { value: "#b64242", label: "红色" },
+    { value: "#0891b2", label: "青色" },
+    { value: "#059669", label: "翠绿" },
+    { value: "#d97706", label: "橙色" },
+    { value: "#e11d48", label: "玫红" },
+    { value: "#6366f1", label: "靛蓝" },
+    { value: "#8b5cf6", label: "紫罗兰" },
+    { value: "#64748b", label: "石板灰" },
 ];
 
 interface SettingsPageProps {
@@ -45,21 +55,23 @@ interface SettingsPageProps {
     onThemeChange?: (theme: ThemeMode) => void;
 }
 
+
 const rowClass =
     "flex min-h-12 items-center justify-between gap-4 border-b border-[var(--line)] py-2 last:border-b-0";
-const selectClass =
-    "h-9 rounded-xl border border-[var(--line)] bg-[var(--field)] px-3 text-sm text-[var(--text)] outline-none";
 
 export function SettingsPage({
     theme = "system",
     onThemeChange,
 }: SettingsPageProps) {
     const [activeSection, setActiveSection] = useState(0);
+    const [colorPickerOpen, setColorPickerOpen] = useState(false);
     const settings = useSettingsStore((s) => s.settings);
     const dbSize = useSettingsStore((s) => s.dbSize);
     const dbPath = useSettingsStore((s) => s.dbPath);
     const init = useSettingsStore((s) => s.init);
     const updateSetting = useSettingsStore((s) => s.updateSetting);
+    const addCustomColor = useSettingsStore((s) => s.addCustomColor);
+    const removeCustomColor = useSettingsStore((s) => s.removeCustomColor);
     const refreshDbSize = useSettingsStore((s) => s.refreshDbSize);
     const fetchDbPath = useSettingsStore((s) => s.fetchDbPath);
     const optimizeDb = useSettingsStore((s) => s.optimizeDb);
@@ -137,10 +149,11 @@ export function SettingsPage({
                         <h2 className="mb-3 text-sm font-semibold text-[var(--text)]">
                             强调色
                         </h2>
-                        <div className="flex gap-3">
+                        <div className="mb-1.5 text-xs font-medium text-[var(--muted)]">预定义</div>
+                        <div className="mb-4 flex flex-wrap gap-2.5">
                             {ACCENT_COLORS.map((c) => (
                                 <button
-                                    className={`h-7 w-7 rounded-full border border-[var(--line)] ${c.value === settings.accentColor ? "outline outline-2 outline-offset-2 outline-[var(--accent)]" : ""}`}
+                                    className={`h-7 w-7 rounded-full border border-[var(--line)] transition-transform hover:scale-110 ${c.value === settings.accentColor ? "outline outline-2 outline-offset-2 outline-[var(--accent)]" : ""}`}
                                     key={c.value}
                                     data-testid="accent-color"
                                     style={{ background: c.value }}
@@ -152,6 +165,49 @@ export function SettingsPage({
                                 />
                             ))}
                         </div>
+                        <div className="mb-1.5 text-xs font-medium text-[var(--muted)]">自定义</div>
+                        <div className="flex flex-wrap items-center gap-2.5">
+                            {settings.customAccentColors.map((c) => (
+                                <div className="group relative" key={c.hex}>
+                                    <button
+                                        className={`h-7 w-7 rounded-full border border-[var(--line)] transition-transform hover:scale-110 ${c.hex === settings.accentColor ? "outline outline-2 outline-offset-2 outline-[var(--accent)]" : ""}`}
+                                        style={{ background: c.hex }}
+                                        title={`${c.name} (${c.hex.toUpperCase()})`}
+                                        type="button"
+                                        onClick={() =>
+                                            updateSetting("accentColor", c.hex)
+                                        }
+                                    />
+                                    <button
+                                        type="button"
+                                        className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--danger)] text-white opacity-0 transition-opacity group-hover:opacity-100"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            removeCustomColor(c.hex);
+                                        }}
+                                    >
+                                        <X className="h-2.5 w-2.5" />
+                                    </button>
+                                </div>
+                            ))}
+                            <button
+                                type="button"
+                                className="flex h-7 w-7 items-center justify-center rounded-full border border-dashed border-[var(--line)] text-[var(--muted)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                                title="添加自定义颜色"
+                                onClick={() => setColorPickerOpen(true)}
+                            >
+                                <span className="text-sm leading-none">+</span>
+                            </button>
+                        </div>
+                        <ColorPickerModal
+                            open={colorPickerOpen}
+                            onConfirm={(hex, name) => {
+                                addCustomColor(hex, name);
+                                updateSetting("accentColor", hex);
+                                setColorPickerOpen(false);
+                            }}
+                            onCancel={() => setColorPickerOpen(false)}
+                        />
                     </section>
                     <section>
                         <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">
@@ -212,38 +268,23 @@ export function SettingsPage({
                             <span className="text-sm text-[var(--text)]">
                                 界面字体
                             </span>
-                            <select
-                                className={selectClass}
-                                data-testid="font-select"
+                            <Select
+                                className="w-48"
+                                options={FONT_OPTIONS}
                                 value={settings.fontFamily}
-                                onChange={(e) =>
-                                    updateSetting("fontFamily", e.target.value)
-                                }
-                            >
-                                {FONT_OPTIONS.map((f) => (
-                                    <option key={f.value} value={f.value}>
-                                        {f.label}
-                                    </option>
-                                ))}
-                            </select>
+                                onChange={(v) => updateSetting("fontFamily", v)}
+                            />
                         </div>
                         <div className={rowClass}>
                             <span className="text-sm text-[var(--text)]">
                                 等宽字体
                             </span>
-                            <select
-                                className={selectClass}
+                            <Select
+                                className="w-48"
+                                options={MONO_OPTIONS}
                                 value={settings.fontMono}
-                                onChange={(e) =>
-                                    updateSetting("fontMono", e.target.value)
-                                }
-                            >
-                                {MONO_OPTIONS.map((f) => (
-                                    <option key={f.value} value={f.value}>
-                                        {f.label}
-                                    </option>
-                                ))}
-                            </select>
+                                onChange={(v) => updateSetting("fontMono", v)}
+                            />
                         </div>
                     </section>
                     <section>

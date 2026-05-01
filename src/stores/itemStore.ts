@@ -1,28 +1,27 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
+import { getLibraryData, type ItemDto, type TagDto } from "../services/tauriCommands";
 import { useToastStore } from "./toastStore";
 
-export interface ItemDto {
-  id: string;
-  title: string;
-  item_type: string;
-  content: string;
-  summary: string;
-  pinned: boolean;
-  favorite: boolean;
-  encrypted: boolean;
-  created_at: string;
-  updated_at: string;
+export type { ItemDto };
+
+interface LibraryResult {
+  items: ItemDto[];
+  tags: TagDto[];
+  mappings: Record<string, string[]>;
 }
 
 interface ItemState {
   items: ItemDto[];
+  itemTagNames: Record<string, string[]>;
   selectedItem: ItemDto | null;
   pinnedItems: ItemDto[];
   recentItems: ItemDto[];
   loading: boolean;
   error: string | null;
   fetchItems: (itemType?: string) => Promise<void>;
+  fetchLibraryData: () => Promise<LibraryResult>;
+  setItemTagNames: (id: string, names: string[]) => void;
   getItem: (id: string) => Promise<void>;
   createItem: (title: string, itemType: string, content?: string) => Promise<ItemDto>;
   updateItem: (id: string, updates: Record<string, unknown>) => Promise<void>;
@@ -33,6 +32,7 @@ interface ItemState {
 
 export const useItemStore = create<ItemState>((set) => ({
   items: [],
+  itemTagNames: {},
   selectedItem: null,
   pinnedItems: [],
   recentItems: [],
@@ -51,6 +51,28 @@ export const useItemStore = create<ItemState>((set) => ({
     } catch (e) {
       set({ error: String(e), loading: false });
     }
+  },
+
+  fetchLibraryData: async () => {
+    set({ loading: true });
+    try {
+      const data = await getLibraryData();
+      const mappings: Record<string, string[]> = {};
+      for (const [itemId, tagName] of data.mappings) {
+        (mappings[itemId] ??= []).push(tagName);
+      }
+      set({ items: data.items, itemTagNames: mappings, loading: false });
+      return { items: data.items, tags: data.tags, mappings };
+    } catch (e) {
+      set({ error: String(e), loading: false });
+      return { items: [], tags: [], mappings: {} };
+    }
+  },
+
+  setItemTagNames: (id, names) => {
+    set((state) => ({
+      itemTagNames: { ...state.itemTagNames, [id]: names },
+    }));
   },
 
   getItem: async (id) => {
