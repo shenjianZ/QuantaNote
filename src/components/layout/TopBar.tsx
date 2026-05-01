@@ -63,9 +63,17 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
     };
   }, [menuOpen]);
 
+  function handleMinimize() {
+    if (settings.minimizeToTray) {
+      appWindow.hide();
+      return;
+    }
+    appWindow.minimize();
+  }
+
   function handleClose() {
-    if (settings.closeKeepRunning || settings.minimizeToTray) {
-      appWindow.minimize();
+    if (settings.closeKeepRunning) {
+      appWindow.hide();
       return;
     }
     appWindow.close();
@@ -185,7 +193,7 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
         >
           <Pin className={`h-4 w-4 ${alwaysOnTop ? "fill-current" : ""}`} />
         </button>
-        <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="window-minimize" title="最小化" onClick={() => appWindow.minimize()}>
+        <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="window-minimize" title="最小化" onClick={handleMinimize}>
           <Minus className="h-4 w-4" />
         </button>
         <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="window-maximize" title={isMaximized ? "恢复" : "全屏"} onClick={() => appWindow.toggleMaximize()}>

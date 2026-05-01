@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { ThemeMode } from "../hooks/useTheme";
 import { useSettingsStore } from "../stores/settingsStore";
+import { useToastStore } from "../stores/toastStore";
 
 const settingsMenu = [
     { icon: Palette, label: "外观" },
@@ -159,17 +160,24 @@ export function SettingsPage({
                         {[
                             {
                                 key: "minimizeToTray" as const,
-                                label: "最小化到托盘",
+                                label: "最小化到系统托盘",
+                                desc: "点击最小化按钮时，将窗口隐藏到托盘",
                             },
                             {
                                 key: "closeKeepRunning" as const,
-                                label: "关闭时保持运行",
+                                label: "关闭窗口时隐藏到托盘",
+                                desc: "点击关闭按钮时，不退出应用，而是隐藏到托盘",
                             },
                         ].map((item) => (
                             <div className={rowClass} key={item.key}>
-                                <span className="text-sm text-[var(--text)]">
-                                    {item.label}
-                                </span>
+                                <div>
+                                    <span className="text-sm text-[var(--text)]">
+                                        {item.label}
+                                    </span>
+                                    <div className="mt-0.5 text-xs text-[var(--muted)]">
+                                        {item.desc}
+                                    </div>
+                                </div>
                                 {renderToggle(settings[item.key], (v) =>
                                     updateSetting(item.key, v),
                                 )}
@@ -182,7 +190,7 @@ export function SettingsPage({
                         </h2>
                         <div className={rowClass}>
                             <span className="text-sm text-[var(--text)]">
-                                开机自启
+                                开机自动启动
                             </span>
                             {renderToggle(settings.autostart, (v) =>
                                 updateSetting("autostart", v),
@@ -360,9 +368,23 @@ export function SettingsPage({
                                 className="max-w-[60%] truncate rounded-full bg-[var(--field)] px-3 py-1.5 text-sm text-[var(--muted)] hover:bg-[var(--hover)]"
                                 type="button"
                                 title={dbPath}
-                                onClick={() =>
-                                    navigator.clipboard.writeText(dbPath)
-                                }
+                                onClick={async () => {
+                                    try {
+                                        await navigator.clipboard.writeText(
+                                            dbPath,
+                                        );
+                                        useToastStore
+                                            .getState()
+                                            .addToast(
+                                                "success",
+                                                "路径已复制到剪贴板",
+                                            );
+                                    } catch {
+                                        useToastStore
+                                            .getState()
+                                            .addToast("error", "复制失败");
+                                    }
+                                }}
                             >
                                 {dbPath || "加载中..."}
                             </button>

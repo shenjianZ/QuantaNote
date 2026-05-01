@@ -9,9 +9,9 @@ mod utils;
 use commands::{attachment, data_io, item, search, tag, version};
 use db::DbState;
 use std::sync::atomic::{AtomicBool, Ordering};
-use tauri::menu::{Menu, MenuItem};
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use utils::logging::tauri_log_plugin;
 use utils::paths;
 
@@ -29,6 +29,19 @@ fn update_window_behavior(
 ) {
     state.minimize_to_tray.store(minimize_to_tray, Ordering::Relaxed);
     state.close_keep_running.store(close_keep_running, Ordering::Relaxed);
+}
+
+fn show_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+}
+
+fn emit_tray_command(app: &tauri::AppHandle, command: &str) {
+    show_main_window(app);
+    let _ = app.emit("quantanote-tray-command", command);
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -60,8 +73,27 @@ pub fn run() {
 
             // 系统托盘
             let show_item = MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)?;
+            let new_note_item = MenuItem::with_id(app, "new_note", "新建笔记", true, None::<&str>)?;
+            let workspace_item =
+                MenuItem::with_id(app, "workspace", "打开工作台", true, None::<&str>)?;
+            let library_item =
+                MenuItem::with_id(app, "library", "打开记录库", true, None::<&str>)?;
+            let settings_item =
+                MenuItem::with_id(app, "settings", "打开设置", true, None::<&str>)?;
+            let separator = PredefinedMenuItem::separator(app)?;
             let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+            let menu = Menu::with_items(
+                app,
+                &[
+                    &show_item,
+                    &new_note_item,
+                    &workspace_item,
+                    &library_item,
+                    &settings_item,
+                    &separator,
+                    &quit_item,
+                ],
+            )?;
 
             let _tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
@@ -75,20 +107,18 @@ pub fn run() {
                     } = event
                     {
                         let app = tray.app_handle();
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
+                        show_main_window(app);
                     }
                 })
                 .on_menu_event(|app, event| {
                     match event.id().as_ref() {
                         "show" => {
-                            if let Some(window) = app.get_webview_window("main") {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                            }
+                            show_main_window(app);
                         }
+                        "new_note" => emit_tray_command(app, "new-note"),
+                        "workspace" => emit_tray_command(app, "open-workspace"),
+                        "library" => emit_tray_command(app, "open-library"),
+                        "settings" => emit_tray_command(app, "open-settings"),
                         "quit" => {
                             if let Some(window) = app.get_webview_window("main") {
                                 if let Some(db_state) = window.try_state::<DbState>() {
@@ -107,10 +137,9 @@ pub fn run() {
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 let behavior = window.state::<WindowBehavior>();
-                let minimize = behavior.minimize_to_tray.load(Ordering::Relaxed);
                 let keep_running = behavior.close_keep_running.load(Ordering::Relaxed);
 
-                if minimize || keep_running {
+                if keep_running {
                     api.prevent_close();
                     let _ = window.hide();
                 } else {

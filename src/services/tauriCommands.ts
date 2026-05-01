@@ -2,138 +2,169 @@ import { invoke } from "@tauri-apps/api/core";
 
 // Types
 interface AttachmentResult {
-  id: string;
-  item_id: string;
-  filename: string;
-  file_path: string;
-  mime_type: string;
-  file_size: number;
-  created_at: string;
+    id: string;
+    item_id: string;
+    filename: string;
+    file_path: string;
+    mime_type: string;
+    file_size: number;
+    created_at: string;
 }
 
 // Item commands
-export async function createItem(title: string, itemType: string, content?: string) {
-  return invoke("create_item", { title, itemType, content: content ?? null });
+export async function createItem(
+    title: string,
+    itemType: string,
+    content?: string,
+) {
+    return invoke("create_item", { title, itemType, content: content ?? null });
 }
 
-export async function getItems(itemType?: string, limit?: number, offset?: number) {
-  return invoke("get_items", { itemType: itemType ?? null, limit: limit ?? 50, offset: offset ?? 0 });
+export async function getItems(
+    itemType?: string,
+    limit?: number,
+    offset?: number,
+) {
+    return invoke("get_items", {
+        itemType: itemType ?? null,
+        limit: limit ?? 50,
+        offset: offset ?? 0,
+    });
 }
 
 export async function getItem(id: string) {
-  return invoke("get_item", { id });
+    return invoke("get_item", { id });
 }
 
 export async function updateItem(id: string, updates: Record<string, unknown>) {
-  return invoke("update_item", { id, ...updates });
+    return invoke("update_item", { id, ...updates });
 }
 
 export async function deleteItem(id: string) {
-  return invoke("delete_item", { id });
+    return invoke("delete_item", { id });
 }
 
 export async function getRecentItems(limit?: number) {
-  return invoke("get_recent_items", { limit: limit ?? 20 });
+    return invoke("get_recent_items", { limit: limit ?? 20 });
 }
 
 // Search commands
 export async function searchItems(query: string, itemType?: string) {
-  return invoke("search_items", { query, itemType: itemType ?? null });
+    return invoke("search_items", { query, itemType: itemType ?? null });
 }
 
 // Attachment commands
 export async function addAttachment(itemId: string, path: string) {
-  return invoke<AttachmentResult>("add_attachment", { itemId, path });
+    return invoke<AttachmentResult>("add_attachment", { itemId, path });
 }
 
 export async function getAttachments(itemId: string) {
-  return invoke("get_attachments", { itemId });
+    return invoke("get_attachments", { itemId });
 }
 
 export async function deleteAttachment(id: string) {
-  return invoke("delete_attachment", { id });
+    return invoke("delete_attachment", { id });
 }
 
 // Version commands
 export async function getVersions(itemId: string) {
-  return invoke("get_versions", { itemId });
+    return invoke("get_versions", { itemId });
 }
 
-export async function createVersion(itemId: string, content: string, changeSummary?: string, name?: string, description?: string) {
-  return invoke("create_version", {
-    itemId,
-    content,
-    changeSummary: changeSummary ?? null,
-    name: name ?? null,
-    description: description ?? null,
-  });
+export async function createVersion(
+    itemId: string,
+    content: string,
+    changeSummary?: string,
+    name?: string,
+    description?: string,
+) {
+    return invoke("create_version", {
+        itemId,
+        content,
+        changeSummary: changeSummary ?? null,
+        name: name ?? null,
+        description: description ?? null,
+    });
 }
 
-export async function updateVersion(id: string, name: string, description: string) {
-  return invoke("update_version", { id, name, description });
+export async function updateVersion(
+    id: string,
+    name: string,
+    description: string,
+) {
+    return invoke("update_version", { id, name, description });
 }
 
 export async function restoreVersion(versionId: string) {
-  return invoke("restore_version", { versionId });
+    return invoke("restore_version", { versionId });
 }
 
 // Tag commands
 interface TagDto {
-  name: string;
-  color: string;
+    name: string;
+    color: string;
 }
 
 export async function getAllTags() {
-  return invoke<TagDto[]>("get_all_tags");
+    return invoke<TagDto[]>("get_all_tags");
 }
 
 export async function createTag(name: string, color: string) {
-  return invoke<TagDto>("create_tag", { name, color });
+    return invoke<TagDto>("create_tag", { name, color });
 }
 
 export async function deleteTag(name: string) {
-  return invoke("delete_tag", { name });
+    return invoke("delete_tag", { name });
 }
 
 export async function getItemTags(itemId: string) {
-  return invoke<TagDto[]>("get_item_tags", { itemId });
+    return invoke<TagDto[]>("get_item_tags", { itemId });
 }
 
 export async function setItemTags(itemId: string, tagNames: string[]) {
-  return invoke("set_item_tags", { itemId, tagNames });
+    return invoke("set_item_tags", { itemId, tagNames });
 }
 
 export async function getAllItemTagMappings() {
-  return invoke<[string, string][]>("get_all_item_tag_mappings");
+    return invoke<[string, string][]>("get_all_item_tag_mappings");
 }
 
 export async function renameTag(oldName: string, newName: string) {
-  return invoke<TagDto>("rename_tag", { oldName, newName });
+    return invoke<TagDto>("rename_tag", { oldName, newName });
 }
 
 export async function updateTagColor(name: string, color: string) {
-  return invoke<TagDto>("update_tag_color", { name, color });
+    return invoke<TagDto>("update_tag_color", { name, color });
 }
 
 export async function getTagItemCounts() {
-  return invoke<[string, string, number][]>("get_tag_item_counts");
+    return invoke<[string, string, number][]>("get_tag_item_counts");
 }
 
 // DB path command
 export async function getDbPath() {
-  return invoke<string>("get_db_path");
+    return invoke<string>("get_db_path");
 }
 
 // Autostart commands
 export async function setAutostart(enabled: boolean) {
-  return invoke("plugin:autostart|set_enabled", { enabled });
+    if (enabled) {
+        return invoke("plugin:autostart|enable");
+    }
+    return invoke("plugin:autostart|disable");
 }
 
 export async function getAutostart() {
-  return invoke<boolean>("plugin:autostart|is_enabled");
+    return invoke<boolean>("plugin:autostart|is_enabled");
 }
 
 // Window behavior sync
-export async function updateWindowBehavior(minimizeToTray: boolean, closeKeepRunning: boolean) {
-  return invoke("update_window_behavior", { minimizeToTray, closeKeepRunning });
+export async function updateWindowBehavior(
+    minimizeToTray: boolean,
+    closeKeepRunning: boolean,
+) {
+    return invoke("update_window_behavior", {
+        minimizeToTray,
+        closeKeepRunning,
+    });
 }
