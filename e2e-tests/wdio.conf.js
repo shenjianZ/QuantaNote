@@ -10,9 +10,22 @@ const appBinary = process.platform === "win32"
   ? path.join(rootDir, "src-tauri", "target", "debug", "quanta-note.exe")
   : path.join(rootDir, "src-tauri", "target", "debug", "quanta-note");
 const dataDir = path.join(os.tmpdir(), `quantanote-e2e-${process.pid}`);
+const isHeaded = process.env.E2E_HEADED === "1" || process.env.E2E_HEADED === "true";
 
 let tauriDriver;
 let expectedExit = false;
+
+function killExistingDriver() {
+  try {
+    if (process.platform === "win32") {
+      spawnSync("taskkill", ["/F", "/IM", "tauri-driver.exe"], { stdio: "ignore", shell: true });
+    } else {
+      spawnSync("pkill", ["-f", "tauri-driver"], { stdio: "ignore", shell: true });
+    }
+  } catch {
+    // ignore — no existing process
+  }
+}
 
 function closeTauriDriver() {
   expectedExit = true;
@@ -58,6 +71,9 @@ export const config = {
   ],
   logLevel: "warn",
   framework: "mocha",
+  before() {
+    console.log(`\n🎬 E2E 模式: ${isHeaded ? "有头 (headed)" : "无头 (headless)"}\n`);
+  },
   reporters: ["spec"],
   mochaOpts: {
     ui: "bdd",
@@ -80,6 +96,7 @@ export const config = {
     }
   },
   beforeSession() {
+    killExistingDriver();
     tauriDriver = spawn("tauri-driver", [], {
       env: { ...process.env, QUANTANOTE_DATA_DIR: dataDir },
       stdio: ["ignore", "pipe", "pipe"],

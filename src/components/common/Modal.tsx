@@ -40,6 +40,7 @@ export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg" }:
           <button
             className="grid h-8 w-8 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
             type="button"
+            data-testid="modal-close-btn"
             onClick={onClose}
           >
             <X className="h-4 w-4" />

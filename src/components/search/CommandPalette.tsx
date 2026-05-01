@@ -122,6 +122,7 @@ export function CommandPalette({
             ref={inputRef}
             className="min-w-0 flex-1 bg-transparent text-base text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
             placeholder="搜索笔记"
+            data-testid="palette-search-input"
             value={query}
             onChange={(e) => handleChange(e.currentTarget.value)}
             onKeyDown={handleKeyDown}
@@ -142,6 +143,7 @@ export function CommandPalette({
                   index === selectedIdx ? "bg-[var(--hover)]" : "hover:bg-[var(--hover)]"
                 }`}
                 key={item.id}
+                data-testid="palette-result"
                 onClick={() => handleSelect(item)}
                 type="button"
               >

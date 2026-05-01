@@ -59,6 +59,7 @@ export function VersionPreviewModal({ open, version, onClose, onRestore, theme }
         <button
           className={`rounded-full px-4 py-2 text-sm text-white ${confirming ? "bg-red-500 hover:bg-red-600" : "bg-[var(--accent)] hover:opacity-90"}`}
           type="button"
+          data-testid="version-restore-btn"
           onClick={handleRestore}
         >
           {confirming ? "确认恢复到此版本？" : "恢复到此版本"}

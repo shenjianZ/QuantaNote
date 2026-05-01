@@ -1,8 +1,10 @@
+import { pause, observePause } from "../helpers/config.js";
+
 describe("QuantaNote desktop smoke", () => {
   async function closeOverlays() {
     await browser.keys("Escape");
     await browser.keys("Escape");
-    await browser.pause(100);
+    await pause(100);
   }
 
   async function goLibrary() {
@@ -31,7 +33,7 @@ describe("QuantaNote desktop smoke", () => {
     const titleInput = await $("input[placeholder='文档标题']");
     await expect(titleInput).toBeDisplayed();
     await titleInput.setValue(title);
-    await browser.pause(1300);
+    await pause(1300);
     await goLibrary();
     await expect($(`//*[contains(., '${title}')]`)).toBeDisplayed();
   }

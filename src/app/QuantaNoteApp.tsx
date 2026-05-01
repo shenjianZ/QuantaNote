@@ -46,6 +46,15 @@ export function QuantaNoteApp() {
     fetchItems().catch(() => {});
   }, [fetchItems]);
 
+  useEffect(() => {
+    function handleE2eDataChanged() {
+      fetchItems().catch(() => {});
+    }
+
+    window.addEventListener("quantanote:e2e-data-changed", handleE2eDataChanged);
+    return () => window.removeEventListener("quantanote:e2e-data-changed", handleE2eDataChanged);
+  }, [fetchItems]);
+
   const displayItems: Item[] = useMemo(() => dbItems.map(adaptItem), [dbItems]);
 
   const selectedItem = useMemo<Item>(() => {
@@ -114,18 +123,19 @@ export function QuantaNoteApp() {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       const mod = e.metaKey || e.ctrlKey;
-      if (mod && e.key === "k") {
+      const key = e.key.toLowerCase();
+      if (mod && key === "k") {
         e.preventDefault();
         if (paletteOpen) closePalette();
         else openPalette();
       }
-      if (mod && e.key === "n") {
+      if (mod && key === "n") {
         e.preventDefault();
         handleCreateNote().catch(() => {});
       }
     }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => document.removeEventListener("keydown", handleKeyDown, true);
   }, [paletteOpen, openPalette, closePalette, handleCreateNote]);
 
   return (

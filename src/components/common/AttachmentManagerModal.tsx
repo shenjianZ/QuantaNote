@@ -131,6 +131,7 @@ export function AttachmentManagerModal({ open: isOpen, onClose, itemId }: Attach
           <button
             className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent)] px-3 py-1.5 text-sm text-white hover:opacity-90"
             type="button"
+            data-testid="attachment-add-btn"
             onClick={handleAddFile}
           >
             <Plus className="h-4 w-4" />
@@ -146,7 +147,7 @@ export function AttachmentManagerModal({ open: isOpen, onClose, itemId }: Attach
                 const Icon = category === "image" ? null : getCategoryIcon(category);
                 const ext = getExtension(att.filename);
                 return (
-                  <div key={att.id} className="group flex items-center gap-3 rounded-2xl border border-[var(--line)] bg-[var(--field)] p-3 transition hover:border-[var(--accent)]/30">
+                  <div key={att.id} className="group flex items-center gap-3 rounded-2xl border border-[var(--line)] bg-[var(--field)] p-3 transition hover:border-[var(--accent)]/30" data-testid="attachment-item">
                     {/* Thumbnail or icon */}
                     {category === "image" ? (
                       <button

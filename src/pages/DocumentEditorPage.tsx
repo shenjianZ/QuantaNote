@@ -167,15 +167,17 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
         <button
           className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--field)] px-3 text-sm text-[var(--text)] hover:bg-[var(--hover)]"
           type="button"
+          data-testid="doc-back-btn"
           onClick={onBackToPreview}
         >
           <ArrowLeft className="h-4 w-4" />
           预览
         </button>
-        <span className="ml-auto text-xs text-[var(--muted)]">{saved ? "已保存" : "保存中..."}</span>
+        <span className="ml-auto text-xs text-[var(--muted)]" data-testid="doc-save-status">{saved ? "已保存" : "保存中..."}</span>
         <button
           className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--accent)] px-3 text-sm text-white hover:opacity-90"
           type="button"
+          data-testid="doc-save-version-btn"
           onClick={handleSaveVersion}
           title="保存为新版本"
         >
@@ -185,6 +187,7 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
         <button
           className={`grid h-9 w-9 place-items-center rounded-full ${isFavorite ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "bg-[var(--field)] text-[var(--muted)] hover:text-[var(--text)]"}`}
           type="button"
+          data-testid="doc-favorite-btn"
           onClick={handleToggleFavorite}
         >
           <Star className="h-4 w-4" fill={isFavorite ? "currentColor" : "none"} />
@@ -195,6 +198,7 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
         <input
           className="mb-3 w-full bg-transparent text-xl font-semibold text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
           type="text"
+          data-testid="doc-title-input"
           value={title}
           onChange={(e) => handleTitleChange(e.currentTarget.value)}
           placeholder="文档标题"
@@ -204,7 +208,7 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
         </div>
       </article>
 
-      <details className="mt-3 shrink-0" open>
+      <details className="mt-3 shrink-0" open data-testid="doc-version-list">
         <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-full px-2 py-1 text-sm text-[var(--muted)] hover:text-[var(--text)] [&::-webkit-details-marker]:hidden">
           <Clock className="h-4 w-4" />
           版本记录 ({versions.length})

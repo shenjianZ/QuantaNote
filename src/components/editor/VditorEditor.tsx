@@ -19,6 +19,7 @@ interface VditorEditorProps {
 
 export interface VditorEditorHandle {
   getValue: () => string;
+  setValue: (value: string) => void;
   focus: () => void;
 }
 
@@ -202,6 +203,12 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
 
   useImperativeHandle(ref, () => ({
     getValue: () => vditorRef.current?.getValue() ?? initialValueRef.current,
+    setValue: (value: string) => {
+      const vditor = vditorRef.current;
+      if (!vditor) return;
+      skipNextChange.current = true;
+      vditor.setValue(value);
+    },
     focus: () => {
       vditorRef.current?.focus();
     },
@@ -210,6 +217,7 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
   useEffect(() => {
     if (!containerRef.current) return;
     readyRef.current = false;
+    containerRef.current.dataset.vditorReady = "false";
 
     const vditor = new Vditor(containerRef.current, {
       mode: "ir",
@@ -239,6 +247,9 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
       counter: { enable: true },
       after: () => {
         readyRef.current = true;
+        if (containerRef.current) {
+          containerRef.current.dataset.vditorReady = "true";
+        }
         const latestValue = initialValueRef.current;
         if (vditor.getValue() !== latestValue) {
           skipNextChange.current = true;
@@ -248,6 +259,7 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
     });
 
     vditorRef.current = vditor;
+    (containerRef.current as HTMLDivElement & { __vditor?: Vditor }).__vditor = vditor;
 
     return () => {
       try {
@@ -256,6 +268,10 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
         }
       } catch { /* ignore */ }
       closeActiveTablePanel?.();
+      if (containerRef.current) {
+        delete (containerRef.current as HTMLDivElement & { __vditor?: Vditor }).__vditor;
+        containerRef.current.dataset.vditorReady = "false";
+      }
       vditorRef.current = null;
       readyRef.current = false;
     };

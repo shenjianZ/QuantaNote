@@ -39,9 +39,6 @@ export function TagPickerModal({ open, onClose, selectedTags, onChange }: TagPic
     if (!exists) {
       await createTag(newTagName.trim(), newTagColor);
     }
-    if (!selectedTags.includes(newTagName.trim())) {
-      onChange([...selectedTags, newTagName.trim()]);
-    }
     setNewTagName("");
   }
 
@@ -57,6 +54,7 @@ export function TagPickerModal({ open, onClose, selectedTags, onChange }: TagPic
               <button
                 key={tag.name}
                 type="button"
+                data-testid="tag-option"
                 onClick={() => toggleTag(tag.name)}
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors ${
                   isSelected
@@ -87,6 +85,7 @@ export function TagPickerModal({ open, onClose, selectedTags, onChange }: TagPic
               value={newTagName}
               onChange={(e) => setNewTagName(e.target.value)}
               placeholder="标签名"
+              data-testid="tag-create-input"
               onKeyDown={(e) => e.key === "Enter" && handleCreateTag()}
             />
             <div className="flex gap-1">
@@ -105,6 +104,7 @@ export function TagPickerModal({ open, onClose, selectedTags, onChange }: TagPic
             <button
               className="inline-flex h-8 items-center gap-1 rounded-full bg-[var(--accent)] px-3 text-sm text-white hover:opacity-90"
               type="button"
+              data-testid="tag-create-btn"
               onClick={handleCreateTag}
             >
               <Plus className="h-3.5 w-3.5" />

@@ -35,10 +35,14 @@ export function WorkspacePage({ onQuickCreate }: WorkspacePageProps) {
   async function handleQuickSave() {
     const currentValue = editorRef.current?.getValue() ?? draft;
     const text = currentValue.trim();
-    if (!text || saving) return;
+    if (!text || saving) {
+      setSaved(false);
+      return;
+    }
     setSaving(true);
     try {
       await onQuickCreate(text);
+      editorRef.current?.setValue("");
       setDraft("");
       setSaved(true);
     } finally {
@@ -57,6 +61,7 @@ export function WorkspacePage({ onQuickCreate }: WorkspacePageProps) {
           <button
             className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full bg-[var(--accent)] px-3 text-sm font-medium text-white hover:opacity-90"
             type="button"
+            data-testid="workspace-save-btn"
             aria-disabled={!draft.trim() || saving}
             onClick={() => handleQuickSave().catch(() => {})}
           >
@@ -65,19 +70,22 @@ export function WorkspacePage({ onQuickCreate }: WorkspacePageProps) {
           </button>
         </div>
 
-        <article className="workspace-editor-panel flex min-h-0 flex-1 flex-col rounded-3xl border border-[var(--line)] bg-[var(--paper)] p-4">
+        <article className="workspace-editor-panel flex min-h-0 flex-1 flex-col rounded-3xl border border-[var(--line)] bg-[var(--paper)] p-4" data-testid="workspace-editor">
           <div className="min-h-0 flex-1 overflow-hidden">
             <VditorEditor
               ref={editorRef}
               initialValue={draft}
-              onChange={setDraft}
+              onChange={(value) => {
+                setDraft(value);
+                if (saved) setSaved(false);
+              }}
               theme={theme === "light" ? "light" : "dark"}
               toolbar={["table", "link", "code"]}
               placeholder="今天想记什么？"
             />
           </div>
           <footer className="mt-3 flex shrink-0 items-center justify-between">
-            <div className="min-w-0 text-xs text-[var(--muted)]">
+            <div className="min-w-0 text-xs text-[var(--muted)]" data-testid="workspace-status">
               {saved ? (
                 <span className="inline-flex items-center gap-1 text-[var(--accent)]">
                   <CheckCircle2 className="h-3.5 w-3.5" />

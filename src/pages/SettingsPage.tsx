@@ -95,6 +95,7 @@ export function SettingsPage({ theme = "system", onThemeChange }: SettingsPagePr
                   <button
                     className={`inline-flex h-9 items-center gap-2 rounded-full border px-3 text-sm ${theme === opt.value ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--text)]" : "border-[var(--line)] bg-[var(--field)] text-[var(--muted)] hover:text-[var(--text)]"}`}
                     key={opt.value}
+                    data-testid={`theme-${opt.value}`}
                     onClick={() => onThemeChange?.(opt.value)}
                     type="button"
                   >
@@ -112,6 +113,7 @@ export function SettingsPage({ theme = "system", onThemeChange }: SettingsPagePr
                 <button
                   className={`h-7 w-7 rounded-full border border-[var(--line)] ${c.value === settings.accentColor ? "outline outline-2 outline-offset-2 outline-[var(--accent)]" : ""}`}
                   key={c.value}
+                  data-testid="accent-color"
                   style={{ background: c.value }}
                   title={c.label}
                   type="button"
@@ -143,7 +145,7 @@ export function SettingsPage({ theme = "system", onThemeChange }: SettingsPagePr
             <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">字体</h2>
             <div className={rowClass}>
               <span className="text-sm text-[var(--text)]">界面字体</span>
-              <select className={selectClass} value={settings.fontFamily} onChange={(e) => updateSetting("fontFamily", e.target.value)}>
+              <select className={selectClass} data-testid="font-select" value={settings.fontFamily} onChange={(e) => updateSetting("fontFamily", e.target.value)}>
                 {FONT_OPTIONS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
               </select>
             </div>
@@ -159,7 +161,7 @@ export function SettingsPage({ theme = "system", onThemeChange }: SettingsPagePr
             <div className={rowClass}>
               <span className="text-sm text-[var(--text)]">界面字号</span>
               <div className="flex items-center gap-3">
-                <input type="range" min={14} max={18} step={1} value={settings.fontSize} onChange={(e) => updateSetting("fontSize", Number(e.target.value))} />
+                <input type="range" min={14} max={18} step={1} data-testid="font-size-slider" value={settings.fontSize} onChange={(e) => updateSetting("fontSize", Number(e.target.value))} />
                 <span className="font-mono text-xs text-[var(--muted)]">{settings.fontSize}px</span>
               </div>
             </div>
@@ -201,7 +203,7 @@ export function SettingsPage({ theme = "system", onThemeChange }: SettingsPagePr
             <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">数据库</h2>
             <div className={rowClass}><span className="text-sm text-[var(--text)]">数据库大小</span><span className="text-sm text-[var(--muted)]">{dbSize}</span></div>
             <div className={rowClass}><span className="text-sm text-[var(--text)]">存储位置</span><span className="text-sm text-[var(--muted)]">应用数据目录</span></div>
-            <div className={rowClass}><span className="text-sm text-[var(--text)]">优化</span><button className="rounded-full bg-[var(--field)] px-3 py-1.5 text-sm hover:bg-[var(--hover)]" type="button" onClick={() => optimizeDb()}>优化与清理</button></div>
+            <div className={rowClass}><span className="text-sm text-[var(--text)]">优化</span><button className="rounded-full bg-[var(--field)] px-3 py-1.5 text-sm hover:bg-[var(--hover)]" type="button" data-testid="optimize-db-btn" onClick={() => optimizeDb()}>优化与清理</button></div>
           </section>
         </>
       );

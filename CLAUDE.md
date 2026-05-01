@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 QuantaNote 是本地优先的桌面信息管理工具，基于 Tauri 2.0。支持 Markdown 笔记、全文搜索、标签管理、附件和版本历史。数据本地存储在 `~/.quantanote/quanta_note.sqlite`（SQLite + WAL 模式）。
 
+# 遵守的约定
+
+修改前端 UI 代码后，需要考虑是否需要同步修改 E2E 测试文件。允许先批量完成前端 UI 修改，再统一修复对应的 E2E 测试文件并运行测试验证
+
 ## 常用命令
 
 ```bash

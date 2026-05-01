@@ -99,6 +99,7 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
       <button
         className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm transition [-webkit-app-region:no-drag] ${currentPage === "workspace" ? "bg-[var(--field)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"}`}
         type="button"
+        data-testid="nav-workspace"
         onClick={() => onNavigate("workspace")}
         title="打开工作台"
       >
@@ -109,6 +110,7 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
       <button
         className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm transition [-webkit-app-region:no-drag] ${currentPage === "library" ? "bg-[var(--field)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"}`}
         type="button"
+        data-testid="nav-library"
         onClick={() => onNavigate("library")}
         title="打开记录库"
       >
@@ -176,19 +178,20 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
         <button
           className={`grid h-8 w-8 place-items-center rounded-lg ${alwaysOnTop ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"}`}
           type="button"
+          data-testid="window-pin"
           title={alwaysOnTop ? "窗口已置顶，点击取消" : "窗口置顶"}
           aria-pressed={alwaysOnTop}
           onClick={handleToggleAlwaysOnTop}
         >
           <Pin className={`h-4 w-4 ${alwaysOnTop ? "fill-current" : ""}`} />
         </button>
-        <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" title="最小化" onClick={() => appWindow.minimize()}>
+        <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="window-minimize" title="最小化" onClick={() => appWindow.minimize()}>
           <Minus className="h-4 w-4" />
         </button>
-        <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" title={isMaximized ? "恢复" : "全屏"} onClick={() => appWindow.toggleMaximize()}>
+        <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="window-maximize" title={isMaximized ? "恢复" : "全屏"} onClick={() => appWindow.toggleMaximize()}>
           {isMaximized ? <Copy className="h-4 w-4" /> : <Square className="h-4 w-4" />}
         </button>
-        <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-red-500/12 hover:text-red-400" type="button" title="关闭" onClick={handleClose}>
+        <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-red-500/12 hover:text-red-400" type="button" data-testid="window-close" title="关闭" onClick={handleClose}>
           <X className="h-4 w-4" />
         </button>
       </div>

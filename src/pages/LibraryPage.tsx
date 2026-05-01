@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Copy,
   Edit3,
@@ -83,23 +83,7 @@ export function LibraryPage({
   const searching = useSearchStore((s) => s.searching);
   const search = useSearchStore((s) => s.search);
 
-  useEffect(() => {
-    fetchTags();
-  }, [fetchTags]);
-
-  useEffect(() => {
-    if (!selectedItem.id) return;
-    fetchAttachments(selectedItem.id);
-    fetchItemTags(selectedItem.id);
-  }, [selectedItem.id, fetchAttachments, fetchItemTags]);
-
-  useEffect(() => {
-    if (!previewRequest?.itemId) return;
-    onSelectItem(previewRequest.itemId);
-    setReaderOpen(true);
-  }, [previewRequest, onSelectItem]);
-
-  useEffect(() => {
+  const refreshItemTagMappings = useCallback(() => {
     let cancelled = false;
     getAllItemTagMappings()
       .then((mappings) => {
@@ -116,7 +100,41 @@ export function LibraryPage({
     return () => {
       cancelled = true;
     };
-  }, [items]);
+  }, []);
+
+  useEffect(() => {
+    fetchTags();
+  }, [fetchTags]);
+
+  useEffect(() => {
+    function handleE2eDataChanged() {
+      fetchTags();
+      refreshItemTagMappings();
+      if (selectedItem.id) {
+        fetchAttachments(selectedItem.id);
+        fetchItemTags(selectedItem.id);
+      }
+    }
+
+    window.addEventListener("quantanote:e2e-data-changed", handleE2eDataChanged);
+    return () => window.removeEventListener("quantanote:e2e-data-changed", handleE2eDataChanged);
+  }, [fetchAttachments, fetchItemTags, fetchTags, refreshItemTagMappings, selectedItem.id]);
+
+  useEffect(() => {
+    if (!selectedItem.id) return;
+    fetchAttachments(selectedItem.id);
+    fetchItemTags(selectedItem.id);
+  }, [selectedItem.id, fetchAttachments, fetchItemTags]);
+
+  useEffect(() => {
+    if (!previewRequest?.itemId) return;
+    onSelectItem(previewRequest.itemId);
+    setReaderOpen(true);
+  }, [previewRequest, onSelectItem]);
+
+  useEffect(() => {
+    return refreshItemTagMappings();
+  }, [items, refreshItemTagMappings]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -200,6 +218,10 @@ export function LibraryPage({
   async function handleTagChange(tagNames: string[]) {
     if (!selectedItem.id) return;
     await updateItemTagsAction(selectedItem.id, tagNames);
+    setItemTagNames((current) => ({
+      ...current,
+      [selectedItem.id]: tagNames,
+    }));
   }
 
   function handleOpenItem(id: string) {
@@ -229,6 +251,7 @@ export function LibraryPage({
             <button
               className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full bg-[var(--accent)] px-3 text-sm font-medium text-white hover:opacity-90"
               type="button"
+              data-testid="library-new-btn"
               onClick={onCreateItem}
             >
               <Edit3 className="h-4 w-4" />
@@ -242,16 +265,17 @@ export function LibraryPage({
                 className="min-w-0 flex-1 bg-transparent text-sm text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
                 value={query}
                 placeholder="搜索记录"
+                data-testid="library-search-input"
                 onChange={(e) => setQuery(e.currentTarget.value)}
               />
               {searching && <span className="text-xs">搜索中</span>}
             </div>
 
             <details className="relative">
-              <summary className="grid h-10 w-10 cursor-pointer list-none place-items-center rounded-full border border-[var(--line)] bg-[var(--field)] text-[var(--muted)] hover:text-[var(--text)] [&::-webkit-details-marker]:hidden">
+              <summary className="grid h-10 w-10 cursor-pointer list-none place-items-center rounded-full border border-[var(--line)] bg-[var(--field)] text-[var(--muted)] hover:text-[var(--text)] [&::-webkit-details-marker]:hidden" data-testid="library-filter-btn">
                 <SlidersHorizontal className="h-4 w-4" />
               </summary>
-              <div className="absolute right-0 top-12 z-20 w-64 rounded-2xl border border-[var(--line)] bg-[var(--popover)] p-3 shadow-xl">
+              <div className="absolute right-0 top-12 z-20 w-64 rounded-2xl border border-[var(--line)] bg-[var(--popover)] p-3 shadow-xl" data-testid="library-filter-panel">
                 <div className="mb-3 text-xs font-medium uppercase tracking-wide text-[var(--muted)]">筛选</div>
                 <div className="mb-3 grid grid-cols-3 gap-1 rounded-xl bg-[var(--field)] p-1">
                   {FILTERS.map((filter) => (
@@ -312,6 +336,7 @@ export function LibraryPage({
                     key={item.id}
                     className="group flex w-full items-start gap-3 px-4 py-3 text-left transition hover:bg-[var(--hover)]"
                     type="button"
+                    data-testid="library-item"
                     onClick={() => handleOpenItem(item.id)}
                   >
                     {(() => {
@@ -339,7 +364,7 @@ export function LibraryPage({
       </section>
 
       {hasSelection && (
-        <section className="fixed inset-x-3 bottom-3 top-14 z-30 overflow-hidden rounded-3xl border border-[var(--line)] bg-[var(--paper)] shadow-2xl">
+        <section className="fixed inset-x-3 bottom-3 top-14 z-30 overflow-hidden rounded-3xl border border-[var(--line)] bg-[var(--paper)] shadow-2xl" data-testid="reader-drawer">
           <div className="flex h-full min-h-0 flex-col">
             <header className="flex shrink-0 items-start gap-3 border-b border-[var(--line)] px-4 py-3">
               <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--field)] text-[var(--muted)]">
@@ -360,7 +385,7 @@ export function LibraryPage({
                 </div>
               </div>
               <details className="relative shrink-0">
-                <summary className="grid h-8 w-8 cursor-pointer list-none place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)] [&::-webkit-details-marker]:hidden">
+                <summary className="grid h-8 w-8 cursor-pointer list-none place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)] [&::-webkit-details-marker]:hidden" data-testid="reader-menu-btn">
                   <MoreHorizontal className="h-4 w-4" />
                 </summary>
                 <div className="absolute right-0 top-10 z-40 w-48 overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--popover)] p-1 shadow-xl">
@@ -372,10 +397,10 @@ export function LibraryPage({
                   <button className="menu-item text-red-400" type="button" onClick={handleDelete}><Trash2 className="h-4 w-4" />删除</button>
                 </div>
               </details>
-              <button className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" onClick={onOpenDocument} title="编辑当前笔记">
+              <button className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="reader-edit-btn" onClick={onOpenDocument} title="编辑当前笔记">
                 <Edit3 className="h-4 w-4" />
               </button>
-              <button className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" onClick={handleCloseReader} title="关闭">
+              <button className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="reader-close-btn" onClick={handleCloseReader} title="关闭">
                 <X className="h-4 w-4" />
               </button>
             </header>
@@ -397,6 +422,7 @@ export function LibraryPage({
                 <button
                   className="inline-flex items-center gap-1 rounded-full bg-[var(--field)] px-2.5 py-1 text-xs text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
                   type="button"
+                  data-testid="reader-tags-btn"
                   onClick={() => setTagModalOpen(true)}
                 >
                   <Tag className="h-3.5 w-3.5" />
@@ -405,6 +431,7 @@ export function LibraryPage({
                 <button
                   className="inline-flex items-center gap-1 rounded-full bg-[var(--field)] px-2.5 py-1 text-xs text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
                   type="button"
+                  data-testid="reader-attachments-btn"
                   onClick={() => setAttachmentModalOpen(true)}
                 >
                   <Paperclip className="h-3.5 w-3.5" />
