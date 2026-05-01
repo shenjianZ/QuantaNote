@@ -5,6 +5,7 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { Modal } from "./Modal";
 import { useAttachmentStore } from "../../stores/attachmentStore";
+import { useToastStore } from "../../stores/toastStore";
 
 interface AttachmentManagerModalProps {
   open: boolean;
@@ -84,12 +85,20 @@ export function AttachmentManagerModal({ open: isOpen, onClose, itemId }: Attach
       title: "选择附件",
     });
     if (selected) {
-      await addAttachment(itemId, selected);
+      try {
+        await addAttachment(itemId, selected);
+      } catch {
+        useToastStore.getState().addToast("error", "添加附件失败");
+      }
     }
   }
 
   async function handleDelete(id: string) {
-    await deleteAttachment(id);
+    try {
+      await deleteAttachment(id);
+    } catch {
+      useToastStore.getState().addToast("error", "删除附件失败");
+    }
   }
 
   async function handlePreview(filePath: string, filename: string, mime: string) {

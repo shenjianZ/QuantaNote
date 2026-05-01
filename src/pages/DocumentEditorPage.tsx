@@ -3,6 +3,7 @@ import { ArrowLeft, Clock, Loader2, Save, Star } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAppStore } from "../stores/appStore";
 import { useItemStore } from "../stores/itemStore";
+import { useToastStore } from "../stores/toastStore";
 import { VersionPanel, type VersionDto } from "../components/editor/VersionPanel";
 
 const VditorEditor = lazy(() => import("../components/editor/VditorEditor").then((m) => ({ default: m.VditorEditor })));
@@ -72,6 +73,7 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
       setSaved(true);
     } catch (e) {
       console.error("保存失败:", e);
+      useToastStore.getState().addToast("error", "保存失败");
     }
   }, [selectedItemId, updateItem]);
 
@@ -101,6 +103,7 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
       // 回滚乐观更新
       setIsFavorite(!next);
       console.error("切换收藏失败:", e);
+      useToastStore.getState().addToast("error", "切换收藏失败");
     }
   }
 
@@ -114,8 +117,10 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
         name: formatNowAsName(),
       });
       setVersions((current) => [version, ...current].slice(0, 50));
+      useToastStore.getState().addToast("success", "版本已保存");
     } catch (e) {
       console.error("创建版本失败:", e);
+      useToastStore.getState().addToast("error", "创建版本失败");
     }
   }
 
@@ -125,6 +130,7 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
       setVersions((current) => current.map((v) => (v.id === versionId ? updated : v)));
     } catch (e) {
       console.error("更新版本信息失败:", e);
+      useToastStore.getState().addToast("error", "更新版本信息失败");
     }
   }
 
@@ -133,15 +139,17 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
       const updatedItem = await invoke<{ id: string; title: string; content: string }>("restore_version", { versionId: version.id });
       setContent(updatedItem.content);
       setTitle(updatedItem.title);
+      useToastStore.getState().addToast("success", "版本已恢复");
     } catch (e) {
       console.error("恢复版本失败:", e);
+      useToastStore.getState().addToast("error", "恢复版本失败");
     }
   }
 
   const charCount = content.replace(/\s/g, "").length;
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[var(--app-bg)] p-4">
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-4xl flex-col bg-[var(--app-bg)] p-4">
       {/* Top toolbar: back + favorite */}
       <div className="mb-3 flex shrink-0 items-center gap-2">
         <button

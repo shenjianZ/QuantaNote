@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Pencil, Plus, Search, Trash2, Palette } from "lucide-react";
 import { Modal } from "./Modal";
 import { useTagStore } from "../../stores/tagStore";
+import { useToastStore } from "../../stores/toastStore";
 import { getTagItemCounts } from "../../services/tauriCommands";
 
 const TAG_COLORS = [
@@ -71,9 +72,13 @@ export function TagManagerModal({ open, onClose }: TagManagerModalProps) {
 
   async function handleCreate() {
     if (!newName.trim()) return;
-    await createTag(newName.trim(), newColor);
-    setNewName("");
-    setCreating(false);
+    try {
+      await createTag(newName.trim(), newColor);
+      setNewName("");
+      setCreating(false);
+    } catch {
+      useToastStore.getState().addToast("error", "创建标签失败");
+    }
   }
 
   function startEdit(name: string, color: string) {
@@ -85,19 +90,27 @@ export function TagManagerModal({ open, onClose }: TagManagerModalProps) {
 
   async function handleSaveEdit() {
     if (!editingName) return;
-    if (editName.trim() !== editingName) {
-      await renameTag(editingName, editName.trim());
+    try {
+      if (editName.trim() !== editingName) {
+        await renameTag(editingName, editName.trim());
+      }
+      if (editColor !== allTags.find((t) => t.name === editingName)?.color) {
+        const targetName = editName.trim() !== editingName ? editName.trim() : editingName;
+        await updateTagColor(targetName, editColor);
+      }
+      setEditingName(null);
+    } catch {
+      useToastStore.getState().addToast("error", "保存标签失败");
     }
-    if (editColor !== allTags.find((t) => t.name === editingName)?.color) {
-      const targetName = editName.trim() !== editingName ? editName.trim() : editingName;
-      await updateTagColor(targetName, editColor);
-    }
-    setEditingName(null);
   }
 
   async function handleDelete(name: string) {
-    await removeTag(name);
-    setDeleteConfirm(null);
+    try {
+      await removeTag(name);
+      setDeleteConfirm(null);
+    } catch {
+      useToastStore.getState().addToast("error", "删除标签失败");
+    }
   }
 
   return (

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
+import { useToastStore } from "./toastStore";
 
 export interface ItemDto {
   id: string;
@@ -73,6 +74,7 @@ export const useItemStore = create<ItemState>((set) => ({
       return item;
     } catch (e) {
       set({ error: String(e) });
+      useToastStore.getState().addToast("error", "创建记录失败");
       throw e;
     }
   },
@@ -87,6 +89,7 @@ export const useItemStore = create<ItemState>((set) => ({
       }));
     } catch (e) {
       set({ error: String(e) });
+      useToastStore.getState().addToast("error", "更新记录失败");
       throw e;
     }
   },
@@ -101,6 +104,7 @@ export const useItemStore = create<ItemState>((set) => ({
       }));
     } catch (e) {
       set({ error: String(e) });
+      useToastStore.getState().addToast("error", "删除记录失败");
       throw e;
     }
   },

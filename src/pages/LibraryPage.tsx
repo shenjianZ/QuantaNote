@@ -23,6 +23,7 @@ import { useItemStore } from "../stores/itemStore";
 import { useSearchStore } from "../stores/searchStore";
 import { useTagStore } from "../stores/tagStore";
 import { getAllItemTagMappings } from "../services/tauriCommands";
+import { useToastStore } from "../stores/toastStore";
 import type { Item } from "../types";
 
 type TabKey = "recent" | "pinned" | "favorite";
@@ -63,7 +64,6 @@ export function LibraryPage({
   const [activeTag, setActiveTag] = useState("all");
   const [sortOrder, setSortOrder] = useState<SortOption>("updated");
   const [itemTagNames, setItemTagNames] = useState<Record<string, string[]>>({});
-  const [copied, setCopied] = useState(false);
   const [readerOpen, setReaderOpen] = useState(false);
   const [tagModalOpen, setTagModalOpen] = useState(false);
   const [tagManagerOpen, setTagManagerOpen] = useState(false);
@@ -191,10 +191,9 @@ export function LibraryPage({
     const text = selectedContent || selectedItem.summary || selectedItem.title;
     try {
       await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      useToastStore.getState().addToast("success", "已复制到剪贴板");
     } catch {
-      /* ignore */
+      useToastStore.getState().addToast("error", "复制失败");
     }
   }
 
@@ -210,9 +209,14 @@ export function LibraryPage({
 
   async function handleDelete() {
     if (!selectedItem.id) return;
-    await deleteItem(selectedItem.id);
-    setReaderOpen(false);
-    onPreviewRequestClear?.();
+    try {
+      await deleteItem(selectedItem.id);
+      setReaderOpen(false);
+      onPreviewRequestClear?.();
+      useToastStore.getState().addToast("success", "记录已删除");
+    } catch {
+      useToastStore.getState().addToast("error", "删除失败");
+    }
   }
 
   async function handleAddAttachment() {
@@ -247,7 +251,7 @@ export function LibraryPage({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--app-bg)] px-[clamp(1rem,4vw,4rem)] py-4">
-      <section className="mx-auto flex min-h-0 w-full max-w-none flex-1 flex-col">
+      <section className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col">
           <div className="mb-4 flex shrink-0 items-center justify-between gap-4">
             <div>
               <h1 className="app-hero-title text-[var(--text)]">记录库</h1>
@@ -263,7 +267,6 @@ export function LibraryPage({
               新建
             </button>
           </div>
-          <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col">
           <div className="mb-3 flex items-center gap-2">
             <div className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--field)] px-3 text-[var(--muted)]">
               <Search className="h-4 w-4 shrink-0" />
@@ -366,11 +369,10 @@ export function LibraryPage({
               </div>
             )}
           </div>
-          </div>
       </section>
 
       {hasSelection && (
-        <section className="fixed inset-x-3 bottom-8 top-14 z-30 overflow-hidden rounded-3xl border border-[var(--line)] bg-[var(--paper)] shadow-2xl" data-testid="reader-drawer">
+        <section className="fixed inset-x-3 bottom-8 top-14 z-30 mx-auto overflow-hidden rounded-3xl border border-[var(--line)] bg-[var(--paper)] shadow-2xl" style={{ maxWidth: "42rem" }} data-testid="reader-drawer">
           <div className="flex h-full min-h-0 flex-col">
             <header className="flex shrink-0 items-start gap-3 border-b border-[var(--line)] px-4 py-3">
               <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--field)] text-[var(--muted)]">
@@ -397,7 +399,7 @@ export function LibraryPage({
                 <div className="absolute right-0 top-10 z-40 w-48 overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--popover)] p-1 shadow-xl">
                   <button className="menu-item" type="button" onClick={handleTogglePin}><Star className="h-4 w-4" />{selectedItem.pinned ? "取消置顶" : "置顶"}</button>
                   <button className="menu-item" type="button" onClick={handleToggleFavorite}><Star className="h-4 w-4" />{selectedItem.favorite ? "取消收藏" : "收藏"}</button>
-                  <button className="menu-item" type="button" onClick={handleCopy}><Copy className="h-4 w-4" />{copied ? "已复制" : "复制内容"}</button>
+                  <button className="menu-item" type="button" onClick={handleCopy}><Copy className="h-4 w-4" />复制内容</button>
                   <button className="menu-item" type="button" onClick={handleAddAttachment}><Paperclip className="h-4 w-4" />添加附件</button>
                   <button className="menu-item" type="button" onClick={onOpenDocument}><Edit3 className="h-4 w-4" />完整编辑</button>
                   <button className="menu-item text-red-400" type="button" onClick={handleDelete}><Trash2 className="h-4 w-4" />删除</button>

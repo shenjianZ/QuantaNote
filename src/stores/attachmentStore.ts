@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { addAttachment, deleteAttachment, getAttachments } from "../services/tauriCommands";
+import { useToastStore } from "./toastStore";
 
 interface AttachmentDto {
   id: string;
@@ -39,8 +40,10 @@ export const useAttachmentStore = create<AttachmentState>((set, get) => ({
     try {
       const newAtt = await addAttachment(itemId, path) as AttachmentDto;
       set({ attachments: [...get().attachments, newAtt] });
+      useToastStore.getState().addToast("success", "附件已添加");
     } catch (e) {
       set({ error: String(e) });
+      useToastStore.getState().addToast("error", "添加附件失败");
     }
   },
 
@@ -48,8 +51,10 @@ export const useAttachmentStore = create<AttachmentState>((set, get) => ({
     try {
       await deleteAttachment(id);
       set({ attachments: get().attachments.filter((a) => a.id !== id) });
+      useToastStore.getState().addToast("success", "附件已删除");
     } catch (e) {
       set({ error: String(e) });
+      useToastStore.getState().addToast("error", "删除附件失败");
     }
   },
 }));

@@ -4,6 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { AppPage } from "../../types";
 import { Kbd } from "../common/Kbd";
 import { useSettingsStore } from "../../stores/settingsStore";
+import { useToastStore } from "../../stores/toastStore";
 
 const appWindow = getCurrentWindow();
 const ALWAYS_ON_TOP_STORAGE_KEY = "quantanote-always-on-top";
@@ -92,6 +93,7 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
     } catch {
       setAlwaysOnTop(!next);
       localStorage.setItem(ALWAYS_ON_TOP_STORAGE_KEY, String(!next));
+      useToastStore.getState().addToast("error", "设置窗口置顶失败");
     }
   }
 

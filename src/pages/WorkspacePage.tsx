@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { CheckCircle2, Edit3, Loader2 } from "lucide-react";
 import { useAppStore } from "../stores/appStore";
+import { useToastStore } from "../stores/toastStore";
 import type { VditorEditorHandle } from "../components/editor/VditorEditor";
 
 const VditorEditor = lazy(() => import("../components/editor/VditorEditor").then((m) => ({ default: m.VditorEditor })));
@@ -52,6 +53,9 @@ export function WorkspacePage({ onQuickCreate }: WorkspacePageProps) {
       editorRef.current?.setValue("");
       setDraft("");
       setSaved(true);
+      useToastStore.getState().addToast("success", "记录已保存");
+    } catch {
+      useToastStore.getState().addToast("error", "保存失败");
     } finally {
       setSaving(false);
     }
@@ -59,7 +63,7 @@ export function WorkspacePage({ onQuickCreate }: WorkspacePageProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--app-bg)] px-[clamp(1rem,4vw,4rem)] py-4">
-      <section className="mx-auto flex min-h-0 w-full max-w-none flex-1 flex-col">
+      <section className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col">
         <div className="mb-4 flex shrink-0 items-center justify-between gap-4">
           <div>
             <h1 className="app-hero-title text-[var(--text)]">随手记录</h1>
