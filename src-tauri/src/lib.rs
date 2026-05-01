@@ -15,6 +15,8 @@ use tauri::{Emitter, Manager};
 use utils::logging::tauri_log_plugin;
 use utils::paths;
 
+const AUTOSTART_HIDDEN_ARG: &str = "--quantanote-start-hidden";
+
 /// 窗口行为设置状态，由前端同步
 pub struct WindowBehavior {
     pub minimize_to_tray: AtomicBool,
@@ -48,9 +50,23 @@ fn emit_tray_command(app: &tauri::AppHandle, command: &str) {
     let _ = app.emit("quantanote-tray-command", command);
 }
 
+fn should_start_hidden<I, S>(args: I) -> bool
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    args.into_iter()
+        .any(|arg| arg.as_ref() == AUTOSTART_HIDDEN_ARG)
+}
+
+fn is_hidden_autostart_launch() -> bool {
+    should_start_hidden(std::env::args())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     utils::logging::init_sql_log_state();
+    let start_hidden = is_hidden_autostart_launch();
 
     tauri::Builder::default()
         .plugin(tauri_log_plugin())
@@ -58,13 +74,13 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            None,
+            Some(vec![AUTOSTART_HIDDEN_ARG]),
         ))
         .manage(WindowBehavior {
             minimize_to_tray: AtomicBool::new(true),
             close_keep_running: AtomicBool::new(false),
         })
-        .setup(|app| {
+        .setup(move |app| {
             let quantanote_dir = paths::quantanote_dir();
             std::fs::create_dir_all(&quantanote_dir)
                 .map_err(|e| format!("创建数据目录失败: {}", e))?;
@@ -143,6 +159,14 @@ pub fn run() {
                 })
                 .build(app)?;
 
+            if start_hidden {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.hide();
+                }
+            } else {
+                show_main_window(app.handle());
+            }
+
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -220,6 +244,21 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{should_start_hidden, AUTOSTART_HIDDEN_ARG};
+
+    #[test]
+    fn detects_hidden_autostart_argument() {
+        assert!(should_start_hidden(["quantanote", AUTOSTART_HIDDEN_ARG]));
+    }
+
+    #[test]
+    fn ignores_unrelated_arguments() {
+        assert!(!should_start_hidden(["quantanote", "--other-flag"]));
+    }
 }
 
 #[cfg(test)]

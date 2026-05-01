@@ -12,6 +12,7 @@ import { SettingsPage } from "../pages/SettingsPage";
 import { useAppStore } from "../stores/appStore";
 import { useItemStore } from "../stores/itemStore";
 import { adaptItem } from "../adapters/itemAdapter";
+import { preloadVditorResources } from "../utils/vditorPreload";
 import type { AppPage, Item } from "../types";
 import "../styles/themes.css";
 import "../styles/global.css";
@@ -65,6 +66,10 @@ export function QuantaNoteApp() {
         itemId: string;
         requestId: number;
     } | null>(null);
+
+    useEffect(() => {
+        preloadVditorResources();
+    }, []);
 
     useEffect(() => {
         // LibraryPage 通过 fetchLibraryData 统一加载，这里只在非 library 页面加载
