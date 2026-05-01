@@ -8,9 +8,28 @@ mod utils;
 
 use commands::{attachment, data_io, item, search, tag, version};
 use db::DbState;
+use std::sync::atomic::{AtomicBool, Ordering};
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::TrayIconBuilder;
 use tauri::Manager;
 use utils::logging::tauri_log_plugin;
 use utils::paths;
+
+/// 窗口行为设置状态，由前端同步
+pub struct WindowBehavior {
+    pub minimize_to_tray: AtomicBool,
+    pub close_keep_running: AtomicBool,
+}
+
+#[tauri::command]
+fn update_window_behavior(
+    state: tauri::State<'_, WindowBehavior>,
+    minimize_to_tray: bool,
+    close_keep_running: bool,
+) {
+    state.minimize_to_tray.store(minimize_to_tray, Ordering::Relaxed);
+    state.close_keep_running.store(close_keep_running, Ordering::Relaxed);
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -18,6 +37,14 @@ pub fn run() {
         .plugin(tauri_log_plugin())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
+        .manage(WindowBehavior {
+            minimize_to_tray: AtomicBool::new(true),
+            close_keep_running: AtomicBool::new(false),
+        })
         .setup(|app| {
             let quantanote_dir = paths::quantanote_dir();
             std::fs::create_dir_all(&quantanote_dir).expect("failed to create QuantaNote data dir");
@@ -30,17 +57,71 @@ pub fn run() {
                 .expect("failed to initialize schema");
 
             app.manage(db_state);
+
+            // 系统托盘
+            let show_item = MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+
+            let _tray = TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .menu(&menu)
+                .tooltip("QuantaNote")
+                .on_tray_icon_event(|tray, event| {
+                    if let tauri::tray::TrayIconEvent::Click {
+                        button: tauri::tray::MouseButton::Left,
+                        button_state: tauri::tray::MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                })
+                .on_menu_event(|app, event| {
+                    match event.id().as_ref() {
+                        "show" => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        }
+                        "quit" => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                if let Some(db_state) = window.try_state::<DbState>() {
+                                    let _ = db_state.checkpoint_wal();
+                                }
+                            }
+                            app.exit(0);
+                        }
+                        _ => {}
+                    }
+                })
+                .build(app)?;
+
             Ok(())
         })
         .on_window_event(|window, event| {
-            if matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
-                if let Some(db_state) = window.try_state::<DbState>() {
-                    match db_state.checkpoint_wal() {
-                        Ok(()) => log::info!("SQLite WAL checkpoint completed before window close"),
-                        Err(error) => log::warn!(
-                            "SQLite WAL checkpoint failed before window close: {}",
-                            error
-                        ),
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let behavior = window.state::<WindowBehavior>();
+                let minimize = behavior.minimize_to_tray.load(Ordering::Relaxed);
+                let keep_running = behavior.close_keep_running.load(Ordering::Relaxed);
+
+                if minimize || keep_running {
+                    api.prevent_close();
+                    let _ = window.hide();
+                } else {
+                    if let Some(db_state) = window.try_state::<DbState>() {
+                        match db_state.checkpoint_wal() {
+                            Ok(()) => log::info!("SQLite WAL checkpoint completed before window close"),
+                            Err(error) => log::warn!(
+                                "SQLite WAL checkpoint failed before window close: {}",
+                                error
+                            ),
+                        }
                     }
                 }
             }
@@ -76,6 +157,8 @@ pub fn run() {
             tag::rename_tag,
             tag::update_tag_color,
             tag::get_tag_item_counts,
+            item::get_db_path,
+            update_window_behavior,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

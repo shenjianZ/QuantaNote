@@ -118,3 +118,22 @@ export async function updateTagColor(name: string, color: string) {
 export async function getTagItemCounts() {
   return invoke<[string, string, number][]>("get_tag_item_counts");
 }
+
+// DB path command
+export async function getDbPath() {
+  return invoke<string>("get_db_path");
+}
+
+// Autostart commands
+export async function setAutostart(enabled: boolean) {
+  return invoke("plugin:autostart|set_enabled", { enabled });
+}
+
+export async function getAutostart() {
+  return invoke<boolean>("plugin:autostart|is_enabled");
+}
+
+// Window behavior sync
+export async function updateWindowBehavior(minimizeToTray: boolean, closeKeepRunning: boolean) {
+  return invoke("update_window_behavior", { minimizeToTray, closeKeepRunning });
+}

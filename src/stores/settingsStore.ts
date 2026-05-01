@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { useItemStore } from "./itemStore";
+import { getDbPath, setAutostart, getAutostart, updateWindowBehavior } from "../services/tauriCommands";
 
 export interface AppSettings {
   fontFamily: string;
@@ -11,6 +12,7 @@ export interface AppSettings {
   minimizeToTray: boolean;
   closeKeepRunning: boolean;
   autoBackup: boolean;
+  autostart: boolean;
 }
 
 const DEFAULTS: AppSettings = {
@@ -21,6 +23,7 @@ const DEFAULTS: AppSettings = {
   minimizeToTray: true,
   closeKeepRunning: false,
   autoBackup: true,
+  autostart: false,
 };
 
 function loadSettings(): AppSettings {
@@ -68,10 +71,12 @@ function applySettings(settings: AppSettings) {
 interface SettingsState {
   settings: AppSettings;
   dbSize: string;
+  dbPath: string;
   init: () => void;
   updateSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
   updateSettings: (partial: Partial<AppSettings>) => void;
   refreshDbSize: () => Promise<void>;
+  fetchDbPath: () => Promise<void>;
   optimizeDb: () => Promise<void>;
   exportData: () => Promise<void>;
   importData: () => Promise<void>;
@@ -80,16 +85,35 @@ interface SettingsState {
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   settings: loadSettings(),
   dbSize: "计算中...",
+  dbPath: "",
 
   init: () => {
-    applySettings(get().settings);
+    const settings = get().settings;
+    applySettings(settings);
+    // 同步窗口行为到 Rust 端
+    updateWindowBehavior(settings.minimizeToTray, settings.closeKeepRunning).catch(() => {});
+    // 获取自启状态
+    getAutostart().then((enabled) => {
+      if (enabled !== settings.autostart) {
+        const updated = { ...settings, autostart: enabled };
+        persist(updated);
+        set({ settings: updated });
+      }
+    }).catch(() => {});
   },
 
-  updateSetting: (key, value) => {
+  updateSetting: async (key, value) => {
     const settings = { ...get().settings, [key]: value };
     persist(settings);
     applySettings(settings);
     set({ settings });
+
+    // 同步到 Rust 端
+    if (key === "autostart") {
+      await setAutostart(value as boolean).catch(() => {});
+    } else if (key === "minimizeToTray" || key === "closeKeepRunning") {
+      await updateWindowBehavior(settings.minimizeToTray, settings.closeKeepRunning).catch(() => {});
+    }
   },
 
   updateSettings: (partial) => {
@@ -97,6 +121,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     persist(settings);
     applySettings(settings);
     set({ settings });
+    // 同步窗口行为
+    updateWindowBehavior(settings.minimizeToTray, settings.closeKeepRunning).catch(() => {});
   },
 
   refreshDbSize: async () => {
@@ -105,6 +131,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       set({ dbSize: size });
     } catch {
       set({ dbSize: "未知" });
+    }
+  },
+
+  fetchDbPath: async () => {
+    try {
+      const path = await getDbPath();
+      set({ dbPath: path });
+    } catch {
+      set({ dbPath: "未知" });
     }
   },
 

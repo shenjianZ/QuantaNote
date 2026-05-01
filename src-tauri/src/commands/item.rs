@@ -4,6 +4,7 @@ use crate::db::DbState;
 use crate::error::AppError;
 use crate::models::item::{ItemDto, UpdateItemPayload};
 use crate::services::item_service;
+use crate::utils::paths;
 
 #[tauri::command]
 pub fn create_item(
@@ -113,4 +114,12 @@ pub fn optimize_db(db: State<'_, DbState>) -> Result<(), AppError> {
     )
     .map_err(|e| AppError::Database(e.to_string()))?;
     Ok(())
+}
+
+#[tauri::command]
+pub fn get_db_path() -> Result<String, AppError> {
+    Ok(paths::quantanote_dir()
+        .join("quanta_note.sqlite")
+        .to_string_lossy()
+        .to_string())
 }
