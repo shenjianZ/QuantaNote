@@ -137,5 +137,9 @@ pub fn get_library_data(db: State<'_, DbState>) -> Result<LibraryData, AppError>
     let items = item_service::get_items(&db, None, 200, 0)?;
     let tags = tag_service::get_all_tags(&db)?;
     let mappings = tag_service::get_all_item_tag_mappings(&db)?;
-    Ok(LibraryData { items, tags, mappings })
+    Ok(LibraryData {
+        items,
+        tags,
+        mappings,
+    })
 }

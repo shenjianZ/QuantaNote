@@ -18,6 +18,13 @@
     "core:event:allow-unlisten",
     "autostart:default",
     "opener:default",
+    {
+      "identifier": "opener:allow-open-path",
+      "allow": [
+        { "path": "$HOME/.quantanote" },
+        { "path": "$HOME/.quantanote/**" }
+      ]
+    },
     "dialog:default",
     "log:default"
   ]

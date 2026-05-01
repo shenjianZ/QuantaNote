@@ -6,7 +6,7 @@ mod repositories;
 mod services;
 mod utils;
 
-use commands::{attachment, data_io, item, search, tag, version};
+use commands::{attachment, auto_backup, data_io, diagnostics, item, search, tag, version};
 use db::DbState;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
@@ -27,8 +27,12 @@ fn update_window_behavior(
     minimize_to_tray: bool,
     close_keep_running: bool,
 ) {
-    state.minimize_to_tray.store(minimize_to_tray, Ordering::Relaxed);
-    state.close_keep_running.store(close_keep_running, Ordering::Relaxed);
+    state
+        .minimize_to_tray
+        .store(minimize_to_tray, Ordering::Relaxed);
+    state
+        .close_keep_running
+        .store(close_keep_running, Ordering::Relaxed);
 }
 
 fn show_main_window(app: &tauri::AppHandle) {
@@ -46,6 +50,8 @@ fn emit_tray_command(app: &tauri::AppHandle, command: &str) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    utils::logging::init_sql_log_state();
+
     tauri::Builder::default()
         .plugin(tauri_log_plugin())
         .plugin(tauri_plugin_opener::init())
@@ -72,15 +78,16 @@ pub fn run() {
 
             app.manage(db_state);
 
+            // 启动自动备份调度器
+            auto_backup::start_backup_scheduler(app.handle());
+
             // 系统托盘
             let show_item = MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)?;
             let new_note_item = MenuItem::with_id(app, "new_note", "新建笔记", true, None::<&str>)?;
             let workspace_item =
                 MenuItem::with_id(app, "workspace", "打开工作台", true, None::<&str>)?;
-            let library_item =
-                MenuItem::with_id(app, "library", "打开记录库", true, None::<&str>)?;
-            let settings_item =
-                MenuItem::with_id(app, "settings", "打开设置", true, None::<&str>)?;
+            let library_item = MenuItem::with_id(app, "library", "打开记录库", true, None::<&str>)?;
+            let settings_item = MenuItem::with_id(app, "settings", "打开设置", true, None::<&str>)?;
             let separator = PredefinedMenuItem::separator(app)?;
             let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
             let menu = Menu::with_items(
@@ -115,26 +122,24 @@ pub fn run() {
                         show_main_window(app);
                     }
                 })
-                .on_menu_event(|app, event| {
-                    match event.id().as_ref() {
-                        "show" => {
-                            show_main_window(app);
-                        }
-                        "new_note" => emit_tray_command(app, "new-note"),
-                        "workspace" => emit_tray_command(app, "open-workspace"),
-                        "library" => emit_tray_command(app, "open-library"),
-                        "settings" => emit_tray_command(app, "open-settings"),
-                        "quit" => {
-                            if let Some(db_state) = app.try_state::<DbState>() {
-                                match db_state.checkpoint_wal() {
-                                    Ok(()) => log::info!("退出时 WAL checkpoint 完成"),
-                                    Err(e) => log::warn!("退出时 WAL checkpoint 失败: {}", e),
-                                }
-                            }
-                            app.exit(0);
-                        }
-                        _ => {}
+                .on_menu_event(|app, event| match event.id().as_ref() {
+                    "show" => {
+                        show_main_window(app);
                     }
+                    "new_note" => emit_tray_command(app, "new-note"),
+                    "workspace" => emit_tray_command(app, "open-workspace"),
+                    "library" => emit_tray_command(app, "open-library"),
+                    "settings" => emit_tray_command(app, "open-settings"),
+                    "quit" => {
+                        if let Some(db_state) = app.try_state::<DbState>() {
+                            match db_state.checkpoint_wal() {
+                                Ok(()) => log::info!("退出时 WAL checkpoint 完成"),
+                                Err(e) => log::warn!("退出时 WAL checkpoint 失败: {}", e),
+                            }
+                        }
+                        app.exit(0);
+                    }
+                    _ => {}
                 })
                 .build(app)?;
 
@@ -151,7 +156,9 @@ pub fn run() {
                 } else {
                     if let Some(db_state) = window.try_state::<DbState>() {
                         match db_state.checkpoint_wal() {
-                            Ok(()) => log::info!("SQLite WAL checkpoint completed before window close"),
+                            Ok(()) => {
+                                log::info!("SQLite WAL checkpoint completed before window close")
+                            }
                             Err(error) => log::warn!(
                                 "SQLite WAL checkpoint failed before window close: {}",
                                 error
@@ -177,12 +184,27 @@ pub fn run() {
             version::create_version,
             version::update_version,
             version::restore_version,
+            version::delete_version,
             item::get_db_size,
             item::optimize_db,
             data_io::export_data,
             data_io::import_data,
             data_io::save_to_file,
             data_io::read_from_file,
+            data_io::get_export_size_estimate,
+            data_io::export_data_zip,
+            data_io::import_data_zip,
+            diagnostics::get_sql_log_config,
+            diagnostics::update_sql_log_config,
+            diagnostics::clear_sql_log,
+            diagnostics::get_log_dir,
+            diagnostics::get_sql_log_path,
+            auto_backup::get_auto_backup_config,
+            auto_backup::update_auto_backup_config,
+            auto_backup::trigger_backup_now,
+            auto_backup::get_backup_dir_path,
+            auto_backup::list_backups,
+            auto_backup::delete_backup,
             tag::get_all_tags,
             tag::create_tag,
             tag::delete_tag,

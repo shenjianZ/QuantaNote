@@ -99,6 +99,10 @@ export async function restoreVersion(versionId: string) {
     return invoke("restore_version", { versionId });
 }
 
+export async function deleteVersion(versionId: string) {
+    return invoke("delete_version", { versionId });
+}
+
 // Item DTO
 export interface ItemDto {
     id: string;
@@ -192,4 +196,115 @@ export interface LibraryData {
 
 export async function getLibraryData() {
     return invoke<LibraryData>("get_library_data");
+}
+
+// Diagnostics
+export interface SqlLogConfig {
+    enabled: boolean;
+    to_console: boolean;
+    to_file: boolean;
+    pretty: boolean;
+    max_len: number;
+}
+
+export async function getSqlLogConfig() {
+    return invoke<SqlLogConfig>("get_sql_log_config");
+}
+
+export async function updateSqlLogConfig(config: SqlLogConfig) {
+    return invoke<SqlLogConfig>("update_sql_log_config", { config });
+}
+
+export async function clearSqlLog() {
+    return invoke("clear_sql_log");
+}
+
+export async function getLogDir() {
+    return invoke<string>("get_log_dir");
+}
+
+export async function getSqlLogPath() {
+    return invoke<string>("get_sql_log_path");
+}
+
+// ZIP export/import
+export interface ExportOptions {
+    includeTags: boolean;
+    includeAttachments: boolean;
+    includeVersions: boolean;
+}
+
+export interface ImportOptions {
+    includeTags: boolean;
+    includeAttachments: boolean;
+    includeVersions: boolean;
+    overwrite: boolean;
+}
+
+export interface ExportSizeEstimate {
+    items_json: number;
+    tags_json: number;
+    versions_json: number;
+    attachments: number;
+    total: number;
+}
+
+export async function getExportSizeEstimate() {
+    return invoke<ExportSizeEstimate>("get_export_size_estimate");
+}
+
+export async function exportDataZip(path: string, options: ExportOptions) {
+    return invoke("export_data_zip", { path, options: {
+        include_tags: options.includeTags,
+        include_attachments: options.includeAttachments,
+        include_versions: options.includeVersions,
+    }});
+}
+
+export async function importDataZip(path: string, options: ImportOptions) {
+    return invoke("import_data_zip", { path, options: {
+        include_tags: options.includeTags,
+        include_attachments: options.includeAttachments,
+        include_versions: options.includeVersions,
+        overwrite: options.overwrite,
+    }});
+}
+
+// Auto backup
+export interface AutoBackupConfig {
+    enabled: boolean;
+    interval_days: number;
+    max_backups: number;
+    expire_days: number;
+    last_backup_at: string | null;
+}
+
+export interface BackupFileInfo {
+    filename: string;
+    size: number;
+    created_at: string;
+}
+
+export async function getAutoBackupConfig() {
+    return invoke<AutoBackupConfig>("get_auto_backup_config");
+}
+
+export async function updateAutoBackupConfig(config: AutoBackupConfig) {
+    return invoke("update_auto_backup_config", { config });
+}
+
+export async function triggerBackupNow() {
+    return invoke<string>("trigger_backup_now");
+}
+
+export async function getBackupDirPath() {
+    return invoke<string>("get_backup_dir_path");
+}
+
+export async function listBackups() {
+    return invoke<BackupFileInfo[]>("list_backups");
+}
+
+export async function deleteBackup(filename: string) {
+    return invoke("delete_backup", { filename });
 }

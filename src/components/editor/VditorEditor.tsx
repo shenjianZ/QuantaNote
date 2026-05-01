@@ -1,6 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import Vditor from "vditor";
 import "vditor/dist/index.css";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { VDITOR_CDN, VDITOR_LANG } from "../../utils/vditorConfig";
 import { SearchReplaceBar } from "./SearchReplaceBar";
 
@@ -475,6 +476,13 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
     readyRef.current = false;
     containerRef.current.dataset.vditorReady = "false";
 
+    // 跟踪 Ctrl/Meta 按键状态，用于 Vditor link.click 回调
+    let modifierHeld = false;
+    const onKey = (e: KeyboardEvent) => { if (e.ctrlKey || e.metaKey) modifierHeld = true; };
+    const onKeyUp = () => { modifierHeld = false; };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("keyup", onKeyUp);
+
     const vditor = new Vditor(containerRef.current, {
       cdn: VDITOR_CDN,
       lang: VDITOR_LANG,
@@ -503,6 +511,16 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
         theme: { current: theme === "dark" ? "dark" : "light" },
       },
       counter: { enable: true },
+      link: {
+        isOpen: false,
+        click: (element) => {
+          if (!element || !modifierHeld) return;
+          const url = element.getAttribute("href") || element.textContent;
+          if (url) {
+            openUrl(url).catch(() => {});
+          }
+        },
+      },
       after: () => {
         readyRef.current = true;
         if (containerRef.current) {
@@ -520,6 +538,8 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
     (containerRef.current as HTMLDivElement & { __vditor?: Vditor }).__vditor = vditor;
 
     return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onKeyUp);
       try {
         if (readyRef.current) {
           vditor.destroy();

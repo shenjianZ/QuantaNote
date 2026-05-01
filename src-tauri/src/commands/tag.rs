@@ -60,8 +60,6 @@ pub fn update_tag_color(
 }
 
 #[tauri::command]
-pub fn get_tag_item_counts(
-    db: State<'_, DbState>,
-) -> Result<Vec<(String, String, i64)>, AppError> {
+pub fn get_tag_item_counts(db: State<'_, DbState>) -> Result<Vec<(String, String, i64)>, AppError> {
     tag_service::get_tag_item_counts(&db)
 }

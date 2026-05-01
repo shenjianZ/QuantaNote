@@ -32,6 +32,61 @@ describe("Document editor", () => {
     expect(updated.title).toBe("自动保存测试");
   });
 
+  it("supports native copy and paste shortcuts in editor", async () => {
+    await DocumentEditorPage.clearContent();
+    await DocumentEditorPage.typeContent("剪贴板快捷键测试");
+
+    await browser.keys(["Control", "a"]);
+    await browser.keys(["Control", "c"]);
+    await browser.keys("ArrowRight");
+    await browser.keys("Enter");
+    await browser.keys(["Control", "v"]);
+
+    await browser.waitUntil(
+      async () => {
+        const content = await DocumentEditorPage.getContent();
+        const matches = content.match(/剪贴板快捷键测试/g) ?? [];
+        return matches.length >= 2;
+      },
+      { timeout: 3000, timeoutMsg: "Editor did not paste copied content" },
+    );
+
+    await DocumentEditorPage.clearContent();
+    await DocumentEditorPage.typeContent("初始内容");
+    await DocumentEditorPage.waitForSaved(3000);
+  });
+
+  it("keeps editor table border aligned with cells", async () => {
+    await DocumentEditorPage.setContent("| 列 1 | 列 2 | 列 3 |\n| --- | --- | --- |\n|     |     | 01   |\n|     |     | 01   |");
+
+    await browser.waitUntil(
+      async () => {
+        return browser.execute(() => Boolean(document.querySelector(".vditor-ir table")));
+      },
+      { timeout: 3000, timeoutMsg: "Editor table was not rendered" },
+    );
+
+    const geometry = await browser.execute(() => {
+      const table = document.querySelector(".vditor-ir table");
+      const rows = Array.from(table?.querySelectorAll("tr") ?? []);
+      const rightmostCells = rows
+        .map((row) => row.querySelector(":scope > th:last-child, :scope > td:last-child"))
+        .filter(Boolean);
+      const tableRect = table?.getBoundingClientRect();
+      const lastRight = Math.max(...rightmostCells.map((cell) => cell.getBoundingClientRect().right));
+      return {
+        tableWidth: tableRect?.width ?? 0,
+        trailingGap: tableRect ? tableRect.right - lastRight : 999,
+      };
+    });
+
+    expect(geometry.tableWidth).toBeGreaterThan(0);
+    expect(geometry.trailingGap).toBeLessThan(4);
+
+    await DocumentEditorPage.setContent("初始内容");
+    await DocumentEditorPage.waitForSaved(3000);
+  });
+
   it("toggles favorite state", async () => {
     await DocumentEditorPage.toggleFavorite();
     const isFav = await DocumentEditorPage.isFavorite();
@@ -47,6 +102,16 @@ describe("Document editor", () => {
 
   it("saves a version", async () => {
     const countBefore = await DocumentEditorPage.getVersionCount();
+    expect(await DocumentEditorPage.isSaveVersionEnabled()).toBe(false);
+
+    await DocumentEditorPage.clearContent();
+    await DocumentEditorPage.typeContent("manual version change");
+    await DocumentEditorPage.waitForSaved(3000);
+    await browser.waitUntil(
+      async () => DocumentEditorPage.isSaveVersionEnabled(),
+      { timeout: 3000, timeoutMsg: "Save version button did not become enabled after content changed" },
+    );
+
     await DocumentEditorPage.clickSaveVersion();
 
     await browser.waitUntil(
@@ -59,6 +124,7 @@ describe("Document editor", () => {
 
     const countAfter = await DocumentEditorPage.getVersionCount();
     expect(countAfter).toBe(countBefore + 1);
+    expect(await DocumentEditorPage.isSaveVersionEnabled()).toBe(false);
   });
 
   it("edits version name and description", async () => {
@@ -88,7 +154,7 @@ describe("Document editor", () => {
     await pause(500);
 
     const content = await DocumentEditorPage.getContent();
-    expect(content).toContain("初始内容");
+    expect(content).toContain("manual version change");
   });
 
   it("navigates back to library preview", async () => {

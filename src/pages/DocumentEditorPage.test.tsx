@@ -30,10 +30,12 @@ vi.mock("../components/editor/VditorEditor", () => ({
 describe("DocumentEditorPage", () => {
   const onBackToPreview = vi.fn();
   const updateItemMock = vi.fn(async () => {});
+  let mockedVersions: unknown[] = [];
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useRealTimers();
+    mockedVersions = [];
 
     useAppStore.setState({ selectedItemId: "item-1", theme: "light" });
     useItemStore.setState({
@@ -54,7 +56,7 @@ describe("DocumentEditorPage", () => {
     });
 
     mockIPC((cmd) => {
-      if (cmd === "get_versions") return [];
+      if (cmd === "get_versions") return mockedVersions;
       if (cmd === "create_version") return { id: "ver-1", version_number: 1, content: "c", name: "v1", description: "", created_at: new Date().toISOString() };
       return null;
     });
@@ -85,6 +87,45 @@ describe("DocumentEditorPage", () => {
     const { user } = setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
     await user.click(screen.getByTitle("保存为新版本"));
     expect(screen.getByText(/版本 \(1\)/)).toBeInTheDocument();
+  });
+
+  it("disables save version when current content matches latest version", async () => {
+    mockedVersions = [{
+      id: "ver-latest",
+      item_id: "item-1",
+      version_number: 1,
+      content: "初始内容",
+      change_summary: "初始版本",
+      name: "v1",
+      description: "",
+      created_at: "2026-01-01",
+    }];
+
+    setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
+
+    const button = await screen.findByTitle("当前内容与最新版本一致");
+    expect(button).toBeDisabled();
+  });
+
+  it("enables save version after content differs from latest version", async () => {
+    mockedVersions = [{
+      id: "ver-latest",
+      item_id: "item-1",
+      version_number: 1,
+      content: "初始内容",
+      change_summary: "初始版本",
+      name: "v1",
+      description: "",
+      created_at: "2026-01-01",
+    }];
+
+    const { user } = setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
+    const editor = await screen.findByTestId("vditor");
+
+    await user.clear(editor);
+    await user.type(editor, "改动后的内容");
+
+    expect(screen.getByTitle("保存为新版本")).toBeEnabled();
   });
 
   it("toggles favorite on star click", async () => {

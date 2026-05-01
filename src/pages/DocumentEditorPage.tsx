@@ -4,7 +4,7 @@ import { useAppStore } from "../stores/appStore";
 import { useItemStore } from "../stores/itemStore";
 import { useToastStore } from "../stores/toastStore";
 import { VersionPanel, type VersionDto } from "../components/editor/VersionPanel";
-import { getVersions, createVersion, updateVersion, restoreVersion } from "../services/tauriCommands";
+import { getVersions, createVersion, updateVersion, restoreVersion, deleteVersion } from "../services/tauriCommands";
 
 const VditorEditor = lazy(() => import("../components/editor/VditorEditor").then((m) => ({ default: m.VditorEditor })));
 
@@ -108,7 +108,7 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
   }
 
   async function handleSaveVersion() {
-    if (!selectedItemId) return;
+    if (!selectedItemId || !canSaveVersion) return;
     try {
       const version = await createVersion(
         selectedItemId,
@@ -146,7 +146,20 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
     }
   }
 
+  async function handleDeleteVersion(versionId: string) {
+    try {
+      await deleteVersion(versionId);
+      setVersions((current) => current.filter((v) => v.id !== versionId));
+      useToastStore.getState().addToast("success", "版本已删除");
+    } catch (e) {
+      console.error("删除版本失败:", e);
+      useToastStore.getState().addToast("error", "删除版本失败");
+    }
+  }
+
   const charCount = content.replace(/\s/g, "").length;
+  const latestVersionContent = versions[0]?.content;
+  const canSaveVersion = latestVersionContent === undefined || content !== latestVersionContent;
 
   return (
     <div className="mx-auto flex h-full min-h-0 w-full max-w-4xl flex-col bg-[var(--app-bg)] p-4">
@@ -200,11 +213,17 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
         </div>
         <div className="flex items-center gap-3">
           <button
-            className="inline-flex items-center gap-1 rounded-full px-2 py-1 hover:bg-[var(--hover)] hover:text-[var(--text)]"
+            className={`inline-flex items-center gap-1 rounded-full px-2 py-1 ${
+              canSaveVersion
+                ? "hover:bg-[var(--hover)] hover:text-[var(--text)]"
+                : "cursor-not-allowed opacity-45"
+            }`}
             type="button"
             data-testid="doc-save-version-btn"
             onClick={handleSaveVersion}
-            title="保存为新版本"
+            disabled={!canSaveVersion}
+            aria-disabled={!canSaveVersion}
+            title={canSaveVersion ? "保存为新版本" : "当前内容与最新版本一致"}
           >
             <Save className="h-3.5 w-3.5" />
             保存版本
@@ -229,6 +248,7 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
         onClose={() => setVersionPanelOpen(false)}
         onRestore={handleRestore}
         onUpdateMeta={handleUpdateVersionMeta}
+        onDelete={handleDeleteVersion}
         theme={resolveTheme(theme)}
       />
     </div>

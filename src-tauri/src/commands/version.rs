@@ -48,3 +48,8 @@ pub fn restore_version(db: State<'_, DbState>, version_id: String) -> Result<Ite
     version_service::restore_version(&db, &version_id)?;
     crate::repositories::item_repository::get_item(&db, &item_id)
 }
+
+#[tauri::command]
+pub fn delete_version(db: State<'_, DbState>, version_id: String) -> Result<(), AppError> {
+    version_service::delete_version(&db, &version_id)
+}

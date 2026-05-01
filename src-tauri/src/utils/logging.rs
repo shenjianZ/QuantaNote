@@ -1,4 +1,10 @@
 use log::LevelFilter;
+use serde::{Deserialize, Serialize};
+use std::fs::{self, OpenOptions};
+use std::io::Write;
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::OnceLock;
 use tauri::{plugin::TauriPlugin, Runtime};
 use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
 
@@ -47,6 +53,104 @@ const SQL_KEYWORDS: &[&str] = &[
     "using",
 ];
 
+const SQL_LOG_FILE_NAME: &str = "quanta-note-sql.log";
+const DEFAULT_SQL_LOG_MAX_LEN: usize = 4_000;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SqlLogConfig {
+    pub enabled: bool,
+    pub to_console: bool,
+    pub to_file: bool,
+    pub pretty: bool,
+    pub max_len: usize,
+}
+
+impl Default for SqlLogConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            to_console: false,
+            to_file: true,
+            pretty: false,
+            max_len: DEFAULT_SQL_LOG_MAX_LEN,
+        }
+    }
+}
+
+pub struct SqlLogState {
+    enabled: AtomicBool,
+    to_console: AtomicBool,
+    to_file: AtomicBool,
+    pretty: AtomicBool,
+    max_len: AtomicUsize,
+}
+
+impl SqlLogState {
+    fn new(config: SqlLogConfig) -> Self {
+        Self {
+            enabled: AtomicBool::new(config.enabled),
+            to_console: AtomicBool::new(config.to_console),
+            to_file: AtomicBool::new(config.to_file),
+            pretty: AtomicBool::new(config.pretty),
+            max_len: AtomicUsize::new(normalize_max_len(config.max_len)),
+        }
+    }
+
+    fn config(&self) -> SqlLogConfig {
+        SqlLogConfig {
+            enabled: self.enabled.load(Ordering::Relaxed),
+            to_console: self.to_console.load(Ordering::Relaxed),
+            to_file: self.to_file.load(Ordering::Relaxed),
+            pretty: self.pretty.load(Ordering::Relaxed),
+            max_len: self.max_len.load(Ordering::Relaxed),
+        }
+    }
+
+    fn update(&self, config: SqlLogConfig) {
+        self.enabled.store(config.enabled, Ordering::Relaxed);
+        self.to_console.store(config.to_console, Ordering::Relaxed);
+        self.to_file.store(config.to_file, Ordering::Relaxed);
+        self.pretty.store(config.pretty, Ordering::Relaxed);
+        self.max_len
+            .store(normalize_max_len(config.max_len), Ordering::Relaxed);
+    }
+}
+
+static SQL_LOG_STATE: OnceLock<SqlLogState> = OnceLock::new();
+
+pub fn init_sql_log_state() -> &'static SqlLogState {
+    SQL_LOG_STATE.get_or_init(|| SqlLogState::new(SqlLogConfig::default()))
+}
+
+pub fn get_sql_log_config() -> SqlLogConfig {
+    init_sql_log_state().config()
+}
+
+pub fn update_sql_log_config(config: SqlLogConfig) -> SqlLogConfig {
+    let normalized = SqlLogConfig {
+        max_len: normalize_max_len(config.max_len),
+        ..config
+    };
+    init_sql_log_state().update(normalized.clone());
+    normalized
+}
+
+pub fn log_dir() -> PathBuf {
+    paths::quantanote_dir()
+}
+
+pub fn sql_log_path() -> PathBuf {
+    log_dir().join(SQL_LOG_FILE_NAME)
+}
+
+pub fn clear_sql_log_file() -> std::io::Result<()> {
+    let path = sql_log_path();
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(path, "")
+}
+
 pub fn tauri_log_plugin<R: Runtime>() -> TauriPlugin<R> {
     tauri_plugin_log::Builder::new()
         .clear_targets()
@@ -72,7 +176,61 @@ pub fn tauri_log_plugin<R: Runtime>() -> TauriPlugin<R> {
 }
 
 pub fn log_sql(sql: &str) {
-    log::debug!(target: "sql", "\n{}", format_sql(sql));
+    let state = init_sql_log_state();
+    if !state.enabled.load(Ordering::Relaxed) {
+        return;
+    }
+
+    let pretty = state.pretty.load(Ordering::Relaxed);
+    let max_len = state.max_len.load(Ordering::Relaxed);
+    let sql = if pretty {
+        format_sql(sql)
+    } else {
+        sql.trim().to_string()
+    };
+    let sql = truncate_for_log(&sql, max_len);
+    let entry = format!(
+        "{} [SQL]\n{}\n",
+        chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f"),
+        sql
+    );
+
+    if state.to_console.load(Ordering::Relaxed) {
+        println!("{}", entry.trim_end());
+    }
+
+    if state.to_file.load(Ordering::Relaxed) {
+        if let Err(error) = append_sql_log(&entry) {
+            log::warn!("写入 SQL 日志失败: {}", error);
+        }
+    }
+}
+
+fn append_sql_log(entry: &str) -> std::io::Result<()> {
+    let path = sql_log_path();
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let mut file = OpenOptions::new().create(true).append(true).open(path)?;
+    file.write_all(entry.as_bytes())?;
+    file.write_all(b"\n")?;
+    Ok(())
+}
+
+fn normalize_max_len(max_len: usize) -> usize {
+    max_len.clamp(200, 50_000)
+}
+
+fn truncate_for_log(value: &str, max_len: usize) -> String {
+    if value.len() <= max_len {
+        return value.to_string();
+    }
+
+    let mut end = max_len;
+    while !value.is_char_boundary(end) {
+        end -= 1;
+    }
+    format!("{}... [truncated]", &value[..end])
 }
 
 pub fn format_sql(sql: &str) -> String {

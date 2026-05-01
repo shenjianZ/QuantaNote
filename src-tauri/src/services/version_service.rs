@@ -56,6 +56,10 @@ pub fn restore_version(db: &DbState, version_id: &str) -> Result<(), AppError> {
     Ok(())
 }
 
+pub fn delete_version(db: &DbState, version_id: &str) -> Result<(), AppError> {
+    version_repository::delete_version(db, version_id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -129,8 +133,12 @@ mod tests {
     fn get_versions_returns_all_for_item() {
         let db = crate::test_support::test_db();
         let item = crate::services::item_service::create_item(
-            &db, "V".to_string(), "note".to_string(), Some("c1".to_string()),
-        ).unwrap();
+            &db,
+            "V".to_string(),
+            "note".to_string(),
+            Some("c1".to_string()),
+        )
+        .unwrap();
         create_version(&db, &item.id, "c2", "", None, None).unwrap();
 
         let versions = get_versions(&db, &item.id).unwrap();
@@ -141,8 +149,12 @@ mod tests {
     fn update_version_changes_metadata() {
         let db = crate::test_support::test_db();
         let item = crate::services::item_service::create_item(
-            &db, "V".to_string(), "note".to_string(), Some("c".to_string()),
-        ).unwrap();
+            &db,
+            "V".to_string(),
+            "note".to_string(),
+            Some("c".to_string()),
+        )
+        .unwrap();
         let v = create_version(&db, &item.id, "c", "", Some("old"), Some("old desc")).unwrap();
 
         let updated = update_version(&db, &v.id, "new name", "new desc").unwrap();

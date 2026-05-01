@@ -74,7 +74,10 @@ mod tests {
 
     #[test]
     fn tag_dto_roundtrip_json() {
-        let tag = TagDto { name: "rust".to_string(), color: "cyan".to_string() };
+        let tag = TagDto {
+            name: "rust".to_string(),
+            color: "cyan".to_string(),
+        };
         let json = serde_json::to_string(&tag).unwrap();
         let parsed: TagDto = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.name, "rust");

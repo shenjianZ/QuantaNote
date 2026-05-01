@@ -3,7 +3,7 @@
  */
 
 import { waitForDisplayed, waitForSavedStatus } from "../waits.js";
-import { typeInVditor, clearVditor, getVditorText } from "../vditor.js";
+import { typeInVditor, clearVditor, getVditorText, setVditorValue } from "../vditor.js";
 import { pause, observePause } from "../config.js";
 
 class DocumentEditorPage {
@@ -35,6 +35,10 @@ class DocumentEditorPage {
     await typeInVditor(text);
   }
 
+  async setContent(markdown) {
+    await setVditorValue(markdown);
+  }
+
   async clearContent() {
     await clearVditor();
   }
@@ -55,6 +59,11 @@ class DocumentEditorPage {
   async clickSaveVersion() {
     await $(this.saveVersionBtn).then(b => b.click());
     await observePause();
+  }
+
+  async isSaveVersionEnabled() {
+    const btn = await $(this.saveVersionBtn);
+    return btn.isEnabled();
   }
 
   async toggleFavorite() {

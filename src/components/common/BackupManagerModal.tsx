@@ -1,0 +1,77 @@
+import { useEffect } from "react";
+import { Trash2 } from "lucide-react";
+import { Modal } from "./Modal";
+import { useSettingsStore } from "../../stores/settingsStore";
+
+function formatSize(bytes: number): string {
+    if (bytes === 0) return "0 B";
+    const units = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return `${(bytes / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
+}
+
+interface BackupManagerModalProps {
+    open: boolean;
+    onClose: () => void;
+}
+
+export function BackupManagerModal({ open, onClose }: BackupManagerModalProps) {
+    const backupFiles = useSettingsStore((s) => s.backupFiles);
+    const fetchBackups = useSettingsStore((s) => s.fetchBackups);
+    const deleteBackup = useSettingsStore((s) => s.deleteBackup);
+
+    useEffect(() => {
+        if (open) {
+            fetchBackups();
+        }
+    }, [open, fetchBackups]);
+
+    return (
+        <Modal open={open} onClose={onClose} title="备份管理" maxWidth="max-w-lg">
+            <div className="space-y-3">
+                {backupFiles.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-[var(--muted)]">
+                        暂无备份记录
+                    </p>
+                ) : (
+                    <div className="max-h-80 space-y-1 overflow-auto">
+                        {backupFiles.map((file) => (
+                            <div
+                                key={file.filename}
+                                className="group flex items-center gap-3 rounded-xl bg-[var(--field)] px-4 py-3 hover:bg-[var(--hover)]"
+                            >
+                                <div className="min-w-0 flex-1">
+                                    <div className="truncate text-sm text-[var(--text)]">
+                                        {file.filename}
+                                    </div>
+                                    <div className="mt-0.5 flex items-center gap-3 text-xs text-[var(--muted)]">
+                                        <span>{formatSize(file.size)}</span>
+                                        <span>{file.created_at}</span>
+                                    </div>
+                                </div>
+                                <button
+                                    className="shrink-0 rounded-full p-2 text-[var(--muted)] opacity-0 transition-opacity hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100"
+                                    type="button"
+                                    title="删除此备份"
+                                    onClick={() => deleteBackup(file.filename)}
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                <div className="flex justify-end pt-2">
+                    <button
+                        className="rounded-full px-4 py-2 text-sm text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
+                        type="button"
+                        onClick={onClose}
+                    >
+                        关闭
+                    </button>
+                </div>
+            </div>
+        </Modal>
+    );
+}

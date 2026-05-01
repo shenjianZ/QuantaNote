@@ -558,6 +558,15 @@ kbd {
     background: var(--md-table-row-alt) !important;
 }
 
+.markdown-preview table,
+.vditor-ir table,
+.vditor-wysiwyg table {
+    display: table !important;
+    width: auto !important;
+    max-width: 100% !important;
+    table-layout: auto !important;
+}
+
 .markdown-preview img,
 .vditor-reset img {
     max-width: 100%;

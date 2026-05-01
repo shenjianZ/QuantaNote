@@ -123,8 +123,12 @@ mod tests {
     fn get_tags_for_item_after_set() {
         let db = crate::test_support::test_db();
         let item = crate::services::item_service::create_item(
-            &db, "T".to_string(), "note".to_string(), None,
-        ).unwrap();
+            &db,
+            "T".to_string(),
+            "note".to_string(),
+            None,
+        )
+        .unwrap();
         set_item_tags(&db, &item.id, vec!["go".to_string()]).unwrap();
 
         let tags = get_tags_for_item(&db, &item.id).unwrap();

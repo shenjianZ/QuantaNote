@@ -1,5 +1,7 @@
 pub mod attachment;
+pub mod auto_backup;
 pub mod data_io;
+pub mod diagnostics;
 pub mod item;
 pub mod search;
 pub mod tag;

@@ -78,5 +78,6 @@ export async function setVditorValue(markdown, containerSel = DEFAULT_CONTAINER)
       }
       ce.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: value }));
     }
+    vditorInstance?.options?.input?.(value);
   }, containerSel, markdown);
 }

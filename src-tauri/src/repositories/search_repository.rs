@@ -237,8 +237,8 @@ fn escape_like(term: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repositories::item_repository;
     use crate::models::item::CreateItemPayload;
+    use crate::repositories::item_repository;
 
     fn seed_item(db: &DbState, title: &str, content: &str) {
         item_repository::create(

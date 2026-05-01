@@ -234,8 +234,8 @@ pub fn get_tag_item_counts(db: &DbState) -> Result<Vec<(String, String, i64)>, A
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repositories::item_repository;
     use crate::models::item::CreateItemPayload;
+    use crate::repositories::item_repository;
 
     fn create_test_item(db: &DbState) -> String {
         let dto = item_repository::create(

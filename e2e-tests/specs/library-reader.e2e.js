@@ -9,6 +9,10 @@ describe("Library reader and item actions", () => {
   before(async () => {
     await cleanupAll();
     normalItem = await seedItem({ title: "普通笔记", content: "普通内容" });
+    await seedItem({
+      title: "表格笔记",
+      content: "| 列 1 | 列 2 | 列 3 |\n| --- | --- | --- |\n|     |     | 01   |\n|     |     | 01   |",
+    });
     pinnedItem = await seedItem({ title: "置顶笔记", content: "置顶内容", pinned: true });
     favoriteItem = await seedItem({ title: "收藏笔记", content: "收藏内容", favorite: true });
     await TopBar.navLibrary();
@@ -27,6 +31,35 @@ describe("Library reader and item actions", () => {
     const drawer = await $(LibraryPage.readerDrawer);
     const text = await drawer.getText();
     expect(text).toContain("普通笔记");
+  });
+
+  it("keeps preview table border aligned with cells", async () => {
+    await LibraryPage.closeReader();
+    await LibraryPage.clickItem("表格笔记");
+
+    await browser.waitUntil(
+      async () => {
+        return browser.execute(() => Boolean(document.querySelector("[data-testid='reader-drawer'] .markdown-preview table")));
+      },
+      { timeout: 3000, timeoutMsg: "Preview table was not rendered" },
+    );
+
+    const geometry = await browser.execute(() => {
+      const table = document.querySelector("[data-testid='reader-drawer'] .markdown-preview table");
+      const rows = Array.from(table?.querySelectorAll("tr") ?? []);
+      const rightmostCells = rows
+        .map((row) => row.querySelector(":scope > th:last-child, :scope > td:last-child"))
+        .filter(Boolean);
+      const tableRect = table?.getBoundingClientRect();
+      const lastRight = Math.max(...rightmostCells.map((cell) => cell.getBoundingClientRect().right));
+      return {
+        tableWidth: tableRect?.width ?? 0,
+        trailingGap: tableRect ? tableRect.right - lastRight : 999,
+      };
+    });
+
+    expect(geometry.tableWidth).toBeGreaterThan(0);
+    expect(geometry.trailingGap).toBeLessThan(4);
   });
 
   it("closing reader drawer", async () => {

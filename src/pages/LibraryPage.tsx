@@ -69,6 +69,7 @@ export function LibraryPage({
   const [tagManagerOpen, setTagManagerOpen] = useState(false);
   const [attachmentModalOpen, setAttachmentModalOpen] = useState(false);
   const filterDetailsRef = useRef<HTMLDetailsElement>(null);
+  const menuDetailsRef = useRef<HTMLDetailsElement>(null);
 
   const theme = useAppStore((s) => s.theme);
   const selectedItemDto = useItemStore((s) => s.selectedItem);
@@ -100,12 +101,16 @@ export function LibraryPage({
     loadLibraryData();
   }, [loadLibraryData]);
 
-  // 点击外部关闭筛选下拉菜单
+  // 点击外部关闭下拉菜单
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      const details = filterDetailsRef.current;
-      if (details && details.open && !details.contains(e.target as Node)) {
-        details.open = false;
+      const filter = filterDetailsRef.current;
+      if (filter && filter.open && !filter.contains(e.target as Node)) {
+        filter.open = false;
+      }
+      const menu = menuDetailsRef.current;
+      if (menu && menu.open && !menu.contains(e.target as Node)) {
+        menu.open = false;
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -402,17 +407,17 @@ export function LibraryPage({
                   ))}
                 </div>
               </div>
-              <details className="relative shrink-0">
+              <details ref={menuDetailsRef} className="relative shrink-0">
                 <summary className="grid h-8 w-8 cursor-pointer list-none place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)] [&::-webkit-details-marker]:hidden" data-testid="reader-menu-btn" aria-label="更多操作">
                   <MoreHorizontal className="h-4 w-4" />
                 </summary>
                 <div className="absolute right-0 top-10 z-40 w-48 overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--popover)] p-1 shadow-xl">
-                  <button className="menu-item" type="button" onClick={handleTogglePin}><Star className="h-4 w-4" />{selectedItem.pinned ? "取消置顶" : "置顶"}</button>
-                  <button className="menu-item" type="button" onClick={handleToggleFavorite}><Star className="h-4 w-4" />{selectedItem.favorite ? "取消收藏" : "收藏"}</button>
-                  <button className="menu-item" type="button" onClick={handleCopy}><Copy className="h-4 w-4" />复制内容</button>
-                  <button className="menu-item" type="button" onClick={handleAddAttachment}><Paperclip className="h-4 w-4" />添加附件</button>
-                  <button className="menu-item" type="button" onClick={onOpenDocument}><Edit3 className="h-4 w-4" />完整编辑</button>
-                  <button className="menu-item text-red-400" type="button" onClick={handleDelete}><Trash2 className="h-4 w-4" />删除</button>
+                  <button className="menu-item" type="button" onClick={() => { handleTogglePin(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Star className="h-4 w-4" />{selectedItem.pinned ? "取消置顶" : "置顶"}</button>
+                  <button className="menu-item" type="button" onClick={() => { handleToggleFavorite(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Star className="h-4 w-4" />{selectedItem.favorite ? "取消收藏" : "收藏"}</button>
+                  <button className="menu-item" type="button" onClick={() => { handleCopy(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Copy className="h-4 w-4" />复制内容</button>
+                  <button className="menu-item" type="button" onClick={() => { handleAddAttachment(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Paperclip className="h-4 w-4" />添加附件</button>
+                  <button className="menu-item" type="button" onClick={() => { onOpenDocument(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Edit3 className="h-4 w-4" />完整编辑</button>
+                  <button className="menu-item text-red-400" type="button" onClick={() => { handleDelete(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Trash2 className="h-4 w-4" />删除</button>
                 </div>
               </details>
               <button className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="reader-edit-btn" aria-label="编辑当前笔记" onClick={onOpenDocument} title="编辑当前笔记">

@@ -35,6 +35,13 @@ type TrayCommand =
     | "open-library"
     | "open-settings";
 
+function isEditableShortcutTarget(target: EventTarget | null) {
+    if (!(target instanceof HTMLElement)) return false;
+    if (target.isContentEditable) return true;
+    if (target.closest("[contenteditable='true']")) return true;
+    return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement;
+}
+
 export function QuantaNoteApp() {
     const {
         currentPage,
@@ -185,9 +192,10 @@ export function QuantaNoteApp() {
                     return; // 不阻止传播，让 VditorEditor 处理
                 }
 
-                // 其他快捷键完全阻止
+                // 其他快捷键完全阻止；编辑区域内保留系统级编辑/剪贴板快捷键。
                 const blockedKeys = ["p", "s", "u", "a", "r", "g", "j", "d", "e", "q", "w", "t", "i", "o", "z", "x", "c", "v"];
-                if (blockedKeys.includes(key)) {
+                const editorKeys = ["a", "z", "x", "c", "v"];
+                if (blockedKeys.includes(key) && !(editorKeys.includes(key) && isEditableShortcutTarget(e.target))) {
                     e.preventDefault();
                     e.stopPropagation();
                 }

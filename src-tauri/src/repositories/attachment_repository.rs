@@ -28,10 +28,9 @@ pub fn add(db: &DbState, item_id: String, source_path: String) -> Result<Attachm
         .map(|f| f.to_string_lossy().to_string())
         .unwrap_or_else(|| "unknown".to_string());
 
-    let relative_path =
-        PathBuf::from("attachments")
-            .join(&safe_item_id)
-            .join(format!("{}-{}", &id[..8], filename));
+    let relative_path = PathBuf::from("attachments")
+        .join(&safe_item_id)
+        .join(format!("{}-{}", &id[..8], filename));
     let dest_path = paths::quantanote_dir().join(&relative_path);
     std::fs::create_dir_all(
         dest_path
@@ -229,8 +228,8 @@ pub fn delete(db: &DbState, id: &str) -> Result<(), AppError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repositories::item_repository;
     use crate::models::item::CreateItemPayload;
+    use crate::repositories::item_repository;
 
     fn setup() -> (DbState, String, std::sync::MutexGuard<'static, ()>) {
         let data_dir = crate::test_support::unique_temp_dir("att-repo");

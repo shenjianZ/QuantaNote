@@ -2,17 +2,24 @@ import { useEffect, useState } from "react";
 import {
     Database,
     Download,
+    FileText,
     Globe2,
     Keyboard,
     Laptop,
     Moon,
     Palette,
+    Settings2,
     Sun,
+    Trash2,
     Upload,
     X,
 } from "lucide-react";
+import { openPath } from "@tauri-apps/plugin-opener";
 import type { ThemeMode } from "../hooks/useTheme";
+import { BackupManagerModal } from "../components/common/BackupManagerModal";
 import { ColorPickerModal } from "../components/common/ColorPickerModal";
+import { ExportModal } from "../components/common/ExportModal";
+import { ImportModal } from "../components/common/ImportModal";
 import { Select } from "../components/common/Select";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useToastStore } from "../stores/toastStore";
@@ -65,9 +72,16 @@ export function SettingsPage({
 }: SettingsPageProps) {
     const [activeSection, setActiveSection] = useState(0);
     const [colorPickerOpen, setColorPickerOpen] = useState(false);
+    const [exportModalOpen, setExportModalOpen] = useState(false);
+    const [importModalOpen, setImportModalOpen] = useState(false);
+    const [backupManagerOpen, setBackupManagerOpen] = useState(false);
     const settings = useSettingsStore((s) => s.settings);
     const dbSize = useSettingsStore((s) => s.dbSize);
     const dbPath = useSettingsStore((s) => s.dbPath);
+    const autoBackupConfig = useSettingsStore((s) => s.autoBackupConfig);
+    const backupDirPath = useSettingsStore((s) => s.backupDirPath);
+    const logDir = useSettingsStore((s) => s.logDir);
+    const sqlLogPath = useSettingsStore((s) => s.sqlLogPath);
     const init = useSettingsStore((s) => s.init);
     const updateSetting = useSettingsStore((s) => s.updateSetting);
     const addCustomColor = useSettingsStore((s) => s.addCustomColor);
@@ -75,14 +89,24 @@ export function SettingsPage({
     const refreshDbSize = useSettingsStore((s) => s.refreshDbSize);
     const fetchDbPath = useSettingsStore((s) => s.fetchDbPath);
     const optimizeDb = useSettingsStore((s) => s.optimizeDb);
-    const exportData = useSettingsStore((s) => s.exportData);
-    const importData = useSettingsStore((s) => s.importData);
+    const fetchAutoBackupConfig = useSettingsStore((s) => s.fetchAutoBackupConfig);
+    const updateAutoBackupConfig = useSettingsStore((s) => s.updateAutoBackupConfig);
+    const triggerBackupNow = useSettingsStore((s) => s.triggerBackupNow);
+    const fetchBackupDirPath = useSettingsStore((s) => s.fetchBackupDirPath);
+    const fetchBackups = useSettingsStore((s) => s.fetchBackups);
+    const fetchDiagnosticsPaths = useSettingsStore((s) => s.fetchDiagnosticsPaths);
+    const updateSqlLogging = useSettingsStore((s) => s.updateSqlLogging);
+    const clearSqlLogFile = useSettingsStore((s) => s.clearSqlLogFile);
 
     useEffect(() => {
         init();
         refreshDbSize();
         fetchDbPath();
-    }, [init, refreshDbSize, fetchDbPath]);
+        fetchAutoBackupConfig();
+        fetchBackupDirPath();
+        fetchBackups();
+        fetchDiagnosticsPaths();
+    }, [init, refreshDbSize, fetchDbPath, fetchAutoBackupConfig, fetchBackupDirPath, fetchBackups, fetchDiagnosticsPaths]);
 
     function renderToggle(value: boolean, onChange: (v: boolean) => void) {
         return (
@@ -295,25 +319,18 @@ export function SettingsPage({
                             <span className="text-sm text-[var(--text)]">
                                 界面字号
                             </span>
-                            <div className="flex items-center gap-3">
-                                <input
-                                    type="range"
-                                    min={14}
-                                    max={18}
-                                    step={1}
-                                    data-testid="font-size-slider"
-                                    value={settings.fontSize}
-                                    onChange={(e) =>
-                                        updateSetting(
-                                            "fontSize",
-                                            Number(e.target.value),
-                                        )
-                                    }
-                                />
-                                <span className="font-mono text-xs text-[var(--muted)]">
-                                    {settings.fontSize}px
-                                </span>
-                            </div>
+                            <Select
+                                className="w-24"
+                                options={[
+                                    { value: "14", label: "14 px" },
+                                    { value: "15", label: "15 px" },
+                                    { value: "16", label: "16 px" },
+                                    { value: "17", label: "17 px" },
+                                    { value: "18", label: "18 px" },
+                                ]}
+                                value={String(settings.fontSize)}
+                                onChange={(v) => updateSetting("fontSize", Number(v))}
+                            />
                         </div>
                         <div className="mt-4 rounded-2xl bg-[var(--field)] p-4 text-sm text-[var(--text)]">
                             这是一段预览文字 The quick brown fox
@@ -328,39 +345,131 @@ export function SettingsPage({
                 <>
                     <section className="mb-6">
                         <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">
-                            备份与恢复
+                            自动备份
                         </h2>
                         <div className={rowClass}>
+                            <div>
+                                <span className="text-sm text-[var(--text)]">
+                                    启用自动备份
+                                </span>
+                                <div className="mt-0.5 text-xs text-[var(--muted)]">
+                                    定时在后台创建 ZIP 备份
+                                </div>
+                            </div>
+                            {renderToggle(autoBackupConfig?.enabled ?? false, (v) => {
+                                if (autoBackupConfig) {
+                                    updateAutoBackupConfig({ ...autoBackupConfig, enabled: v });
+                                }
+                            })}
+                        </div>
+                        {autoBackupConfig?.enabled && (
+                            <>
+                                <div className={rowClass}>
+                                    <span className="text-sm text-[var(--text)]">
+                                        备份间隔
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <Select
+                                            className="w-20"
+                                            options={Array.from({ length: 30 }, (_, i) => ({
+                                                value: String(i + 1),
+                                                label: String(i + 1),
+                                            }))}
+                                            value={String(autoBackupConfig.interval_days)}
+                                            onChange={(v) =>
+                                                updateAutoBackupConfig({
+                                                    ...autoBackupConfig,
+                                                    interval_days: Number(v),
+                                                })
+                                            }
+                                        />
+                                        <span className="text-sm text-[var(--muted)]">天</span>
+                                    </div>
+                                </div>
+                                <div className={rowClass}>
+                                    <span className="text-sm text-[var(--text)]">
+                                        最多保留
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <Select
+                                            className="w-20"
+                                            options={[5, 10, 20, 50, 100].map((n) => ({
+                                                value: String(n),
+                                                label: String(n),
+                                            }))}
+                                            value={String(autoBackupConfig.max_backups)}
+                                            onChange={(v) =>
+                                                updateAutoBackupConfig({
+                                                    ...autoBackupConfig,
+                                                    max_backups: Number(v),
+                                                })
+                                            }
+                                        />
+                                        <span className="text-sm text-[var(--muted)]">个备份</span>
+                                    </div>
+                                </div>
+                                <div className={rowClass}>
+                                    <span className="text-sm text-[var(--text)]">
+                                        过期时长
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <Select
+                                            className="w-20"
+                                            options={[30, 60, 90, 180, 365].map((n) => ({
+                                                value: String(n),
+                                                label: String(n),
+                                            }))}
+                                            value={String(autoBackupConfig.expire_days)}
+                                            onChange={(v) =>
+                                                updateAutoBackupConfig({
+                                                    ...autoBackupConfig,
+                                                    expire_days: Number(v),
+                                                })
+                                            }
+                                        />
+                                        <span className="text-sm text-[var(--muted)]">天</span>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                        <div className={rowClass}>
                             <span className="text-sm text-[var(--text)]">
-                                自动备份
+                                备份目录
                             </span>
-                            {renderToggle(settings.autoBackup, (v) =>
-                                updateSetting("autoBackup", v),
-                            )}
+                            <span className="max-w-[60%] truncate text-sm text-[var(--muted)]">
+                                {backupDirPath || "加载中..."}
+                            </span>
                         </div>
                         <div className={rowClass}>
                             <span className="text-sm text-[var(--text)]">
-                                手动备份
+                                上次备份
                             </span>
+                            <span className="text-sm text-[var(--muted)]">
+                                {autoBackupConfig?.last_backup_at
+                                    ? new Date(autoBackupConfig.last_backup_at).toLocaleString()
+                                    : "从未备份"}
+                            </span>
+                        </div>
+                        <div className="mt-3 flex gap-2">
                             <button
-                                className="rounded-full bg-[var(--field)] px-3 py-1.5 text-sm text-[var(--text)] hover:bg-[var(--hover)]"
+                                className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm text-white hover:opacity-90"
                                 type="button"
-                                onClick={() => exportData()}
+                                onClick={() => triggerBackupNow()}
                             >
                                 立即备份
                             </button>
-                        </div>
-                        <div className={rowClass}>
-                            <span className="text-sm text-[var(--text)]">
-                                恢复数据
-                            </span>
                             <button
-                                className="rounded-full bg-[var(--field)] px-3 py-1.5 text-sm text-[var(--text)] hover:bg-[var(--hover)]"
+                                className="inline-flex items-center gap-2 rounded-full bg-[var(--field)] px-4 py-2 text-sm hover:bg-[var(--hover)]"
                                 type="button"
-                                onClick={() => importData()}
+                                onClick={() => setBackupManagerOpen(true)}
                             >
-                                选择文件
+                                <Settings2 className="h-4 w-4" />
+                                备份管理
                             </button>
+                            <BackupManagerModal
+                                open={backupManagerOpen}
+                                onClose={() => setBackupManagerOpen(false)}
+                            />
                         </div>
                     </section>
                     <section className="mb-6">
@@ -368,26 +477,34 @@ export function SettingsPage({
                             导入导出
                         </h2>
                         <div className="mb-3 text-sm text-[var(--muted)]">
-                            导出为 JSON 格式，包含所有记录和标签。
+                            导出为 ZIP 格式，可选择包含标签、附件和版本历史。
                         </div>
                         <div className="flex gap-2">
                             <button
                                 className="inline-flex items-center gap-2 rounded-full bg-[var(--field)] px-3 py-2 text-sm hover:bg-[var(--hover)]"
                                 type="button"
-                                onClick={() => importData()}
-                            >
-                                <Upload className="h-4 w-4" />
-                                导入
-                            </button>
-                            <button
-                                className="inline-flex items-center gap-2 rounded-full bg-[var(--field)] px-3 py-2 text-sm hover:bg-[var(--hover)]"
-                                type="button"
-                                onClick={() => exportData()}
+                                onClick={() => setExportModalOpen(true)}
                             >
                                 <Download className="h-4 w-4" />
                                 导出
                             </button>
+                            <button
+                                className="inline-flex items-center gap-2 rounded-full bg-[var(--field)] px-3 py-2 text-sm hover:bg-[var(--hover)]"
+                                type="button"
+                                onClick={() => setImportModalOpen(true)}
+                            >
+                                <Upload className="h-4 w-4" />
+                                导入
+                            </button>
                         </div>
+                        <ExportModal
+                            open={exportModalOpen}
+                            onClose={() => setExportModalOpen(false)}
+                        />
+                        <ImportModal
+                            open={importModalOpen}
+                            onClose={() => setImportModalOpen(false)}
+                        />
                     </section>
                     <section>
                         <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">
@@ -447,6 +564,106 @@ export function SettingsPage({
                                 onClick={() => optimizeDb()}
                             >
                                 优化与清理
+                            </button>
+                        </div>
+                    </section>
+                    <section className="mt-6">
+                        <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">
+                            诊断日志
+                        </h2>
+                        <div className={rowClass}>
+                            <div>
+                                <span className="text-sm text-[var(--text)]">
+                                    SQL 日志
+                                </span>
+                                <div className="mt-1 text-xs text-[var(--muted)]">
+                                    仅用于排查问题，可能包含笔记内容、搜索词和文件路径
+                                </div>
+                            </div>
+                            {renderToggle(settings.sqlLogging.enabled, (v) =>
+                                updateSqlLogging({ enabled: v }),
+                            )}
+                        </div>
+                        <div className={rowClass}>
+                            <span className="text-sm text-[var(--text)]">
+                                输出到控制台
+                            </span>
+                            {renderToggle(settings.sqlLogging.toConsole, (v) =>
+                                updateSqlLogging({ toConsole: v }),
+                            )}
+                        </div>
+                        <div className={rowClass}>
+                            <span className="text-sm text-[var(--text)]">
+                                输出到 SQL 日志文件
+                            </span>
+                            {renderToggle(settings.sqlLogging.toFile, (v) =>
+                                updateSqlLogging({ toFile: v }),
+                            )}
+                        </div>
+                        <div className={rowClass}>
+                            <span className="text-sm text-[var(--text)]">
+                                格式化 SQL
+                            </span>
+                            {renderToggle(settings.sqlLogging.pretty, (v) =>
+                                updateSqlLogging({ pretty: v }),
+                            )}
+                        </div>
+                        <div className={rowClass}>
+                            <span className="text-sm text-[var(--text)]">
+                                单条最大长度
+                            </span>
+                            <Select
+                                className="w-28"
+                                options={[
+                                    { value: "1000", label: "1,000" },
+                                    { value: "4000", label: "4,000" },
+                                    { value: "10000", label: "10,000" },
+                                    { value: "50000", label: "50,000" },
+                                ]}
+                                value={String(settings.sqlLogging.maxLen)}
+                                onChange={(v) => updateSqlLogging({ maxLen: Number(v) })}
+                            />
+                        </div>
+                        <div className={rowClass}>
+                            <span className="text-sm text-[var(--text)]">
+                                SQL 日志文件
+                            </span>
+                            <button
+                                className="max-w-[60%] truncate rounded-full bg-[var(--field)] px-3 py-1.5 text-sm text-[var(--muted)] hover:bg-[var(--hover)]"
+                                type="button"
+                                title={sqlLogPath}
+                                onClick={async () => {
+                                    try {
+                                        await navigator.clipboard.writeText(sqlLogPath);
+                                        useToastStore
+                                            .getState()
+                                            .addToast("success", "SQL 日志路径已复制");
+                                    } catch {
+                                        useToastStore
+                                            .getState()
+                                            .addToast("error", "复制失败");
+                                    }
+                                }}
+                            >
+                                {sqlLogPath || "加载中..."}
+                            </button>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                            <button
+                                className="inline-flex items-center gap-2 rounded-full bg-[var(--field)] px-4 py-2 text-sm hover:bg-[var(--hover)]"
+                                type="button"
+                                onClick={() => logDir && openPath(logDir)}
+                            >
+                                <FileText className="h-4 w-4" />
+                                打开日志目录
+                            </button>
+                            <button
+                                className="inline-flex items-center gap-2 rounded-full bg-[var(--field)] px-4 py-2 text-sm hover:bg-[var(--hover)]"
+                                type="button"
+                                onClick={() => clearSqlLogFile()}
+                            >
+                                <Trash2 className="h-4 w-4" />
+                                清空 SQL 日志
                             </button>
                         </div>
                     </section>

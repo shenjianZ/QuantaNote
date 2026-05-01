@@ -127,11 +127,23 @@ pub fn update_version(
     get_version(db, id)
 }
 
+pub fn delete_version(db: &DbState, id: &str) -> Result<(), AppError> {
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+    conn.execute("DELETE FROM versions WHERE id = ?1", params![id])
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repositories::item_repository;
     use crate::models::item::CreateItemPayload;
+    use crate::repositories::item_repository;
 
     fn create_test_item(db: &DbState) -> String {
         let dto = item_repository::create(

@@ -8,6 +8,25 @@ import {
     setAutostart,
     getAutostart,
     updateWindowBehavior,
+    getExportSizeEstimate,
+    exportDataZip,
+    importDataZip,
+    getAutoBackupConfig,
+    updateAutoBackupConfig as updateAutoBackupConfigCmd,
+    triggerBackupNow as triggerBackupNowCmd,
+    getBackupDirPath as getBackupDirPathCmd,
+    listBackups as listBackupsCmd,
+    deleteBackup as deleteBackupCmd,
+    updateSqlLogConfig as updateSqlLogConfigCmd,
+    clearSqlLog as clearSqlLogCmd,
+    getLogDir as getLogDirCmd,
+    getSqlLogPath as getSqlLogPathCmd,
+    type ExportOptions,
+    type ImportOptions,
+    type ExportSizeEstimate,
+    type AutoBackupConfig,
+    type BackupFileInfo,
+    type SqlLogConfig,
 } from "../services/tauriCommands";
 
 export interface CustomColor {
@@ -25,6 +44,15 @@ export interface AppSettings {
     closeKeepRunning: boolean;
     autoBackup: boolean;
     autostart: boolean;
+    sqlLogging: SqlLogSettings;
+}
+
+export interface SqlLogSettings {
+    enabled: boolean;
+    toConsole: boolean;
+    toFile: boolean;
+    pretty: boolean;
+    maxLen: number;
 }
 
 const DEFAULTS: AppSettings = {
@@ -37,6 +65,13 @@ const DEFAULTS: AppSettings = {
     closeKeepRunning: false,
     autoBackup: true,
     autostart: false,
+    sqlLogging: {
+        enabled: false,
+        toConsole: false,
+        toFile: true,
+        pretty: false,
+        maxLen: 4000,
+    },
 };
 
 const AVAILABLE_FONT_FAMILIES = new Set(["Noto Sans SC", "system-ui"]);
@@ -49,6 +84,7 @@ const AVAILABLE_MONO_FAMILIES = new Set([
 function normalizeSettings(settings: AppSettings): AppSettings {
     return {
         ...settings,
+        sqlLogging: normalizeSqlLogSettings(settings.sqlLogging),
         fontFamily: AVAILABLE_FONT_FAMILIES.has(settings.fontFamily)
             ? settings.fontFamily
             : DEFAULTS.fontFamily,
@@ -56,6 +92,14 @@ function normalizeSettings(settings: AppSettings): AppSettings {
             ? settings.fontMono
             : DEFAULTS.fontMono,
         fontSize: Math.min(18, Math.max(14, Number(settings.fontSize) || DEFAULTS.fontSize)),
+    };
+}
+
+function normalizeSqlLogSettings(settings?: Partial<SqlLogSettings>): SqlLogSettings {
+    return {
+        ...DEFAULTS.sqlLogging,
+        ...settings,
+        maxLen: Math.min(50000, Math.max(200, Number(settings?.maxLen) || DEFAULTS.sqlLogging.maxLen)),
     };
 }
 
@@ -73,6 +117,26 @@ function loadSettings(): AppSettings {
 
 function persist(settings: AppSettings) {
     localStorage.setItem("quantanote-settings", JSON.stringify(settings));
+}
+
+function toBackendSqlLogConfig(settings: SqlLogSettings): SqlLogConfig {
+    return {
+        enabled: settings.enabled,
+        to_console: settings.toConsole,
+        to_file: settings.toFile,
+        pretty: settings.pretty,
+        max_len: settings.maxLen,
+    };
+}
+
+function fromBackendSqlLogConfig(config: SqlLogConfig): SqlLogSettings {
+    return normalizeSqlLogSettings({
+        enabled: config.enabled,
+        toConsole: config.to_console,
+        toFile: config.to_file,
+        pretty: config.pretty,
+        maxLen: config.max_len,
+    });
 }
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
@@ -158,6 +222,12 @@ interface SettingsState {
     settings: AppSettings;
     dbSize: string;
     dbPath: string;
+    exportSizeEstimate: ExportSizeEstimate | null;
+    autoBackupConfig: AutoBackupConfig | null;
+    backupDirPath: string;
+    backupFiles: BackupFileInfo[];
+    logDir: string;
+    sqlLogPath: string;
     init: () => void;
     updateSetting: <K extends keyof AppSettings>(
         key: K,
@@ -169,18 +239,43 @@ interface SettingsState {
     refreshDbSize: () => Promise<void>;
     fetchDbPath: () => Promise<void>;
     optimizeDb: () => Promise<void>;
-    exportData: () => Promise<void>;
-    importData: () => Promise<void>;
+    fetchExportSizeEstimate: () => Promise<void>;
+    exportDataWithOptions: (options: ExportOptions) => Promise<void>;
+    importDataWithOptions: (options: ImportOptions) => Promise<void>;
+    fetchAutoBackupConfig: () => Promise<void>;
+    updateAutoBackupConfig: (config: AutoBackupConfig) => Promise<void>;
+    triggerBackupNow: () => Promise<void>;
+    fetchBackupDirPath: () => Promise<void>;
+    fetchBackups: () => Promise<void>;
+    deleteBackup: (filename: string) => Promise<void>;
+    fetchDiagnosticsPaths: () => Promise<void>;
+    updateSqlLogging: (partial: Partial<SqlLogSettings>) => Promise<void>;
+    clearSqlLogFile: () => Promise<void>;
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
     settings: loadSettings(),
     dbSize: "计算中...",
     dbPath: "",
+    exportSizeEstimate: null,
+    autoBackupConfig: null,
+    backupDirPath: "",
+    backupFiles: [],
+    logDir: "",
+    sqlLogPath: "",
 
     init: () => {
         const settings = get().settings;
         applySettings(settings);
+        updateSqlLogConfigCmd(toBackendSqlLogConfig(settings.sqlLogging))
+            .then((config) => {
+                const sqlLogging = fromBackendSqlLogConfig(config);
+                const current = get().settings;
+                const updated = { ...current, sqlLogging };
+                persist(updated);
+                set({ settings: updated });
+            })
+            .catch(() => {});
         // 同步窗口行为到 Rust 端
         updateWindowBehavior(
             settings.minimizeToTray,
@@ -270,6 +365,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             settings.minimizeToTray,
             settings.closeKeepRunning,
         ).catch(() => {});
+        updateSqlLogConfigCmd(toBackendSqlLogConfig(settings.sqlLogging)).catch(() => {});
     },
 
     addCustomColor: (hex, name) => {
@@ -355,6 +451,154 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             }
         } catch {
             useToastStore.getState().addToast("error", "数据恢复失败");
+        }
+    },
+
+    fetchExportSizeEstimate: async () => {
+        try {
+            const estimate = await getExportSizeEstimate();
+            set({ exportSizeEstimate: estimate });
+        } catch {
+            set({ exportSizeEstimate: null });
+        }
+    },
+
+    exportDataWithOptions: async (options: ExportOptions) => {
+        try {
+            const path = await save({
+                defaultPath: "quantanote-backup.zip",
+                filters: [{ name: "ZIP", extensions: ["zip"] }],
+            });
+            if (path) {
+                await exportDataZip(path, options);
+                useToastStore
+                    .getState()
+                    .addToast("success", "数据已导出到 ZIP 文件");
+            }
+        } catch {
+            useToastStore.getState().addToast("error", "数据导出失败");
+        }
+    },
+
+    importDataWithOptions: async (options: ImportOptions) => {
+        try {
+            const path = await open({
+                multiple: false,
+                filters: [{ name: "ZIP", extensions: ["zip"] }],
+            });
+            if (path) {
+                await importDataZip(path, options);
+                await useItemStore.getState().fetchItems();
+                await get().refreshDbSize();
+                useToastStore
+                    .getState()
+                    .addToast("success", "数据已导入，请刷新查看");
+            }
+        } catch {
+            useToastStore.getState().addToast("error", "数据导入失败");
+        }
+    },
+
+    fetchAutoBackupConfig: async () => {
+        try {
+            const config = await getAutoBackupConfig();
+            set({ autoBackupConfig: config });
+        } catch {
+            set({ autoBackupConfig: null });
+        }
+    },
+
+    updateAutoBackupConfig: async (config: AutoBackupConfig) => {
+        try {
+            await updateAutoBackupConfigCmd(config);
+            set({ autoBackupConfig: config });
+            useToastStore.getState().addToast("success", "自动备份配置已更新");
+        } catch {
+            useToastStore.getState().addToast("error", "更新配置失败");
+        }
+    },
+
+    triggerBackupNow: async () => {
+        try {
+            await triggerBackupNowCmd();
+            await get().fetchBackups();
+            await get().fetchAutoBackupConfig();
+            useToastStore.getState().addToast("success", "备份已完成");
+        } catch {
+            useToastStore.getState().addToast("error", "备份失败");
+        }
+    },
+
+    fetchBackupDirPath: async () => {
+        try {
+            const path = await getBackupDirPathCmd();
+            set({ backupDirPath: path });
+        } catch {
+            set({ backupDirPath: "" });
+        }
+    },
+
+    fetchBackups: async () => {
+        try {
+            const files = await listBackupsCmd();
+            set({ backupFiles: files });
+        } catch {
+            set({ backupFiles: [] });
+        }
+    },
+
+    deleteBackup: async (filename: string) => {
+        try {
+            await deleteBackupCmd(filename);
+            await get().fetchBackups();
+            useToastStore.getState().addToast("success", "备份已删除");
+        } catch {
+            useToastStore.getState().addToast("error", "删除失败");
+        }
+    },
+
+    fetchDiagnosticsPaths: async () => {
+        try {
+            const [logDir, sqlLogPath] = await Promise.all([
+                getLogDirCmd(),
+                getSqlLogPathCmd(),
+            ]);
+            set({ logDir, sqlLogPath });
+        } catch {
+            set({ logDir: "", sqlLogPath: "" });
+        }
+    },
+
+    updateSqlLogging: async (partial: Partial<SqlLogSettings>) => {
+        const current = get().settings;
+        const nextSqlLogging = normalizeSqlLogSettings({
+            ...current.sqlLogging,
+            ...partial,
+        });
+        const optimistic = { ...current, sqlLogging: nextSqlLogging };
+        persist(optimistic);
+        set({ settings: optimistic });
+
+        try {
+            const synced = await updateSqlLogConfigCmd(toBackendSqlLogConfig(nextSqlLogging));
+            const sqlLogging = fromBackendSqlLogConfig(synced);
+            const updated = { ...get().settings, sqlLogging };
+            persist(updated);
+            set({ settings: updated });
+            useToastStore
+                .getState()
+                .addToast("success", sqlLogging.enabled ? "SQL 日志已开启" : "SQL 日志已关闭");
+        } catch {
+            useToastStore.getState().addToast("error", "SQL 日志设置同步失败");
+        }
+    },
+
+    clearSqlLogFile: async () => {
+        try {
+            await clearSqlLogCmd();
+            useToastStore.getState().addToast("success", "SQL 日志已清空");
+        } catch {
+            useToastStore.getState().addToast("error", "清空 SQL 日志失败");
         }
     },
 }));
