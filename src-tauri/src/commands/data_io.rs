@@ -37,6 +37,10 @@ fn value_bool(value: &serde_json::Value, key: &str) -> i32 {
 
 #[tauri::command]
 pub fn export_data(db: State<'_, DbState>) -> Result<String, AppError> {
+    export_data_from_db(&db)
+}
+
+fn export_data_from_db(db: &DbState) -> Result<String, AppError> {
     let conn = db
         .conn
         .lock()
@@ -157,6 +161,10 @@ pub fn export_data(db: State<'_, DbState>) -> Result<String, AppError> {
 
 #[tauri::command]
 pub fn import_data(db: State<'_, DbState>, json: String) -> Result<(), AppError> {
+    import_data_into_db(&db, json)
+}
+
+fn import_data_into_db(db: &DbState, json: String) -> Result<(), AppError> {
     let data: ExportData =
         serde_json::from_str(&json).map_err(|e| AppError::Validation(e.to_string()))?;
     let conn = db
@@ -221,9 +229,14 @@ pub fn import_data(db: State<'_, DbState>, json: String) -> Result<(), AppError>
             let bytes = BASE64
                 .decode(file_data)
                 .map_err(|e| AppError::Validation(format!("附件数据无效: {}", e)))?;
-            let relative_path = std::path::PathBuf::from("attachments")
-                .join(&item_id)
-                .join(format!("{}-{}", &id.chars().take(8).collect::<String>(), filename));
+            let relative_path =
+                std::path::PathBuf::from("attachments")
+                    .join(&item_id)
+                    .join(format!(
+                        "{}-{}",
+                        &id.chars().take(8).collect::<String>(),
+                        filename
+                    ));
             let dest_path = data_dir.join(&relative_path);
             std::fs::create_dir_all(dest_path.parent().unwrap())
                 .map_err(|e| AppError::Io(e.to_string()))?;
@@ -274,4 +287,79 @@ pub fn save_to_file(path: String, content: String) -> Result<(), AppError> {
 #[tauri::command]
 pub fn read_from_file(path: String) -> Result<String, AppError> {
     std::fs::read_to_string(&path).map_err(|e| AppError::Io(e.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn save_and_read_file_round_trip() {
+        let dir = crate::test_support::unique_temp_dir("data-io");
+        let file = dir.join("backup.json");
+
+        save_to_file(
+            file.to_string_lossy().to_string(),
+            "{\"items\":[]}".to_string(),
+        )
+        .expect("save file");
+        let content = read_from_file(file.to_string_lossy().to_string()).expect("read file");
+
+        assert_eq!(content, "{\"items\":[]}");
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn read_missing_file_returns_io_error() {
+        let error = read_from_file("Z:\\missing\\quantanote.json".to_string())
+            .expect_err("missing file should fail");
+
+        assert!(matches!(error, AppError::Io(_)));
+    }
+
+    #[test]
+    fn export_and_import_data_round_trip_keeps_items_tags_and_versions() {
+        let data_dir = crate::test_support::unique_temp_dir("data-io-round-trip");
+        let _guard = crate::test_support::lock_test_data_dir(&data_dir);
+        let source = crate::test_support::test_db();
+        let item = crate::services::item_service::create_item(
+            &source,
+            "导出导入".to_string(),
+            "note".to_string(),
+            Some("往返内容".to_string()),
+        )
+        .expect("create source item");
+        crate::services::tag_service::set_item_tags(&source, &item.id, vec!["备份".to_string()])
+            .expect("set source tags");
+        crate::services::version_service::create_version(
+            &source,
+            &item.id,
+            "第二版",
+            "手动保存",
+            Some("v2"),
+            Some("说明"),
+        )
+        .expect("create version");
+
+        let json = export_data_from_db(&source).expect("export data");
+        let target = crate::test_support::test_db();
+        import_data_into_db(&target, json).expect("import data");
+
+        let imported =
+            crate::services::item_service::get_item(&target, &item.id).expect("imported item");
+        assert_eq!(imported.title, "导出导入");
+        assert_eq!(imported.content, "往返内容");
+
+        let tags = crate::services::tag_service::get_tags_for_item(&target, &item.id)
+            .expect("imported tags");
+        assert_eq!(tags.len(), 1);
+        assert_eq!(tags[0].name, "备份");
+
+        let versions = crate::services::version_service::get_versions(&target, &item.id)
+            .expect("imported versions");
+        assert_eq!(versions.len(), 2);
+        assert_eq!(versions[0].name, "v2");
+
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
 }

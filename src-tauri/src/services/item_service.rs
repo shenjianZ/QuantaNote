@@ -70,3 +70,112 @@ pub fn get_pinned(db: &DbState) -> Result<Vec<ItemDto>, AppError> {
 pub fn get_recent(db: &DbState, limit: i64) -> Result<Vec<ItemDto>, AppError> {
     item_repository::get_recent(db, limit)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn create_item_trims_title_summarizes_content_and_creates_initial_version() {
+        let db = crate::test_support::test_db();
+        let item = create_item(
+            &db,
+            "  第一条笔记  ".to_string(),
+            "note".to_string(),
+            Some("这是一段用于摘要的内容".to_string()),
+        )
+        .expect("create item");
+
+        assert_eq!(item.title, "第一条笔记");
+        assert_eq!(item.summary, "这是一段用于摘要的内容");
+        assert!(item.id.starts_with("item-"));
+
+        let versions =
+            crate::repositories::version_repository::get_versions(&db, &item.id).expect("versions");
+        assert_eq!(versions.len(), 1);
+        assert_eq!(versions[0].version_number, 1);
+        assert_eq!(versions[0].change_summary, "创建");
+        assert_eq!(versions[0].name, "初始版本");
+    }
+
+    #[test]
+    fn create_item_rejects_blank_title() {
+        let db = crate::test_support::test_db();
+        let error = create_item(&db, " \n ".to_string(), "note".to_string(), None)
+            .expect_err("blank title should fail");
+
+        assert!(matches!(error, AppError::Validation(_)));
+        assert!(error.to_string().contains("标题不能为空"));
+    }
+
+    #[test]
+    fn update_item_keeps_unset_fields_and_updates_flags() {
+        let db = crate::test_support::test_db();
+        let item = create_item(
+            &db,
+            "原标题".to_string(),
+            "note".to_string(),
+            Some("原正文".to_string()),
+        )
+        .expect("create item");
+
+        let updated = update_item(
+            &db,
+            UpdateItemPayload {
+                id: item.id.clone(),
+                title: Some("新标题".to_string()),
+                content: None,
+                summary: None,
+                pinned: Some(true),
+                favorite: Some(true),
+                encrypted: None,
+            },
+        )
+        .expect("update item");
+
+        assert_eq!(updated.title, "新标题");
+        assert_eq!(updated.content, "原正文");
+        assert!(updated.pinned);
+        assert!(updated.favorite);
+        assert_eq!(updated.item_type, "note");
+    }
+
+    #[test]
+    fn delete_item_removes_related_rows_via_foreign_keys() {
+        let db = crate::test_support::test_db();
+        let item = create_item(
+            &db,
+            "待删除".to_string(),
+            "note".to_string(),
+            Some("正文".to_string()),
+        )
+        .expect("create item");
+        crate::services::tag_service::set_item_tags(
+            &db,
+            &item.id,
+            vec!["rust".to_string(), "tauri".to_string()],
+        )
+        .expect("set tags");
+
+        delete_item(&db, &item.id).expect("delete item");
+
+        assert!(get_item(&db, &item.id).is_err());
+        let conn = db.conn.lock().expect("lock db");
+        let mappings: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM item_tags WHERE item_id = ?1",
+                [&item.id],
+                |row| row.get(0),
+            )
+            .expect("mapping count");
+        let versions: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM versions WHERE item_id = ?1",
+                [&item.id],
+                |row| row.get(0),
+            )
+            .expect("version count");
+        assert_eq!(mappings, 0);
+        assert_eq!(versions, 0);
+    }
+}

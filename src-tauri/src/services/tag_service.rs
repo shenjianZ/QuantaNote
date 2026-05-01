@@ -24,14 +24,67 @@ pub fn get_tags_for_item(db: &DbState, item_id: &str) -> Result<Vec<TagDto>, App
 }
 
 pub fn set_item_tags(db: &DbState, item_id: &str, tag_names: Vec<String>) -> Result<(), AppError> {
+    let tag_names: Vec<String> = tag_names
+        .into_iter()
+        .map(|name| name.trim().to_string())
+        .filter(|name| !name.is_empty())
+        .collect();
+
     for name in &tag_names {
-        if name.trim().is_empty() {
-            continue;
-        }
         let existing = tag_repository::get_tag_by_name(db, name);
         if existing.is_none() {
             tag_repository::create_tag(db, name, "cyan")?;
         }
     }
     tag_repository::set_item_tags(db, item_id, tag_names)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn set_item_tags_creates_missing_tags_and_skips_blank_names() {
+        let db = crate::test_support::test_db();
+        let item = crate::services::item_service::create_item(
+            &db,
+            "标签测试".to_string(),
+            "note".to_string(),
+            None,
+        )
+        .expect("create item");
+
+        set_item_tags(
+            &db,
+            &item.id,
+            vec![" rust ".to_string(), "".to_string(), "tauri".to_string()],
+        )
+        .expect("set tags");
+
+        let tags = get_tags_for_item(&db, &item.id).expect("item tags");
+        let names: Vec<String> = tags.into_iter().map(|tag| tag.name).collect();
+        assert_eq!(names, vec!["rust".to_string(), "tauri".to_string()]);
+
+        let all = get_all_tags(&db).expect("all tags");
+        assert_eq!(all.len(), 2);
+        assert!(all.iter().all(|tag| tag.color == "cyan"));
+    }
+
+    #[test]
+    fn delete_tag_removes_item_mappings() {
+        let db = crate::test_support::test_db();
+        let item = crate::services::item_service::create_item(
+            &db,
+            "标签删除".to_string(),
+            "note".to_string(),
+            None,
+        )
+        .expect("create item");
+        set_item_tags(&db, &item.id, vec!["rust".to_string()]).expect("set tags");
+
+        delete_tag(&db, "rust").expect("delete tag");
+
+        let tags = get_tags_for_item(&db, &item.id).expect("item tags");
+        assert!(tags.is_empty());
+    }
 }

@@ -35,3 +35,81 @@ pub fn get_attachments(db: &DbState, item_id: &str) -> Result<Vec<AttachmentDto>
 pub fn delete_attachment(db: &DbState, id: &str) -> Result<(), AppError> {
     attachment_repository::delete(db, id)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn add_and_delete_attachment_copies_and_removes_file() {
+        let data_dir = crate::test_support::unique_temp_dir("attachment-data");
+        let _guard = crate::test_support::lock_test_data_dir(&data_dir);
+        let source_dir = crate::test_support::unique_temp_dir("attachment-source");
+        let source = source_dir.join("note.txt");
+        std::fs::write(&source, "attachment body").expect("write source");
+        let db = crate::test_support::test_db();
+        let item = crate::services::item_service::create_item(
+            &db,
+            "附件测试".to_string(),
+            "note".to_string(),
+            None,
+        )
+        .expect("create item");
+
+        let attachment = add_attachment(&db, item.id.clone(), source.to_string_lossy().to_string())
+            .expect("add attachment");
+
+        assert_eq!(attachment.filename, "note.txt");
+        assert_eq!(attachment.mime_type, "text/plain");
+        assert!(std::path::Path::new(&attachment.file_path).exists());
+
+        let listed = get_attachments(&db, &item.id).expect("get attachments");
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].id, attachment.id);
+
+        delete_attachment(&db, &attachment.id).expect("delete attachment");
+        assert!(!std::path::Path::new(&attachment.file_path).exists());
+
+        let _ = std::fs::remove_dir_all(data_dir);
+        let _ = std::fs::remove_dir_all(source_dir);
+    }
+
+    #[test]
+    fn add_attachment_rejects_missing_source_file() {
+        let db = crate::test_support::test_db();
+        let item = crate::services::item_service::create_item(
+            &db,
+            "缺失附件".to_string(),
+            "note".to_string(),
+            None,
+        )
+        .expect("create item");
+
+        let error = add_attachment(&db, item.id, "Z:\\missing\\file.txt".to_string())
+            .expect_err("missing file should fail");
+
+        assert!(matches!(error, AppError::Validation(_)));
+        assert!(error.to_string().contains("文件不存在"));
+    }
+
+    #[test]
+    fn add_attachment_rejects_unknown_item_before_touching_file() {
+        let source_dir = crate::test_support::unique_temp_dir("attachment-source");
+        let source = source_dir.join("note.txt");
+        std::fs::write(&source, "attachment body").expect("write source");
+        let db = crate::test_support::test_db();
+
+        let error = add_attachment(
+            &db,
+            "item-missing".to_string(),
+            source.to_string_lossy().to_string(),
+        )
+        .expect_err("unknown item should fail");
+
+        assert!(matches!(
+            error,
+            AppError::Database(_) | AppError::NotFound(_)
+        ));
+        let _ = std::fs::remove_dir_all(source_dir);
+    }
+}

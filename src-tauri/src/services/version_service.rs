@@ -55,3 +55,73 @@ pub fn restore_version(db: &DbState, version_id: &str) -> Result<(), AppError> {
     )?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn create_version_increments_per_item_and_preserves_metadata() {
+        let db = crate::test_support::test_db();
+        let item = crate::services::item_service::create_item(
+            &db,
+            "版本测试".to_string(),
+            "note".to_string(),
+            Some("初始内容".to_string()),
+        )
+        .expect("create item");
+
+        let version = create_version(
+            &db,
+            &item.id,
+            "第二版内容",
+            "手动保存",
+            Some("v2"),
+            Some("说明"),
+        )
+        .expect("create version");
+
+        assert_eq!(version.version_number, 2);
+        assert_eq!(version.name, "v2");
+        assert_eq!(version.description, "说明");
+
+        let versions = get_versions(&db, &item.id).expect("get versions");
+        assert_eq!(versions[0].version_number, 2);
+        assert_eq!(versions[1].version_number, 1);
+    }
+
+    #[test]
+    fn restore_version_updates_content_without_touching_title_or_flags() {
+        let db = crate::test_support::test_db();
+        let item = crate::services::item_service::create_item(
+            &db,
+            "恢复测试".to_string(),
+            "note".to_string(),
+            Some("初始内容".to_string()),
+        )
+        .expect("create item");
+        crate::services::item_service::update_item(
+            &db,
+            crate::models::item::UpdateItemPayload {
+                id: item.id.clone(),
+                title: Some("恢复测试-改名".to_string()),
+                content: Some("当前内容".to_string()),
+                summary: None,
+                pinned: Some(true),
+                favorite: Some(true),
+                encrypted: None,
+            },
+        )
+        .expect("update item");
+        let version = create_version(&db, &item.id, "历史内容", "手动保存", Some("history"), None)
+            .expect("create version");
+
+        restore_version(&db, &version.id).expect("restore version");
+
+        let restored = crate::services::item_service::get_item(&db, &item.id).expect("get item");
+        assert_eq!(restored.title, "恢复测试-改名");
+        assert_eq!(restored.content, "历史内容");
+        assert!(restored.pinned);
+        assert!(restored.favorite);
+    }
+}

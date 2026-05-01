@@ -77,3 +77,35 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
+#[cfg(test)]
+mod test_support {
+    use std::path::PathBuf;
+    use std::sync::{Mutex, MutexGuard, OnceLock};
+
+    use crate::db::DbState;
+
+    static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+    pub fn test_db() -> DbState {
+        let db = DbState::open(":memory:").expect("open in-memory database");
+        db.initialize_schema().expect("initialize schema");
+        db
+    }
+
+    pub fn unique_temp_dir(prefix: &str) -> PathBuf {
+        let path =
+            std::env::temp_dir().join(format!("quantanote-{}-{}", prefix, uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&path).expect("create temp dir");
+        path
+    }
+
+    pub fn lock_test_data_dir(path: &PathBuf) -> MutexGuard<'static, ()> {
+        let guard = ENV_LOCK
+            .get_or_init(|| Mutex::new(()))
+            .lock()
+            .expect("lock test data dir");
+        std::env::set_var("QUANTANOTE_DATA_DIR", path);
+        guard
+    }
+}

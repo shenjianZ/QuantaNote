@@ -7,7 +7,12 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "test:e2e": "wdio run e2e-tests/wdio.conf.js",
+    "test": "pnpm test:unit && pnpm test:rust"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
@@ -22,12 +27,21 @@
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.4",
     "@tauri-apps/cli": "^2",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
+    "@wdio/cli": "^9.27.1",
+    "@wdio/local-runner": "^9.27.1",
+    "@wdio/mocha-framework": "^9.27.1",
+    "@wdio/spec-reporter": "^9.27.1",
+    "jsdom": "^29.1.1",
     "tailwindcss": "^4.2.4",
     "typescript": "~5.8.3",
-    "vite": "^7.0.4"
+    "vite": "^7.0.4",
+    "vitest": "^4.1.5"
   },
   "packageManager": "pnpm@8.15.9+sha512.499434c9d8fdd1a2794ebf4552b3b25c0a633abcee5bb15e7b5de90f32f47b513aca98cd5cfd001c31f0db454bc3804edccd578501e4ca293a6816166bbd9f81"
 }

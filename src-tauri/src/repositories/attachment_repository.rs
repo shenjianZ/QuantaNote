@@ -10,11 +10,7 @@ fn resolve_file_path(relative_path: &str) -> PathBuf {
     paths::quantanote_dir().join(relative_path)
 }
 
-pub fn add(
-    db: &DbState,
-    item_id: String,
-    source_path: String,
-) -> Result<AttachmentDto, AppError> {
+pub fn add(db: &DbState, item_id: String, source_path: String) -> Result<AttachmentDto, AppError> {
     let id = ids::new_id("att");
     let now = chrono::Utc::now().to_rfc3339();
 
@@ -24,9 +20,10 @@ pub fn add(
         .map(|f| f.to_string_lossy().to_string())
         .unwrap_or_else(|| "unknown".to_string());
 
-    let relative_path = PathBuf::from("attachments")
-        .join(&item_id)
-        .join(format!("{}-{}", &id[..8], filename));
+    let relative_path =
+        PathBuf::from("attachments")
+            .join(&item_id)
+            .join(format!("{}-{}", &id[..8], filename));
     let dest_path = paths::quantanote_dir().join(&relative_path);
     std::fs::create_dir_all(dest_path.parent().unwrap())
         .map_err(|e| AppError::Io(e.to_string()))?;
@@ -165,7 +162,9 @@ pub fn get_by_item(db: &DbState, item_id: &str) -> Result<Vec<AttachmentDto>, Ap
                 id: row.get(0)?,
                 item_id: row.get(1)?,
                 filename: row.get(2)?,
-                file_path: resolve_file_path(&relative_path).to_string_lossy().to_string(),
+                file_path: resolve_file_path(&relative_path)
+                    .to_string_lossy()
+                    .to_string(),
                 mime_type: row.get(4)?,
                 file_size: row.get(5)?,
                 created_at: row.get(6)?,

@@ -172,3 +172,92 @@ impl DbState {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn initializes_schema_with_fts_tables_and_triggers() {
+        let db = DbState::open(":memory:").expect("open db");
+        db.initialize_schema().expect("initialize schema");
+        let conn = db.conn.lock().expect("lock db");
+
+        let item_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE name = 'items'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("items table count");
+        assert_eq!(item_count, 1);
+
+        let fts_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('items_fts', 'items_fts_trigram')",
+                [],
+                |row| row.get(0),
+            )
+            .expect("fts table count");
+        assert_eq!(fts_count, 2);
+
+        let trigger_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name IN (
+                    'items_ai', 'items_ad', 'items_au',
+                    'items_trigram_ai', 'items_trigram_ad', 'items_trigram_au'
+                )",
+                [],
+                |row| row.get(0),
+            )
+            .expect("trigger count");
+        assert_eq!(trigger_count, 6);
+    }
+
+    #[test]
+    fn fts_triggers_track_insert_update_and_delete() {
+        let db = DbState::open(":memory:").expect("open db");
+        db.initialize_schema().expect("initialize schema");
+        let conn = db.conn.lock().expect("lock db");
+
+        conn.execute(
+            "INSERT INTO items (id, title, item_type, content, summary, created_at, updated_at)
+             VALUES ('item-test', 'Rust search', 'note', 'alpha token', '', '2026-01-01', '2026-01-01')",
+            [],
+        )
+        .expect("insert item");
+        let alpha_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM items_fts WHERE items_fts MATCH 'alpha'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("alpha fts count");
+        assert_eq!(alpha_count, 1);
+
+        conn.execute(
+            "UPDATE items SET content = 'beta token' WHERE id = 'item-test'",
+            [],
+        )
+        .expect("update item");
+        let beta_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM items_fts WHERE items_fts MATCH 'beta'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("beta fts count");
+        assert_eq!(beta_count, 1);
+
+        conn.execute("DELETE FROM items WHERE id = 'item-test'", [])
+            .expect("delete item");
+        let deleted_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM items_fts WHERE items_fts MATCH 'beta'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("deleted fts count");
+        assert_eq!(deleted_count, 0);
+    }
+}
