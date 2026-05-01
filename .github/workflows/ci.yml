@@ -53,13 +53,21 @@ jobs:
       matrix:
         include:
           - platform: windows-latest
+            artifact_name: windows-x64
             args: ""
+            rust_target: ""
           - platform: ubuntu-latest
+            artifact_name: linux-x64
             args: ""
+            rust_target: ""
           - platform: macos-latest
+            artifact_name: macos-aarch64
             args: "--target aarch64-apple-darwin"
+            rust_target: "aarch64-apple-darwin"
           - platform: macos-latest
+            artifact_name: macos-x64
             args: "--target x86_64-apple-darwin"
+            rust_target: "x86_64-apple-darwin"
 
     runs-on: ${{ matrix.platform }}
 
@@ -88,12 +96,100 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
       - name: Install frontend dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
-      - name: Build and upload
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build app
+        run: pnpm tauri build ${{ matrix.args }}
+
+      - name: Prepare release assets
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $tag = "${{ github.ref_name }}"
+          $platform = "${{ matrix.artifact_name }}"
+          $target = "${{ matrix.rust_target }}"
+
+          if ([string]::IsNullOrWhiteSpace($target)) {
+            $bundleRoot = Join-Path $PWD "src-tauri/target/release/bundle"
+          } else {
+            $bundleRoot = Join-Path $PWD "src-tauri/target/$target/release/bundle"
+          }
+
+          if (!(Test-Path $bundleRoot)) {
+            throw "Bundle directory not found: $bundleRoot"
+          }
+
+          $outDir = Join-Path $PWD "release-assets"
+          New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+
+          $suffixes = @(
+            ".tar.gz.sig",
+            ".tar.gz",
+            ".AppImage.sig",
+            ".AppImage",
+            ".msi.sig",
+            ".msi",
+            ".exe.sig",
+            ".exe",
+            ".dmg.sig",
+            ".dmg",
+            ".deb.sig",
+            ".deb",
+            ".rpm.sig",
+            ".rpm",
+            ".zip.sig",
+            ".zip"
+          )
+
+          $assets = Get-ChildItem -Path $bundleRoot -Recurse -File | Where-Object {
+            $name = $_.Name
+            $suffixes | Where-Object { $name.EndsWith($_, [System.StringComparison]::OrdinalIgnoreCase) }
+          }
+
+          if (!$assets) {
+            throw "No bundle assets found in $bundleRoot"
+          }
+
+          foreach ($asset in $assets) {
+            $suffix = $suffixes | Where-Object {
+              $asset.Name.EndsWith($_, [System.StringComparison]::OrdinalIgnoreCase)
+            } | Select-Object -First 1
+
+            $destination = Join-Path $outDir "QuantaNote-$tag-$platform$suffix"
+            Copy-Item -LiteralPath $asset.FullName -Destination $destination -Force
+          }
+
+          Get-ChildItem -Path $outDir -File | ForEach-Object {
+            Write-Host "Prepared release asset: $($_.Name)"
+          }
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
         with:
-          releaseId: ${{ needs.create-release.outputs.release_id }}
-          args: ${{ matrix.args }}
+          name: QuantaNote-${{ github.ref_name }}-${{ matrix.artifact_name }}
+          path: release-assets/*
+          if-no-files-found: error
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload ${{ github.ref_name }} release-assets/* --clobber
+
+  publish-release:
+    needs:
+      - create-release
+      - build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Publish release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: Number("${{ needs.create-release.outputs.release_id }}"),
+              draft: false
+            });
