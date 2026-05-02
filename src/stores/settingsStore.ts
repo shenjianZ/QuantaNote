@@ -21,6 +21,8 @@ import {
     clearSqlLog as clearSqlLogCmd,
     getLogDir as getLogDirCmd,
     getSqlLogPath as getSqlLogPathCmd,
+    loadAllSettings,
+    saveSettings,
     type ExportOptions,
     type ImportOptions,
     type ExportSizeEstimate,
@@ -44,6 +46,7 @@ export interface AppSettings {
     closeKeepRunning: boolean;
     autoBackup: boolean;
     autostart: boolean;
+    alwaysOnTop: boolean;
     sqlLogging: SqlLogSettings;
 }
 
@@ -65,6 +68,7 @@ const DEFAULTS: AppSettings = {
     closeKeepRunning: false,
     autoBackup: true,
     autostart: false,
+    alwaysOnTop: false,
     sqlLogging: {
         enabled: false,
         toConsole: false,
@@ -104,19 +108,11 @@ function normalizeSqlLogSettings(settings?: Partial<SqlLogSettings>): SqlLogSett
 }
 
 function loadSettings(): AppSettings {
-    try {
-        const saved = localStorage.getItem("quantanote-settings");
-        if (saved) {
-            return normalizeSettings({ ...DEFAULTS, ...JSON.parse(saved) });
-        }
-    } catch {
-        /* ignore */
-    }
     return { ...DEFAULTS };
 }
 
 function persist(settings: AppSettings) {
-    localStorage.setItem("quantanote-settings", JSON.stringify(settings));
+    saveSettings({ "quantanote-settings": JSON.stringify(settings) }).catch(() => {});
 }
 
 function toBackendSqlLogConfig(settings: SqlLogSettings): SqlLogConfig {
@@ -264,7 +260,19 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     logDir: "",
     sqlLogPath: "",
 
-    init: () => {
+    init: async () => {
+        // 从 SQLite 加载设置
+        try {
+            const saved = await loadAllSettings();
+            if (saved["quantanote-settings"]) {
+                const parsed = JSON.parse(saved["quantanote-settings"]);
+                const merged = normalizeSettings({ ...DEFAULTS, ...parsed });
+                set({ settings: merged });
+            }
+        } catch {
+            /* 首次启动，SQLite 为空 */
+        }
+
         const settings = get().settings;
         applySettings(settings);
         updateSqlLogConfigCmd(toBackendSqlLogConfig(settings.sqlLogging))

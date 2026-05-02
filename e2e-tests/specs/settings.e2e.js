@@ -1,4 +1,4 @@
-import { cleanupAll, resetAppState } from "../helpers/commands.js";
+import { cleanupAll, resetAppState, waitForAppSetting } from "../helpers/commands.js";
 import { pause } from "../helpers/config.js";
 import TopBar from "../helpers/page-objects/TopBar.js";
 import SettingsPage from "../helpers/page-objects/SettingsPage.js";
@@ -49,20 +49,12 @@ describe("Settings deep coverage", () => {
 
     it("toggles minimizeToTray setting", async () => {
         await SettingsPage.toggleSetting("最小化到系统托盘");
-        const settings = await browser.execute(() => {
-            const s = localStorage.getItem("quantanote-settings");
-            return s ? JSON.parse(s) : {};
-        });
-        expect(typeof settings.minimizeToTray).toBe("boolean");
+        await waitForAppSetting("minimizeToTray", (value) => typeof value === "boolean");
     });
 
     it("toggles closeKeepRunning setting", async () => {
         await SettingsPage.toggleSetting("关闭窗口时隐藏到托盘");
-        const settings = await browser.execute(() => {
-            const s = localStorage.getItem("quantanote-settings");
-            return s ? JSON.parse(s) : {};
-        });
-        expect(typeof settings.closeKeepRunning).toBe("boolean");
+        await waitForAppSetting("closeKeepRunning", (value) => typeof value === "boolean");
     });
 
     it("refreshes db size", async () => {

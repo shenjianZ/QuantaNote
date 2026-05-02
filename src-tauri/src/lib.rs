@@ -6,7 +6,9 @@ mod repositories;
 mod services;
 mod utils;
 
-use commands::{attachment, auto_backup, data_io, diagnostics, item, search, tag, version};
+use commands::{
+    attachment, auto_backup, data_io, diagnostics, item, search, settings, tag, version,
+};
 use db::DbState;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
@@ -240,6 +242,8 @@ pub fn run() {
             tag::get_tag_item_counts,
             item::get_db_path,
             item::get_library_data,
+            settings::load_all_settings,
+            settings::save_settings,
             update_window_behavior,
         ])
         .run(tauri::generate_context!())

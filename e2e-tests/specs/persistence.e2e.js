@@ -1,4 +1,4 @@
-import { cleanupAll, resetAppState, seedItem } from "../helpers/commands.js";
+import { cleanupAll, resetAppState, seedItem, waitForSetting } from "../helpers/commands.js";
 import TopBar from "../helpers/page-objects/TopBar.js";
 import SettingsPage from "../helpers/page-objects/SettingsPage.js";
 import WorkspacePage from "../helpers/page-objects/WorkspacePage.js";
@@ -45,14 +45,12 @@ describe("Persistence across interactions", () => {
     await LibraryPage.expectItemVisible("持久化测试笔记");
   });
 
-  it("localStorage page restore records current page", async () => {
+  it("SQLite page restore records current page", async () => {
     await TopBar.navLibrary();
-    const page = await browser.execute(() => localStorage.getItem("quantanote-current-page"));
-    expect(page).toBe("library");
+    await waitForSetting("currentPage", "library");
 
     await TopBar.navWorkspace();
-    const page2 = await browser.execute(() => localStorage.getItem("quantanote-current-page"));
-    expect(page2).toBe("workspace");
+    await waitForSetting("currentPage", "workspace");
   });
 
   it("settings persist after navigation", async () => {

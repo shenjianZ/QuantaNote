@@ -15,7 +15,7 @@ class SettingsPage {
   async setTheme(mode) {
     // mode: "system" / "light" / "dark"
     const btn = await $(`[data-testid='theme-${mode}']`);
-    await btn.click();
+    await browser.execute((el) => el.click(), btn);
     await observePause();
   }
 
@@ -38,24 +38,24 @@ class SettingsPage {
   }
 
   async selectFont(fontName) {
-    const select = await $("[data-testid='font-select']");
-    await select.selectByVisibleText(fontName);
+    const select = await $("//div[contains(@class, 'min-h-12')][.//span[contains(., '界面字体')]]//button");
+    await select.click();
+    const option = await $(`//button[normalize-space(.)='${fontName}']`);
+    await option.click();
     await observePause();
   }
 
   async getFontSize() {
-    const slider = await $("[data-testid='font-size-slider']");
-    return slider.getValue();
+    const select = await $("//div[contains(@class, 'min-h-12')][.//span[contains(., '界面字号')]]//button");
+    const text = await select.getText();
+    return text.replace(/\D/g, "");
   }
 
   async setFontSize(size) {
-    const slider = await $("[data-testid='font-size-slider']");
-    await browser.execute((el, value) => {
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-      setter?.call(el, String(value));
-      el.dispatchEvent(new Event("input", { bubbles: true }));
-      el.dispatchEvent(new Event("change", { bubbles: true }));
-    }, slider, size);
+    const select = await $("//div[contains(@class, 'min-h-12')][.//span[contains(., '界面字号')]]//button");
+    await select.click();
+    const option = await $(`//button[normalize-space(.)='${size} px']`);
+    await option.click();
     await observePause();
   }
 

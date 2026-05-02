@@ -11,6 +11,7 @@ import { DocumentEditorPage } from "../pages/DocumentEditorPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import { useAppStore } from "../stores/appStore";
 import { useItemStore } from "../stores/itemStore";
+import { useSettingsStore } from "../stores/settingsStore";
 import { adaptItem } from "../adapters/itemAdapter";
 import { preloadVditorResources } from "../utils/vditorPreload";
 import type { AppPage, Item } from "../types";
@@ -69,6 +70,8 @@ export function QuantaNoteApp() {
 
     useEffect(() => {
         preloadVditorResources();
+        useAppStore.getState().init();
+        useSettingsStore.getState().init();
     }, []);
 
     useEffect(() => {

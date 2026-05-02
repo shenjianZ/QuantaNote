@@ -169,19 +169,86 @@ export async function optimizeDb() {
   return tauriInvoke("optimize_db");
 }
 
+const DEFAULT_APP_SETTINGS = {
+  fontFamily: "Noto Sans SC",
+  fontMono: "JetBrains Mono",
+  fontSize: 15,
+  accentColor: "#386c5f",
+  customAccentColors: [],
+  minimizeToTray: true,
+  closeKeepRunning: false,
+  autoBackup: true,
+  autostart: false,
+  alwaysOnTop: false,
+  sqlLogging: {
+    enabled: false,
+    toConsole: false,
+    toFile: true,
+    pretty: false,
+    maxLen: 4000,
+  },
+};
+
+export async function loadSettingsMap() {
+  await waitForTauriBridge();
+  return tauriInvoke("load_all_settings");
+}
+
+export async function saveSettingsMap(settings) {
+  await waitForTauriBridge();
+  return tauriInvoke("save_settings", { settings });
+}
+
+export async function loadAppSettings() {
+  const settings = await loadSettingsMap();
+  return settings["quantanote-settings"]
+    ? JSON.parse(settings["quantanote-settings"])
+    : {};
+}
+
+export async function waitForSetting(key, expectedValue, timeout = 5000) {
+  await browser.waitUntil(
+    async () => {
+      const settings = await loadSettingsMap();
+      return settings[key] === expectedValue;
+    },
+    { timeout, timeoutMsg: `Expected setting ${key}=${expectedValue}` },
+  );
+}
+
+export async function waitForAppSetting(key, predicate, timeout = 5000) {
+  await browser.waitUntil(
+    async () => {
+      const settings = await loadAppSettings();
+      return predicate(settings[key], settings);
+    },
+    { timeout, timeoutMsg: `Expected app setting ${key}` },
+  );
+}
+
 // --- 状态重置 ---
 
 export async function resetAppState() {
+  await waitForTauriBridge();
+  await saveSettingsMap({
+    theme: "system",
+    currentPage: "workspace",
+    alwaysOnTop: "false",
+    "quantanote-settings": JSON.stringify(DEFAULT_APP_SETTINGS),
+  });
   await browser.execute(() => {
     localStorage.removeItem("quantanote-theme");
     localStorage.removeItem("quantanote-settings");
     localStorage.removeItem("quantanote-current-page");
+    document.documentElement.setAttribute("data-theme", "system");
   });
+  await browser.refresh();
+  await waitForTauriBridge();
 }
 
 export async function setTheme(theme) {
+  await saveSettingsMap({ theme });
   await browser.execute((t) => {
-    localStorage.setItem("quantanote-theme", t);
     document.documentElement.setAttribute("data-theme", t);
   }, theme);
 }

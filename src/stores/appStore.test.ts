@@ -1,13 +1,16 @@
 import { describe, expect, it, beforeEach } from "vitest";
+import { mockIPC } from "@tauri-apps/api/mocks";
 import { useAppStore } from "./appStore";
 
 describe("appStore", () => {
   beforeEach(() => {
+    mockIPC(() => null);
     useAppStore.setState({
       currentPage: "workspace",
       paletteOpen: false,
       selectedItemId: null,
       theme: "system",
+      alwaysOnTop: false,
     });
   });
 
@@ -15,14 +18,12 @@ describe("appStore", () => {
     useAppStore.getState().navigate("library");
 
     expect(useAppStore.getState().currentPage).toBe("library");
-    expect(localStorage.getItem("quantanote-current-page")).toBe("library");
   });
 
   it("persists theme and applies it to the document", () => {
     useAppStore.getState().setTheme("dark");
 
     expect(useAppStore.getState().theme).toBe("dark");
-    expect(localStorage.getItem("quantanote-theme")).toBe("dark");
     expect(document.documentElement).toHaveAttribute("data-theme", "dark");
   });
 

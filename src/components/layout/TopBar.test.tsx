@@ -30,10 +30,19 @@ function setWindowSettings(settings: {
       fontMono: "JetBrains Mono",
       fontSize: 15,
       accentColor: "#386c5f",
+      customAccentColors: [],
       minimizeToTray: settings.minimizeToTray,
       closeKeepRunning: settings.closeKeepRunning,
       autoBackup: true,
       autostart: false,
+      alwaysOnTop: false,
+      sqlLogging: {
+        enabled: false,
+        toConsole: false,
+        toFile: true,
+        pretty: false,
+        maxLen: 4000,
+      },
     },
   });
 }

@@ -4,5 +4,6 @@ pub mod data_io;
 pub mod diagnostics;
 pub mod item;
 pub mod search;
+pub mod settings;
 pub mod tag;
 pub mod version;

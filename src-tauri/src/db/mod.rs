@@ -112,10 +112,15 @@ CREATE TRIGGER IF NOT EXISTS items_trigram_au AFTER UPDATE ON items BEGIN
     VALUES (new.rowid, new.title, new.content, new.summary);
 END;
 
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
 INSERT OR IGNORE INTO schema_version (version) VALUES (1);
 ";
 
-const SCHEMA_VERSION: i64 = 2;
+const SCHEMA_VERSION: i64 = 3;
 
 impl DbState {
     pub fn open(db_path: &str) -> Result<Self, AppError> {
@@ -151,10 +156,21 @@ impl DbState {
             )
             .map_err(|e| AppError::Database(e.to_string()))?;
 
-        if current_version < SCHEMA_VERSION {
+        if current_version < 2 {
             conn.execute_batch(
                 "INSERT INTO items_fts_trigram(items_fts_trigram) VALUES('rebuild');
                  INSERT OR IGNORE INTO schema_version (version) VALUES (2);",
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+
+        if current_version < SCHEMA_VERSION {
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                 );
+                 INSERT OR IGNORE INTO schema_version (version) VALUES (3);",
             )
             .map_err(|e| AppError::Database(e.to_string()))?;
         }
@@ -212,6 +228,22 @@ mod tests {
             )
             .expect("trigger count");
         assert_eq!(trigger_count, 6);
+    }
+
+    #[test]
+    fn settings_table_exists_after_init() {
+        let db = DbState::open(":memory:").expect("open db");
+        db.initialize_schema().expect("initialize schema");
+        let conn = db.conn.lock().expect("lock db");
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'settings'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("settings table count");
+        assert_eq!(count, 1);
     }
 
     #[test]

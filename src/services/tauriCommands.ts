@@ -308,3 +308,12 @@ export async function listBackups() {
 export async function deleteBackup(filename: string) {
     return invoke("delete_backup", { filename });
 }
+
+// Settings (SQLite-backed)
+export async function loadAllSettings() {
+    return invoke<Record<string, string>>("load_all_settings");
+}
+
+export async function saveSettings(settings: Record<string, string>) {
+    return invoke("save_settings", { settings });
+}

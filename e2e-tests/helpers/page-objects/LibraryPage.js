@@ -5,6 +5,10 @@
 import { waitForDisplayed, waitForHidden, waitForText, waitForClickable } from "../waits.js";
 import { pause, observePause } from "../config.js";
 
+async function clickByDom(element) {
+  await browser.execute((el) => el.click(), element);
+}
+
 class LibraryPage {
   // --- 选择器 ---
   get newBtn() { return "[data-testid='library-new-btn']"; }
@@ -63,15 +67,25 @@ class LibraryPage {
 
   async selectSortOrder(value) {
     // value: "updated" / "created" / "title"
-    const select = await $("//*[@data-testid='library-filter-panel']//select[../span[contains(., '排序')]]");
-    await select.selectByAttribute("value", value);
+    const labels = {
+      updated: "最近更新",
+      created: "创建时间",
+      title: "标题排序",
+    };
+    const select = await $("//*[@data-testid='library-filter-panel']//label[.//span[contains(., '排序')]]//button");
+    await clickByDom(select);
+    const option = await $(`//*[@data-testid='library-filter-panel']//button[normalize-space(.)='${labels[value]}']`);
+    await clickByDom(option);
     await observePause();
   }
 
   async selectTagFilter(tagName) {
     // tagName: "all" 或具体标签名
-    const select = await $("//*[@data-testid='library-filter-panel']//select[../span[contains(., '标签')]]");
-    await select.selectByAttribute("value", tagName);
+    const label = tagName === "all" ? "全部标签" : tagName;
+    const select = await $("//*[@data-testid='library-filter-panel']//label[.//span[contains(., '标签')]]//button");
+    await clickByDom(select);
+    const option = await $(`//*[@data-testid='library-filter-panel']//button[normalize-space(.)='${label}']`);
+    await clickByDom(option);
     await observePause();
   }
 

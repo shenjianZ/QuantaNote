@@ -4,10 +4,9 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { AppPage } from "../../types";
 import { Kbd } from "../common/Kbd";
 import { useSettingsStore } from "../../stores/settingsStore";
-import { useToastStore } from "../../stores/toastStore";
+import { useAppStore } from "../../stores/appStore";
 
 const appWindow = getCurrentWindow();
-const ALWAYS_ON_TOP_STORAGE_KEY = "quantanote-always-on-top";
 
 interface TopBarProps {
   currentPage: AppPage;
@@ -17,9 +16,10 @@ interface TopBarProps {
 
 export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
   const settings = useSettingsStore((s) => s.settings);
+  const alwaysOnTop = useAppStore((s) => s.alwaysOnTop);
+  const setAlwaysOnTop = useAppStore((s) => s.setAlwaysOnTop);
   const [menuOpen, setMenuOpen] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
-  const [alwaysOnTop, setAlwaysOnTop] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -28,19 +28,6 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
       appWindow.isMaximized().then(setIsMaximized);
     });
     return () => { unlisten.then((fn) => fn()); };
-  }, []);
-
-  useEffect(() => {
-    const savedAlwaysOnTop = localStorage.getItem(ALWAYS_ON_TOP_STORAGE_KEY) === "true";
-    setAlwaysOnTop(savedAlwaysOnTop);
-    appWindow
-      .setAlwaysOnTop(savedAlwaysOnTop)
-      .then(() => appWindow.isAlwaysOnTop())
-      .then(setAlwaysOnTop)
-      .catch((error) => {
-        console.warn("设置窗口置顶失败", error);
-        appWindow.isAlwaysOnTop().then(setAlwaysOnTop).catch(() => {});
-      });
   }, []);
 
   useEffect(() => {
@@ -80,21 +67,8 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
     appWindow.close();
   }
 
-  async function handleToggleAlwaysOnTop() {
-    const next = !alwaysOnTop;
-    setAlwaysOnTop(next);
-    localStorage.setItem(ALWAYS_ON_TOP_STORAGE_KEY, String(next));
-
-    try {
-      await appWindow.setAlwaysOnTop(next);
-      const actual = await appWindow.isAlwaysOnTop();
-      setAlwaysOnTop(actual);
-      localStorage.setItem(ALWAYS_ON_TOP_STORAGE_KEY, String(actual));
-    } catch {
-      setAlwaysOnTop(!next);
-      localStorage.setItem(ALWAYS_ON_TOP_STORAGE_KEY, String(!next));
-      useToastStore.getState().addToast("error", "设置窗口置顶失败");
-    }
+  function handleToggleAlwaysOnTop() {
+    void setAlwaysOnTop(!alwaysOnTop);
   }
 
   function navigateAndClose(page: AppPage) {

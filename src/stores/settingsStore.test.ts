@@ -15,15 +15,26 @@ describe("settingsStore", () => {
   beforeEach(() => {
     saveMock.mockReset();
     openMock.mockReset();
+    mockIPC(() => null);
     useSettingsStore.setState({
       settings: {
         fontFamily: "Noto Sans SC",
         fontMono: "JetBrains Mono",
         fontSize: 15,
         accentColor: "#386c5f",
+        customAccentColors: [],
         minimizeToTray: true,
         closeKeepRunning: false,
         autoBackup: true,
+        autostart: false,
+        alwaysOnTop: false,
+        sqlLogging: {
+          enabled: false,
+          toConsole: false,
+          toFile: true,
+          pretty: false,
+          maxLen: 4000,
+        },
       },
       dbSize: "计算中...",
     });
@@ -41,7 +52,6 @@ describe("settingsStore", () => {
     useSettingsStore.getState().updateSetting("accentColor", "#2563eb");
 
     expect(useSettingsStore.getState().settings.accentColor).toBe("#2563eb");
-    expect(localStorage.getItem("quantanote-settings")).toContain("#2563eb");
     expect(document.documentElement.style.getPropertyValue("--accent")).toBe("#2563eb");
   });
 
