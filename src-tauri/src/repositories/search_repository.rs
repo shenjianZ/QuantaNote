@@ -15,14 +15,14 @@ pub fn search(
         .map_err(|e| AppError::Database(e.to_string()))?;
 
     let sql = if item_type.is_some() {
-        "SELECT i.id, i.title, i.item_type, COALESCE(substr(i.content, 1, 100), '') as summary
+        "SELECT i.id, i.title, i.item_type, COALESCE(i.summary, '') as summary
          FROM items_fts f
          JOIN items i ON i.rowid = f.rowid
          WHERE items_fts MATCH ?1 AND i.item_type = ?2
          ORDER BY rank
          LIMIT 50"
     } else {
-        "SELECT i.id, i.title, i.item_type, COALESCE(substr(i.content, 1, 100), '') as summary
+        "SELECT i.id, i.title, i.item_type, COALESCE(i.summary, '') as summary
          FROM items_fts f
          JOIN items i ON i.rowid = f.rowid
          WHERE items_fts MATCH ?1
@@ -74,14 +74,14 @@ pub fn search_trigram(
         .map_err(|e| AppError::Database(e.to_string()))?;
 
     let sql = if item_type.is_some() {
-        "SELECT i.id, i.title, i.item_type, COALESCE(substr(i.content, 1, 100), '') as summary
+        "SELECT i.id, i.title, i.item_type, COALESCE(i.summary, '') as summary
          FROM items_fts_trigram f
          JOIN items i ON i.rowid = f.rowid
          WHERE items_fts_trigram MATCH ?1 AND i.item_type = ?2
          ORDER BY rank
          LIMIT 50"
     } else {
-        "SELECT i.id, i.title, i.item_type, COALESCE(substr(i.content, 1, 100), '') as summary
+        "SELECT i.id, i.title, i.item_type, COALESCE(i.summary, '') as summary
          FROM items_fts_trigram f
          JOIN items i ON i.rowid = f.rowid
          WHERE items_fts_trigram MATCH ?1
@@ -149,7 +149,7 @@ pub fn search_like(
         ]
         .join(" AND ");
         let sql = format!(
-            "SELECT i.id, i.title, i.item_type, COALESCE(substr(i.content, 1, 100), '') as summary
+            "SELECT i.id, i.title, i.item_type, COALESCE(i.summary, '') as summary
              FROM items i
              WHERE i.item_type = ? AND ({})
              ORDER BY i.updated_at DESC
@@ -188,7 +188,7 @@ pub fn search_like(
         ]
         .join(" AND ");
         let sql = format!(
-            "SELECT i.id, i.title, i.item_type, COALESCE(substr(i.content, 1, 100), '') as summary
+            "SELECT i.id, i.title, i.item_type, COALESCE(i.summary, '') as summary
              FROM items i
              WHERE {}
              ORDER BY i.updated_at DESC
@@ -241,13 +241,17 @@ mod tests {
     use crate::repositories::item_repository;
 
     fn seed_item(db: &DbState, title: &str, content: &str) {
+        seed_item_with_summary(db, title, content, "");
+    }
+
+    fn seed_item_with_summary(db: &DbState, title: &str, content: &str, summary: &str) {
         item_repository::create(
             db,
             CreateItemPayload {
                 title: title.to_string(),
                 item_type: "note".to_string(),
                 content: Some(content.to_string()),
-                summary: String::new(),
+                summary: summary.to_string(),
             },
         )
         .unwrap();
@@ -282,5 +286,20 @@ mod tests {
         let results = search_like(&db, "important", None).unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].title, "My Document");
+    }
+
+    #[test]
+    fn search_result_uses_item_summary_not_content_excerpt() {
+        let db = crate::test_support::test_db();
+        seed_item_with_summary(
+            &db,
+            "Summary Test",
+            "content-only match text",
+            "manually edited summary",
+        );
+
+        let results = search_like(&db, "content-only", None).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].summary, "manually edited summary");
     }
 }
