@@ -17,7 +17,7 @@ pub fn create_item(
     let summary = if content_val.is_empty() {
         String::new()
     } else {
-        let s: String = content_val.chars().take(100).collect();
+        let s: String = content_val.chars().take(10).collect();
         s
     };
     let item = item_repository::create(
@@ -87,7 +87,7 @@ mod tests {
         .expect("create item");
 
         assert_eq!(item.title, "第一条笔记");
-        assert_eq!(item.summary, "这是一段用于摘要的内容");
+        assert_eq!(item.summary, "这是一段用于摘要的内");
         assert!(item.id.starts_with("item-"));
 
         let versions =

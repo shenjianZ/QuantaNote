@@ -46,7 +46,6 @@ export interface AppSettings {
     closeKeepRunning: boolean;
     autoBackup: boolean;
     autostart: boolean;
-    alwaysOnTop: boolean;
     sqlLogging: SqlLogSettings;
 }
 
@@ -68,7 +67,6 @@ const DEFAULTS: AppSettings = {
     closeKeepRunning: false,
     autoBackup: true,
     autostart: false,
-    alwaysOnTop: false,
     sqlLogging: {
         enabled: false,
         toConsole: false,
@@ -87,8 +85,6 @@ const AVAILABLE_MONO_FAMILIES = new Set([
 
 function normalizeSettings(settings: AppSettings): AppSettings {
     return {
-        ...settings,
-        sqlLogging: normalizeSqlLogSettings(settings.sqlLogging),
         fontFamily: AVAILABLE_FONT_FAMILIES.has(settings.fontFamily)
             ? settings.fontFamily
             : DEFAULTS.fontFamily,
@@ -96,6 +92,15 @@ function normalizeSettings(settings: AppSettings): AppSettings {
             ? settings.fontMono
             : DEFAULTS.fontMono,
         fontSize: Math.min(18, Math.max(14, Number(settings.fontSize) || DEFAULTS.fontSize)),
+        accentColor: settings.accentColor,
+        customAccentColors: Array.isArray(settings.customAccentColors)
+            ? settings.customAccentColors
+            : DEFAULTS.customAccentColors,
+        minimizeToTray: Boolean(settings.minimizeToTray),
+        closeKeepRunning: Boolean(settings.closeKeepRunning),
+        autoBackup: Boolean(settings.autoBackup),
+        autostart: Boolean(settings.autostart),
+        sqlLogging: normalizeSqlLogSettings(settings.sqlLogging),
     };
 }
 
@@ -268,6 +273,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
                 const parsed = JSON.parse(saved["quantanote-settings"]);
                 const merged = normalizeSettings({ ...DEFAULTS, ...parsed });
                 set({ settings: merged });
+                if (saved["quantanote-settings"] !== JSON.stringify(merged)) {
+                    persist(merged);
+                }
             }
         } catch {
             /* 首次启动，SQLite 为空 */

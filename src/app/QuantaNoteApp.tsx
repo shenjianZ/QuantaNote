@@ -13,6 +13,7 @@ import { useAppStore } from "../stores/appStore";
 import { useItemStore } from "../stores/itemStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { adaptItem } from "../adapters/itemAdapter";
+import { deriveRecordTitle } from "../utils/recordTitle";
 import { preloadVditorResources } from "../utils/vditorPreload";
 import type { AppPage, Item } from "../types";
 import "../styles/themes.css";
@@ -168,15 +169,7 @@ export function QuantaNoteApp() {
         async (content: string) => {
             const text = content.trim();
             if (!text) return;
-            const firstLine =
-                text
-                    .split(/\r?\n/)
-                    .find((line) => line.trim())
-                    ?.trim() ?? "未命名笔记";
-            const title =
-                firstLine.length > 32
-                    ? `${firstLine.slice(0, 32)}...`
-                    : firstLine;
+            const title = deriveRecordTitle(text);
             const item = await createItem(title, "note", text);
             selectItem(item.id);
             await getItem(item.id);

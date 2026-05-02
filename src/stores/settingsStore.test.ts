@@ -27,7 +27,6 @@ describe("settingsStore", () => {
         closeKeepRunning: false,
         autoBackup: true,
         autostart: false,
-        alwaysOnTop: false,
         sqlLogging: {
           enabled: false,
           toConsole: false,

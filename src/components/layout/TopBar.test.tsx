@@ -35,7 +35,6 @@ function setWindowSettings(settings: {
       closeKeepRunning: settings.closeKeepRunning,
       autoBackup: true,
       autostart: false,
-      alwaysOnTop: false,
       sqlLogging: {
         enabled: false,
         toConsole: false,
