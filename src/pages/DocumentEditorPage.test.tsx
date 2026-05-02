@@ -108,7 +108,8 @@ describe("DocumentEditorPage", () => {
 
   it("creates version on save version click", async () => {
     const { user } = setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
-    await user.click(screen.getByTitle("保存为新版本"));
+    const button = await screen.findByTitle("保存为新版本");
+    await user.click(button);
     expect(screen.getByText(/版本 \(1\)/)).toBeInTheDocument();
   });
 

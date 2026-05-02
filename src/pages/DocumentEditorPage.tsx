@@ -19,6 +19,10 @@ function formatNowAsName() {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
 }
 
+function normalizeForVersionCompare(value: string | undefined) {
+  return (value ?? "").trimEnd();
+}
+
 interface DocumentEditorPageProps {
   onBackToPreview: () => void;
 }
@@ -35,6 +39,7 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
   const [content, setContent] = useState("");
   const [saved, setSaved] = useState(true);
   const [versions, setVersions] = useState<VersionDto[]>([]);
+  const [versionsLoaded, setVersionsLoaded] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [versionPanelOpen, setVersionPanelOpen] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -55,10 +60,12 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
 
   useEffect(() => {
     if (!selectedItemId) return;
+    setVersionsLoaded(false);
     getItem(selectedItemId).catch(() => {});
     getVersions(selectedItemId)
       .then((v) => setVersions(v as VersionDto[]))
-      .catch(() => {});
+      .catch(() => setVersions([]))
+      .finally(() => setVersionsLoaded(true));
   }, [selectedItemId, getItem]);
 
   useEffect(() => {
@@ -172,7 +179,9 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
 
   const charCount = content.replace(/\s/g, "").length;
   const latestVersionContent = versions[0]?.content;
-  const canSaveVersion = latestVersionContent === undefined || content !== latestVersionContent;
+  const canSaveVersion = versionsLoaded
+    && (latestVersionContent === undefined
+      || normalizeForVersionCompare(content) !== normalizeForVersionCompare(latestVersionContent));
 
   return (
     <div className="mx-auto flex h-full min-h-0 w-full max-w-4xl flex-col bg-[var(--app-bg)] p-4">

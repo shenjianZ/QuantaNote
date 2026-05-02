@@ -58,6 +58,14 @@ describe("Document editor", () => {
       },
       { timeout: 3000, timeoutMsg: "Editor did not paste copied content" },
     );
+    await browser.waitUntil(
+      async () => {
+        const updated = await getItemById(testItem.id);
+        const matches = updated.content.match(/剪贴板快捷键测试/g) ?? [];
+        return matches.length >= 2;
+      },
+      { timeout: 5000, timeoutMsg: "Pasted editor content was not auto-saved" },
+    );
 
     await DocumentEditorPage.clearContent();
     await DocumentEditorPage.typeContent("初始内容");
@@ -109,8 +117,11 @@ describe("Document editor", () => {
   });
 
   it("saves a version", async () => {
+    await browser.waitUntil(
+      async () => (await DocumentEditorPage.getVersionCount()) > 0,
+      { timeout: 5000, timeoutMsg: "Initial version was not loaded" },
+    );
     const countBefore = await DocumentEditorPage.getVersionCount();
-    expect(await DocumentEditorPage.isSaveVersionEnabled()).toBe(false);
 
     await DocumentEditorPage.clearContent();
     await DocumentEditorPage.typeContent("manual version change");

@@ -198,7 +198,7 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
   const vditorRef = useRef<Vditor | null>(null);
   const onChangeRef = useRef(onChange);
   const initialValueRef = useRef(initialValue);
-  const skipNextChange = useRef(false);
+  const skipNextValueRef = useRef<string | null>(null);
   const readyRef = useRef(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const searchMatchesRef = useRef<Array<{ start: number; end: number }>>([]);
@@ -463,7 +463,7 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
     setValue: (value: string) => {
       const vditor = vditorRef.current;
       if (!vditor) return;
-      skipNextChange.current = true;
+      skipNextValueRef.current = value;
       vditor.setValue(value);
     },
     focus: () => {
@@ -480,8 +480,25 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
     let modifierHeld = false;
     const onKey = (e: KeyboardEvent) => { if (e.ctrlKey || e.metaKey) modifierHeld = true; };
     const onKeyUp = () => { modifierHeld = false; };
+    const notifyCurrentValue = () => {
+      const value = vditorRef.current?.getValue();
+      if (value === undefined) return;
+      if (skipNextValueRef.current !== null) {
+        if (value === skipNextValueRef.current) {
+          skipNextValueRef.current = null;
+          return;
+        }
+        skipNextValueRef.current = null;
+      }
+      onChangeRef.current(value);
+    };
+    const onPaste = () => {
+      window.setTimeout(notifyCurrentValue, 0);
+      window.setTimeout(notifyCurrentValue, 50);
+    };
     window.addEventListener("keydown", onKey);
     window.addEventListener("keyup", onKeyUp);
+    containerRef.current.addEventListener("paste", onPaste, true);
 
     const vditor = new Vditor(containerRef.current, {
       cdn: VDITOR_CDN,
@@ -493,9 +510,12 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
       cache: { enable: false },
       value: initialValue,
       input: (value) => {
-        if (skipNextChange.current) {
-          skipNextChange.current = false;
-          return;
+        if (skipNextValueRef.current !== null) {
+          if (value === skipNextValueRef.current) {
+            skipNextValueRef.current = null;
+            return;
+          }
+          skipNextValueRef.current = null;
         }
         onChangeRef.current(value);
       },
@@ -528,7 +548,7 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
         }
         const latestValue = initialValueRef.current;
         if (vditor.getValue() !== latestValue) {
-          skipNextChange.current = true;
+          skipNextValueRef.current = latestValue;
           vditor.setValue(latestValue);
         }
       },
@@ -540,6 +560,7 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
     return () => {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("keyup", onKeyUp);
+      containerRef.current?.removeEventListener("paste", onPaste, true);
       try {
         if (readyRef.current) {
           vditor.destroy();
@@ -561,7 +582,7 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
     if (!vditor || !readyRef.current) return;
     const current = vditor.getValue();
     if (current !== initialValue) {
-      skipNextChange.current = true;
+      skipNextValueRef.current = initialValue;
       vditor.setValue(initialValue);
     }
   }, [initialValue]);
