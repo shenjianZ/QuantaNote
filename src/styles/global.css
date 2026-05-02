@@ -357,6 +357,11 @@ kbd {
     background: var(--hover);
 }
 
+::selection {
+    background: var(--accent-soft);
+    color: var(--text);
+}
+
 .markdown-preview {
     color: var(--text);
     font-size: var(--font-size-md);

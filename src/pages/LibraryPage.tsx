@@ -428,7 +428,7 @@ export function LibraryPage({
               </button>
             </header>
 
-            <div className="min-h-0 flex-1 overflow-auto px-4 py-4">
+            <div className="min-h-0 flex-1 overflow-auto px-4 py-4" onCopy={() => useToastStore.getState().addToast("success", "已复制到剪贴板")}>
               <MarkdownRenderer
                 content={previewContent || selectedItem.summary || ""}
                 theme={theme === "light" ? "light" : "dark"}

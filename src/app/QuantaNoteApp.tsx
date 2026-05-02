@@ -196,7 +196,9 @@ export function QuantaNoteApp() {
                 // 其他快捷键完全阻止；编辑区域内保留系统级编辑/剪贴板快捷键。
                 const blockedKeys = ["p", "s", "u", "a", "r", "g", "j", "d", "e", "q", "w", "t", "i", "o", "z", "x", "c", "v"];
                 const editorKeys = ["a", "z", "x", "c", "v"];
-                if (blockedKeys.includes(key) && !(editorKeys.includes(key) && isEditableShortcutTarget(e.target))) {
+                const isEditor = isEditableShortcutTarget(e.target);
+                const hasSelection = !!window.getSelection()?.toString();
+                if (blockedKeys.includes(key) && !(editorKeys.includes(key) && (isEditor || (key === "c" && hasSelection)))) {
                     e.preventDefault();
                     e.stopPropagation();
                 }
