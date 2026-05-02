@@ -32,6 +32,14 @@ describe("Document editor", () => {
     expect(updated.title).toBe("自动保存测试");
   });
 
+  it("auto-saves summary after 1 second debounce", async () => {
+    await DocumentEditorPage.setSummary("手动修改后的摘要");
+    await DocumentEditorPage.waitForSaved(3000);
+
+    const updated = await getItemById(testItem.id);
+    expect(updated.summary).toBe("手动修改后的摘要");
+  });
+
   it("supports native copy and paste shortcuts in editor", async () => {
     await DocumentEditorPage.clearContent();
     await DocumentEditorPage.typeContent("剪贴板快捷键测试");

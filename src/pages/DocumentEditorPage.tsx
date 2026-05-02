@@ -31,6 +31,7 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
   const updateItem = useItemStore((s) => s.updateItem);
 
   const [title, setTitle] = useState("");
+  const [summary, setSummary] = useState("");
   const [content, setContent] = useState("");
   const [saved, setSaved] = useState(true);
   const [versions, setVersions] = useState<VersionDto[]>([]);
@@ -38,9 +39,11 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
   const [versionPanelOpen, setVersionPanelOpen] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestTitle = useRef(title);
+  const latestSummary = useRef(summary);
   const latestContent = useRef(content);
 
   useEffect(() => { latestTitle.current = title; }, [title]);
+  useEffect(() => { latestSummary.current = summary; }, [summary]);
   useEffect(() => { latestContent.current = content; }, [content]);
 
   // 组件卸载时清理防抖定时器
@@ -61,15 +64,20 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
   useEffect(() => {
     if (!selectedItem) return;
     setTitle(selectedItem.title);
+    setSummary(selectedItem.summary || "");
     setContent(selectedItem.content || "");
     setIsFavorite(selectedItem.favorite);
     setSaved(true);
   }, [selectedItem]);
 
-  const save = useCallback(async (newTitle: string, newContent: string) => {
+  const save = useCallback(async (newTitle: string, newSummary: string, newContent: string) => {
     if (!selectedItemId) return;
     try {
-      await updateItem(selectedItemId, { title: newTitle, content: newContent });
+      await updateItem(selectedItemId, {
+        title: newTitle,
+        summary: newSummary,
+        content: newContent,
+      });
       setSaved(true);
     } catch (e) {
       console.error("保存失败:", e);
@@ -77,20 +85,25 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
     }
   }, [selectedItemId, updateItem]);
 
-  function scheduleSave(newTitle: string, newContent: string) {
+  function scheduleSave(newTitle: string, newSummary: string, newContent: string) {
     setSaved(false);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => save(newTitle, newContent), 1000);
+    debounceRef.current = setTimeout(() => save(newTitle, newSummary, newContent), 1000);
   }
 
   function handleTitleChange(value: string) {
     setTitle(value);
-    scheduleSave(value, latestContent.current);
+    scheduleSave(value, latestSummary.current, latestContent.current);
+  }
+
+  function handleSummaryChange(value: string) {
+    setSummary(value);
+    scheduleSave(latestTitle.current, value, latestContent.current);
   }
 
   function handleContentChange(value: string) {
     setContent(value);
-    scheduleSave(latestTitle.current, value);
+    scheduleSave(latestTitle.current, latestSummary.current, value);
   }
 
   async function handleToggleFavorite() {
@@ -191,12 +204,20 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
       {/* Editor */}
       <article className="flex min-h-0 flex-1 flex-col rounded-3xl border border-[var(--line)] bg-[var(--paper)] p-4">
         <input
-          className="app-editor-title mb-3 w-full bg-transparent text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
+          className="app-editor-title mb-2 w-full bg-transparent text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
           type="text"
           data-testid="doc-title-input"
           value={title}
           onChange={(e) => handleTitleChange(e.currentTarget.value)}
           placeholder="文档标题"
+        />
+        <textarea
+          className="mb-3 max-h-24 min-h-12 w-full resize-y rounded-xl border border-transparent bg-[var(--field)] px-3 py-2 text-sm leading-relaxed text-[var(--muted)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:text-[var(--text)]"
+          data-testid="doc-summary-input"
+          value={summary}
+          onChange={(e) => handleSummaryChange(e.currentTarget.value)}
+          placeholder="摘要"
+          rows={2}
         />
         <div className="min-h-0 flex-1 overflow-hidden">
           <Suspense fallback={<div className="flex h-full items-center justify-center text-[var(--muted)]"><Loader2 className="mr-2 h-4 w-4 animate-spin" />加载编辑器...</div>}>

@@ -18,32 +18,11 @@ const SCRIPT_ASSETS = [
 ];
 
 const HINT_ASSETS = [
-  {
-    as: "style",
-    path: `${VDITOR_CDN}/dist/css/content-theme/dark.css`,
-  },
-  {
-    as: "style",
-    path: `${VDITOR_CDN}/dist/css/content-theme/light.css`,
-  },
-  {
-    as: "script",
-    path: `${VDITOR_CDN}/dist/js/highlight.js/highlight.min.js`,
-  },
-  {
-    as: "script",
-    path: `${VDITOR_CDN}/dist/js/highlight.js/third-languages.js`,
-  },
+  `${VDITOR_CDN}/dist/css/content-theme/dark.css`,
+  `${VDITOR_CDN}/dist/css/content-theme/light.css`,
+  `${VDITOR_CDN}/dist/js/highlight.js/highlight.min.js`,
+  `${VDITOR_CDN}/dist/js/highlight.js/third-languages.js`,
 ];
-
-function addPreloadHint(path: string, as: string) {
-  if (document.querySelector(`link[rel="preload"][href="${path}"]`)) return;
-  const link = document.createElement("link");
-  link.rel = "preload";
-  link.href = path;
-  link.as = as;
-  document.head.appendChild(link);
-}
 
 function loadScript(path: string, id: string) {
   return new Promise<void>((resolve, reject) => {
@@ -72,6 +51,10 @@ function loadScript(path: string, id: string) {
   });
 }
 
+function warmCache(path: string) {
+  return fetch(path, { cache: "force-cache" }).catch(() => undefined);
+}
+
 export function preloadVditorResources() {
   if (preloadPromise) return preloadPromise;
   if (typeof document === "undefined" || import.meta.env.MODE === "test") {
@@ -79,14 +62,23 @@ export function preloadVditorResources() {
     return preloadPromise;
   }
 
-  [...SCRIPT_ASSETS.map((asset) => ({ as: "script", path: asset.path })), ...HINT_ASSETS]
-    .forEach((asset) => addPreloadHint(asset.path, asset.as));
+  const warmOptionalAssets = () => {
+    HINT_ASSETS.forEach((path) => {
+      warmCache(path);
+    });
+  };
 
   preloadPromise = Promise.all([
     import("../components/editor/VditorEditor"),
     ...SCRIPT_ASSETS.map((asset) => loadScript(asset.path, asset.id)),
   ])
-    .then(() => undefined)
+    .then(() => {
+      if ("requestIdleCallback" in window) {
+        window.requestIdleCallback(warmOptionalAssets);
+      } else {
+        globalThis.setTimeout(warmOptionalAssets, 500);
+      }
+    })
     .catch(() => undefined);
 
   return preloadPromise;

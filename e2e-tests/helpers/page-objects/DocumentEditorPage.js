@@ -8,6 +8,7 @@ import { pause, observePause } from "../config.js";
 
 class DocumentEditorPage {
   get titleInput() { return "[data-testid='doc-title-input']"; }
+  get summaryInput() { return "[data-testid='doc-summary-input']"; }
   get saveStatus() { return "[data-testid='doc-save-status']"; }
   get saveVersionBtn() { return "[data-testid='doc-save-version-btn']"; }
   get favoriteBtn() { return "[data-testid='doc-favorite-btn']"; }
@@ -29,6 +30,17 @@ class DocumentEditorPage {
     const input = await $(this.titleInput);
     await input.clearValue();
     await input.setValue(title);
+  }
+
+  async getSummary() {
+    const input = await $(this.summaryInput);
+    return input.getValue();
+  }
+
+  async setSummary(summary) {
+    const input = await $(this.summaryInput);
+    await input.clearValue();
+    await input.setValue(summary);
   }
 
   async typeContent(text) {
