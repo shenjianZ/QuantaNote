@@ -43,10 +43,20 @@ pub struct SyncRecordData {
     pub data: serde_json::Value,
 }
 
+/// 远程附件元信息（用于客户端判断需要下载哪些附件）
+#[derive(Debug, Serialize, Clone)]
+pub struct RemoteAttachmentInfo {
+    pub attachment_id: String,
+    pub file_hash: String,
+}
+
 /// 附件差异结果
 #[derive(Debug, Serialize)]
 pub struct AttachmentDiffResult {
+    /// 服务端缺少的附件 hash（需要客户端上传）
     pub missing: Vec<String>,
+    /// 服务端已有的附件列表（客户端可据此判断需要下载哪些）
+    pub remote_attachments: Vec<RemoteAttachmentInfo>,
 }
 
 /// 提交结果

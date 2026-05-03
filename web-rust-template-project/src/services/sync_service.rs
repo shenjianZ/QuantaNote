@@ -4,7 +4,7 @@ use crate::domain::dto::sync::{
 use crate::domain::entities::{sync_attachments, sync_records};
 use crate::domain::vo::sync::{
     AttachmentDiffResult, CommitResult, PullResult, PushResult, RecordMetaInfo,
-    SnapshotInfo, SyncHistoryEntry, SyncRecordData,
+    RemoteAttachmentInfo, SnapshotInfo, SyncHistoryEntry, SyncRecordData,
 };
 use crate::infra::storage::StorageBackend;
 use crate::repositories::sync_repository::SyncRepository;
@@ -174,7 +174,18 @@ impl SyncService {
             .cloned()
             .collect();
 
-        Ok(AttachmentDiffResult { missing })
+        let remote_attachments: Vec<RemoteAttachmentInfo> = existing
+            .iter()
+            .map(|a| RemoteAttachmentInfo {
+                attachment_id: a.attachment_id.clone(),
+                file_hash: a.file_hash.clone(),
+            })
+            .collect();
+
+        Ok(AttachmentDiffResult {
+            missing,
+            remote_attachments,
+        })
     }
 
     /// 上传附件

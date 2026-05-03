@@ -18,6 +18,24 @@ import {
     type SyncHistoryEntry,
 } from "../services/tauriCommands";
 
+let _autoSyncTimer: ReturnType<typeof setInterval> | null = null;
+let _initialized = false;
+
+function startAutoSync(intervalMinutes: number, triggerFn: () => Promise<void>) {
+    stopAutoSync();
+    if (intervalMinutes < 1) return;
+    _autoSyncTimer = setInterval(() => {
+        triggerFn().catch(() => {});
+    }, intervalMinutes * 60 * 1000);
+}
+
+function stopAutoSync() {
+    if (_autoSyncTimer) {
+        clearInterval(_autoSyncTimer);
+        _autoSyncTimer = null;
+    }
+}
+
 interface SyncStore {
     config: SyncConfig;
     state: SyncState;
@@ -75,10 +93,22 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
             const state = await getSyncState();
             set({ config, state });
 
-            // 监听同步状态变化事件
-            listen<SyncState>("sync-state-changed", (event) => {
-                set({ state: event.payload });
-            });
+            // 仅注册一次事件监听，防止重复
+            if (!_initialized) {
+                _initialized = true;
+                listen<SyncState>("sync-state-changed", (event) => {
+                    set({ state: event.payload });
+                });
+            }
+
+            // 启动自动同步
+            if (config.enabled && config.access_token && config.auto_sync) {
+                startAutoSync(config.sync_interval_minutes, async () => {
+                    try {
+                        await get().triggerSync();
+                    } catch {}
+                });
+            }
         } catch (e) {
             console.error("初始化同步配置失败:", e);
         }
@@ -181,6 +211,17 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
             await saveSyncConfig(updated);
         } catch (e) {
             set({ error: String(e) });
+        }
+
+        // 更新自动同步定时器
+        if (updated.enabled && updated.access_token && updated.auto_sync) {
+            startAutoSync(updated.sync_interval_minutes, async () => {
+                try {
+                    await get().triggerSync();
+                } catch {}
+            });
+        } else {
+            stopAutoSync();
         }
     },
 

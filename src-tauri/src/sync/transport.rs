@@ -5,6 +5,16 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+/// 判断 HTTP 状态码是否值得重试
+fn is_retryable_status(status: reqwest::StatusCode) -> bool {
+    status.is_server_error() || status == reqwest::StatusCode::TOO_MANY_REQUESTS
+}
+
+/// 判断错误是否值得重试（网络层错误）
+fn is_retryable_error(err: &reqwest::Error) -> bool {
+    err.is_timeout() || err.is_connect() || err.is_request()
+}
+
 /// API 响应结构
 #[derive(Debug, Deserialize)]
 struct ApiResponse<T> {
@@ -46,10 +56,20 @@ pub struct PullResult {
     pub snapshot_id: String,
 }
 
+/// 远程附件元信息
+#[derive(Debug, Deserialize, Clone)]
+pub struct RemoteAttachmentInfo {
+    pub attachment_id: String,
+    pub file_hash: String,
+}
+
 /// 附件差异结果
 #[derive(Debug, Deserialize)]
 pub struct AttachmentDiffResult {
+    /// 服务端缺少的附件 hash（需要上传）
     pub missing: Vec<String>,
+    /// 服务端已有的附件列表（用于判断需要下载哪些）
+    pub remote_attachments: Vec<RemoteAttachmentInfo>,
 }
 
 /// 提交结果
@@ -208,18 +228,70 @@ impl SyncTransport {
         resp: reqwest::Response,
     ) -> Result<T, AppError> {
         let status = resp.status();
+
+        if !status.is_success() {
+            // 非 2xx：先读取原始 body 文本，尽可能保留错误信息
+            let body_text = resp.text().await.unwrap_or_else(|_| "无法读取响应体".to_string());
+            // 尝试解析为 JSON 获取 message 字段
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body_text) {
+                let msg = json["message"].as_str().unwrap_or(&body_text);
+                return Err(AppError::SyncError(format!("HTTP {}: {}", status.as_u16(), msg)));
+            }
+            return Err(AppError::SyncError(format!("HTTP {}: {}", status.as_u16(), body_text)));
+        }
+
         let body: ApiResponse<T> = resp.json().await.map_err(|e| {
             AppError::SyncError(format!("解析响应失败: {}", e))
         })?;
 
-        if status.is_success() && body.code == 200 {
+        if body.code == 200 {
             body.data.ok_or_else(|| AppError::SyncError("响应数据为空".to_string()))
         } else {
-            Err(AppError::SyncError(format!("请求失败: {}", body.message)))
+            Err(AppError::SyncError(format!("业务错误 ({}): {}", body.code, body.message)))
         }
     }
 
-    /// 发送带认证的请求，遇到 401 自动刷新 token 并重试
+    /// 带指数退避的请求执行（对可重试的瞬态错误自动重试）
+    async fn execute_with_retry(&self, req: reqwest::Request) -> Result<reqwest::Response, AppError> {
+        const MAX_RETRIES: u32 = 3;
+        const INITIAL_BACKOFF_MS: u64 = 500;
+
+        let mut last_err: Option<String> = None;
+
+        for attempt in 0..MAX_RETRIES {
+            let req_clone = req.try_clone()
+                .ok_or_else(|| AppError::SyncError("无法克隆请求".to_string()))?;
+
+            match self.client.execute(req_clone).await {
+                Ok(resp) => {
+                    if is_retryable_status(resp.status()) && attempt < MAX_RETRIES - 1 {
+                        let backoff = INITIAL_BACKOFF_MS * 2u64.pow(attempt);
+                        last_err = Some(format!("HTTP {}", resp.status().as_u16()));
+                        tokio::time::sleep(std::time::Duration::from_millis(backoff)).await;
+                        continue;
+                    }
+                    return Ok(resp);
+                }
+                Err(e) => {
+                    if is_retryable_error(&e) && attempt < MAX_RETRIES - 1 {
+                        let backoff = INITIAL_BACKOFF_MS * 2u64.pow(attempt);
+                        last_err = Some(format!("网络错误: {}", e));
+                        tokio::time::sleep(std::time::Duration::from_millis(backoff)).await;
+                        continue;
+                    }
+                    return Err(AppError::SyncError(format!("请求失败: {}", e)));
+                }
+            }
+        }
+
+        Err(AppError::SyncError(format!(
+            "请求失败（已重试 {} 次）: {}",
+            MAX_RETRIES,
+            last_err.unwrap_or_else(|| "未知错误".to_string())
+        )))
+    }
+
+    /// 发送带认证的请求，遇到 401 自动刷新 token 并重试，其他瞬态错误自动重试
     async fn send_auth_with_refresh(
         &self,
         builder: reqwest::RequestBuilder,
@@ -236,10 +308,9 @@ impl SyncTransport {
                 .map_err(|e| AppError::SyncError(format!("无效的 auth header: {}", e)))?,
         );
 
-        let resp = self.client
-            .execute(req.try_clone().ok_or_else(|| AppError::SyncError("无法克隆请求".to_string()))?)
-            .await
-            .map_err(|e| AppError::SyncError(format!("请求失败: {}", e)))?;
+        let resp = self.execute_with_retry(
+            req.try_clone().ok_or_else(|| AppError::SyncError("无法克隆请求".to_string()))?
+        ).await?;
 
         if resp.status() != reqwest::StatusCode::UNAUTHORIZED {
             return Ok(resp);
@@ -256,10 +327,7 @@ impl SyncTransport {
                 .map_err(|e| AppError::SyncError(format!("无效的 auth header: {}", e)))?,
         );
 
-        let resp2 = self.client
-            .execute(req2)
-            .await
-            .map_err(|e| AppError::SyncError(format!("重试请求失败: {}", e)))?;
+        let resp2 = self.execute_with_retry(req2).await?;
 
         Ok(resp2)
     }
@@ -435,11 +503,16 @@ impl SyncTransport {
         snapshot_id: &str,
         data: Vec<u8>,
     ) -> Result<String, AppError> {
-        let url = format!(
-            "{}/sync/attachments/upload?attachment_id={}&item_id={}&filename={}&mime_type={}&file_hash={}&snapshot_id={}",
-            self.server_url, attachment_id, item_id, filename, mime_type, file_hash, snapshot_id
-        );
-        let builder = self.client.post(&url).body(data);
+        let mut url = reqwest::Url::parse(&format!("{}/sync/attachments/upload", self.server_url))
+            .map_err(|e| AppError::SyncError(format!("URL 解析失败: {}", e)))?;
+        url.query_pairs_mut()
+            .append_pair("attachment_id", attachment_id)
+            .append_pair("item_id", item_id)
+            .append_pair("filename", filename)
+            .append_pair("mime_type", mime_type)
+            .append_pair("file_hash", file_hash)
+            .append_pair("snapshot_id", snapshot_id);
+        let builder = self.client.post(url).body(data);
         let resp = self.send_auth_with_refresh(builder).await?;
 
         let body: ApiResponse<serde_json::Value> = resp.json().await.map_err(|e| {

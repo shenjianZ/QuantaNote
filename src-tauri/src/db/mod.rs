@@ -121,7 +121,7 @@ CREATE TABLE IF NOT EXISTS settings (
 INSERT OR IGNORE INTO schema_version (version) VALUES (1);
 ";
 
-const SCHEMA_VERSION: i64 = 4;
+const SCHEMA_VERSION: i64 = 5;
 
 impl DbState {
     pub fn open(db_path: &str) -> Result<Self, AppError> {
@@ -186,6 +186,19 @@ impl DbState {
                     PRIMARY KEY (record_id, table_name)
                  );
                  INSERT OR IGNORE INTO schema_version (version) VALUES (4);",
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+
+        if current_version < 5 {
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS sync_tombstones (
+                    record_id TEXT NOT NULL,
+                    table_name TEXT NOT NULL,
+                    deleted_at TEXT NOT NULL,
+                    PRIMARY KEY (record_id, table_name)
+                 );
+                 INSERT OR IGNORE INTO schema_version (version) VALUES (5);",
             )
             .map_err(|e| AppError::Database(e.to_string()))?;
         }

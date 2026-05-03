@@ -155,12 +155,27 @@ pub fn delete(db: &DbState, id: &str) -> Result<(), AppError> {
         .conn
         .lock()
         .map_err(|e| AppError::Database(e.to_string()))?;
-    let rows = conn
-        .execute("DELETE FROM items WHERE id = ?1", params![id])
-        .map_err(|e| AppError::Database(e.to_string()))?;
-    if rows == 0 {
+
+    // 先检查记录是否存在
+    let exists: bool = conn
+        .query_row("SELECT 1 FROM items WHERE id = ?1", params![id], |_| Ok(true))
+        .unwrap_or(false);
+    if !exists {
         return Err(AppError::NotFound(format!("Item {}", id)));
     }
+
+    // 记录 tombstone（用于同步删除操作）
+    let now = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "INSERT OR REPLACE INTO sync_tombstones (record_id, table_name, deleted_at) VALUES (?1, 'items', ?2)",
+        params![id, now],
+    )
+    .map_err(|e| AppError::Database(e.to_string()))?;
+
+    // 硬删除（CASCADE 会清理 item_tags, attachments, versions）
+    conn.execute("DELETE FROM items WHERE id = ?1", params![id])
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
     Ok(())
 }
 

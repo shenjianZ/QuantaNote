@@ -175,6 +175,39 @@ pub fn collect_local_records(db: &DbState) -> Result<Vec<SyncRecordPayload>, App
         &mut all_records,
     )?;
 
+    // tombstones（已删除记录的标记）
+    let mut stmt = conn
+        .prepare("SELECT record_id, table_name, deleted_at FROM sync_tombstones")
+        .map_err(|e| AppError::Database(format!("准备查询失败 (tombstones): {}", e)))?;
+
+    let rows = stmt
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+            ))
+        })
+        .map_err(|e| AppError::Database(format!("查询失败 (tombstones): {}", e)))?;
+
+    for row in rows {
+        let (record_id, table_name, deleted_at) =
+            row.map_err(|e| AppError::Database(format!("读取行失败 (tombstones): {}", e)))?;
+        let data = serde_json::json!({
+            "id": record_id,
+            "_deleted": true,
+            "deleted_at": deleted_at,
+        });
+        let content_hash = compute_record_hash(&data);
+        all_records.push(SyncRecordPayload {
+            table_name,
+            record_id,
+            content_hash,
+            updated_at: deleted_at,
+            data,
+        });
+    }
+
     Ok(all_records)
 }
 
@@ -278,7 +311,15 @@ pub fn compute_diff(
                             let resolution = match conflict_strategy {
                                 "local-wins" => ConflictResolution::LocalWins,
                                 "remote-wins" => ConflictResolution::RemoteWins,
-                                _ => ConflictResolution::RemoteWins, // 默认远程优先
+                                "auto" => {
+                                    // 比较时间戳，选择更新的一方
+                                    if l.updated_at >= r.updated_at {
+                                        ConflictResolution::LocalWins
+                                    } else {
+                                        ConflictResolution::RemoteWins
+                                    }
+                                }
+                                _ => ConflictResolution::RemoteWins,
                             };
                             conflicts.push(SyncConflict {
                                 record_id: id,

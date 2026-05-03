@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager, State};
 
@@ -15,6 +16,14 @@ fn ensure_device_id(config: &mut SyncConfig) {
     }
 }
 
+/// RAII guard，确保同步标记在函数退出时清除
+struct SyncGuard<'a>(&'a AtomicBool);
+impl Drop for SyncGuard<'_> {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::SeqCst);
+    }
+}
+
 /// 同步引擎状态，由 Tauri 管理
 pub struct SyncEngineState {
     pub engine: Mutex<SyncEngine>,
@@ -23,6 +32,8 @@ pub struct SyncEngineState {
     pub transport: Mutex<Option<SyncTransport>>,
     /// 共享的状态管理器
     pub state_manager: Mutex<SyncStateManager>,
+    /// 防止并发同步
+    is_syncing: AtomicBool,
 }
 
 impl SyncEngineState {
@@ -33,6 +44,7 @@ impl SyncEngineState {
             config: Mutex::new(config),
             transport: Mutex::new(None),
             state_manager: Mutex::new(state_manager),
+            is_syncing: AtomicBool::new(false),
         }
     }
 
@@ -126,6 +138,14 @@ pub async fn trigger_sync(
     db: State<'_, DbState>,
     sync_state: State<'_, SyncEngineState>,
 ) -> Result<SyncResult, AppError> {
+    // 防止并发同步
+    if sync_state.is_syncing.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_err() {
+        return Err(AppError::SyncError("同步正在进行中，请稍后再试".to_string()));
+    }
+
+    // 确保同步结束后清除标记
+    let _guard = SyncGuard(&sync_state.is_syncing);
+
     let config = {
         let mut cfg = sync_state
             .config
@@ -145,44 +165,45 @@ pub async fn trigger_sync(
     }
 
     // 获取 transport 和 state_manager 的克隆，然后释放 engine 锁
-    let (transport, state_manager) = {
+    let (transport, state_manager, _shared_config) = {
         let engine = sync_state
             .engine
             .lock()
             .map_err(|e| AppError::Database(e.to_string()))?;
-        // 使用带回调的 transport，refresh 成功后立即持久化新 token
+        // 使用共享 config 的 transport，回调和主流程共享同一份 config
+        let shared_config = std::sync::Arc::new(std::sync::Mutex::new(config.clone()));
         let db_clone = db.inner().clone();
-        let config_clone = config.clone();
+        let shared_cfg_clone = shared_config.clone();
         let transport = SyncTransport::new_with_callback(
             &config.server_url,
             &config.access_token,
             &config.refresh_token,
             &config.device_id,
             Box::new(move |new_access, new_refresh| {
-                let mut cfg = config_clone.clone();
-                cfg.access_token = new_access;
-                cfg.refresh_token = new_refresh;
-                let _ = save_sync_config(&db_clone, &cfg);
+                if let Ok(mut cfg) = shared_cfg_clone.lock() {
+                    cfg.access_token = new_access;
+                    cfg.refresh_token = new_refresh;
+                    let _ = save_sync_config(&db_clone, &cfg);
+                }
             }),
         );
         let sm = engine.state_manager().clone();
-        (transport, sm)
+        (transport, sm, shared_config)
     };
 
     // 使用独立的 transport 执行同步（不持有 engine 锁）
     let result = run_sync_with_transport(&transport, &state_manager, &config, &db).await?;
 
-    // 获取可能已刷新的 tokens
+    // 获取可能已刷新的 tokens（回调可能已更新了 shared_config）
     let (new_access, new_refresh) = transport.get_tokens().await;
 
-    // 更新配置（含 last_sync_at 等字段，回调已即时保存了 token）
+    // 更新配置（含 last_sync_at 等字段）
     let mut updated_config = config;
     updated_config.last_sync_at = Some(chrono::Utc::now().to_rfc3339());
     updated_config.last_snapshot_id = Some(result.snapshot_id.clone());
-    if new_access != updated_config.access_token {
-        updated_config.access_token = new_access;
-        updated_config.refresh_token = new_refresh;
-    }
+    // 回调可能已更新了 token，以 transport 中的为准
+    updated_config.access_token = new_access;
+    updated_config.refresh_token = new_refresh;
     save_sync_config(&db, &updated_config)?;
     if let Ok(mut cfg) = sync_state.config.lock() {
         *cfg = updated_config;
@@ -305,23 +326,66 @@ async fn sync_attachments(
     result: &mut SyncResult,
     db: &DbState,
 ) -> Result<(), AppError> {
+    use crate::utils::paths;
+
     let attachments = collect_local_attachments(db)?;
-    let hashes: Vec<String> = attachments.iter().map(|a| a.1.clone()).collect();
+    let local_hashes: Vec<String> = attachments.iter().map(|a| a.1.clone()).collect();
 
-    if hashes.is_empty() {
-        return Ok(());
-    }
+    let diff = transport.diff_attachments(local_hashes).await?;
 
-    let diff = transport.diff_attachments(hashes).await?;
+    // 构建本地 hash 集合，用于快速查找
+    let local_hash_set: std::collections::HashSet<&str> =
+        attachments.iter().map(|a| a.1.as_str()).collect();
 
-    for (path, hash, item_id, filename, mime_type) in &attachments {
+    // 上传服务端缺少的附件（直接使用预读的文件数据）
+    for (_path, hash, data, item_id, filename, mime_type) in &attachments {
         if diff.missing.contains(hash) {
-            let data = std::fs::read(path).map_err(|e| AppError::Io(e.to_string()))?;
             let attachment_id = filename;
             transport
-                .upload_attachment(attachment_id, item_id, filename, mime_type, hash, "", data)
+                .upload_attachment(attachment_id, item_id, filename, mime_type, hash, "", data.clone())
                 .await?;
             result.attachments_uploaded += 1;
+        }
+    }
+
+    // 下载本地缺少的附件
+    for remote in &diff.remote_attachments {
+        if !local_hash_set.contains(remote.file_hash.as_str()) {
+            // 检查本地 attachments 表是否已有此附件的记录（可能有记录但文件丢失）
+            let local_has_record = {
+                let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
+                let exists: bool = conn
+                    .query_row(
+                        "SELECT 1 FROM attachments WHERE id = ?1",
+                        rusqlite::params![remote.attachment_id],
+                        |_| Ok(true),
+                    )
+                    .unwrap_or(false);
+                exists
+            };
+
+            if local_has_record {
+                // 记录存在但文件丢失，重新下载到已有路径
+                let file_path = {
+                    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
+                    conn.query_row(
+                        "SELECT file_path FROM attachments WHERE id = ?1",
+                        rusqlite::params![remote.attachment_id],
+                        |row| row.get::<_, String>(0),
+                    )
+                    .map_err(|e| AppError::Database(e.to_string()))?
+                };
+                let data = transport.download_attachment(&remote.attachment_id).await?;
+                let full_path = paths::quantanote_dir().join(&file_path);
+                if let Some(parent) = full_path.parent() {
+                    std::fs::create_dir_all(parent).map_err(|e| AppError::Io(e.to_string()))?;
+                }
+                std::fs::write(&full_path, &data).map_err(|e| AppError::Io(e.to_string()))?;
+                result.attachments_downloaded += 1;
+            }
+            // 如果本地连记录都没有，说明是来自远程的新附件。
+            // 此时 attachments 表的元数据应该已通过记录同步（apply_item 等）获得，
+            // 但 attachments 表的 apply 逻辑尚不完善，此处暂跳过。
         }
     }
 
@@ -330,7 +394,7 @@ async fn sync_attachments(
 
 fn collect_local_attachments(
     db: &DbState,
-) -> Result<Vec<(std::path::PathBuf, String, String, String, String)>, AppError> {
+) -> Result<Vec<(std::path::PathBuf, String, Vec<u8>, String, String, String)>, AppError> {
     use crate::sync::diff::compute_file_hash;
     use crate::utils::paths;
 
@@ -363,7 +427,7 @@ fn collect_local_attachments(
         if full_path.exists() {
             let data = std::fs::read(&full_path).map_err(|e| AppError::Io(e.to_string()))?;
             let hash = compute_file_hash(&data);
-            result.push((full_path, hash, item_id, filename, mime_type));
+            result.push((full_path, hash, data, item_id, filename, mime_type));
         }
     }
 
@@ -378,15 +442,24 @@ fn apply_pulled_records(records: &[SyncRecordPayload], db: &DbState) -> Result<(
         .lock()
         .map_err(|e| AppError::Database(e.to_string()))?;
 
+    let tx = conn.unchecked_transaction()
+        .map_err(|e| AppError::Database(format!("开始事务失败: {}", e)))?;
+
     for record in records {
-        match record.table_name.as_str() {
-            "items" => apply_item(&conn, &record.data)?,
-            "tags" => apply_tag(&conn, &record.data)?,
-            "item_tags" => apply_item_tag(&conn, &record.data)?,
-            "versions" => apply_version(&conn, &record.data)?,
-            _ => {}
+        let result = match record.table_name.as_str() {
+            "items" => apply_item(&tx, &record.data),
+            "tags" => apply_tag(&tx, &record.data),
+            "item_tags" => apply_item_tag(&tx, &record.data),
+            "versions" => apply_version(&tx, &record.data),
+            _ => Ok(()),
+        };
+        if let Err(e) = result {
+            tx.rollback().map_err(|re| AppError::Database(format!("回滚事务失败: {}", re)))?;
+            return Err(e);
         }
     }
+
+    tx.commit().map_err(|e| AppError::Database(format!("提交事务失败: {}", e)))?;
 
     Ok(())
 }
