@@ -12,12 +12,28 @@ interface ModalProps {
 export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg" }: ModalProps) {
   const backdropRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
+  // 自动聚焦：仅在 open 从 false 变为 true 时执行一次
+  useEffect(() => {
+    if (!open) return;
+    const timer = setTimeout(() => {
+      if (dialogRef.current) {
+        const first = dialogRef.current.querySelector<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        first?.focus();
+      }
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [open]);
+
+  // 键盘事件：Escape 关闭 + Tab 焦点陷阱
   useEffect(() => {
     if (!open) return;
     function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-      // 焦点陷阱：Tab 键循环在模态框内
+      if (e.key === "Escape") onCloseRef.current();
       if (e.key === "Tab" && dialogRef.current) {
         const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
           'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
@@ -35,17 +51,8 @@ export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg" }:
       }
     }
     document.addEventListener("keydown", handleKey);
-    // 自动聚焦第一个可聚焦元素
-    setTimeout(() => {
-      if (dialogRef.current) {
-        const first = dialogRef.current.querySelector<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        );
-        first?.focus();
-      }
-    }, 50);
     return () => document.removeEventListener("keydown", handleKey);
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 

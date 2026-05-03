@@ -46,6 +46,14 @@ config = "0.13"
 rand = "0.8"
 clap = { version = "4", features = ["derive", "env"] }
 
+# ===== 存储后端 =====
+# S3 兼容存储（MinIO / AWS S3）
+rust-s3 = { version = "0.35", features = ["with-tokio"] }
+# HTTP 客户端（OpenList API）
+reqwest = { version = "0.12", features = ["json", "multipart", "stream"] }
+# 字节处理
+bytes = "1"
+
 # 优化发布版本
 [profile.release]
 opt-level = "z"

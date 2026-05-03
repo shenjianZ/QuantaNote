@@ -10,6 +10,8 @@ pub enum AppError {
     Validation(String),
     #[error("IO 错误: {0}")]
     Io(String),
+    #[error("同步错误: {0}")]
+    SyncError(String),
 }
 
 impl Serialize for AppError {
@@ -45,6 +47,7 @@ mod tests {
             AppError::NotFound("nf".to_string()),
             AppError::Validation("val".to_string()),
             AppError::Io("io".to_string()),
+            AppError::SyncError("sync".to_string()),
         ];
         for err in &errors {
             let json = serde_json::to_string(err).unwrap();

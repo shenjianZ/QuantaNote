@@ -73,6 +73,23 @@ impl UserRepository {
         Ok(inserted_user)
     }
 
+    /// 更新用户密码
+    pub async fn update_password(&self, id: &str, new_password_hash: &str) -> Result<()> {
+        let user = users::Entity::find_by_id(id)
+            .one(&self.db)
+            .await
+            .map_err(|e| anyhow::anyhow!("查询失败: {}", e))?
+            .ok_or_else(|| anyhow::anyhow!("用户不存在"))?;
+
+        let mut active_model: users::ActiveModel = user.into();
+        active_model.password_hash = Set(new_password_hash.to_string());
+        active_model.update(&self.db)
+            .await
+            .map_err(|e| anyhow::anyhow!("更新失败: {}", e))?;
+
+        Ok(())
+    }
+
     /// 根据 ID 删除用户
     pub async fn delete_by_id(&self, id: &str) -> Result<()> {
         users::Entity::delete_by_id(id)

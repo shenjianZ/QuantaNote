@@ -317,3 +317,115 @@ export async function loadAllSettings() {
 export async function saveSettings(settings: Record<string, string>) {
     return invoke("save_settings", { settings });
 }
+
+// Sync types
+export interface SyncConfig {
+    enabled: boolean;
+    server_url: string;
+    access_token: string;
+    refresh_token: string;
+    user_id: string;
+    device_id: string;
+    auto_sync: boolean;
+    sync_interval_minutes: number;
+    conflict_resolution: string;
+    sync_attachments: boolean;
+    last_sync_at: string | null;
+    last_snapshot_id: string | null;
+}
+
+export interface SyncState {
+    status: string;
+    progress: { phase: string; current: number; total: number } | null;
+    last_error: string | null;
+    last_sync_at: string | null;
+}
+
+export interface SyncResult {
+    pushed: number;
+    pulled: number;
+    skipped: number;
+    attachments_uploaded: number;
+    attachments_downloaded: number;
+    snapshot_id: string;
+}
+
+export interface SyncLoginResult {
+    user_id: string;
+    email: string;
+    access_token: string;
+    refresh_token: string;
+}
+
+export interface SyncHistoryEntry {
+    snapshot_id: string;
+    record_count: number;
+    total_size: number;
+    created_at: string;
+}
+
+// Sync commands
+export async function getSyncConfig() {
+    return invoke<SyncConfig>("get_sync_config");
+}
+
+export async function saveSyncConfig(config: SyncConfig) {
+    return invoke("save_sync_config_cmd", { config });
+}
+
+export async function getSyncState() {
+    return invoke<SyncState>("get_sync_state");
+}
+
+export async function triggerSync() {
+    return invoke<SyncResult>("trigger_sync");
+}
+
+export async function syncLogin(
+    serverUrl: string,
+    email: string,
+    password: string,
+) {
+    return invoke<SyncLoginResult>("sync_login", { serverUrl, email, password });
+}
+
+export async function syncRegister(
+    serverUrl: string,
+    email: string,
+    password: string,
+) {
+    return invoke<SyncLoginResult>("sync_register", { serverUrl, email, password });
+}
+
+export async function syncLogout() {
+    return invoke("sync_logout");
+}
+
+export async function syncForgotPassword(
+    serverUrl: string,
+    email: string,
+) {
+    return invoke<string>("sync_forgot_password", { serverUrl, email });
+}
+
+export async function syncResetPassword(
+    serverUrl: string,
+    email: string,
+    resetToken: string,
+    newPassword: string,
+) {
+    return invoke("sync_reset_password", {
+        serverUrl,
+        email,
+        resetToken,
+        newPassword,
+    });
+}
+
+export async function testSyncConnection(serverUrl: string) {
+    return invoke<boolean>("test_sync_connection", { serverUrl });
+}
+
+export async function getSyncHistory() {
+    return invoke<SyncHistoryEntry[]>("get_sync_history");
+}

@@ -10,6 +10,7 @@ impl TokenService {
     /// 生成 JWT access token
     pub fn generate_access_token(
         user_id: &str,
+        device_id: &str,
         expiration_minutes: u64,
         jwt_secret: &str,
     ) -> Result<String> {
@@ -22,6 +23,7 @@ impl TokenService {
             sub: user_id.to_string(),
             exp: expiration,
             token_type: TokenType::Access,
+            device_id: device_id.to_string(),
         };
 
         let token = encode(
@@ -36,6 +38,7 @@ impl TokenService {
     /// 生成 refresh token
     pub fn generate_refresh_token(
         user_id: &str,
+        device_id: &str,
         expiration_days: i64,
         jwt_secret: &str,
     ) -> Result<String> {
@@ -48,6 +51,7 @@ impl TokenService {
             sub: user_id.to_string(),
             exp: expiration,
             token_type: TokenType::Refresh,
+            device_id: device_id.to_string(),
         };
 
         let token = encode(
@@ -62,14 +66,15 @@ impl TokenService {
     /// 生成 access token 和 refresh token
     pub fn generate_token_pair(
         user_id: &str,
+        device_id: &str,
         access_token_expiration_minutes: u64,
         refresh_token_expiration_days: i64,
         jwt_secret: &str,
     ) -> Result<(String, String)> {
         let access_token =
-            Self::generate_access_token(user_id, access_token_expiration_minutes, jwt_secret)?;
+            Self::generate_access_token(user_id, device_id, access_token_expiration_minutes, jwt_secret)?;
         let refresh_token =
-            Self::generate_refresh_token(user_id, refresh_token_expiration_days, jwt_secret)?;
+            Self::generate_refresh_token(user_id, device_id, refresh_token_expiration_days, jwt_secret)?;
 
         Ok((access_token, refresh_token))
     }
@@ -85,6 +90,18 @@ impl TokenService {
 
         Ok(token_data.claims.sub)
     }
+
+    /// 从 token 中解码出 device_id
+    pub fn decode_device_id(token: &str, jwt_secret: &str) -> Result<String> {
+        let token_data = decode::<Claims>(
+            token,
+            &DecodingKey::from_secret(jwt_secret.as_ref()),
+            &Validation::default(),
+        )
+        .map_err(|e| anyhow::anyhow!("Token 解码失败: {}", e))?;
+
+        Ok(token_data.claims.device_id)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -92,6 +109,8 @@ pub struct Claims {
     pub sub: String, // user_id
     pub exp: usize,  // 过期时间
     pub token_type: TokenType,
+    #[serde(default)]
+    pub device_id: String, // 设备标识
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]

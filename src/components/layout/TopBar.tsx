@@ -5,6 +5,7 @@ import type { AppPage } from "../../types";
 import { Kbd } from "../common/Kbd";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useAppStore } from "../../stores/appStore";
+import { SyncStatusIndicator } from "../sync/SyncStatusIndicator";
 
 const appWindow = getCurrentWindow();
 
@@ -101,6 +102,8 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
         <Archive className="h-4 w-4" />
         记录库
       </button>
+
+      <SyncStatusIndicator onClick={() => onNavigate("settings")} />
 
       <button
         className="ml-auto flex h-8 w-44 max-w-[36vw] items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--field)] px-3 text-sm text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--text)] [-webkit-app-region:no-drag]"

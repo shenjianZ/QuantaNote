@@ -4,6 +4,7 @@ mod error;
 mod models;
 mod repositories;
 mod services;
+mod sync;
 mod utils;
 
 use commands::{
@@ -98,6 +99,12 @@ pub fn run() {
 
             // 启动自动备份调度器
             auto_backup::start_backup_scheduler(app.handle());
+
+            // 初始化同步引擎
+            {
+                let db = app.state::<DbState>();
+                commands::sync::init_sync_engine(app.handle(), &db);
+            }
 
             // 系统托盘
             let show_item = MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)?;
@@ -244,6 +251,17 @@ pub fn run() {
             item::get_library_data,
             settings::load_all_settings,
             settings::save_settings,
+            commands::sync::get_sync_config,
+            commands::sync::save_sync_config_cmd,
+            commands::sync::get_sync_state,
+            commands::sync::trigger_sync,
+            commands::sync::sync_login,
+            commands::sync::sync_register,
+            commands::sync::sync_logout,
+            commands::sync::sync_forgot_password,
+            commands::sync::sync_reset_password,
+            commands::sync::test_sync_connection,
+            commands::sync::get_sync_history,
             update_window_behavior,
         ])
         .run(tauri::generate_context!())

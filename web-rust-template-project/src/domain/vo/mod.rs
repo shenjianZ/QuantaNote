@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod sync;
 pub mod user;
 
 /// 统一的 API 响应结构

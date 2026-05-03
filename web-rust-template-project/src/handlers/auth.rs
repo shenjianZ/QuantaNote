@@ -1,7 +1,7 @@
 use crate::error::ErrorResponse;
 use crate::infra::middleware::logging::{log_info, RequestId};
-use crate::domain::dto::auth::{RegisterRequest, LoginRequest, RefreshRequest, DeleteUserRequest};
-use crate::domain::vo::auth::{RegisterResult, LoginResult, RefreshResult};
+use crate::domain::dto::auth::{RegisterRequest, LoginRequest, RefreshRequest, DeleteUserRequest, ForgotPasswordRequest, ResetPasswordRequest};
+use crate::domain::vo::auth::{RegisterResult, LoginResult, RefreshResult, ForgotPasswordResult, ResetPasswordResult};
 use crate::domain::vo::ApiResponse;
 use crate::repositories::user_repository::UserRepository;
 use crate::services::auth_service::AuthService;
@@ -132,18 +132,20 @@ pub async fn delete_account(
     }
 }
 
-/// 刷新令牌
+/// 删除刷新令牌
 pub async fn delete_refresh_token(
     Extension(request_id): Extension<RequestId>,
     State(state): State<AppState>,
     Extension(user_id): Extension<String>,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
 ) -> Result<Json<ApiResponse<()>>, ErrorResponse> {
-    log_info(&request_id, "删除刷新令牌请求", &format!("user_id={}", user_id));
+    let device_id = params.get("device_id").cloned().unwrap_or_else(|| "default".to_string());
+    log_info(&request_id, "删除刷新令牌请求", &format!("user_id={}, device_id={}", user_id, device_id));
 
     let user_repo = UserRepository::new(state.pool.clone());
     let service = AuthService::new(user_repo, state.redis_client.clone(), state.config.auth.clone());
 
-    match service.delete_refresh_token(&user_id).await {
+    match service.delete_refresh_token(&user_id, &device_id).await {
         Ok(_) => {
             log_info(&request_id, "刷新令牌删除成功", &format!("user_id={}", user_id));
             let response = ApiResponse::success_with_message((), "刷新令牌删除成功");
@@ -151,6 +153,59 @@ pub async fn delete_refresh_token(
         }
         Err(e) => {
             log_info(&request_id, "刷新令牌删除失败", &e.to_string());
+            Err(ErrorResponse::new(e.to_string()))
+        }
+    }
+}
+
+/// 忘记密码
+pub async fn forgot_password(
+    Extension(request_id): Extension<RequestId>,
+    State(state): State<AppState>,
+    Json(payload): Json<ForgotPasswordRequest>,
+) -> Result<Json<ApiResponse<ForgotPasswordResult>>, ErrorResponse> {
+    log_info(&request_id, "忘记密码请求", &payload);
+
+    let user_repo = UserRepository::new(state.pool.clone());
+    let service = AuthService::new(user_repo, state.redis_client.clone(), state.config.auth.clone());
+
+    match service.forgot_password(payload).await {
+        Ok(reset_token) => {
+            log_info(&request_id, "重置令牌生成成功", &"");
+            let response = ApiResponse::success(ForgotPasswordResult {
+                message: "重置令牌已生成".to_string(),
+                reset_token,
+            });
+            Ok(Json(response))
+        }
+        Err(e) => {
+            log_info(&request_id, "忘记密码失败", &e.to_string());
+            Err(ErrorResponse::new(e.to_string()))
+        }
+    }
+}
+
+/// 重置密码
+pub async fn reset_password(
+    Extension(request_id): Extension<RequestId>,
+    State(state): State<AppState>,
+    Json(payload): Json<ResetPasswordRequest>,
+) -> Result<Json<ApiResponse<ResetPasswordResult>>, ErrorResponse> {
+    log_info(&request_id, "重置密码请求", &payload);
+
+    let user_repo = UserRepository::new(state.pool.clone());
+    let service = AuthService::new(user_repo, state.redis_client.clone(), state.config.auth.clone());
+
+    match service.reset_password(payload).await {
+        Ok(_) => {
+            log_info(&request_id, "密码重置成功", &"");
+            let response = ApiResponse::success(ResetPasswordResult {
+                message: "密码重置成功".to_string(),
+            });
+            Ok(Json(response))
+        }
+        Err(e) => {
+            log_info(&request_id, "密码重置失败", &e.to_string());
             Err(ErrorResponse::new(e.to_string()))
         }
     }

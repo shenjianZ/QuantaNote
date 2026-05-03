@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+    Cloud,
     Database,
     Download,
     FileText,
@@ -21,6 +22,7 @@ import { ColorPickerModal } from "../components/common/ColorPickerModal";
 import { ExportModal } from "../components/common/ExportModal";
 import { ImportModal } from "../components/common/ImportModal";
 import { Select } from "../components/common/Select";
+import { SyncSettingsPanel } from "../components/sync/SyncSettingsPanel";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useToastStore } from "../stores/toastStore";
 
@@ -28,6 +30,7 @@ const settingsMenu = [
     { icon: Palette, label: "外观" },
     { icon: Keyboard, label: "字体" },
     { icon: Database, label: "数据" },
+    { icon: Cloud, label: "同步" },
     { icon: Globe2, label: "关于" },
 ];
 
@@ -671,10 +674,22 @@ export function SettingsPage({
             );
         }
 
+        if (activeSection === 3) {
+            return (
+                <section>
+                    <h2 className="mb-3 text-sm font-semibold text-[var(--text)]">
+                        数据同步
+                    </h2>
+                    <SyncSettingsPanel />
+                </section>
+            );
+        }
+
         return (
             <section>
-                <h2 className="mb-3 text-sm font-semibold text-[var(--text)]">
-                    QuantaNote v0.1.0
+                <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+                    <span className="inline-block rounded-md bg-[var(--accent)] px-2.5 py-1 text-white">QuantaNote</span>
+                    <span className="inline-block rounded-md bg-[var(--accent-soft)] px-2.5 py-1 text-[var(--accent)]">v0.1.0</span>
                 </h2>
                 <div className="mb-4 text-sm text-[var(--muted)]">
                     本地优先的笔记管理工具
