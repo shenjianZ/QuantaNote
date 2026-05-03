@@ -1,0 +1,40 @@
+{
+  "title": "记录库",
+  "subtitle": "搜索、查看和管理已经保存的记录。",
+  "newBtn": "新建",
+  "searchPlaceholder": "搜索记录",
+  "searching": "搜索中",
+  "filter": {
+    "title": "筛选",
+    "all": "全部",
+    "pinned": "置顶",
+    "favorite": "收藏",
+    "sort": "排序",
+    "sortUpdated": "最近更新",
+    "sortCreated": "创建时间",
+    "sortTitle": "标题排序",
+    "tag": "标签",
+    "allTags": "全部标签"
+  },
+  "empty": {
+    "title": "还没有可显示的记录",
+    "subtitle": "写下第一条，或者换个关键词搜索。"
+  },
+  "searchResult": "搜索结果",
+  "unnamed": "未命名",
+  "noPreview": "无正文预览",
+  "reader": {
+    "pin": "置顶",
+    "unpin": "取消置顶",
+    "favorite": "收藏",
+    "unfavorite": "取消收藏",
+    "copy": "复制内容",
+    "addAttachment": "添加附件",
+    "fullEdit": "完整编辑",
+    "delete": "删除",
+    "tags": "标签",
+    "attachments": "附件",
+    "editCurrent": "编辑当前笔记",
+    "moreActions": "更多操作"
+  }
+}

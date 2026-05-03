@@ -52,7 +52,7 @@ pub async fn get_snapshot_records(
 
     let service = create_sync_service(&state).map_err(|e| ErrorResponse::new(e.to_string()))?;
     let records = service
-        .get_snapshot_records(&snapshot_id)
+        .get_snapshot_records(&user_id, &snapshot_id)
         .await
         .map_err(|e| ErrorResponse::new(e.to_string()))?;
 
@@ -91,11 +91,7 @@ pub async fn pull_records(
     State(state): State<AppState>,
     Json(payload): Json<PullRecordsRequest>,
 ) -> Result<Json<ApiResponse<PullResult>>, ErrorResponse> {
-    log_info(
-        &request_id,
-        "拉取记录",
-        &format!("user_id={}", user_id),
-    );
+    log_info(&request_id, "拉取记录", &format!("user_id={}", user_id));
 
     let service = create_sync_service(&state).map_err(|e| ErrorResponse::new(e.to_string()))?;
     let result = service
@@ -136,6 +132,7 @@ pub struct UploadAttachmentQuery {
     pub filename: String,
     pub mime_type: String,
     pub file_hash: String,
+    pub file_size: Option<i64>,
     pub snapshot_id: String,
 }
 
@@ -163,6 +160,7 @@ pub async fn upload_attachment(
             &query.filename,
             &query.mime_type,
             &query.file_hash,
+            query.file_size.unwrap_or(0),
             body,
         )
         .await
@@ -211,7 +209,7 @@ pub async fn commit_sync(
         &format!(
             "user_id={}, pushed_records={}, attachments={}",
             user_id,
-            payload.pushed_record_ids.len(),
+            payload.pushed_records.len(),
             payload.attachments.len()
         ),
     );
@@ -245,7 +243,10 @@ pub async fn sync_history(
     log_info(
         &request_id,
         "获取同步历史",
-        &format!("user_id={}, page={}, page_size={}", user_id, page, page_size),
+        &format!(
+            "user_id={}, page={}, page_size={}",
+            user_id, page, page_size
+        ),
     );
 
     let service = create_sync_service(&state).map_err(|e| ErrorResponse::new(e.to_string()))?;
@@ -263,11 +264,7 @@ pub async fn reset_sync_data(
     Extension(user_id): Extension<String>,
     State(state): State<AppState>,
 ) -> Result<Json<ApiResponse<()>>, ErrorResponse> {
-    log_info(
-        &request_id,
-        "重置同步数据",
-        &format!("user_id={}", user_id),
-    );
+    log_info(&request_id, "重置同步数据", &format!("user_id={}", user_id));
 
     let service = create_sync_service(&state).map_err(|e| ErrorResponse::new(e.to_string()))?;
     service

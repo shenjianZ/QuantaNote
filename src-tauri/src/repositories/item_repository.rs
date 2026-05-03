@@ -158,7 +158,9 @@ pub fn delete(db: &DbState, id: &str) -> Result<(), AppError> {
 
     // 先检查记录是否存在
     let exists: bool = conn
-        .query_row("SELECT 1 FROM items WHERE id = ?1", params![id], |_| Ok(true))
+        .query_row("SELECT 1 FROM items WHERE id = ?1", params![id], |_| {
+            Ok(true)
+        })
         .unwrap_or(false);
     if !exists {
         return Err(AppError::NotFound(format!("Item {}", id)));
@@ -171,6 +173,59 @@ pub fn delete(db: &DbState, id: &str) -> Result<(), AppError> {
         params![id, now],
     )
     .map_err(|e| AppError::Database(e.to_string()))?;
+
+    // 为子记录写入 tombstone（CASCADE 删除后无法查询，需在删除前写入）
+    {
+        let mut stmt = conn
+            .prepare("SELECT id FROM versions WHERE item_id = ?1")
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        let rows = stmt
+            .query_map(params![id], |row| row.get::<_, String>(0))
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        for row in rows {
+            let ver_id = row.map_err(|e| AppError::Database(e.to_string()))?;
+            conn.execute(
+                "INSERT OR IGNORE INTO sync_tombstones (record_id, table_name, deleted_at) VALUES (?1, 'versions', ?2)",
+                params![ver_id, now],
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+    }
+    {
+        let mut stmt = conn
+            .prepare("SELECT id FROM attachments WHERE item_id = ?1")
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        let rows = stmt
+            .query_map(params![id], |row| row.get::<_, String>(0))
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        for row in rows {
+            let att_id = row.map_err(|e| AppError::Database(e.to_string()))?;
+            conn.execute(
+                "INSERT OR IGNORE INTO sync_tombstones (record_id, table_name, deleted_at) VALUES (?1, 'attachments', ?2)",
+                params![att_id, now],
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+    }
+    {
+        let mut stmt = conn
+            .prepare(
+                "SELECT t.uuid FROM item_tags it JOIN tags t ON t.id = it.tag_id WHERE it.item_id = ?1",
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        let rows = stmt
+            .query_map(params![id], |row| row.get::<_, String>(0))
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        for row in rows {
+            let tag_uuid = row.map_err(|e| AppError::Database(e.to_string()))?;
+            let tombstone_id = format!("{}_{}", id, tag_uuid);
+            conn.execute(
+                "INSERT OR IGNORE INTO sync_tombstones (record_id, table_name, deleted_at) VALUES (?1, 'item_tags', ?2)",
+                params![tombstone_id, now],
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+    }
 
     // 硬删除（CASCADE 会清理 item_tags, attachments, versions）
     conn.execute("DELETE FROM items WHERE id = ?1", params![id])

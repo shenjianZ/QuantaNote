@@ -133,6 +133,27 @@ pub fn delete_version(db: &DbState, id: &str) -> Result<(), AppError> {
         .lock()
         .map_err(|e| AppError::Database(e.to_string()))?;
 
+    // 先检查记录是否存在
+    let exists: bool = conn
+        .query_row(
+            "SELECT COUNT(*) FROM versions WHERE id = ?1",
+            params![id],
+            |row| row.get::<_, i64>(0),
+        )
+        .map(|c| c > 0)
+        .unwrap_or(false);
+
+    if !exists {
+        return Err(AppError::NotFound(format!("Version {}", id)));
+    }
+
+    let now = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "INSERT OR IGNORE INTO sync_tombstones (record_id, table_name, deleted_at) VALUES (?1, 'versions', ?2)",
+        params![id, now],
+    )
+    .map_err(|e| AppError::Database(e.to_string()))?;
+
     conn.execute("DELETE FROM versions WHERE id = ?1", params![id])
         .map_err(|e| AppError::Database(e.to_string()))?;
 

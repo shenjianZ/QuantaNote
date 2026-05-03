@@ -1,0 +1,10 @@
+{
+  "title": "随手记录",
+  "subtitle": "写下内容，保存为新的笔记。",
+  "saveBtn": "记录",
+  "savingBtn": "保存中",
+  "placeholder": "今天想记什么？",
+  "savedStatus": "已保存",
+  "shortcutHint": "Ctrl/⌘ + Enter 保存",
+  "loadingEditor": "加载编辑器..."
+}

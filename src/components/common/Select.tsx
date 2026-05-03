@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export interface SelectOption {
   value: string;
@@ -21,6 +22,7 @@ export function Select({
   className = "",
   placeholder,
 }: SelectProps) {
+  const { t } = useTranslation(["common"]);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const selected = options.find((o) => o.value === value);
@@ -49,7 +51,7 @@ export function Select({
         onClick={() => setOpen(!open)}
       >
         <span className={!selected ? "text-[var(--muted)]" : ""}>
-          {selected?.label ?? placeholder ?? "请选择"}
+          {selected?.label ?? placeholder ?? t("common:buttons.done")}
         </span>
         <ChevronDown
           className={`h-4 w-4 shrink-0 text-[var(--muted)] transition-transform ${open ? "rotate-180" : ""}`}

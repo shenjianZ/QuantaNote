@@ -2,9 +2,9 @@ pub mod auth;
 pub mod sync;
 pub mod user;
 
+use axum::http::StatusCode;
 /// 统一的 API 响应结构
 use serde::Serialize;
-use axum::http::StatusCode;
 
 #[derive(Debug, Serialize)]
 pub struct ApiResponse<T> {

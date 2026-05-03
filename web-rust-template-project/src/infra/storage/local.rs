@@ -70,11 +70,39 @@ impl StorageBackend for LocalStorage {
     async fn exists(&self, key: &str) -> anyhow::Result<bool> {
         Ok(self.full_path(key).exists())
     }
+
+    async fn move_object(&self, from_key: &str, to_key: &str) -> anyhow::Result<()> {
+        let from_path = self.full_path(from_key);
+        let to_path = self.full_path(to_key);
+
+        // 幂等：目标已存在时跳过（重试场景）
+        if to_path.exists() {
+            if from_path.exists() && from_path != to_path {
+                let _ = std::fs::remove_file(&from_path);
+            }
+            return Ok(());
+        }
+
+        // 源不存在时说明已经移动过，跳过
+        if !from_path.exists() {
+            return Ok(());
+        }
+
+        if let Some(parent) = to_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::rename(&from_path, &to_path)?;
+        Ok(())
+    }
 }
 
 /// 递归收集文件
 #[allow(dead_code)]
-fn collect_files(dir: &Path, base: &Path, results: &mut Vec<StorageMetadata>) -> anyhow::Result<()> {
+fn collect_files(
+    dir: &Path,
+    base: &Path,
+    results: &mut Vec<StorageMetadata>,
+) -> anyhow::Result<()> {
     for entry in std::fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
@@ -90,10 +118,7 @@ fn collect_files(dir: &Path, base: &Path, results: &mut Vec<StorageMetadata>) ->
             results.push(StorageMetadata {
                 key,
                 size: metadata.len(),
-                last_modified: metadata
-                    .modified()
-                    .ok()
-                    .map(|t| chrono::DateTime::from(t)),
+                last_modified: metadata.modified().ok().map(|t| chrono::DateTime::from(t)),
             });
         }
     }
@@ -101,11 +126,7 @@ fn collect_files(dir: &Path, base: &Path, results: &mut Vec<StorageMetadata>) ->
 }
 
 fn mime_from_path(path: &Path) -> String {
-    match path
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-    {
+    match path.extension().and_then(|e| e.to_str()).unwrap_or("") {
         "json" => "application/json",
         "txt" => "text/plain",
         "bin" => "application/octet-stream",

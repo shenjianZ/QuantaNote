@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import { save, open } from "@tauri-apps/plugin-dialog";
+import i18n from "../i18n";
 import { useItemStore } from "./itemStore";
 import { useToastStore } from "./toastStore";
 import {
@@ -47,6 +48,7 @@ export interface AppSettings {
     autoBackup: boolean;
     autostart: boolean;
     sqlLogging: SqlLogSettings;
+    locale: "zh-CN" | "en";
 }
 
 export interface SqlLogSettings {
@@ -74,6 +76,7 @@ const DEFAULTS: AppSettings = {
         pretty: false,
         maxLen: 4000,
     },
+    locale: "zh-CN",
 };
 
 const AVAILABLE_FONT_FAMILIES = new Set(["Noto Sans SC", "system-ui"]);
@@ -84,6 +87,7 @@ const AVAILABLE_MONO_FAMILIES = new Set([
 ]);
 
 function normalizeSettings(settings: AppSettings): AppSettings {
+    const locale = settings.locale === "en" ? "en" : "zh-CN";
     return {
         fontFamily: AVAILABLE_FONT_FAMILIES.has(settings.fontFamily)
             ? settings.fontFamily
@@ -101,6 +105,7 @@ function normalizeSettings(settings: AppSettings): AppSettings {
         autoBackup: Boolean(settings.autoBackup),
         autostart: Boolean(settings.autostart),
         sqlLogging: normalizeSqlLogSettings(settings.sqlLogging),
+        locale,
     };
 }
 
@@ -283,6 +288,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
         const settings = get().settings;
         applySettings(settings);
+        i18n.changeLanguage(settings.locale);
         updateSqlLogConfigCmd(toBackendSqlLogConfig(settings.sqlLogging))
             .then((config) => {
                 const sqlLogging = fromBackendSqlLogConfig(config);
@@ -315,6 +321,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         applySettings(settings);
         set({ settings });
 
+        if (key === "locale") {
+            i18n.changeLanguage(value as string);
+        }
+
         // 同步到 Rust 端
         if (key === "autostart") {
             try {
@@ -323,12 +333,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
                     .getState()
                     .addToast(
                         "success",
-                        value ? "已开启开机自动启动" : "已关闭开机自动启动",
+                        value ? i18n.t("common:toast.autostartEnabled") : i18n.t("common:toast.autostartDisabled"),
                     );
             } catch {
                 useToastStore
                     .getState()
-                    .addToast("error", "开机自动启动设置同步失败");
+                    .addToast("error", i18n.t("common:toast.autostartFailed"));
             }
         } else if (key === "minimizeToTray") {
             try {
@@ -341,13 +351,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
                     .addToast(
                         "success",
                         value
-                            ? "已开启最小化到系统托盘"
-                            : "已关闭最小化到系统托盘",
+                            ? i18n.t("common:toast.trayEnabled")
+                            : i18n.t("common:toast.trayDisabled"),
                     );
             } catch {
                 useToastStore
                     .getState()
-                    .addToast("error", "窗口行为设置同步失败");
+                    .addToast("error", i18n.t("common:toast.windowBehaviorFailed"));
             }
         } else if (key === "closeKeepRunning") {
             try {
@@ -360,13 +370,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
                     .addToast(
                         "success",
                         value
-                            ? "已开启关闭窗口时隐藏到托盘"
-                            : "已关闭关闭窗口时隐藏到托盘",
+                            ? i18n.t("common:toast.closeTrayEnabled")
+                            : i18n.t("common:toast.closeTrayDisabled"),
                     );
             } catch {
                 useToastStore
                     .getState()
-                    .addToast("error", "窗口行为设置同步失败");
+                    .addToast("error", i18n.t("common:toast.windowBehaviorFailed"));
             }
         }
     },
@@ -426,9 +436,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             await get().refreshDbSize();
             useToastStore
                 .getState()
-                .addToast("success", "数据库优化完成，已回收未使用空间");
+                .addToast("success", i18n.t("common:toast.dbOptimized"));
         } catch {
-            useToastStore.getState().addToast("error", "数据库优化失败");
+            useToastStore.getState().addToast("error", i18n.t("common:toast.dbOptimizeFailed"));
         }
     },
 
@@ -443,10 +453,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
                 await invoke("save_to_file", { path, content: json });
                 useToastStore
                     .getState()
-                    .addToast("success", "数据已备份到文件");
+                    .addToast("success", i18n.t("common:toast.exportSuccess"));
             }
         } catch {
-            useToastStore.getState().addToast("error", "数据备份失败");
+            useToastStore.getState().addToast("error", i18n.t("common:toast.exportFailed"));
         }
     },
 
@@ -463,10 +473,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
                 await get().refreshDbSize();
                 useToastStore
                     .getState()
-                    .addToast("success", "数据已恢复，请刷新查看");
+                    .addToast("success", i18n.t("common:toast.importSuccess"));
             }
         } catch {
-            useToastStore.getState().addToast("error", "数据恢复失败");
+            useToastStore.getState().addToast("error", i18n.t("common:toast.importFailed"));
         }
     },
 
@@ -489,10 +499,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
                 await exportDataZip(path, options);
                 useToastStore
                     .getState()
-                    .addToast("success", "数据已导出到 ZIP 文件");
+                    .addToast("success", i18n.t("common:toast.exportSuccess"));
             }
         } catch {
-            useToastStore.getState().addToast("error", "数据导出失败");
+            useToastStore.getState().addToast("error", i18n.t("common:toast.exportFailed"));
         }
     },
 
@@ -508,10 +518,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
                 await get().refreshDbSize();
                 useToastStore
                     .getState()
-                    .addToast("success", "数据已导入，请刷新查看");
+                    .addToast("success", i18n.t("common:toast.importSuccess"));
             }
         } catch {
-            useToastStore.getState().addToast("error", "数据导入失败");
+            useToastStore.getState().addToast("error", i18n.t("common:toast.importFailed"));
         }
     },
 
@@ -528,9 +538,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         try {
             await updateAutoBackupConfigCmd(config);
             set({ autoBackupConfig: config });
-            useToastStore.getState().addToast("success", "自动备份配置已更新");
+            useToastStore.getState().addToast("success", i18n.t("common:toast.configUpdated"));
         } catch {
-            useToastStore.getState().addToast("error", "更新配置失败");
+            useToastStore.getState().addToast("error", i18n.t("common:toast.configUpdateFailed"));
         }
     },
 
@@ -539,9 +549,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             await triggerBackupNowCmd();
             await get().fetchBackups();
             await get().fetchAutoBackupConfig();
-            useToastStore.getState().addToast("success", "备份已完成");
+            useToastStore.getState().addToast("success", i18n.t("common:toast.backupSuccess"));
         } catch {
-            useToastStore.getState().addToast("error", "备份失败");
+            useToastStore.getState().addToast("error", i18n.t("common:toast.backupFailed"));
         }
     },
 
@@ -567,9 +577,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         try {
             await deleteBackupCmd(filename);
             await get().fetchBackups();
-            useToastStore.getState().addToast("success", "备份已删除");
+            useToastStore.getState().addToast("success", i18n.t("common:toast.backupDeleted"));
         } catch {
-            useToastStore.getState().addToast("error", "删除失败");
+            useToastStore.getState().addToast("error", i18n.t("common:toast.backupDeleteFailed"));
         }
     },
 
@@ -603,18 +613,18 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             set({ settings: updated });
             useToastStore
                 .getState()
-                .addToast("success", sqlLogging.enabled ? "SQL 日志已开启" : "SQL 日志已关闭");
+                .addToast("success", sqlLogging.enabled ? i18n.t("common:toast.sqlLogEnabled") : i18n.t("common:toast.sqlLogDisabled"));
         } catch {
-            useToastStore.getState().addToast("error", "SQL 日志设置同步失败");
+            useToastStore.getState().addToast("error", i18n.t("common:toast.sqlLogFailed"));
         }
     },
 
     clearSqlLogFile: async () => {
         try {
             await clearSqlLogCmd();
-            useToastStore.getState().addToast("success", "SQL 日志已清空");
+            useToastStore.getState().addToast("success", i18n.t("common:toast.sqlLogCleared"));
         } catch {
-            useToastStore.getState().addToast("error", "清空 SQL 日志失败");
+            useToastStore.getState().addToast("error", i18n.t("common:toast.sqlLogClearFailed"));
         }
     },
 }));

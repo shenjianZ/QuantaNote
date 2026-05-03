@@ -212,16 +212,21 @@ impl SyncTransport {
     async fn do_refresh(&self) -> Result<(), AppError> {
         let rt = self.refresh_token.lock().await.clone();
         let url = format!("{}/auth/refresh", self.server_url);
-        let resp = self.client
+        let resp = self
+            .client
             .post(&url)
-            .json(&serde_json::json!({ "refresh_token": rt }))
+            .json(&serde_json::json!({
+                "refresh_token": rt,
+                "device_id": self.device_id
+            }))
             .send()
             .await
             .map_err(|e| AppError::SyncError(format!("刷新 token 请求失败: {}", e)))?;
 
-        let body: ApiResponse<RefreshResult> = resp.json().await.map_err(|e| {
-            AppError::SyncError(format!("解析刷新响应失败: {}", e))
-        })?;
+        let body: ApiResponse<RefreshResult> = resp
+            .json()
+            .await
+            .map_err(|e| AppError::SyncError(format!("解析刷新响应失败: {}", e)))?;
 
         if body.code == 200 {
             if let Some(data) = body.data {
@@ -249,35 +254,55 @@ impl SyncTransport {
 
         if !status.is_success() {
             // 非 2xx：先读取原始 body 文本，尽可能保留错误信息
-            let body_text = resp.text().await.unwrap_or_else(|_| "无法读取响应体".to_string());
+            let body_text = resp
+                .text()
+                .await
+                .unwrap_or_else(|_| "无法读取响应体".to_string());
             // 尝试解析为 JSON 获取 message 字段
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body_text) {
                 let msg = json["message"].as_str().unwrap_or(&body_text);
-                return Err(AppError::SyncError(format!("HTTP {}: {}", status.as_u16(), msg)));
+                return Err(AppError::SyncError(format!(
+                    "HTTP {}: {}",
+                    status.as_u16(),
+                    msg
+                )));
             }
-            return Err(AppError::SyncError(format!("HTTP {}: {}", status.as_u16(), body_text)));
+            return Err(AppError::SyncError(format!(
+                "HTTP {}: {}",
+                status.as_u16(),
+                body_text
+            )));
         }
 
-        let body: ApiResponse<T> = resp.json().await.map_err(|e| {
-            AppError::SyncError(format!("解析响应失败: {}", e))
-        })?;
+        let body: ApiResponse<T> = resp
+            .json()
+            .await
+            .map_err(|e| AppError::SyncError(format!("解析响应失败: {}", e)))?;
 
         if body.code == 200 {
-            body.data.ok_or_else(|| AppError::SyncError("响应数据为空".to_string()))
+            body.data
+                .ok_or_else(|| AppError::SyncError("响应数据为空".to_string()))
         } else {
-            Err(AppError::SyncError(format!("业务错误 ({}): {}", body.code, body.message)))
+            Err(AppError::SyncError(format!(
+                "业务错误 ({}): {}",
+                body.code, body.message
+            )))
         }
     }
 
     /// 带指数退避的请求执行（对可重试的瞬态错误自动重试）
-    async fn execute_with_retry(&self, req: reqwest::Request) -> Result<reqwest::Response, AppError> {
+    async fn execute_with_retry(
+        &self,
+        req: reqwest::Request,
+    ) -> Result<reqwest::Response, AppError> {
         const MAX_RETRIES: u32 = 3;
         const INITIAL_BACKOFF_MS: u64 = 500;
 
         let mut last_err: Option<String> = None;
 
         for attempt in 0..MAX_RETRIES {
-            let req_clone = req.try_clone()
+            let req_clone = req
+                .try_clone()
                 .ok_or_else(|| AppError::SyncError("无法克隆请求".to_string()))?;
 
             match self.client.execute(req_clone).await {
@@ -326,9 +351,12 @@ impl SyncTransport {
                 .map_err(|e| AppError::SyncError(format!("无效的 auth header: {}", e)))?,
         );
 
-        let resp = self.execute_with_retry(
-            req.try_clone().ok_or_else(|| AppError::SyncError("无法克隆请求".to_string()))?
-        ).await?;
+        let resp = self
+            .execute_with_retry(
+                req.try_clone()
+                    .ok_or_else(|| AppError::SyncError("无法克隆请求".to_string()))?,
+            )
+            .await?;
 
         if resp.status() != reqwest::StatusCode::UNAUTHORIZED {
             return Ok(resp);
@@ -353,7 +381,8 @@ impl SyncTransport {
     /// 登录
     pub async fn login(&self, email: &str, password: &str) -> Result<SyncLoginResult, AppError> {
         let url = format!("{}/auth/login", self.server_url);
-        let resp = self.client
+        let resp = self
+            .client
             .post(&url)
             .json(&serde_json::json!({
                 "email": email,
@@ -364,12 +393,14 @@ impl SyncTransport {
             .await
             .map_err(|e| AppError::SyncError(format!("请求失败: {}", e)))?;
 
-        let body: ApiResponse<SyncLoginResult> = resp.json().await.map_err(|e| {
-            AppError::SyncError(format!("解析响应失败: {}", e))
-        })?;
+        let body: ApiResponse<SyncLoginResult> = resp
+            .json()
+            .await
+            .map_err(|e| AppError::SyncError(format!("解析响应失败: {}", e)))?;
 
         if body.code == 200 {
-            body.data.ok_or_else(|| AppError::SyncError("响应数据为空".to_string()))
+            body.data
+                .ok_or_else(|| AppError::SyncError("响应数据为空".to_string()))
         } else {
             Err(AppError::SyncError(format!("登录失败: {}", body.message)))
         }
@@ -378,7 +409,8 @@ impl SyncTransport {
     /// 注册
     pub async fn register(&self, email: &str, password: &str) -> Result<SyncLoginResult, AppError> {
         let url = format!("{}/auth/register", self.server_url);
-        let resp = self.client
+        let resp = self
+            .client
             .post(&url)
             .json(&serde_json::json!({
                 "email": email,
@@ -389,12 +421,14 @@ impl SyncTransport {
             .await
             .map_err(|e| AppError::SyncError(format!("请求失败: {}", e)))?;
 
-        let body: ApiResponse<SyncLoginResult> = resp.json().await.map_err(|e| {
-            AppError::SyncError(format!("解析响应失败: {}", e))
-        })?;
+        let body: ApiResponse<SyncLoginResult> = resp
+            .json()
+            .await
+            .map_err(|e| AppError::SyncError(format!("解析响应失败: {}", e)))?;
 
         if body.code == 200 {
-            body.data.ok_or_else(|| AppError::SyncError("响应数据为空".to_string()))
+            body.data
+                .ok_or_else(|| AppError::SyncError("响应数据为空".to_string()))
         } else {
             Err(AppError::SyncError(format!("注册失败: {}", body.message)))
         }
@@ -403,19 +437,23 @@ impl SyncTransport {
     /// 忘记密码
     pub async fn forgot_password(&self, email: &str) -> Result<String, AppError> {
         let url = format!("{}/auth/forgot-password", self.server_url);
-        let resp = self.client
+        let resp = self
+            .client
             .post(&url)
             .json(&serde_json::json!({ "email": email }))
             .send()
             .await
             .map_err(|e| AppError::SyncError(format!("请求失败: {}", e)))?;
 
-        let body: ApiResponse<serde_json::Value> = resp.json().await.map_err(|e| {
-            AppError::SyncError(format!("解析响应失败: {}", e))
-        })?;
+        let body: ApiResponse<serde_json::Value> = resp
+            .json()
+            .await
+            .map_err(|e| AppError::SyncError(format!("解析响应失败: {}", e)))?;
 
         if body.code == 200 {
-            let data = body.data.ok_or_else(|| AppError::SyncError("响应数据为空".to_string()))?;
+            let data = body
+                .data
+                .ok_or_else(|| AppError::SyncError("响应数据为空".to_string()))?;
             data["reset_token"]
                 .as_str()
                 .map(|s| s.to_string())
@@ -426,9 +464,15 @@ impl SyncTransport {
     }
 
     /// 重置密码
-    pub async fn reset_password(&self, email: &str, reset_token: &str, new_password: &str) -> Result<(), AppError> {
+    pub async fn reset_password(
+        &self,
+        email: &str,
+        reset_token: &str,
+        new_password: &str,
+    ) -> Result<(), AppError> {
         let url = format!("{}/auth/reset-password", self.server_url);
-        let resp = self.client
+        let resp = self
+            .client
             .post(&url)
             .json(&serde_json::json!({
                 "email": email,
@@ -439,21 +483,26 @@ impl SyncTransport {
             .await
             .map_err(|e| AppError::SyncError(format!("请求失败: {}", e)))?;
 
-        let body: ApiResponse<serde_json::Value> = resp.json().await.map_err(|e| {
-            AppError::SyncError(format!("解析响应失败: {}", e))
-        })?;
+        let body: ApiResponse<serde_json::Value> = resp
+            .json()
+            .await
+            .map_err(|e| AppError::SyncError(format!("解析响应失败: {}", e)))?;
 
         if body.code == 200 {
             Ok(())
         } else {
-            Err(AppError::SyncError(format!("重置密码失败: {}", body.message)))
+            Err(AppError::SyncError(format!(
+                "重置密码失败: {}",
+                body.message
+            )))
         }
     }
 
     /// 测试连接
     pub async fn test_connection(&self) -> Result<bool, AppError> {
         let url = format!("{}/health", self.server_url);
-        let resp = self.client
+        let resp = self
+            .client
             .get(&url)
             .send()
             .await
@@ -467,9 +516,10 @@ impl SyncTransport {
         let builder = self.client.get(&url);
         let resp = self.send_auth_with_refresh(builder).await?;
 
-        let body: ApiResponse<SnapshotInfo> = resp.json().await.map_err(|e| {
-            AppError::SyncError(format!("解析响应失败: {}", e))
-        })?;
+        let body: ApiResponse<SnapshotInfo> = resp
+            .json()
+            .await
+            .map_err(|e| AppError::SyncError(format!("解析响应失败: {}", e)))?;
 
         if body.code == 200 {
             Ok(body.data)
@@ -479,7 +529,10 @@ impl SyncTransport {
     }
 
     /// 获取快照记录
-    pub async fn get_snapshot_records(&self, snapshot_id: &str) -> Result<Vec<RecordMetaInfo>, AppError> {
+    pub async fn get_snapshot_records(
+        &self,
+        snapshot_id: &str,
+    ) -> Result<Vec<RecordMetaInfo>, AppError> {
         let url = format!("{}/sync/snapshot/{}/records", self.server_url, snapshot_id);
         let builder = self.client.get(&url);
         let resp = self.send_auth_with_refresh(builder).await?;
@@ -487,25 +540,43 @@ impl SyncTransport {
     }
 
     /// 推送记录
-    pub async fn push_records(&self, records: Vec<SyncRecordPayload>) -> Result<PushResult, AppError> {
+    pub async fn push_records(
+        &self,
+        records: Vec<SyncRecordPayload>,
+    ) -> Result<PushResult, AppError> {
         let url = format!("{}/sync/records/push", self.server_url);
-        let builder = self.client.post(&url).json(&serde_json::json!({ "records": records }));
+        let builder = self
+            .client
+            .post(&url)
+            .json(&serde_json::json!({ "records": records }));
         let resp = self.send_auth_with_refresh(builder).await?;
         self.handle_response(resp).await
     }
 
     /// 拉取记录
-    pub async fn pull_records(&self, since_snapshot_id: Option<&str>) -> Result<PullResult, AppError> {
+    pub async fn pull_records(
+        &self,
+        since_snapshot_id: Option<&str>,
+    ) -> Result<PullResult, AppError> {
         let url = format!("{}/sync/records/pull", self.server_url);
-        let builder = self.client.post(&url).json(&serde_json::json!({ "since_snapshot_id": since_snapshot_id }));
+        let builder = self
+            .client
+            .post(&url)
+            .json(&serde_json::json!({ "since_snapshot_id": since_snapshot_id }));
         let resp = self.send_auth_with_refresh(builder).await?;
         self.handle_response(resp).await
     }
 
     /// 附件差异
-    pub async fn diff_attachments(&self, hashes: Vec<String>) -> Result<AttachmentDiffResult, AppError> {
+    pub async fn diff_attachments(
+        &self,
+        hashes: Vec<String>,
+    ) -> Result<AttachmentDiffResult, AppError> {
         let url = format!("{}/sync/attachments/diff", self.server_url);
-        let builder = self.client.post(&url).json(&serde_json::json!({ "hashes": hashes }));
+        let builder = self
+            .client
+            .post(&url)
+            .json(&serde_json::json!({ "hashes": hashes }));
         let resp = self.send_auth_with_refresh(builder).await?;
         self.handle_response(resp).await
     }
@@ -518,6 +589,7 @@ impl SyncTransport {
         filename: &str,
         mime_type: &str,
         file_hash: &str,
+        file_size: i64,
         snapshot_id: &str,
         data: Vec<u8>,
     ) -> Result<String, AppError> {
@@ -529,16 +601,20 @@ impl SyncTransport {
             .append_pair("filename", filename)
             .append_pair("mime_type", mime_type)
             .append_pair("file_hash", file_hash)
+            .append_pair("file_size", &file_size.to_string())
             .append_pair("snapshot_id", snapshot_id);
         let builder = self.client.post(url).body(data);
         let resp = self.send_auth_with_refresh(builder).await?;
 
-        let body: ApiResponse<serde_json::Value> = resp.json().await.map_err(|e| {
-            AppError::SyncError(format!("解析响应失败: {}", e))
-        })?;
+        let body: ApiResponse<serde_json::Value> = resp
+            .json()
+            .await
+            .map_err(|e| AppError::SyncError(format!("解析响应失败: {}", e)))?;
 
         if body.code == 200 {
-            let data = body.data.ok_or_else(|| AppError::SyncError("响应数据为空".to_string()))?;
+            let data = body
+                .data
+                .ok_or_else(|| AppError::SyncError("响应数据为空".to_string()))?;
             data["storage_key"]
                 .as_str()
                 .map(|s| s.to_string())
@@ -550,12 +626,16 @@ impl SyncTransport {
 
     /// 下载附件
     pub async fn download_attachment(&self, attachment_id: &str) -> Result<Vec<u8>, AppError> {
-        let url = format!("{}/sync/attachments/download/{}", self.server_url, attachment_id);
+        let url = format!(
+            "{}/sync/attachments/download/{}",
+            self.server_url, attachment_id
+        );
         let builder = self.client.get(&url);
         let resp = self.send_auth_with_refresh(builder).await?;
 
         if resp.status().is_success() {
-            resp.bytes().await
+            resp.bytes()
+                .await
                 .map(|b| b.to_vec())
                 .map_err(|e| AppError::SyncError(format!("读取响应失败: {}", e)))
         } else {
@@ -564,8 +644,15 @@ impl SyncTransport {
     }
 
     /// 获取同步历史（分页）
-    pub async fn get_sync_history(&self, page: u32, page_size: u32) -> Result<PaginatedSyncHistory, AppError> {
-        let url = format!("{}/sync/history?page={}&page_size={}", self.server_url, page, page_size);
+    pub async fn get_sync_history(
+        &self,
+        page: u32,
+        page_size: u32,
+    ) -> Result<PaginatedSyncHistory, AppError> {
+        let url = format!(
+            "{}/sync/history?page={}&page_size={}",
+            self.server_url, page, page_size
+        );
         let builder = self.client.get(&url);
         let resp = self.send_auth_with_refresh(builder).await?;
         self.handle_response(resp).await
@@ -574,12 +661,14 @@ impl SyncTransport {
     /// 提交同步
     pub async fn commit_sync(
         &self,
-        pushed_record_ids: Vec<String>,
+        pushed_records: Vec<crate::models::sync::PushedRecord>,
         attachments: Vec<serde_json::Value>,
+        attachments_complete: bool,
     ) -> Result<CommitResult, AppError> {
         let url = format!("{}/sync/commit", self.server_url);
         let builder = self.client.post(&url).json(&serde_json::json!({
-            "pushed_record_ids": pushed_record_ids,
+            "pushed_records": pushed_records,
+            "attachments_complete": attachments_complete,
             "attachments": attachments
         }));
         let resp = self.send_auth_with_refresh(builder).await?;

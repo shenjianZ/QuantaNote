@@ -1,5 +1,5 @@
-use crate::AppState;
 use crate::db;
+use crate::AppState;
 use axum::{
     extract::State,
     response::{IntoResponse, Json},

@@ -73,12 +73,14 @@ impl SyncRepository {
 
     // ========== 记录操作 ==========
 
-    /// 获取快照的所有记录元信息
+    /// 获取快照的所有记录元信息（校验 snapshot 归属用户）
     pub async fn get_snapshot_records(
         &self,
+        user_id: &str,
         snapshot_id: &str,
     ) -> anyhow::Result<Vec<sync_records::Model>> {
         let records = sync_records::Entity::find()
+            .filter(sync_records::Column::UserId.eq(user_id))
             .filter(sync_records::Column::SnapshotId.eq(snapshot_id))
             .all(&self.db)
             .await?;
@@ -91,9 +93,18 @@ impl SyncRepository {
         records: Vec<sync_records::ActiveModel>,
     ) -> anyhow::Result<()> {
         for record in records {
-            let user_id = match &record.user_id { Set(v) => v.as_str(), _ => "" };
-            let table_name = match &record.table_name { Set(v) => v.as_str(), _ => "" };
-            let rid = match &record.record_id { Set(v) => v.as_str(), _ => "" };
+            let user_id = match &record.user_id {
+                Set(v) => v.as_str(),
+                _ => "",
+            };
+            let table_name = match &record.table_name {
+                Set(v) => v.as_str(),
+                _ => "",
+            };
+            let rid = match &record.record_id {
+                Set(v) => v.as_str(),
+                _ => "",
+            };
 
             let existing = sync_records::Entity::find()
                 .filter(sync_records::Column::UserId.eq(user_id))
@@ -103,12 +114,16 @@ impl SyncRepository {
                 .await?;
 
             if let Some(existing_model) = existing {
-                // 已存在 → 更新
+                // 已存在 → 更新内容哈希和时间，但不修改 snapshot_id/storage_key
+                // 避免破坏已提交快照的记录视图（pending 记录通过 insert 新行或 commit 时统一替换）
                 let mut active: sync_records::ActiveModel = existing_model.into();
                 active.content_hash = record.content_hash;
                 active.updated_at = record.updated_at;
-                active.snapshot_id = record.snapshot_id;
-                active.storage_key = record.storage_key;
+                // 仅当记录已经是 pending 状态时才更新 snapshot_id/storage_key
+                if matches!(&active.snapshot_id, Set(v) if v == "pending") {
+                    active.snapshot_id = record.snapshot_id;
+                    active.storage_key = record.storage_key;
+                }
                 active.update(&self.db).await?;
             } else {
                 // 不存在 → 插入
@@ -145,19 +160,14 @@ impl SyncRepository {
         Ok(records.into_iter().map(|r| r.content_hash).collect())
     }
 
-    /// 更新用户记录的快照 ID（将 pending 关联到新快照）
-    pub async fn update_records_snapshot_id(
+    /// 将用户所有记录关联到新快照（确保最新快照是完整视图）
+    pub async fn update_all_records_snapshot_id(
         &self,
         user_id: &str,
-        old_snapshot_id: &str,
         new_snapshot_id: &str,
     ) -> anyhow::Result<u64> {
         let result = sync_records::Entity::update_many()
-            .filter(
-                sync_records::Column::UserId
-                    .eq(user_id)
-                    .and(sync_records::Column::SnapshotId.eq(old_snapshot_id)),
-            )
+            .filter(sync_records::Column::UserId.eq(user_id))
             .set(sync_records::ActiveModel {
                 snapshot_id: Set(new_snapshot_id.to_string()),
                 ..Default::default()
@@ -167,30 +177,90 @@ impl SyncRepository {
         Ok(result.rows_affected)
     }
 
-    /// 只关联指定 record_id 的 pending 记录到新快照
-    pub async fn update_specific_records_snapshot_id(
+    /// 获取指定 (record_id, table_name) 对的 pending 记录（精确匹配避免跨表碰撞）
+    pub async fn get_pending_records_by_composite_ids(
+        &self,
+        user_id: &str,
+        pushed_records: &[crate::domain::dto::sync::PushedRecordId],
+    ) -> anyhow::Result<Vec<sync_records::Model>> {
+        if pushed_records.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut results = Vec::new();
+        for pr in pushed_records {
+            let record = sync_records::Entity::find()
+                .filter(
+                    sync_records::Column::UserId
+                        .eq(user_id)
+                        .and(sync_records::Column::SnapshotId.eq("pending"))
+                        .and(sync_records::Column::RecordId.eq(&pr.record_id))
+                        .and(sync_records::Column::TableName.eq(&pr.table_name)),
+                )
+                .one(&self.db)
+                .await?;
+            if let Some(r) = record {
+                results.push(r);
+            }
+        }
+        Ok(results)
+    }
+
+    /// 获取指定 record_ids 的 pending 记录（兼容旧客户端）
+    pub async fn get_pending_records_by_ids(
         &self,
         user_id: &str,
         record_ids: &[String],
-        new_snapshot_id: &str,
-    ) -> anyhow::Result<u64> {
+    ) -> anyhow::Result<Vec<sync_records::Model>> {
         if record_ids.is_empty() {
-            return Ok(0);
+            return Ok(Vec::new());
         }
-        let result = sync_records::Entity::update_many()
+        let records = sync_records::Entity::find()
             .filter(
                 sync_records::Column::UserId
                     .eq(user_id)
                     .and(sync_records::Column::SnapshotId.eq("pending"))
                     .and(sync_records::Column::RecordId.is_in(record_ids.to_vec())),
             )
+            .all(&self.db)
+            .await?;
+        Ok(records)
+    }
+
+    /// 获取用户所有 pending 记录（保留用于调试/管理用途）
+    #[allow(dead_code)]
+    pub async fn get_all_pending_records(
+        &self,
+        user_id: &str,
+    ) -> anyhow::Result<Vec<sync_records::Model>> {
+        let records = sync_records::Entity::find()
+            .filter(
+                sync_records::Column::UserId
+                    .eq(user_id)
+                    .and(sync_records::Column::SnapshotId.eq("pending")),
+            )
+            .all(&self.db)
+            .await?;
+        Ok(records)
+    }
+
+    /// 更新记录的 storage_key
+    pub async fn update_record_storage_key(
+        &self,
+        record_db_id: i64,
+        new_storage_key: &str,
+    ) -> anyhow::Result<()> {
+        let result = sync_records::Entity::update_many()
+            .filter(sync_records::Column::Id.eq(record_db_id))
             .set(sync_records::ActiveModel {
-                snapshot_id: Set(new_snapshot_id.to_string()),
+                storage_key: Set(new_storage_key.to_string()),
                 ..Default::default()
             })
             .exec(&self.db)
             .await?;
-        Ok(result.rows_affected)
+        if result.rows_affected == 0 {
+            return Err(anyhow::anyhow!("记录不存在: id={}", record_db_id));
+        }
+        Ok(())
     }
 
     // ========== 附件操作 ==========
@@ -207,14 +277,41 @@ impl SyncRepository {
         Ok(attachments)
     }
 
+    /// 获取指定 attachment_ids 的 pending 附件
+    pub async fn get_pending_attachments_by_ids(
+        &self,
+        user_id: &str,
+        attachment_ids: &[String],
+    ) -> anyhow::Result<Vec<sync_attachments::Model>> {
+        if attachment_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let attachments = sync_attachments::Entity::find()
+            .filter(
+                sync_attachments::Column::UserId
+                    .eq(user_id)
+                    .and(sync_attachments::Column::SnapshotId.eq("pending"))
+                    .and(sync_attachments::Column::AttachmentId.is_in(attachment_ids.to_vec())),
+            )
+            .all(&self.db)
+            .await?;
+        Ok(attachments)
+    }
+
     /// 批量写入附件元信息（真正的 upsert：按自然键冲突时更新）
     pub async fn upsert_attachments(
         &self,
         attachments: Vec<sync_attachments::ActiveModel>,
     ) -> anyhow::Result<()> {
         for attachment in attachments {
-            let uid = match &attachment.user_id { Set(v) => v.as_str(), _ => "" };
-            let aid = match &attachment.attachment_id { Set(v) => v.as_str(), _ => "" };
+            let uid = match &attachment.user_id {
+                Set(v) => v.as_str(),
+                _ => "",
+            };
+            let aid = match &attachment.attachment_id {
+                Set(v) => v.as_str(),
+                _ => "",
+            };
 
             let existing = sync_attachments::Entity::find()
                 .filter(sync_attachments::Column::UserId.eq(uid))
@@ -248,6 +345,22 @@ impl SyncRepository {
         Ok(())
     }
 
+    /// 删除不在当前完整附件列表中的附件元信息
+    pub async fn delete_attachments_not_in_ids(
+        &self,
+        user_id: &str,
+        attachment_ids: &[String],
+    ) -> anyhow::Result<u64> {
+        let mut delete = sync_attachments::Entity::delete_many()
+            .filter(sync_attachments::Column::UserId.eq(user_id));
+        if !attachment_ids.is_empty() {
+            delete = delete
+                .filter(sync_attachments::Column::AttachmentId.is_not_in(attachment_ids.to_vec()));
+        }
+        let result = delete.exec(&self.db).await?;
+        Ok(result.rows_affected)
+    }
+
     /// 更新附件元信息（commit 时由客户端上报完整元数据）
     pub async fn update_attachment_metadata(
         &self,
@@ -271,11 +384,54 @@ impl SyncRepository {
             active.filename = Set(filename.to_string());
             active.mime_type = Set(mime_type.to_string());
             active.file_size = Set(file_size);
-            active.file_hash = Set(file_hash.to_string());
-            active.storage_key = Set(storage_key.to_string());
+            if !file_hash.is_empty() {
+                active.file_hash = Set(file_hash.to_string());
+            }
+            if !storage_key.is_empty() {
+                active.storage_key = Set(storage_key.to_string());
+            }
             active.update(&self.db).await?;
         }
         Ok(())
+    }
+
+    /// 更新附件的 storage_key 和 snapshot_id
+    pub async fn update_attachment_storage_key_snapshot(
+        &self,
+        attachment_db_id: i64,
+        new_storage_key: &str,
+        new_snapshot_id: &str,
+    ) -> anyhow::Result<()> {
+        let result = sync_attachments::Entity::update_many()
+            .filter(sync_attachments::Column::Id.eq(attachment_db_id))
+            .set(sync_attachments::ActiveModel {
+                storage_key: Set(new_storage_key.to_string()),
+                snapshot_id: Set(new_snapshot_id.to_string()),
+                ..Default::default()
+            })
+            .exec(&self.db)
+            .await?;
+        if result.rows_affected == 0 {
+            return Err(anyhow::anyhow!("附件不存在: id={}", attachment_db_id));
+        }
+        Ok(())
+    }
+
+    /// 将用户所有附件关联到新快照（附件表保存的是当前完整视图）
+    pub async fn update_all_attachments_snapshot_id(
+        &self,
+        user_id: &str,
+        new_snapshot_id: &str,
+    ) -> anyhow::Result<u64> {
+        let result = sync_attachments::Entity::update_many()
+            .filter(sync_attachments::Column::UserId.eq(user_id))
+            .set(sync_attachments::ActiveModel {
+                snapshot_id: Set(new_snapshot_id.to_string()),
+                ..Default::default()
+            })
+            .exec(&self.db)
+            .await?;
+        Ok(result.rows_affected)
     }
 
     /// 删除指定快照 ID 之前的旧快照
@@ -302,7 +458,10 @@ impl SyncRepository {
             .all(&self.db)
             .await?;
 
-        let old_ids: Vec<String> = old_snapshots.iter().map(|s| s.snapshot_id.clone()).collect();
+        let old_ids: Vec<String> = old_snapshots
+            .iter()
+            .map(|s| s.snapshot_id.clone())
+            .collect();
         if old_ids.is_empty() {
             return Ok(old_ids);
         }

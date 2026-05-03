@@ -1,0 +1,17 @@
+{
+  "back": "Preview",
+  "charCount": "{{count}} chars",
+  "titlePlaceholder": "Document Title",
+  "summaryPlaceholder": "Summary",
+  "loadingEditor": "Loading editor...",
+  "saved": "Saved",
+  "saving": "Saving...",
+  "saveVersion": "Save Version",
+  "saveVersionTooltip": "Save as new version",
+  "saveVersionDisabled": "Content matches latest version",
+  "version": "Version ({{count}})",
+  "versionTooltip": "Version History",
+  "manualSave": "Manual Save",
+  "favorite": "Favorite",
+  "unfavorite": "Unfavorite"
+}

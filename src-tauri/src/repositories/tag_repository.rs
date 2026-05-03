@@ -46,12 +46,66 @@ pub fn create_tag(db: &DbState, name: &str, color: &str) -> Result<TagDto, AppEr
 }
 
 pub fn delete_tag(db: &DbState, name: &str) -> Result<(), AppError> {
-    let conn = db
+    let mut conn = db
         .conn
         .lock()
         .map_err(|e| AppError::Database(e.to_string()))?;
-    conn.execute("DELETE FROM tags WHERE name = ?1", params![name])
+
+    // 查询 uuid 用于同步 tombstone
+    let uuid: Option<String> = conn
+        .query_row(
+            "SELECT uuid FROM tags WHERE name = ?1",
+            params![name],
+            |row| row.get(0),
+        )
+        .ok();
+
+    let item_tag_mappings: Vec<String> = if let Some(ref tag_uuid) = uuid {
+        let mut stmt = conn
+            .prepare(
+                "SELECT it.item_id FROM item_tags it
+                 JOIN tags t ON t.id = it.tag_id
+                 WHERE t.uuid = ?1",
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        let rows = stmt
+            .query_map(params![tag_uuid], |row| row.get::<_, String>(0))
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        let mut mappings = Vec::new();
+        for row in rows {
+            mappings.push(row.map_err(|e| AppError::Database(e.to_string()))?);
+        }
+        mappings
+    } else {
+        Vec::new()
+    };
+
+    let tx = conn
+        .transaction()
         .map_err(|e| AppError::Database(e.to_string()))?;
+
+    // 写入 tombstone（用于同步删除操作）
+    if let Some(ref tag_uuid) = uuid {
+        let now = chrono::Utc::now().to_rfc3339();
+        tx.execute(
+            "INSERT OR IGNORE INTO sync_tombstones (record_id, table_name, deleted_at) VALUES (?1, 'tags', ?2)",
+            params![tag_uuid, now],
+        )
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+        for item_id in &item_tag_mappings {
+            let tombstone_id = format!("{}_{}", item_id, tag_uuid);
+            tx.execute(
+                "INSERT OR IGNORE INTO sync_tombstones (record_id, table_name, deleted_at) VALUES (?1, 'item_tags', ?2)",
+                params![tombstone_id, now],
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+    }
+
+    tx.execute("DELETE FROM tags WHERE name = ?1", params![name])
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    tx.commit().map_err(|e| AppError::Database(e.to_string()))?;
     Ok(())
 }
 
@@ -125,6 +179,52 @@ pub fn set_item_tags(db: &DbState, item_id: &str, tag_names: Vec<String>) -> Res
         .lock()
         .map_err(|e| AppError::Database(e.to_string()))?;
 
+    // 收集新关联的 tag uuid 集合，用于判断哪些会被删除
+    let new_tag_uuids: std::collections::HashSet<String> = {
+        let mut set = std::collections::HashSet::new();
+        for name in &tag_names {
+            if let Ok(uuid) = conn.query_row(
+                "SELECT uuid FROM tags WHERE name = ?1",
+                params![name],
+                |row| row.get::<_, String>(0),
+            ) {
+                set.insert(uuid);
+            }
+        }
+        set
+    };
+
+    // 查询当前关联的 tag uuid，为被移除的写入 tombstone
+    let old_mappings: Vec<(String, String)> = {
+        let mut stmt = conn
+            .prepare(
+                "SELECT it.item_id, t.uuid FROM item_tags it JOIN tags t ON t.id = it.tag_id WHERE it.item_id = ?1",
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        let rows = stmt
+            .query_map(params![item_id], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        let mut result = Vec::new();
+        for row in rows {
+            result.push(row.map_err(|e| AppError::Database(e.to_string()))?);
+        }
+        result
+    };
+
+    let now = chrono::Utc::now().to_rfc3339();
+    for (iid, tag_uuid) in &old_mappings {
+        if !new_tag_uuids.contains(tag_uuid) {
+            let tombstone_id = format!("{}_{}", iid, tag_uuid);
+            conn.execute(
+                "INSERT OR IGNORE INTO sync_tombstones (record_id, table_name, deleted_at) VALUES (?1, 'item_tags', ?2)",
+                params![tombstone_id, now],
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+    }
+
     let tx = conn
         .transaction()
         .map_err(|e| AppError::Database(e.to_string()))?;
@@ -146,6 +246,21 @@ pub fn set_item_tags(db: &DbState, item_id: &str, tag_names: Vec<String>) -> Res
         tx.execute(
             "INSERT OR IGNORE INTO item_tags (item_id, tag_id) VALUES (?1, ?2)",
             params![item_id, tag_id],
+        )
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+        // 清理可能残留的 tombstone（关联被重新添加的场景）
+        let tag_uuid: String = tx
+            .query_row(
+                "SELECT uuid FROM tags WHERE id = ?1",
+                params![tag_id],
+                |row| row.get(0),
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        let tombstone_id = format!("{}_{}", item_id, tag_uuid);
+        tx.execute(
+            "DELETE FROM sync_tombstones WHERE record_id = ?1 AND table_name = 'item_tags'",
+            params![tombstone_id],
         )
         .map_err(|e| AppError::Database(e.to_string()))?;
     }
@@ -286,6 +401,36 @@ mod tests {
         let tags = get_all_tags(&db).unwrap();
         assert_eq!(tags.len(), 1);
         assert_eq!(tags[0].name, "go");
+    }
+
+    #[test]
+    fn delete_tag_writes_item_tag_tombstone() {
+        let db = crate::test_support::test_db();
+        let item_id = create_test_item(&db);
+        create_tag(&db, "rust", "cyan").unwrap();
+        let tag_uuid = {
+            let conn = db.conn.lock().unwrap();
+            conn.query_row(
+                "SELECT uuid FROM tags WHERE name = ?1",
+                params!["rust"],
+                |row| row.get::<_, String>(0),
+            )
+            .unwrap()
+        };
+
+        set_item_tags(&db, &item_id, vec!["rust".to_string()]).unwrap();
+        delete_tag(&db, "rust").unwrap();
+
+        let tombstone_id = format!("{}_{}", item_id, tag_uuid);
+        let conn = db.conn.lock().unwrap();
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sync_tombstones WHERE record_id = ?1 AND table_name = 'item_tags'",
+                params![tombstone_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 1);
     }
 
     #[test]

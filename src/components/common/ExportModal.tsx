@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Modal } from "./Modal";
 import { useSettingsStore } from "../../stores/settingsStore";
 import type { ExportOptions } from "../../services/tauriCommands";
@@ -17,6 +18,7 @@ interface ExportModalProps {
 }
 
 export function ExportModal({ open, onClose }: ExportModalProps) {
+    const { t } = useTranslation(["modals", "common"]);
     const exportSizeEstimate = useSettingsStore((s) => s.exportSizeEstimate);
     const fetchExportSizeEstimate = useSettingsStore((s) => s.fetchExportSizeEstimate);
     const exportDataWithOptions = useSettingsStore((s) => s.exportDataWithOptions);
@@ -51,17 +53,17 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
     }
 
     return (
-        <Modal open={open} onClose={onClose} title="导出数据">
+        <Modal open={open} onClose={onClose} title={t("modals:export.title")}>
             <div className="space-y-4">
                 <p className="text-sm text-[var(--muted)]">
-                    导出为 ZIP 格式，可选择包含标签、附件和版本历史。
+                    {t("modals:export.desc")}
                 </p>
 
                 <div className="space-y-3">
                     <div className="flex items-center gap-3 rounded-xl bg-[var(--field)] px-4 py-3">
                         <div className="flex-1">
-                            <div className="text-sm text-[var(--text)]">笔记记录</div>
-                            <div className="text-xs text-[var(--muted)]">始终包含</div>
+                            <div className="text-sm text-[var(--text)]">{t("modals:export.notes")}</div>
+                            <div className="text-xs text-[var(--muted)]">{t("modals:export.notesDesc")}</div>
                         </div>
                         {exportSizeEstimate && (
                             <span className="text-xs text-[var(--muted)]">
@@ -78,8 +80,8 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
                             className="h-4 w-4 accent-[var(--accent)]"
                         />
                         <div className="flex-1">
-                            <div className="text-sm text-[var(--text)]">包含标签</div>
-                            <div className="text-xs text-[var(--muted)]">标签和记录关联</div>
+                            <div className="text-sm text-[var(--text)]">{t("modals:export.includeTags")}</div>
+                            <div className="text-xs text-[var(--muted)]">{t("modals:export.tagsDesc")}</div>
                         </div>
                         {exportSizeEstimate && (
                             <span className="text-xs text-[var(--muted)]">
@@ -96,8 +98,8 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
                             className="h-4 w-4 accent-[var(--accent)]"
                         />
                         <div className="flex-1">
-                            <div className="text-sm text-[var(--text)]">包含附件</div>
-                            <div className="text-xs text-[var(--muted)]">图片、文件等</div>
+                            <div className="text-sm text-[var(--text)]">{t("modals:export.includeAttachments")}</div>
+                            <div className="text-xs text-[var(--muted)]">{t("modals:export.attachmentsDesc")}</div>
                         </div>
                         {exportSizeEstimate && (
                             <span className="text-xs text-[var(--muted)]">
@@ -114,8 +116,8 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
                             className="h-4 w-4 accent-[var(--accent)]"
                         />
                         <div className="flex-1">
-                            <div className="text-sm text-[var(--text)]">包含版本历史</div>
-                            <div className="text-xs text-[var(--muted)]">记录的历史版本</div>
+                            <div className="text-sm text-[var(--text)]">{t("modals:export.includeVersions")}</div>
+                            <div className="text-xs text-[var(--muted)]">{t("modals:export.versionsDesc")}</div>
                         </div>
                         {exportSizeEstimate && (
                             <span className="text-xs text-[var(--muted)]">
@@ -127,9 +129,9 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
 
                 {exportSizeEstimate && (
                     <div className="rounded-xl bg-[var(--field)] px-4 py-3 text-sm">
-                        <span className="text-[var(--muted)]">预估大小：</span>
+                        <span className="text-[var(--muted)]">{t("modals:export.estimatedSize")}</span>
                         <span className="font-medium text-[var(--text)]">{formatSize(estimatedSize)}</span>
-                        <span className="ml-1 text-xs text-[var(--muted)]">（ZIP 压缩后更小）</span>
+                        <span className="ml-1 text-xs text-[var(--muted)]">{t("modals:export.compressedHint")}</span>
                     </div>
                 )}
 
@@ -139,7 +141,7 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
                         type="button"
                         onClick={onClose}
                     >
-                        取消
+                        {t("common:buttons.cancel")}
                     </button>
                     <button
                         className="inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2 text-sm text-white hover:opacity-90"
@@ -147,7 +149,7 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
                         onClick={handleExport}
                     >
                         <Download className="h-4 w-4" />
-                        导出 ZIP
+                        {t("modals:export.exportBtn")}
                     </button>
                 </div>
             </div>

@@ -189,39 +189,46 @@ pub fn get_by_item(db: &DbState, item_id: &str) -> Result<Vec<AttachmentDto>, Ap
 }
 
 pub fn delete(db: &DbState, id: &str) -> Result<(), AppError> {
-    // 先查询文件路径
-    let relative_path: Option<String> = {
-        let conn = db
-            .conn
-            .lock()
-            .map_err(|e| AppError::Database(e.to_string()))?;
-        conn.query_row(
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+    // 先检查记录是否存在
+    let relative_path: Option<String> = conn
+        .query_row(
             "SELECT file_path FROM attachments WHERE id = ?1",
             params![id],
             |row| row.get(0),
         )
-        .ok()
-    };
+        .ok();
 
-    // 先删除文件（在 DB 记录之前）
-    if let Some(rel) = &relative_path {
-        let full_path = resolve_file_path(rel);
+    if relative_path.is_none() {
+        return Err(AppError::NotFound(format!("Attachment {}", id)));
+    }
+
+    // 写入 tombstone（用于同步删除操作）— 只有记录存在时才写
+    let now = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "INSERT OR IGNORE INTO sync_tombstones (record_id, table_name, deleted_at) VALUES (?1, 'attachments', ?2)",
+        params![id, now],
+    )
+    .map_err(|e| AppError::Database(e.to_string()))?;
+
+    // 删除 DB 记录
+    conn.execute("DELETE FROM attachments WHERE id = ?1", params![id])
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+    drop(conn);
+
+    // 删除文件（在 DB 记录删除之后，避免删了文件但 DB 记录还在的不一致状态）
+    if let Some(rel) = relative_path {
+        let full_path = resolve_file_path(&rel);
         if full_path.exists() {
             std::fs::remove_file(&full_path).map_err(|e| AppError::Io(e.to_string()))?;
         }
     }
 
-    // 再删除 DB 记录
-    let conn = db
-        .conn
-        .lock()
-        .map_err(|e| AppError::Database(e.to_string()))?;
-    let rows = conn
-        .execute("DELETE FROM attachments WHERE id = ?1", params![id])
-        .map_err(|e| AppError::Database(e.to_string()))?;
-    if rows == 0 {
-        return Err(AppError::NotFound(format!("Attachment {}", id)));
-    }
     Ok(())
 }
 

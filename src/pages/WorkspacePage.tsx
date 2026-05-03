@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { CheckCircle2, Edit3, Loader2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useAppStore } from "../stores/appStore";
 import { useToastStore } from "../stores/toastStore";
 import type { VditorEditorHandle } from "../components/editor/VditorEditor";
@@ -11,6 +12,7 @@ interface WorkspacePageProps {
 }
 
 export function WorkspacePage({ onQuickCreate }: WorkspacePageProps) {
+  const { t } = useTranslation(["workspace", "common"]);
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -53,9 +55,9 @@ export function WorkspacePage({ onQuickCreate }: WorkspacePageProps) {
       editorRef.current?.setValue("");
       setDraft("");
       setSaved(true);
-      useToastStore.getState().addToast("success", "记录已保存");
+      useToastStore.getState().addToast("success", t("common:toast.saveSuccess"));
     } catch {
-      useToastStore.getState().addToast("error", "保存失败");
+      useToastStore.getState().addToast("error", t("common:toast.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -66,8 +68,8 @@ export function WorkspacePage({ onQuickCreate }: WorkspacePageProps) {
       <section className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col">
         <div className="mb-4 flex shrink-0 items-center justify-between gap-4">
           <div>
-            <h1 className="app-hero-title text-[var(--text)]">随手记录</h1>
-            <p className="mt-1 text-sm text-[var(--muted)]">写下内容，保存为新的笔记。</p>
+            <h1 className="app-hero-title text-[var(--text)]">{t("workspace:title")}</h1>
+            <p className="mt-1 text-sm text-[var(--muted)]">{t("workspace:subtitle")}</p>
           </div>
           <button
             className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full bg-[var(--accent)] px-3 text-sm font-medium text-white hover:opacity-90"
@@ -77,13 +79,13 @@ export function WorkspacePage({ onQuickCreate }: WorkspacePageProps) {
             onClick={() => handleQuickSave().catch(() => {})}
           >
             <Edit3 className="h-4 w-4" />
-            {saving ? "保存中" : "记录"}
+            {saving ? t("workspace:savingBtn") : t("workspace:saveBtn")}
           </button>
         </div>
 
         <article className="workspace-editor-panel flex min-h-0 flex-1 flex-col rounded-3xl border border-[var(--line)] bg-[var(--paper)] p-4" data-testid="workspace-editor">
           <div className="min-h-0 flex-1 overflow-hidden">
-            <Suspense fallback={<div className="flex h-full items-center justify-center text-[var(--muted)]"><Loader2 className="mr-2 h-4 w-4 animate-spin" />加载编辑器...</div>}>
+            <Suspense fallback={<div className="flex h-full items-center justify-center text-[var(--muted)]"><Loader2 className="mr-2 h-4 w-4 animate-spin" />{t("workspace:loadingEditor")}</div>}>
               <VditorEditor
                 ref={editorRef}
                 initialValue={draft}
@@ -93,7 +95,7 @@ export function WorkspacePage({ onQuickCreate }: WorkspacePageProps) {
                 }}
                 theme={theme === "light" ? "light" : "dark"}
                 toolbar={["table", "link", "code"]}
-                placeholder="今天想记什么？"
+                placeholder={t("workspace:placeholder")}
               />
             </Suspense>
           </div>
@@ -102,10 +104,10 @@ export function WorkspacePage({ onQuickCreate }: WorkspacePageProps) {
               {saved ? (
                 <span className="inline-flex items-center gap-1 text-[var(--accent)]">
                   <CheckCircle2 className="h-3.5 w-3.5" />
-                  已保存
+                  {t("workspace:savedStatus")}
                 </span>
               ) : (
-                "Ctrl/⌘ + Enter 保存"
+                t("workspace:shortcutHint")
               )}
             </div>
           </footer>

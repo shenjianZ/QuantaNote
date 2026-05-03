@@ -24,9 +24,11 @@
     "@tauri-apps/plugin-dialog": "^2.7.0",
     "@tauri-apps/plugin-opener": "^2",
     "diff": "^9.0.0",
+    "i18next": "^26.0.8",
     "lucide-react": "^0.503.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-i18next": "^17.0.6",
     "vditor": "^3.11.2",
     "zustand": "^5.0.12"
   },

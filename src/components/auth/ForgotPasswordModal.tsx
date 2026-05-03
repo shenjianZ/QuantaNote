@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Mail, Loader2 } from "lucide-react";
 import { Modal } from "../common/Modal";
 import { useSyncStore } from "../../stores/syncStore";
@@ -16,6 +17,7 @@ export function ForgotPasswordModal({
     onSwitchToLogin,
     onSwitchToResetPassword,
 }: ForgotPasswordModalProps) {
+    const { t } = useTranslation(["auth"]);
     const { config, forgotPassword, isLoading, error, clearError } = useSyncStore();
     const [email, setEmail] = useState("");
     const [serverUrl, setServerUrl] = useState(config.server_url || "");
@@ -45,12 +47,12 @@ export function ForgotPasswordModal({
     }
 
     return (
-        <Modal open={open} onClose={handleClose} title="忘记密码">
+        <Modal open={open} onClose={handleClose} title={t("forgotPassword.title")}>
             <form onSubmit={handleSubmit} className="space-y-4">
                 {!config.server_url && (
                     <div>
                         <label className="mb-1 block text-xs text-[var(--muted)]">
-                            服务器地址
+                            {t("forgotPassword.serverUrl")}
                         </label>
                         <input
                             type="url"
@@ -67,17 +69,17 @@ export function ForgotPasswordModal({
                     <div className="rounded-lg bg-green-500/10 px-4 py-6 text-center">
                         <Mail className="mx-auto mb-2 h-8 w-8 text-green-400" />
                         <p className="text-sm text-[var(--text)]">
-                            重置令牌已生成，正在跳转...
+                            {t("forgotPassword.sent")}
                         </p>
                     </div>
                 ) : (
                     <>
                         <p className="text-sm text-[var(--muted)]">
-                            输入注册时使用的邮箱，将生成密码重置令牌。
+                            {t("forgotPassword.desc")}
                         </p>
                         <div>
                             <label className="mb-1 block text-xs text-[var(--muted)]">
-                                邮箱
+                                {t("forgotPassword.email")}
                             </label>
                             <input
                                 type="email"
@@ -105,7 +107,7 @@ export function ForgotPasswordModal({
                             ) : (
                                 <Mail className="h-4 w-4" />
                             )}
-                            {isLoading ? "发送中..." : "发送重置令牌"}
+                            {isLoading ? t("forgotPassword.submitting") : t("forgotPassword.submitBtn")}
                         </button>
                     </>
                 )}
@@ -116,7 +118,7 @@ export function ForgotPasswordModal({
                         onClick={onSwitchToLogin}
                         className="text-[var(--accent)] hover:underline"
                     >
-                        返回登录
+                        {t("forgotPassword.backToLogin")}
                     </button>
                 </div>
             </form>

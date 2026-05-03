@@ -1,0 +1,17 @@
+{
+  "back": "预览",
+  "charCount": "{{count}} 字",
+  "titlePlaceholder": "文档标题",
+  "summaryPlaceholder": "摘要",
+  "loadingEditor": "加载编辑器...",
+  "saved": "已保存",
+  "saving": "保存中...",
+  "saveVersion": "保存版本",
+  "saveVersionTooltip": "保存为新版本",
+  "saveVersionDisabled": "当前内容与最新版本一致",
+  "version": "版本 ({{count}})",
+  "versionTooltip": "版本记录",
+  "manualSave": "手动保存",
+  "favorite": "收藏",
+  "unfavorite": "取消收藏"
+}

@@ -144,7 +144,10 @@ impl CliArgs {
             if config.exists() {
                 return Some(config);
             }
-            eprintln!("⚠ 警告：环境变量 CONFIG 指定的配置文件不存在: {}", config_path);
+            eprintln!(
+                "⚠ 警告：环境变量 CONFIG 指定的配置文件不存在: {}",
+                config_path
+            );
             eprintln!("  将仅使用环境变量运行");
             return None;
         }

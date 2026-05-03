@@ -1,0 +1,10 @@
+{
+  "title": "Quick Note",
+  "subtitle": "Write content and save as a new note.",
+  "saveBtn": "Save",
+  "savingBtn": "Saving",
+  "placeholder": "What do you want to note today?",
+  "savedStatus": "Saved",
+  "shortcutHint": "Ctrl/⌘ + Enter to save",
+  "loadingEditor": "Loading editor..."
+}

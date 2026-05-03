@@ -54,20 +54,41 @@ pub fn print_final_config(config: &AppConfig) {
 
     // ── Database ──
     tracing::info!("║ [database]                                      ║");
-    tracing::info!("║   database_type = {}", db_type_name(&config.database.database_type));
+    tracing::info!(
+        "║   database_type = {}",
+        db_type_name(&config.database.database_type)
+    );
     tracing::info!("║   host          = {}", display_opt(&config.database.host));
-    tracing::info!("║   port          = {}", display_port(&config.database.port));
+    tracing::info!(
+        "║   port          = {}",
+        display_port(&config.database.port)
+    );
     tracing::info!("║   user          = {}", display_opt(&config.database.user));
-    tracing::info!("║   password      = {}", mask_secret(&config.database.password));
-    tracing::info!("║   database      = {}", display_opt(&config.database.database));
-    tracing::info!("║   path          = {}", display_path(&config.database.path));
+    tracing::info!(
+        "║   password      = {}",
+        mask_secret(&config.database.password)
+    );
+    tracing::info!(
+        "║   database      = {}",
+        display_opt(&config.database.database)
+    );
+    tracing::info!(
+        "║   path          = {}",
+        display_path(&config.database.path)
+    );
     tracing::info!("║   max_connections = {}", config.database.max_connections);
 
     // ── Auth ──
     tracing::info!("║ [auth]                                          ║");
     tracing::info!("║   jwt_secret                     = ****");
-    tracing::info!("║   access_token_expiration_minutes = {}", config.auth.access_token_expiration_minutes);
-    tracing::info!("║   refresh_token_expiration_days   = {}", config.auth.refresh_token_expiration_days);
+    tracing::info!(
+        "║   access_token_expiration_minutes = {}",
+        config.auth.access_token_expiration_minutes
+    );
+    tracing::info!(
+        "║   refresh_token_expiration_days   = {}",
+        config.auth.refresh_token_expiration_days
+    );
 
     // ── Redis ──
     tracing::info!("║ [redis]                                         ║");
@@ -79,14 +100,38 @@ pub fn print_final_config(config: &AppConfig) {
     // ── Storage ──
     tracing::info!("║ [storage]                                       ║");
     tracing::info!("║   backend_type    = {}", config.storage.backend_type);
-    tracing::info!("║   base_path       = {}", display_opt(&config.storage.base_path));
-    tracing::info!("║   bucket          = {}", display_opt(&config.storage.bucket));
-    tracing::info!("║   endpoint        = {}", display_opt(&config.storage.endpoint));
-    tracing::info!("║   region          = {}", display_opt(&config.storage.region));
-    tracing::info!("║   access_key      = {}", mask_secret(&config.storage.access_key));
-    tracing::info!("║   secret_key      = {}", mask_secret(&config.storage.secret_key));
-    tracing::info!("║   openlist_url    = {}", display_opt(&config.storage.openlist_url));
-    tracing::info!("║   openlist_token  = {}", mask_secret(&config.storage.openlist_token));
+    tracing::info!(
+        "║   base_path       = {}",
+        display_opt(&config.storage.base_path)
+    );
+    tracing::info!(
+        "║   bucket          = {}",
+        display_opt(&config.storage.bucket)
+    );
+    tracing::info!(
+        "║   endpoint        = {}",
+        display_opt(&config.storage.endpoint)
+    );
+    tracing::info!(
+        "║   region          = {}",
+        display_opt(&config.storage.region)
+    );
+    tracing::info!(
+        "║   access_key      = {}",
+        mask_secret(&config.storage.access_key)
+    );
+    tracing::info!(
+        "║   secret_key      = {}",
+        mask_secret(&config.storage.secret_key)
+    );
+    tracing::info!(
+        "║   openlist_url    = {}",
+        display_opt(&config.storage.openlist_url)
+    );
+    tracing::info!(
+        "║   openlist_token  = {}",
+        mask_secret(&config.storage.openlist_token)
+    );
 
     tracing::info!("╚══════════════════════════════════════════════════╝");
 }

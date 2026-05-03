@@ -1,4 +1,5 @@
 import { Cloud, CloudOff, Loader2, CloudCog } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useSyncStore } from "../../stores/syncStore";
 
 interface SyncStatusIndicatorProps {
@@ -6,6 +7,7 @@ interface SyncStatusIndicatorProps {
 }
 
 export function SyncStatusIndicator({ onClick }: SyncStatusIndicatorProps) {
+    const { t } = useTranslation(["sync", "common"]);
     const { config, state, triggerSync } = useSyncStore();
 
     if (!config.enabled || !config.access_token) {
@@ -29,12 +31,12 @@ export function SyncStatusIndicator({ onClick }: SyncStatusIndicatorProps) {
     );
 
     const tooltip = isSyncing
-        ? `同步中${state.progress ? `: ${state.progress.phase}` : ""}`
+        ? `${t("statusTooltip.syncing")}${state.progress ? `: ${state.progress.phase}` : ""}`
         : state.status === "completed"
-          ? `上次同步: ${state.last_sync_at ? new Date(state.last_sync_at).toLocaleString() : "刚刚"}`
+          ? t("statusTooltip.completed", { time: state.last_sync_at ? new Date(state.last_sync_at).toLocaleString() : t("statusTooltip.justNow") })
           : state.status === "error"
-            ? `同步错误: ${state.last_error || "未知错误"}`
-            : "点击同步";
+            ? t("statusTooltip.error", { message: state.last_error || t("syncError") })
+            : t("statusTooltip.default");
 
     async function handleClick() {
         if (isSyncing) return;

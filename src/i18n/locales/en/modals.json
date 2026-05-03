@@ -1,0 +1,93 @@
+{
+  "tagPicker": {
+    "title": "Select Tags",
+    "searchPlaceholder": "Search tags",
+    "noMatch": "No matching tags",
+    "noTags": "No tags",
+    "manage": "Manage Tags...",
+    "done": "Done"
+  },
+  "tagManager": {
+    "title": "Tag Manager",
+    "searchPlaceholder": "Search tags",
+    "newBtn": "New",
+    "namePlaceholder": "Tag name",
+    "create": "Create",
+    "save": "Save",
+    "rename": "Rename",
+    "color": "Color",
+    "delete": "Delete",
+    "confirmDelete": "Confirm Delete",
+    "recordCount": "{{count}} items",
+    "noMatch": "No matching tags",
+    "noTags": "No tags, click the button above to create one"
+  },
+  "attachment": {
+    "title": "Manage Attachments",
+    "addFile": "Add File",
+    "noAttachments": "No attachments",
+    "openWithSystem": "Open with System App",
+    "deleteAttachment": "Delete Attachment",
+    "preview": "Preview",
+    "loading": "Loading...",
+    "selectFile": "Select Attachment",
+    "categories": {
+      "image": "Image",
+      "audio": "Audio",
+      "video": "Video",
+      "pdf": "PDF",
+      "text": "Text",
+      "other": "File"
+    }
+  },
+  "export": {
+    "title": "Export Data",
+    "desc": "Export as ZIP format, with options to include tags, attachments, and version history.",
+    "notes": "Notes",
+    "notesDesc": "Always included",
+    "includeTags": "Include Tags",
+    "tagsDesc": "Tags and note associations",
+    "includeAttachments": "Include Attachments",
+    "attachmentsDesc": "Images, files, etc.",
+    "includeVersions": "Include Version History",
+    "versionsDesc": "Version history of notes",
+    "estimatedSize": "Estimated size: ",
+    "compressedHint": "(Smaller after ZIP compression)",
+    "exportBtn": "Export ZIP"
+  },
+  "import": {
+    "title": "Import Data",
+    "desc": "Import data from a ZIP file, with options for content selection and conflict handling.",
+    "includeTags": "Include Tags",
+    "tagsDesc": "Tags and note associations",
+    "includeAttachments": "Include Attachments",
+    "attachmentsDesc": "Images, files, etc.",
+    "includeVersions": "Include Version History",
+    "versionsDesc": "Version history of notes",
+    "conflict": "Conflict Handling",
+    "skipExisting": "Skip Existing",
+    "skipDesc": "Keep existing data, ignore duplicates",
+    "overwrite": "Overwrite Existing",
+    "overwriteDesc": "Replace existing data with imported data",
+    "importBtn": "Import ZIP"
+  },
+  "backupManager": {
+    "title": "Backup Manager",
+    "noBackups": "No backups",
+    "deleteBackup": "Delete this backup",
+    "close": "Close"
+  },
+  "colorPicker": {
+    "title": "Choose Color",
+    "hexValue": "HEX Value",
+    "palette": "Palette",
+    "colorName": "Color Name",
+    "namePlaceholder": "e.g., Ocean Blue, Forest Green"
+  },
+  "conflictResolver": {
+    "title": "Sync Conflict",
+    "conflictCount": "Detected {{count}} conflicting records, please choose which version to keep",
+    "useLocal": "Use Local Version",
+    "useRemote": "Use Remote Version"
+  }
+}

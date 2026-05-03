@@ -1,4 +1,5 @@
 import { AlertTriangle, ArrowLeft, ArrowRight } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Modal } from "../common/Modal";
 
 interface ConflictRecord {
@@ -21,20 +22,21 @@ export function ConflictResolver({
     onResolve,
     onClose,
 }: ConflictResolverProps) {
+    const { t } = useTranslation(["sync", "common"]);
     if (conflicts.length === 0) return null;
 
     return (
         <Modal
             open={open}
             onClose={onClose}
-            title="同步冲突"
+            title={t("syncConflictTitle")}
             maxWidth="max-w-2xl"
         >
             <div className="space-y-4">
                 <div className="flex items-center gap-2 rounded-lg bg-yellow-500/10 px-3 py-2">
                     <AlertTriangle className="h-4 w-4 text-yellow-400" />
                     <span className="text-sm text-yellow-400">
-                        检测到 {conflicts.length} 条冲突记录，请选择保留哪个版本
+                        {t("conflictHint", { count: conflicts.length })}
                     </span>
                 </div>
 
@@ -72,7 +74,7 @@ export function ConflictResolver({
                                 >
                                     <div className="flex items-center gap-1.5 text-xs font-medium text-[var(--accent)]">
                                         <ArrowLeft className="h-3.5 w-3.5" />
-                                        使用本地版本
+                                        {t("useLocalVersion")}
                                     </div>
                                     <div className="line-clamp-2 text-xs text-[var(--muted)]">
                                         {String(
@@ -97,7 +99,7 @@ export function ConflictResolver({
                                 >
                                     <div className="flex items-center gap-1.5 text-xs font-medium text-[var(--accent)]">
                                         <ArrowRight className="h-3.5 w-3.5" />
-                                        使用远端版本
+                                        {t("useRemoteVersion")}
                                     </div>
                                     <div className="line-clamp-2 text-xs text-[var(--muted)]">
                                         {String(

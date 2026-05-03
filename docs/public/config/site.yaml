@@ -1,0 +1,345 @@
+# yaml-language-server: $schema=./site.schema.json
+# 网站基本配置
+site:
+    title: "QuantaNote 文档"
+    description: "QuantaNote - 本地优先的桌面信息管理工具文档"
+    url: "https://shenjianz.github.io/QuantaNote"
+    logo:
+        light: "/images/favicon.svg"
+        dark: "/images/favicon-dark.svg"
+    author: "QuantaNote Team"
+
+# 顶部导航配置
+navbar:
+    showLogo: true
+    showTitle: true
+    showLanguageSwitcher: true
+    items:
+        - title: "首页"
+          link: "/"
+          active: true
+        - title: "文档"
+          link: "/docs"
+        - title: "更新日志"
+          link: "/changelog"
+    actions:
+        - type: "github"
+          link: "https://github.com/shenjianZ/QuantaNote"
+          enabled: true
+
+announcement:
+    enabled: true
+    text: "QuantaNote — 本地优先、隐私安全的桌面信息管理工具"
+    link: "https://github.com/shenjianZ/QuantaNote"
+    dismissible: true
+
+versions:
+    enabled: false
+
+changelog:
+    enabled: true
+    title: "更新日志"
+    pageSize: 5
+
+# 侧边栏导航配置
+sidebar:
+    enabled: true
+    collections:
+        docs:
+            sections:
+                - title: "快速开始"
+                  path: "/docs/guide"
+                  children:
+                      - title: "介绍"
+                        path: "/docs/guide/introduction"
+                      - title: "安装"
+                        path: "/docs/guide/installation"
+                      - title: "快速上手"
+                        path: "/docs/guide/quick-start"
+                - title: "功能"
+                  path: "/docs/features"
+                  children:
+                      - title: "工作台"
+                        path: "/docs/features/workspace"
+                      - title: "记录库"
+                        path: "/docs/features/library"
+                      - title: "文档编辑器"
+                        path: "/docs/features/document-editor"
+                      - title: "Markdown 编辑器"
+                        path: "/docs/features/markdown-editor"
+                      - title: "标签"
+                        path: "/docs/features/tags"
+                      - title: "附件"
+                        path: "/docs/features/attachments"
+                      - title: "版本历史"
+                        path: "/docs/features/version-history"
+                      - title: "全文搜索"
+                        path: "/docs/features/search"
+                      - title: "命令面板"
+                        path: "/docs/features/command-palette"
+                - title: "数据管理"
+                  path: "/docs/data"
+                  children:
+                      - title: "导入导出"
+                        path: "/docs/data/import-export"
+                      - title: "备份"
+                        path: "/docs/data/backup"
+                - title: "同步"
+                  path: "/docs/sync"
+                  children:
+                      - title: "服务器设置"
+                        path: "/docs/sync/server-setup"
+                      - title: "认证"
+                        path: "/docs/sync/authentication"
+                      - title: "同步数据"
+                        path: "/docs/sync/syncing"
+                      - title: "冲突解决"
+                        path: "/docs/sync/conflict-resolution"
+                - title: "设置"
+                  path: "/docs/settings"
+                  children:
+                      - title: "外观设置"
+                        path: "/docs/settings/appearance"
+                      - title: "字体设置"
+                        path: "/docs/settings/fonts"
+                      - title: "系统集成"
+                        path: "/docs/settings/system"
+                      - title: "诊断工具"
+                        path: "/docs/settings/diagnostics"
+                      - title: "快捷键"
+                        path: "/docs/settings/shortcuts"
+                - title: "架构"
+                  path: "/docs/architecture"
+                  children:
+                      - title: "架构概览"
+                        path: "/docs/architecture/overview"
+                      - title: "前端架构"
+                        path: "/docs/architecture/frontend"
+                      - title: "后端架构"
+                        path: "/docs/architecture/backend"
+                      - title: "数据库设计"
+                        path: "/docs/architecture/database"
+                      - title: "IPC 通信"
+                        path: "/docs/architecture/ipc"
+                      - title: "状态管理"
+                        path: "/docs/architecture/state-management"
+                - title: "开发"
+                  path: "/docs/development"
+                  children:
+                      - title: "从源码构建"
+                        path: "/docs/development/building"
+                      - title: "技术栈"
+                        path: "/docs/development/tech-stack"
+                      - title: "项目结构"
+                        path: "/docs/development/project-structure"
+                      - title: "开发命令"
+                        path: "/docs/development/commands"
+                      - title: "测试指南"
+                        path: "/docs/development/testing"
+                      - title: "贡献指南"
+                        path: "/docs/development/contributing"
+
+# Theme Configuration
+theme:
+    defaultMode: "auto"
+    allowToggle: true
+
+# Table of Contents Configuration
+toc:
+    maxLevel: 4
+    enabled: true
+    title: "本页目录"
+
+# 图片查看器配置
+imageViewer:
+    enabled: true
+    labels:
+        preview: "预览图片"
+        zoomIn: "放大"
+        zoomOut: "缩小"
+        fit: "适配窗口"
+        actualSize: "原始比例"
+        reset: "重置"
+        rotateLeft: "左旋"
+        rotateRight: "右旋"
+        fullscreen: "全屏"
+        download: "下载"
+        openInNewTab: "新标签打开"
+        close: "关闭图片查看器"
+
+# Footer Configuration
+footer:
+    enabled: true
+    copyright: "© 2026 QuantaNote. All rights reserved."
+    repository:
+        url: "https://github.com/shenjianZ/QuantaNote"
+        branch: "master"
+    lastUpdated: "2026-05-03"
+    version: "v0.1.0"
+    groups:
+        - title: "社区"
+          items:
+              - title: "问题反馈"
+                link: "https://github.com/shenjianZ/QuantaNote/issues"
+                external: true
+              - title: "版本发布"
+                link: "https://github.com/shenjianZ/QuantaNote/releases"
+                external: true
+              - title: "源代码"
+                link: "https://github.com/shenjianZ/QuantaNote"
+                external: true
+        - title: "帮助支持"
+          items:
+              - title: "快速开始"
+                link: "/docs/guide"
+              - title: "功能文档"
+                link: "/docs/features"
+              - title: "贡献指南"
+                link: "/docs/development/contributing"
+              - title: "回到顶部"
+                link: "#"
+                action: "scrollTop"
+    links:
+        - title: "Documentation"
+          link: "/docs/guide/introduction"
+        - title: "GitHub"
+          link: "https://github.com/shenjianZ/QuantaNote"
+          external: true
+    social:
+        - name: "github"
+          url: "https://github.com/shenjianZ/QuantaNote"
+          icon: "github"
+
+# PWA Configuration
+pwa:
+    enabled: true
+    name: "QuantaNote"
+    shortName: "QuantaNote"
+    description: "QuantaNote 文档网站"
+    themeColor: "#ffffff"
+    backgroundColor: "#ffffff"
+
+# 右键菜单配置
+contextMenu:
+    enabled: true
+    page:
+        copySelectedText: true
+        copyUrl: true
+        copyTitle: false
+        copyMarkdownLink: false
+        openInNewTab: false
+        reload: true
+        printPage: true
+        scrollToTop: true
+        scrollToBottom: true
+    site:
+        goHome: true
+        quickNav: false
+        language: false
+    appearance:
+        theme: false
+        resetThemePref: false
+
+# MDX 组件配置
+mdx:
+    componentsPath: "/src/components"
+    enabled: true
+
+pageMeta:
+    showLastUpdated: true
+    showEditLink: true
+    showAuthors: true
+    preferGitMeta: true
+
+editLink:
+    enabled: true
+    label: "编辑此页"
+    urlTemplate: "https://github.com/shenjianZ/QuantaNote/edit/master/docs/{filePath}"
+
+feedback:
+    enabled: true
+    endpoint: ""
+    method: "POST"
+    includePageMeta: true
+    labels:
+        helpful: "有帮助"
+        unhelpful: "没帮助"
+        inputPlaceholder: "可以补充哪里不清楚或不准确"
+        submit: "提交反馈"
+        thanks: "感谢反馈"
+
+ai:
+    enabled: false
+
+# 字体配置
+fonts:
+    fontFamilyZhCn: "MiSans, PingFang SC, Noto Sans SC, Microsoft YaHei, sans-serif"
+    fontFamilyEn: "Fragment Mono, system-ui, sans-serif"
+    downloadFonts:
+        - "FragmentMono-Italic.woff2"
+        - "FragmentMono-Regular.woff2"
+        - "MiSans-Bold.woff2"
+        - "MiSans-Medium.woff2"
+        - "MiSans-Regular.woff2"
+
+# 代码高亮配置
+codeHighlight:
+    langs:
+        - "bash"
+        - "markdown"
+        - "yaml"
+        - "javascript"
+        - "typescript"
+        - "tsx"
+        - "json"
+        - "rust"
+        - "sql"
+        - "css"
+    lightTheme: "github-light"
+    darkTheme: "github-dark"
+
+# 全文搜索配置
+search:
+    enabled: true
+    placeholder: "搜索文档..."
+    maxResults: 20
+    snippetLength: 120
+
+seo:
+    enabled: true
+    defaultTitle: "QuantaNote 文档"
+    titleTemplate: "{title} | QuantaNote"
+    defaultDescription: "QuantaNote - 本地优先的桌面信息管理工具文档"
+    robots: "index, follow"
+    twitterCard: "summary_large_image"
+
+# 面包屑导航配置
+breadcrumb:
+    enabled: true
+    showHome: true
+
+# 阅读体验配置
+reading:
+    showTime: true
+    showProgress: true
+
+# Sitemap 配置
+sitemap:
+    enabled: true
+    changefreq: "weekly"
+    priority: 0.7
+    exclude: []
+
+# RSS Feed 配置
+feed:
+    enabled: true
+    title: "QuantaNote 文档"
+    description: "QuantaNote 更新日志"
+    limit: 20
+
+export:
+    enabled: true
+    markdown: true
+    pdf: true
+    word: true
+    allDocs: true

@@ -3,6 +3,7 @@ import { FileText, FolderOpen, Music, Plus, Trash2, Video, X } from "lucide-reac
 import { openPath } from "@tauri-apps/plugin-opener";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { useTranslation } from "react-i18next";
 import { Modal } from "./Modal";
 import { useAttachmentStore } from "../../stores/attachmentStore";
 import { useToastStore } from "../../stores/toastStore";
@@ -49,14 +50,14 @@ function getCategoryIcon(category: FileCategory) {
   }
 }
 
-function getCategoryLabel(category: FileCategory) {
+function getCategoryLabel(category: FileCategory, t: (key: string) => string) {
   switch (category) {
-    case "image": return "图片";
-    case "audio": return "音频";
-    case "video": return "视频";
-    case "pdf": return "PDF";
-    case "text": return "文本";
-    default: return "文件";
+    case "image": return t("modals:attachment.categories.image");
+    case "audio": return t("modals:attachment.categories.audio");
+    case "video": return t("modals:attachment.categories.video");
+    case "pdf": return t("modals:attachment.categories.pdf");
+    case "text": return t("modals:attachment.categories.text");
+    default: return t("modals:attachment.categories.other");
   }
 }
 
@@ -66,6 +67,7 @@ function getExtension(filename: string) {
 }
 
 export function AttachmentManagerModal({ open: isOpen, onClose, itemId }: AttachmentManagerModalProps) {
+  const { t } = useTranslation(["modals", "common"]);
   const attachments = useAttachmentStore((s) => s.attachments);
   const fetchAttachments = useAttachmentStore((s) => s.fetchAttachments);
   const addAttachment = useAttachmentStore((s) => s.addAttachment);
@@ -82,13 +84,13 @@ export function AttachmentManagerModal({ open: isOpen, onClose, itemId }: Attach
   async function handleAddFile() {
     const selected = await openDialog({
       multiple: false,
-      title: "选择附件",
+      title: t("modals:attachment.selectFile"),
     });
     if (selected) {
       try {
         await addAttachment(itemId, selected);
       } catch {
-        useToastStore.getState().addToast("error", "添加附件失败");
+        useToastStore.getState().addToast("error", t("common:toast.attachmentAddFailed"));
       }
     }
   }
@@ -97,7 +99,7 @@ export function AttachmentManagerModal({ open: isOpen, onClose, itemId }: Attach
     try {
       await deleteAttachment(id);
     } catch {
-      useToastStore.getState().addToast("error", "删除附件失败");
+      useToastStore.getState().addToast("error", t("common:toast.attachmentDeleteFailed"));
     }
   }
 
@@ -109,7 +111,7 @@ export function AttachmentManagerModal({ open: isOpen, onClose, itemId }: Attach
         const content = await invoke<string>("read_from_file", { path: filePath });
         setPreview({ type: category, filePath, filename, textContent: content });
       } catch {
-        setPreview({ type: category, filePath, filename, textContent: "无法读取文件内容" });
+        setPreview({ type: category, filePath, filename, textContent: t("common:error.cannotReadFile") });
       }
       setLoadingText(false);
     } else if (category === "other") {
@@ -135,7 +137,7 @@ export function AttachmentManagerModal({ open: isOpen, onClose, itemId }: Attach
 
   return (
     <>
-      <Modal open={isOpen && !preview} onClose={onClose} title="管理附件" maxWidth="max-w-lg">
+      <Modal open={isOpen && !preview} onClose={onClose} title={t("modals:attachment.title")} maxWidth="max-w-lg">
         <div className="space-y-3">
           <button
             className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent)] px-3 py-1.5 text-sm text-white hover:opacity-90"
@@ -144,11 +146,11 @@ export function AttachmentManagerModal({ open: isOpen, onClose, itemId }: Attach
             onClick={handleAddFile}
           >
             <Plus className="h-4 w-4" />
-            添加文件
+            {t("modals:attachment.addFile")}
           </button>
 
           {attachments.length === 0 ? (
-            <p className="py-4 text-center text-sm text-[var(--muted)]">暂无附件</p>
+            <p className="py-4 text-center text-sm text-[var(--muted)]">{t("modals:attachment.noAttachments")}</p>
           ) : (
             <div className="space-y-2">
               {attachments.map((att) => {
@@ -175,7 +177,7 @@ export function AttachmentManagerModal({ open: isOpen, onClose, itemId }: Attach
                         type="button"
                         className="grid h-14 w-14 shrink-0 place-items-center rounded-xl border border-[var(--line)] bg-[var(--hover)]"
                         onClick={() => handlePreview(att.file_path, att.filename, att.mime_type)}
-                        title={category === "other" ? "用系统应用打开" : "预览"}
+                        title={category === "other" ? t("modals:attachment.openWithSystem") : t("modals:attachment.preview")}
                       >
                         {ext ? (
                           <span className="text-2xs font-bold uppercase text-[var(--muted)]">{ext}</span>
@@ -197,7 +199,7 @@ export function AttachmentManagerModal({ open: isOpen, onClose, itemId }: Attach
                         {att.filename}
                       </button>
                       <p className="text-xs text-[var(--muted)]">
-                        {formatFileSize(att.file_size)} · {getCategoryLabel(category)}
+                        {formatFileSize(att.file_size)} · {getCategoryLabel(category, t)}
                         {ext && ` · .${ext}`}
                       </p>
                     </div>
@@ -208,7 +210,7 @@ export function AttachmentManagerModal({ open: isOpen, onClose, itemId }: Attach
                         className="rounded-full p-1.5 text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
                         type="button"
                         onClick={() => openPath(att.file_path)}
-                        title="用系统应用打开"
+                        title={t("modals:attachment.openWithSystem")}
                       >
                         <FolderOpen className="h-4 w-4" />
                       </button>
@@ -216,7 +218,7 @@ export function AttachmentManagerModal({ open: isOpen, onClose, itemId }: Attach
                         className="rounded-full p-1.5 text-[var(--muted)] hover:bg-red-500/10 hover:text-red-400"
                         type="button"
                         onClick={() => handleDelete(att.id)}
-                        title="删除附件"
+                        title={t("modals:attachment.deleteAttachment")}
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -230,7 +232,7 @@ export function AttachmentManagerModal({ open: isOpen, onClose, itemId }: Attach
           {loadingText && (
             <div className="fixed inset-0 z-[60] grid place-items-center bg-black/40 backdrop-blur-sm">
               <div className="rounded-2xl bg-[var(--popover)] px-6 py-4 text-sm text-[var(--text)]">
-                加载中...
+                {t("modals:attachment.loading")}
               </div>
             </div>
           )}
@@ -257,7 +259,7 @@ export function AttachmentManagerModal({ open: isOpen, onClose, itemId }: Attach
             <div className="flex shrink-0 items-center justify-between border-b border-[var(--line)] px-4 py-2.5">
               <div className="flex min-w-0 items-center gap-2">
                 <span className="shrink-0 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-2xs font-medium text-[var(--accent)]">
-                  {getCategoryLabel(preview.type)}
+                  {getCategoryLabel(preview.type, t)}
                 </span>
                 <span className="truncate text-sm text-[var(--text)]">{preview.filename}</span>
               </div>
@@ -267,7 +269,7 @@ export function AttachmentManagerModal({ open: isOpen, onClose, itemId }: Attach
                   type="button"
                   onClick={() => openPath(preview.filePath)}
                 >
-                  用系统应用打开
+                  {t("modals:attachment.openWithSystem")}
                 </button>
                 <button
                   className="grid h-7 w-7 place-items-center rounded-full bg-[var(--field)] text-[var(--text)] hover:bg-[var(--hover)]"

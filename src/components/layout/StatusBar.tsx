@@ -1,13 +1,7 @@
 import { memo, useEffect, useState } from "react";
 import { CheckCircle2, Database, Wifi, WifiOff } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { AppPage } from "../../types";
-
-const PAGE_NAMES: Record<string, string> = {
-  workspace: "工作台",
-  library: "记录库",
-  document: "文档编辑",
-  settings: "设置",
-};
 
 interface StatusBarProps {
   currentPage: AppPage;
@@ -15,8 +9,16 @@ interface StatusBarProps {
 }
 
 export const StatusBar = memo(function StatusBar({ currentPage, itemCount }: StatusBarProps) {
+  const { t } = useTranslation(["statusbar", "common"]);
   const [time, setTime] = useState(() => formatTime());
   const [online, setOnline] = useState(() => navigator.onLine);
+
+  const PAGE_NAMES: Record<string, string> = {
+    workspace: t("statusbar:workspace"),
+    library: t("statusbar:library"),
+    document: t("statusbar:document"),
+    settings: t("statusbar:settings"),
+  };
 
   useEffect(() => {
     const timer = setInterval(() => setTime(formatTime()), 60_000);
@@ -39,7 +41,7 @@ export const StatusBar = memo(function StatusBar({ currentPage, itemCount }: Sta
       <div className="flex items-center gap-2">
         <Database className="h-3.5 w-3.5" />
         <span>{PAGE_NAMES[currentPage] || currentPage}</span>
-        {itemCount != null && <span>· {itemCount} 条记录</span>}
+        {itemCount != null && <span>· {t("statusbar:recordCount", { count: itemCount })}</span>}
         <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
       </div>
       <div className="flex items-center gap-3">
@@ -49,17 +51,17 @@ export const StatusBar = memo(function StatusBar({ currentPage, itemCount }: Sta
           {online ? (
             <>
               <Wifi className="h-3 w-3 text-green-500" />
-              在线
+              {t("common:status.online")}
             </>
           ) : (
             <>
               <WifiOff className="h-3 w-3" />
-              离线
+              {t("common:status.offline")}
             </>
           )}
         </span>
         <span>·</span>
-        <span>本地模式</span>
+        <span>{t("common:status.localMode")}</span>
       </div>
     </footer>
   );

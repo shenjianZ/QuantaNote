@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { diffLines, type Change } from "diff";
 import { X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Modal } from "../common/Modal";
 import type { VersionDto } from "../../types";
 
@@ -37,6 +38,7 @@ function DiffLine({ change }: { change: Change }) {
 }
 
 export function VersionDiffModal({ open, versionA, versionB, onClose }: VersionDiffModalProps) {
+  const { t } = useTranslation(["editor"]);
   const diffResult = useMemo(() => {
     if (!versionA || !versionB) return [];
     return diffLines(versionA.content || "", versionB.content || "");
@@ -56,7 +58,7 @@ export function VersionDiffModal({ open, versionA, versionB, onClose }: VersionD
   if (!versionA || !versionB) return null;
 
   return (
-    <Modal open={open} onClose={onClose} title="版本对比" maxWidth="max-w-3xl">
+    <Modal open={open} onClose={onClose} title={t("editor:versionDiff.title")} maxWidth="max-w-3xl">
       <div className="space-y-3" data-testid="version-diff-modal">
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-2">
@@ -77,7 +79,7 @@ export function VersionDiffModal({ open, versionA, versionB, onClose }: VersionD
         <div className="max-h-[60vh] overflow-auto rounded-xl border border-[var(--line)] bg-[var(--field)] p-3">
           {diffResult.length === 0 ? (
             <div className="py-8 text-center text-sm text-[var(--muted)]">
-              两个版本内容相同
+              {t("editor:versionDiff.identical")}
             </div>
           ) : (
             diffResult.map((change, i) => <DiffLine key={i} change={change} />)
@@ -91,7 +93,7 @@ export function VersionDiffModal({ open, versionA, versionB, onClose }: VersionD
             onClick={onClose}
           >
             <X className="h-4 w-4" />
-            关闭
+            {t("editor:versionDiff.close")}
           </button>
         </div>
       </div>

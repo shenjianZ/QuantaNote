@@ -1,0 +1,93 @@
+{
+  "tagPicker": {
+    "title": "选择标签",
+    "searchPlaceholder": "搜索标签",
+    "noMatch": "没有匹配的标签",
+    "noTags": "暂无标签",
+    "manage": "管理标签...",
+    "done": "完成"
+  },
+  "tagManager": {
+    "title": "标签管理",
+    "searchPlaceholder": "搜索标签",
+    "newBtn": "新建",
+    "namePlaceholder": "标签名",
+    "create": "创建",
+    "save": "保存",
+    "rename": "重命名",
+    "color": "颜色",
+    "delete": "删除",
+    "confirmDelete": "确认删除",
+    "recordCount": "{{count}} 条",
+    "noMatch": "没有匹配的标签",
+    "noTags": "暂无标签，点击上方按钮创建"
+  },
+  "attachment": {
+    "title": "管理附件",
+    "addFile": "添加文件",
+    "noAttachments": "暂无附件",
+    "openWithSystem": "用系统应用打开",
+    "deleteAttachment": "删除附件",
+    "preview": "预览",
+    "loading": "加载中...",
+    "selectFile": "选择附件",
+    "categories": {
+      "image": "图片",
+      "audio": "音频",
+      "video": "视频",
+      "pdf": "PDF",
+      "text": "文本",
+      "other": "文件"
+    }
+  },
+  "export": {
+    "title": "导出数据",
+    "desc": "导出为 ZIP 格式，可选择包含标签、附件和版本历史。",
+    "notes": "笔记记录",
+    "notesDesc": "始终包含",
+    "includeTags": "包含标签",
+    "tagsDesc": "标签和记录关联",
+    "includeAttachments": "包含附件",
+    "attachmentsDesc": "图片、文件等",
+    "includeVersions": "包含版本历史",
+    "versionsDesc": "记录的历史版本",
+    "estimatedSize": "预估大小：",
+    "compressedHint": "（ZIP 压缩后更小）",
+    "exportBtn": "导出 ZIP"
+  },
+  "import": {
+    "title": "导入数据",
+    "desc": "从 ZIP 文件导入数据，可选择导入内容和冲突处理方式。",
+    "includeTags": "包含标签",
+    "tagsDesc": "标签和记录关联",
+    "includeAttachments": "包含附件",
+    "attachmentsDesc": "图片、文件等",
+    "includeVersions": "包含版本历史",
+    "versionsDesc": "记录的历史版本",
+    "conflict": "冲突处理",
+    "skipExisting": "跳过已有",
+    "skipDesc": "保留现有数据，忽略重复项",
+    "overwrite": "覆盖已有",
+    "overwriteDesc": "用导入数据替换现有数据",
+    "importBtn": "导入 ZIP"
+  },
+  "backupManager": {
+    "title": "备份管理",
+    "noBackups": "暂无备份记录",
+    "deleteBackup": "删除此备份",
+    "close": "关闭"
+  },
+  "colorPicker": {
+    "title": "选择颜色",
+    "hexValue": "HEX 色值",
+    "palette": "调色板",
+    "colorName": "颜色名称",
+    "namePlaceholder": "例如：松绿、深蓝"
+  },
+  "conflictResolver": {
+    "title": "同步冲突",
+    "conflictCount": "检测到 {{count}} 条冲突记录，请选择保留哪个版本",
+    "useLocal": "使用本地版本",
+    "useRemote": "使用远端版本"
+  }
+}

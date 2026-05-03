@@ -350,6 +350,12 @@ export interface ConflictInfo {
     content_hash: string;
 }
 
+export interface ConflictResolutionChoice {
+    table_name: string;
+    record_id: string;
+    choice: "local" | "remote";
+}
+
 export interface SyncResult {
     pushed: number;
     pulled: number;
@@ -452,7 +458,9 @@ export async function getPendingConflicts() {
     return invoke<ConflictInfo[] | null>("get_pending_conflicts");
 }
 
-export async function resolveSyncConflicts(resolutions: [string, string][]) {
+export async function resolveSyncConflicts(
+    resolutions: ConflictResolutionChoice[],
+) {
     return invoke<SyncResult>("resolve_sync_conflicts", { resolutions });
 }
 

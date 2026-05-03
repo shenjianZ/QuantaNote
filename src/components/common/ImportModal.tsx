@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Upload } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Modal } from "./Modal";
 import { useSettingsStore } from "../../stores/settingsStore";
 import type { ImportOptions } from "../../services/tauriCommands";
@@ -10,6 +11,7 @@ interface ImportModalProps {
 }
 
 export function ImportModal({ open, onClose }: ImportModalProps) {
+    const { t } = useTranslation(["modals", "common"]);
     const importDataWithOptions = useSettingsStore((s) => s.importDataWithOptions);
 
     const [options, setOptions] = useState<ImportOptions>({
@@ -36,10 +38,10 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
     }
 
     return (
-        <Modal open={open} onClose={onClose} title="导入数据">
+        <Modal open={open} onClose={onClose} title={t("modals:import.title")}>
             <div className="space-y-4">
                 <p className="text-sm text-[var(--muted)]">
-                    从 ZIP 文件导入数据，可选择导入内容和冲突处理方式。
+                    {t("modals:import.desc")}
                 </p>
 
                 <div className="space-y-3">
@@ -51,8 +53,8 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
                             className="h-4 w-4 accent-[var(--accent)]"
                         />
                         <div className="flex-1">
-                            <div className="text-sm text-[var(--text)]">包含标签</div>
-                            <div className="text-xs text-[var(--muted)]">标签和记录关联</div>
+                            <div className="text-sm text-[var(--text)]">{t("modals:import.includeTags")}</div>
+                            <div className="text-xs text-[var(--muted)]">{t("modals:import.tagsDesc")}</div>
                         </div>
                     </label>
 
@@ -64,8 +66,8 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
                             className="h-4 w-4 accent-[var(--accent)]"
                         />
                         <div className="flex-1">
-                            <div className="text-sm text-[var(--text)]">包含附件</div>
-                            <div className="text-xs text-[var(--muted)]">图片、文件等</div>
+                            <div className="text-sm text-[var(--text)]">{t("modals:import.includeAttachments")}</div>
+                            <div className="text-xs text-[var(--muted)]">{t("modals:import.attachmentsDesc")}</div>
                         </div>
                     </label>
 
@@ -77,14 +79,14 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
                             className="h-4 w-4 accent-[var(--accent)]"
                         />
                         <div className="flex-1">
-                            <div className="text-sm text-[var(--text)]">包含版本历史</div>
-                            <div className="text-xs text-[var(--muted)]">记录的历史版本</div>
+                            <div className="text-sm text-[var(--text)]">{t("modals:import.includeVersions")}</div>
+                            <div className="text-xs text-[var(--muted)]">{t("modals:import.versionsDesc")}</div>
                         </div>
                     </label>
                 </div>
 
                 <div className="rounded-xl bg-[var(--field)] px-4 py-3">
-                    <div className="mb-2 text-sm font-medium text-[var(--text)]">冲突处理</div>
+                    <div className="mb-2 text-sm font-medium text-[var(--text)]">{t("modals:import.conflict")}</div>
                     <div className="space-y-2">
                         <label className="flex items-center gap-3">
                             <input
@@ -95,8 +97,8 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
                                 className="accent-[var(--accent)]"
                             />
                             <div>
-                                <div className="text-sm text-[var(--text)]">跳过已有</div>
-                                <div className="text-xs text-[var(--muted)]">保留现有数据，忽略重复项</div>
+                                <div className="text-sm text-[var(--text)]">{t("modals:import.skipExisting")}</div>
+                                <div className="text-xs text-[var(--muted)]">{t("modals:import.skipDesc")}</div>
                             </div>
                         </label>
                         <label className="flex items-center gap-3">
@@ -108,8 +110,8 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
                                 className="accent-[var(--accent)]"
                             />
                             <div>
-                                <div className="text-sm text-[var(--text)]">覆盖已有</div>
-                                <div className="text-xs text-[var(--muted)]">用导入数据替换现有数据</div>
+                                <div className="text-sm text-[var(--text)]">{t("modals:import.overwrite")}</div>
+                                <div className="text-xs text-[var(--muted)]">{t("modals:import.overwriteDesc")}</div>
                             </div>
                         </label>
                     </div>
@@ -121,7 +123,7 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
                         type="button"
                         onClick={onClose}
                     >
-                        取消
+                        {t("common:buttons.cancel")}
                     </button>
                     <button
                         className="inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2 text-sm text-white hover:opacity-90"
@@ -129,7 +131,7 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
                         onClick={handleImport}
                     >
                         <Upload className="h-4 w-4" />
-                        导入 ZIP
+                        {t("modals:import.importBtn")}
                     </button>
                 </div>
             </div>

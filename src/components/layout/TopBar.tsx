@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Archive, Copy, Home, Minus, MoreHorizontal, Pin, Search, Settings, Square, X } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useTranslation } from "react-i18next";
 import type { AppPage } from "../../types";
 import { Kbd } from "../common/Kbd";
 import { useSettingsStore } from "../../stores/settingsStore";
@@ -16,6 +17,7 @@ interface TopBarProps {
 }
 
 export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
+  const { t } = useTranslation(["topbar", "common"]);
   const settings = useSettingsStore((s) => s.settings);
   const alwaysOnTop = useAppStore((s) => s.alwaysOnTop);
   const setAlwaysOnTop = useAppStore((s) => s.setAlwaysOnTop);
@@ -86,10 +88,10 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
         type="button"
         data-testid="nav-workspace"
         onClick={() => onNavigate("workspace")}
-        title="打开工作台"
+        title={t("topbar:openWorkspace")}
       >
         <Home className="h-4 w-4" />
-        工作台
+        {t("topbar:workspace")}
       </button>
 
       <button
@@ -97,13 +99,13 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
         type="button"
         data-testid="nav-library"
         onClick={() => onNavigate("library")}
-        title="打开记录库"
+        title={t("topbar:openLibrary")}
       >
         <Archive className="h-4 w-4" />
-        记录库
+        {t("topbar:library")}
       </button>
 
-      <SyncStatusIndicator onClick={() => onNavigate("settings")} />
+      <SyncStatusIndicator />
 
       <button
         className="ml-auto flex h-8 w-44 max-w-[36vw] items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--field)] px-3 text-sm text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--text)] [-webkit-app-region:no-drag]"
@@ -111,7 +113,7 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
         type="button"
       >
         <Search className="h-4 w-4 shrink-0" />
-        <span className="min-w-0 flex-1 truncate text-left">搜索</span>
+        <span className="min-w-0 flex-1 truncate text-left">{t("topbar:search")}</span>
         <span className="hidden items-center gap-1 sm:flex">
           <Kbd>⌘</Kbd>
           <Kbd>K</Kbd>
@@ -122,7 +124,7 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
         <button
           className={`flex h-8 w-8 items-center justify-center rounded-lg ${menuOpen ? "bg-[var(--field)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"}`}
           type="button"
-          aria-label="菜单"
+          aria-label={t("topbar:menu")}
           aria-haspopup="menu"
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((open) => !open)}
@@ -138,7 +140,7 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
               onClick={() => navigateAndClose("workspace")}
             >
               <Home className="h-4 w-4" />
-              工作台
+              {t("topbar:workspace")}
             </button>
             <button
               className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-[var(--text)] hover:bg-[var(--hover)]"
@@ -147,7 +149,7 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
               onClick={() => navigateAndClose("library")}
             >
               <Archive className="h-4 w-4" />
-              记录库
+              {t("topbar:library")}
             </button>
             <button
               className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-[var(--text)] hover:bg-[var(--hover)]"
@@ -156,7 +158,7 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
               onClick={() => navigateAndClose("settings")}
             >
               <Settings className="h-4 w-4" />
-              设置
+              {t("topbar:settings")}
             </button>
           </div>
         )}
@@ -167,19 +169,19 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
           className={`grid h-8 w-8 place-items-center rounded-lg ${alwaysOnTop ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"}`}
           type="button"
           data-testid="window-pin"
-          title={alwaysOnTop ? "窗口已置顶，点击取消" : "窗口置顶"}
+          title={alwaysOnTop ? t("topbar:unpin") : t("topbar:pin")}
           aria-pressed={alwaysOnTop}
           onClick={handleToggleAlwaysOnTop}
         >
           <Pin className={`h-4 w-4 ${alwaysOnTop ? "fill-current" : ""}`} />
         </button>
-        <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="window-minimize" aria-label="最小化" title="最小化" onClick={handleMinimize}>
+        <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="window-minimize" aria-label={t("topbar:minimize")} title={t("topbar:minimize")} onClick={handleMinimize}>
           <Minus className="h-4 w-4" />
         </button>
-        <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="window-maximize" aria-label={isMaximized ? "恢复" : "全屏"} title={isMaximized ? "恢复" : "全屏"} onClick={() => appWindow.toggleMaximize()}>
+        <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="window-maximize" aria-label={isMaximized ? t("topbar:restore") : t("topbar:maximize")} title={isMaximized ? t("topbar:restore") : t("topbar:maximize")} onClick={() => appWindow.toggleMaximize()}>
           {isMaximized ? <Copy className="h-4 w-4" /> : <Square className="h-4 w-4" />}
         </button>
-        <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-red-500/12 hover:text-red-400" type="button" data-testid="window-close" aria-label="关闭" title="关闭" onClick={handleClose}>
+        <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-red-500/12 hover:text-red-400" type="button" data-testid="window-close" aria-label={t("common:buttons.close")} title={t("common:buttons.close")} onClick={handleClose}>
           <X className="h-4 w-4" />
         </button>
       </div>

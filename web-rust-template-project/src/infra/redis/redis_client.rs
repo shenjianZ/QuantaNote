@@ -52,11 +52,7 @@ impl RedisClient {
     }
 
     /// 使用 RedisKey 设置 JSON 值
-    pub async fn set_key<T: Serialize>(
-        &self,
-        key: &RedisKey,
-        value: &T,
-    ) -> redis::RedisResult<()> {
+    pub async fn set_key<T: Serialize>(&self, key: &RedisKey, value: &T) -> redis::RedisResult<()> {
         let json = serde_json::to_string(value).map_err(|e| {
             redis::RedisError::from((
                 redis::ErrorKind::TypeError,

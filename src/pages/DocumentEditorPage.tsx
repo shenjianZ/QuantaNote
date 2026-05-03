@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ArrowLeft, Clock, Loader2, Save, Star } from "lucide-react";
 import { useAppStore } from "../stores/appStore";
 import { useItemStore } from "../stores/itemStore";
@@ -28,6 +29,7 @@ interface DocumentEditorPageProps {
 }
 
 export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps) {
+  const { t } = useTranslation(["document", "common"]);
   const selectedItemId = useAppStore((s) => s.selectedItemId);
   const theme = useAppStore((s) => s.theme);
   const selectedItem = useItemStore((s) => s.selectedItem);
@@ -88,7 +90,7 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
       setSaved(true);
     } catch (e) {
       console.error("保存失败:", e);
-      useToastStore.getState().addToast("error", "保存失败");
+      useToastStore.getState().addToast("error", t("common:toast.saveFailed"));
     }
   }, [selectedItemId, updateItem]);
 
@@ -123,7 +125,7 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
       // 回滚乐观更新
       setIsFavorite(!next);
       console.error("切换收藏失败:", e);
-      useToastStore.getState().addToast("error", "切换收藏失败");
+      useToastStore.getState().addToast("error", t("common:toast.favoriteFailed"));
     }
   }
 
@@ -133,14 +135,14 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
       const version = await createVersion(
         selectedItemId,
         latestContent.current,
-        "手动保存",
+        t("document:manualSave"),
         formatNowAsName(),
       );
       setVersions((current) => [version as VersionDto, ...current].slice(0, 50));
-      useToastStore.getState().addToast("success", "版本已保存");
+      useToastStore.getState().addToast("success", t("common:toast.versionSaved"));
     } catch (e) {
       console.error("创建版本失败:", e);
-      useToastStore.getState().addToast("error", "创建版本失败");
+      useToastStore.getState().addToast("error", t("common:toast.versionSaveFailed"));
     }
   }
 
@@ -150,7 +152,7 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
       setVersions((current) => current.map((v) => (v.id === versionId ? (updated as VersionDto) : v)));
     } catch (e) {
       console.error("更新版本信息失败:", e);
-      useToastStore.getState().addToast("error", "更新版本信息失败");
+      useToastStore.getState().addToast("error", t("common:toast.versionMetaFailed"));
     }
   }
 
@@ -159,10 +161,10 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
       const updatedItem = await restoreVersion(version.id) as { id: string; title: string; content: string };
       setContent(updatedItem.content);
       setTitle(updatedItem.title);
-      useToastStore.getState().addToast("success", "版本已恢复");
+      useToastStore.getState().addToast("success", t("common:toast.versionRestored"));
     } catch (e) {
       console.error("恢复版本失败:", e);
-      useToastStore.getState().addToast("error", "恢复版本失败");
+      useToastStore.getState().addToast("error", t("common:toast.versionRestoreFailed"));
     }
   }
 
@@ -170,10 +172,10 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
     try {
       await deleteVersion(versionId);
       setVersions((current) => current.filter((v) => v.id !== versionId));
-      useToastStore.getState().addToast("success", "版本已删除");
+      useToastStore.getState().addToast("success", t("common:toast.versionDeleted"));
     } catch (e) {
       console.error("删除版本失败:", e);
-      useToastStore.getState().addToast("error", "删除版本失败");
+      useToastStore.getState().addToast("error", t("common:toast.versionDeleteFailed"));
     }
   }
 
@@ -194,16 +196,16 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
           onClick={onBackToPreview}
         >
           <ArrowLeft className="h-4 w-4" />
-          预览
+          {t("document:back")}
         </button>
-        <span className="ml-auto text-xs text-[var(--muted)]">{charCount} 字</span>
+        <span className="ml-auto text-xs text-[var(--muted)]">{t("document:charCount", { count: charCount })}</span>
         <button
           className={`grid h-9 w-9 place-items-center rounded-full ${isFavorite ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "bg-[var(--field)] text-[var(--muted)] hover:text-[var(--text)]"}`}
           type="button"
           data-testid="doc-favorite-btn"
           role="switch"
           aria-checked={isFavorite}
-          aria-label={isFavorite ? "取消收藏" : "收藏"}
+          aria-label={isFavorite ? t("document:unfavorite") : t("document:favorite")}
           onClick={handleToggleFavorite}
         >
           <Star className="h-4 w-4" fill={isFavorite ? "currentColor" : "none"} />
@@ -218,18 +220,18 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
           data-testid="doc-title-input"
           value={title}
           onChange={(e) => handleTitleChange(e.currentTarget.value)}
-          placeholder="文档标题"
+          placeholder={t("document:titlePlaceholder")}
         />
         <textarea
           className="mb-3 max-h-24 min-h-12 w-full resize-y rounded-xl border border-transparent bg-[var(--field)] px-3 py-2 text-sm leading-relaxed text-[var(--muted)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:text-[var(--text)]"
           data-testid="doc-summary-input"
           value={summary}
           onChange={(e) => handleSummaryChange(e.currentTarget.value)}
-          placeholder="摘要"
+          placeholder={t("document:summaryPlaceholder")}
           rows={2}
         />
         <div className="min-h-0 flex-1 overflow-hidden">
-          <Suspense fallback={<div className="flex h-full items-center justify-center text-[var(--muted)]"><Loader2 className="mr-2 h-4 w-4 animate-spin" />加载编辑器...</div>}>
+          <Suspense fallback={<div className="flex h-full items-center justify-center text-[var(--muted)]"><Loader2 className="mr-2 h-4 w-4 animate-spin" />{t("document:loadingEditor")}</div>}>
             <VditorEditor initialValue={content} onChange={handleContentChange} theme={resolveTheme(theme)} />
           </Suspense>
         </div>
@@ -238,8 +240,8 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
       {/* Bottom status bar */}
       <div className="mt-2 flex shrink-0 items-center justify-between px-1 text-xs text-[var(--muted)]">
         <div className="flex items-center gap-3">
-          <span data-testid="doc-save-status">{saved ? "已保存" : "保存中..."}</span>
-          <span>{charCount} 字</span>
+          <span data-testid="doc-save-status">{saved ? t("document:saved") : t("document:saving")}</span>
+          <span>{t("document:charCount", { count: charCount })}</span>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -253,20 +255,20 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
             onClick={handleSaveVersion}
             disabled={!canSaveVersion}
             aria-disabled={!canSaveVersion}
-            title={canSaveVersion ? "保存为新版本" : "当前内容与最新版本一致"}
+            title={canSaveVersion ? t("document:saveVersionTooltip") : t("document:saveVersionDisabled")}
           >
             <Save className="h-3.5 w-3.5" />
-            保存版本
+            {t("document:saveVersion")}
           </button>
           <button
             className="inline-flex items-center gap-1 rounded-full px-2 py-1 hover:bg-[var(--hover)] hover:text-[var(--text)]"
             type="button"
             data-testid="doc-version-toggle"
             onClick={() => setVersionPanelOpen(true)}
-            title="版本记录"
+            title={t("document:versionTooltip")}
           >
             <Clock className="h-3.5 w-3.5" />
-            版本 ({versions.length})
+            {t("document:version", { count: versions.length })}
           </button>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { Modal } from "../common/Modal";
 import { useSyncStore } from "../../stores/syncStore";
@@ -9,14 +10,6 @@ interface ConflictResolutionModalProps {
     onClose: () => void;
 }
 
-const TABLE_LABELS: Record<string, string> = {
-    items: "笔记",
-    tags: "标签",
-    item_tags: "标签关联",
-    versions: "版本",
-    attachments: "附件",
-};
-
 function formatTime(iso: string): string {
     try {
         return new Date(iso).toLocaleString();
@@ -25,27 +18,33 @@ function formatTime(iso: string): string {
     }
 }
 
+function conflictKey(conflict: ConflictInfo): string {
+    return `${conflict.table_name}:${conflict.record_id}`;
+}
+
 export function ConflictResolutionModal({
     open,
     onClose,
 }: ConflictResolutionModalProps) {
+    const { t } = useTranslation(["sync", "common"]);
     const { pendingConflicts, resolveConflicts, cancelConflicts, isLoading } =
         useSyncStore();
+
     const [resolutions, setResolutions] = useState<
         Record<string, "local" | "remote">
     >({});
 
     if (!pendingConflicts || pendingConflicts.length === 0) return null;
 
-    function setChoice(recordId: string, choice: "local" | "remote") {
-        setResolutions((prev) => ({ ...prev, [recordId]: choice }));
+    function setChoice(key: string, choice: "local" | "remote") {
+        setResolutions((prev) => ({ ...prev, [key]: choice }));
     }
 
     // 默认全部选择"本地"
     function selectAllLocal() {
         const all: Record<string, "local" | "remote"> = {};
         for (const c of pendingConflicts!) {
-            all[c.record_id] = "local";
+            all[conflictKey(c)] = "local";
         }
         setResolutions(all);
     }
@@ -53,19 +52,20 @@ export function ConflictResolutionModal({
     function selectAllRemote() {
         const all: Record<string, "local" | "remote"> = {};
         for (const c of pendingConflicts!) {
-            all[c.record_id] = "remote";
+            all[conflictKey(c)] = "remote";
         }
         setResolutions(all);
     }
 
     async function handleResolve() {
         // 确保所有冲突都已选择
-        const pairs: [string, string][] = pendingConflicts!.map((c) => [
-            c.record_id,
-            resolutions[c.record_id] || "local",
-        ]);
+        const choices = pendingConflicts!.map((c) => ({
+            table_name: c.table_name,
+            record_id: c.record_id,
+            choice: resolutions[conflictKey(c)] || "local",
+        }));
         try {
-            await resolveConflicts(pairs);
+            await resolveConflicts(choices);
             setResolutions({});
             onClose();
         } catch {
@@ -87,14 +87,14 @@ export function ConflictResolutionModal({
         <Modal
             open={open}
             onClose={handleCancel}
-            title="同步冲突解决"
+            title={t("syncConflictTitle")}
             maxWidth="max-w-2xl"
         >
             <div className="space-y-4">
                 <div className="flex items-start gap-2.5 rounded-xl bg-amber-500/10 px-4 py-3">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
                     <p className="text-xs text-amber-300">
-                        检测到 {pendingConflicts.length} 条记录在本地和远端同时被修改，请为每条冲突选择保留哪个版本。
+                        {t("conflictHint", { count: pendingConflicts.length })}
                     </p>
                 </div>
 
@@ -104,26 +104,30 @@ export function ConflictResolutionModal({
                         onClick={selectAllLocal}
                         className="rounded-lg border border-[var(--line)] px-2.5 py-1 text-xs text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
                     >
-                        全部本地
+                        {t("allLocal")}
                     </button>
                     <button
                         type="button"
                         onClick={selectAllRemote}
                         className="rounded-lg border border-[var(--line)] px-2.5 py-1 text-xs text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
                     >
-                        全部远端
+                        {t("allRemote")}
                     </button>
                 </div>
 
                 <div className="max-h-60 space-y-2 overflow-auto">
-                    {pendingConflicts.map((conflict) => (
-                        <ConflictRow
-                            key={conflict.record_id}
-                            conflict={conflict}
-                            choice={resolutions[conflict.record_id]}
-                            onChoice={(c) => setChoice(conflict.record_id, c)}
-                        />
-                    ))}
+                    {pendingConflicts.map((conflict) => {
+                        const key = conflictKey(conflict);
+                        return (
+                            <ConflictRow
+                                key={key}
+                                conflict={conflict}
+                                conflictKey={key}
+                                choice={resolutions[key]}
+                                onChoice={(c) => setChoice(key, c)}
+                            />
+                        );
+                    })}
                 </div>
 
                 <div className="flex justify-end gap-2 border-t border-[var(--line)] pt-3">
@@ -133,7 +137,7 @@ export function ConflictResolutionModal({
                         disabled={isLoading}
                         className="rounded-xl border border-[var(--line)] px-4 py-2 text-sm text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)] disabled:opacity-50"
                     >
-                        取消同步
+                        {t("cancelSync")}
                     </button>
                     <button
                         type="button"
@@ -144,7 +148,7 @@ export function ConflictResolutionModal({
                         {isLoading && (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         )}
-                        应用解决
+                        {t("applyResolution")}
                     </button>
                 </div>
             </div>
@@ -154,13 +158,23 @@ export function ConflictResolutionModal({
 
 function ConflictRow({
     conflict,
+    conflictKey,
     choice,
     onChoice,
 }: {
     conflict: ConflictInfo;
+    conflictKey: string;
     choice: "local" | "remote" | undefined;
     onChoice: (c: "local" | "remote") => void;
 }) {
+    const { t } = useTranslation(["sync", "common"]);
+    const TABLE_LABELS: Record<string, string> = {
+        items: t("tables.items"),
+        tags: t("tables.tags"),
+        item_tags: t("tables.item_tags"),
+        versions: t("tables.versions"),
+        attachments: t("tables.attachments"),
+    };
     const label = TABLE_LABELS[conflict.table_name] || conflict.table_name;
     const currentChoice = choice || "local";
 
@@ -178,13 +192,13 @@ function ConflictRow({
                 <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
                         type="radio"
-                        name={`conflict-${conflict.record_id}`}
+                        name={`conflict-${conflictKey}`}
                         checked={currentChoice === "local"}
                         onChange={() => onChoice("local")}
                         className="accent-[var(--accent)]"
                     />
                     <span className="text-[var(--text)]">
-                        本地{" "}
+                        {t("local")}{" "}
                         <span className="text-[var(--muted)]">
                             ({formatTime(conflict.local_updated_at)})
                         </span>
@@ -193,13 +207,13 @@ function ConflictRow({
                 <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
                         type="radio"
-                        name={`conflict-${conflict.record_id}`}
+                        name={`conflict-${conflictKey}`}
                         checked={currentChoice === "remote"}
                         onChange={() => onChoice("remote")}
                         className="accent-[var(--accent)]"
                     />
                     <span className="text-[var(--text)]">
-                        远端{" "}
+                        {t("remote")}{" "}
                         <span className="text-[var(--muted)]">
                             ({formatTime(conflict.remote_updated_at)})
                         </span>

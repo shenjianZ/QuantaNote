@@ -1,6 +1,4 @@
-use crate::domain::dto::sync::{
-    CommitSyncRequest, SyncRecordPayload as DtoSyncRecordPayload,
-};
+use crate::domain::dto::sync::{CommitSyncRequest, SyncRecordPayload as DtoSyncRecordPayload};
 use crate::domain::entities::{sync_attachments, sync_records};
 use crate::domain::vo::sync::{
     AttachmentDiffResult, CommitResult, PaginatedSyncHistory, PullResult, PushResult,
@@ -34,12 +32,13 @@ impl SyncService {
         }))
     }
 
-    /// 获取快照的记录元信息
+    /// 获取快照的记录元信息（校验 snapshot 归属用户）
     pub async fn get_snapshot_records(
         &self,
+        user_id: &str,
         snapshot_id: &str,
     ) -> anyhow::Result<Vec<RecordMetaInfo>> {
-        let records = self.repo.get_snapshot_records(snapshot_id).await?;
+        let records = self.repo.get_snapshot_records(user_id, snapshot_id).await?;
         Ok(records
             .into_iter()
             .map(|r| RecordMetaInfo {
@@ -147,15 +146,37 @@ impl SyncService {
         }
 
         // 获取快照的所有记录
-        let records = self.repo.get_snapshot_records(&snapshot.snapshot_id).await?;
+        let records = self
+            .repo
+            .get_snapshot_records(user_id, &snapshot.snapshot_id)
+            .await?;
 
-        // 从对象存储中读取每条记录的数据
+        // 从对象存储中读取每条记录的数据；任意记录缺失都应让本次拉取失败，
+        // 否则客户端会把不完整快照当作成功同步并刷新基线。
         let mut result_records = Vec::new();
         for record in records {
-            let data = match self.storage.get_object(&record.storage_key).await {
-                Ok(obj) => serde_json::from_slice(&obj.data).unwrap_or(serde_json::Value::Null),
-                Err(_) => serde_json::Value::Null,
-            };
+            let obj = self
+                .storage
+                .get_object(&record.storage_key)
+                .await
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "读取记录对象失败: record_id={}, table={}, key={}, error={}",
+                        record.record_id,
+                        record.table_name,
+                        record.storage_key,
+                        e
+                    )
+                })?;
+
+            let data: serde_json::Value = serde_json::from_slice(&obj.data).map_err(|e| {
+                anyhow::anyhow!(
+                    "解析记录数据失败: record_id={}, table={}, error={}",
+                    record.record_id,
+                    record.table_name,
+                    e
+                )
+            })?;
 
             result_records.push(SyncRecordData {
                 table_name: record.table_name,
@@ -219,6 +240,7 @@ impl SyncService {
         filename: &str,
         mime_type: &str,
         file_hash: &str,
+        file_size: i64,
         data: Bytes,
     ) -> anyhow::Result<String> {
         let storage_key = format!(
@@ -238,7 +260,7 @@ impl SyncService {
             item_id: Set(item_id.to_string()),
             filename: Set(filename.to_string()),
             mime_type: Set(mime_type.to_string()),
-            file_size: Set(0), // 会在 commit 时更新
+            file_size: Set(file_size),
             file_hash: Set(file_hash.to_string()),
             storage_key: Set(storage_key.clone()),
             snapshot_id: Set(snapshot_id.to_string()),
@@ -273,37 +295,94 @@ impl SyncService {
     ) -> anyhow::Result<CommitResult> {
         let snapshot_id = uuid::Uuid::new_v4().to_string();
 
-        // 只关联本次推送的 pending 记录到新快照（避免多设备竞态）
-        if request.pushed_record_ids.is_empty() {
-            // 兼容旧客户端：关联所有 pending 记录
+        // 1. 获取 pending 记录（用于移动文件），只处理本次明确提交的记录
+        let pending_records = if !request.pushed_records.is_empty() {
             self.repo
-                .update_records_snapshot_id(user_id, "pending", &snapshot_id)
-                .await?;
+                .get_pending_records_by_composite_ids(user_id, &request.pushed_records)
+                .await?
+        } else if !request.pushed_record_ids.is_empty() {
+            self.repo
+                .get_pending_records_by_ids(user_id, &request.pushed_record_ids)
+                .await?
         } else {
+            Vec::new()
+        };
+
+        // 2. 先更新 DB 中的 storage_key 和 snapshot_id（DB 操作失败不会留下孤立文件）
+        //    记录 key 映射，后续移动文件时使用
+        let mut key_moves: Vec<(String, String)> = Vec::new();
+        for record in &pending_records {
+            let old_key = record.storage_key.clone();
+            let new_key = format!(
+                "{}/{}/{}/{}.json",
+                user_id, snapshot_id, record.table_name, record.record_id
+            );
             self.repo
-                .update_specific_records_snapshot_id(
-                    user_id,
-                    &request.pushed_record_ids,
-                    &snapshot_id,
-                )
+                .update_record_storage_key(record.id, &new_key)
                 .await?;
+            key_moves.push((old_key, new_key));
         }
 
-        // 更新附件元信息（客户端在 commit 时上报完整元数据）
-        for attachment in &request.attachments {
-            let _ = self
+        // 3. 移动文件（幂等操作，重试安全）
+        for (old_key, new_key) in &key_moves {
+            self.storage.move_object(old_key, new_key).await?;
+        }
+
+        // 3. 将用户所有记录关联到新快照（确保最新快照是完整视图，而非增量快照）
+        self.repo
+            .update_all_records_snapshot_id(user_id, &snapshot_id)
+            .await?;
+
+        // 4. 将本次上传的 pending 附件移动到新快照，并保留上传时记录的真实 hash/storage_key。
+        let attachment_ids: Vec<String> = request
+            .attachments
+            .iter()
+            .map(|a| a.attachment_id.clone())
+            .collect();
+        if request.attachments_complete {
+            let pending_attachments = self
                 .repo
-                .update_attachment_metadata(
-                    user_id,
-                    &attachment.attachment_id,
-                    &attachment.item_id,
-                    &attachment.filename,
-                    &attachment.mime_type,
-                    attachment.file_size,
-                    &attachment.file_hash,
-                    &attachment.storage_key,
-                )
-                .await;
+                .get_pending_attachments_by_ids(user_id, &attachment_ids)
+                .await?;
+            // 先更新 DB，再移动文件
+            let mut att_key_moves: Vec<(String, String)> = Vec::new();
+            for attachment in &pending_attachments {
+                let old_key = attachment.storage_key.clone();
+                let new_key = format!(
+                    "{}/{}/attachments/{}/{}",
+                    user_id, snapshot_id, attachment.attachment_id, attachment.filename
+                );
+                self.repo
+                    .update_attachment_storage_key_snapshot(attachment.id, &new_key, &snapshot_id)
+                    .await?;
+                att_key_moves.push((old_key, new_key));
+            }
+            for (old_key, new_key) in &att_key_moves {
+                self.storage.move_object(old_key, new_key).await?;
+            }
+
+            // 5. 更新附件元信息（客户端在 commit 时上报当前完整附件列表）。
+            // 客户端无法可靠构造服务端 storage_key，仓库层会忽略空 storage_key。
+            for attachment in &request.attachments {
+                self.repo
+                    .update_attachment_metadata(
+                        user_id,
+                        &attachment.attachment_id,
+                        &attachment.item_id,
+                        &attachment.filename,
+                        &attachment.mime_type,
+                        attachment.file_size,
+                        &attachment.file_hash,
+                        &attachment.storage_key,
+                    )
+                    .await?;
+            }
+            self.repo
+                .delete_attachments_not_in_ids(user_id, &attachment_ids)
+                .await?;
+            self.repo
+                .update_all_attachments_snapshot_id(user_id, &snapshot_id)
+                .await?;
         }
 
         // 统计实际记录数
@@ -345,12 +424,11 @@ impl SyncService {
     }
 
     /// 清理旧快照，保留最近 keep_count 个
-    async fn cleanup_old_snapshots(
-        &self,
-        user_id: &str,
-        keep_count: usize,
-    ) -> anyhow::Result<()> {
-        let (history, _) = self.repo.get_sync_history(user_id, 0, keep_count as u32 + 1).await?;
+    async fn cleanup_old_snapshots(&self, user_id: &str, keep_count: usize) -> anyhow::Result<()> {
+        let (history, _) = self
+            .repo
+            .get_sync_history(user_id, 0, keep_count as u32 + 1)
+            .await?;
         if history.len() <= keep_count {
             return Ok(());
         }
@@ -372,7 +450,10 @@ impl SyncService {
         page_size: u32,
     ) -> anyhow::Result<PaginatedSyncHistory> {
         let offset = (page - 1) * page_size;
-        let (snapshots, total) = self.repo.get_sync_history(user_id, offset, page_size).await?;
+        let (snapshots, total) = self
+            .repo
+            .get_sync_history(user_id, offset, page_size)
+            .await?;
         let items = snapshots
             .into_iter()
             .map(|s| SyncHistoryEntry {

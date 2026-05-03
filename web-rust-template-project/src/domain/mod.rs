@@ -1,3 +1,3 @@
 pub mod dto;
-pub mod vo;
 pub mod entities;
+pub mod vo;

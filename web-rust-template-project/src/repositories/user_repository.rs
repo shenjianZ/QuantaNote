@@ -1,6 +1,9 @@
-use sea_orm::{EntityTrait, QueryFilter, ColumnTrait, DatabaseConnection, Set, ActiveModelTrait, PaginatorTrait};
 use crate::domain::entities::users;
 use anyhow::Result;
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
+    Set,
+};
 
 /// 用户数据访问仓库
 pub struct UserRepository {
@@ -57,7 +60,12 @@ impl UserRepository {
     }
 
     /// 插入用户（created_at 和 updated_at 会自动填充），返回插入后的用户对象
-    pub async fn insert(&self, id: String, email: String, password_hash: String) -> Result<users::Model> {
+    pub async fn insert(
+        &self,
+        id: String,
+        email: String,
+        password_hash: String,
+    ) -> Result<users::Model> {
         let user_model = users::ActiveModel {
             id: Set(id),
             email: Set(email),
@@ -66,7 +74,8 @@ impl UserRepository {
             ..Default::default()
         };
 
-        let inserted_user = user_model.insert(&self.db)
+        let inserted_user = user_model
+            .insert(&self.db)
             .await
             .map_err(|e| anyhow::anyhow!("插入失败: {}", e))?;
 
@@ -83,7 +92,8 @@ impl UserRepository {
 
         let mut active_model: users::ActiveModel = user.into();
         active_model.password_hash = Set(new_password_hash.to_string());
-        active_model.update(&self.db)
+        active_model
+            .update(&self.db)
             .await
             .map_err(|e| anyhow::anyhow!("更新失败: {}", e))?;
 

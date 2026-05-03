@@ -13,7 +13,11 @@ pub struct RegisterRequest {
 // 实现 Debug trait，对密码进行脱敏
 impl fmt::Debug for RegisterRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "RegisterRequest {{ email: {}, device_id: {}, password: *** }}", self.email, self.device_id)
+        write!(
+            f,
+            "RegisterRequest {{ email: {}, device_id: {}, password: *** }}",
+            self.email, self.device_id
+        )
     }
 }
 
@@ -29,7 +33,11 @@ pub struct LoginRequest {
 // 实现 Debug trait
 impl fmt::Debug for LoginRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "LoginRequest {{ email: {}, device_id: {}, password: *** }}", self.email, self.device_id)
+        write!(
+            f,
+            "LoginRequest {{ email: {}, device_id: {}, password: *** }}",
+            self.email, self.device_id
+        )
     }
 }
 
@@ -47,7 +55,11 @@ pub struct DeleteUserRequest {
 // 实现 Debug trait
 impl fmt::Debug for DeleteUserRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "DeleteUserRequest {{ user_id: {}, password: *** }}", self.user_id)
+        write!(
+            f,
+            "DeleteUserRequest {{ user_id: {}, password: *** }}",
+            self.user_id
+        )
     }
 }
 
@@ -86,6 +98,10 @@ pub struct ResetPasswordRequest {
 
 impl fmt::Debug for ResetPasswordRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "ResetPasswordRequest {{ email: {}, reset_token: ***, new_password: *** }}", self.email)
+        write!(
+            f,
+            "ResetPasswordRequest {{ email: {}, reset_token: ***, new_password: *** }}",
+            self.email
+        )
     }
 }

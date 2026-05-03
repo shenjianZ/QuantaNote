@@ -1,7 +1,7 @@
 use crate::config::database::{DatabaseConfig, DatabaseType};
 use sea_orm::{
-    ConnectionTrait, Database, DatabaseConnection, DbBackend, EntityName, EntityTrait, ConnectOptions, Schema,
-    Statement,
+    ConnectOptions, ConnectionTrait, Database, DatabaseConnection, DbBackend, EntityName,
+    EntityTrait, Schema, Statement,
 };
 use std::time::Duration;
 
@@ -299,7 +299,9 @@ where
         }
         Err(e) => {
             let err_msg = e.to_string();
-            if err_msg.contains("already exists") || (err_msg.contains("table") && err_msg.contains("exists")) {
+            if err_msg.contains("already exists")
+                || (err_msg.contains("table") && err_msg.contains("exists"))
+            {
                 tracing::info!("✅ {}已存在", table_name);
             } else {
                 return Err(anyhow::anyhow!("创建{}失败: {}", table_name, e));
@@ -318,13 +320,20 @@ async fn create_tables(db: &DatabaseConnection) -> anyhow::Result<()> {
     let schema = Schema::new(builder);
 
     // 导入所有 entities
-    use crate::domain::entities::{users, sync_snapshots, sync_records, sync_attachments};
+    use crate::domain::entities::{sync_attachments, sync_records, sync_snapshots, users};
 
     // 创建所有表（添加新表只需一行！）
     create_single_table(db, &schema, &builder, users::Entity, "用户表").await?;
     create_single_table(db, &schema, &builder, sync_snapshots::Entity, "同步快照表").await?;
     create_single_table(db, &schema, &builder, sync_records::Entity, "同步记录表").await?;
-    create_single_table(db, &schema, &builder, sync_attachments::Entity, "同步附件表").await?;
+    create_single_table(
+        db,
+        &schema,
+        &builder,
+        sync_attachments::Entity,
+        "同步附件表",
+    )
+    .await?;
 
     tracing::info!("✅ 数据库表结构检查完成");
 

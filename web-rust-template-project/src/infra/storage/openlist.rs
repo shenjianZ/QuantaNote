@@ -80,7 +80,8 @@ impl StorageBackend for OpenListStorage {
 
     async fn list_objects(&self, prefix: &str) -> anyhow::Result<Vec<StorageMetadata>> {
         let url = self.api_url("list");
-        let resp = self.client
+        let resp = self
+            .client
             .get(&url)
             .header("Authorization", self.auth_header())
             .query(&[("path", prefix)])

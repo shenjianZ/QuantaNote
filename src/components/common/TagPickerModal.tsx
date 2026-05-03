@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, Search } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Modal } from "./Modal";
 import { useTagStore } from "../../stores/tagStore";
 
@@ -21,6 +22,7 @@ interface TagPickerModalProps {
 }
 
 export function TagPickerModal({ open, onClose, selectedTags, onChange, onOpenManager }: TagPickerModalProps) {
+  const { t } = useTranslation(["modals"]);
   const allTags = useTagStore((s) => s.tags);
   const [search, setSearch] = useState("");
   const [localSelectedTags, setLocalSelectedTags] = useState(selectedTags);
@@ -44,7 +46,7 @@ export function TagPickerModal({ open, onClose, selectedTags, onChange, onOpenMa
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="选择标签">
+    <Modal open={open} onClose={onClose} title={t("modals:tagPicker.title")}>
       <div className="space-y-3">
         {/* Search */}
         <div className="flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--field)] px-3 py-1.5">
@@ -53,7 +55,7 @@ export function TagPickerModal({ open, onClose, selectedTags, onChange, onOpenMa
             className="flex-1 bg-transparent text-sm text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="搜索标签"
+            placeholder={t("modals:tagPicker.searchPlaceholder")}
             data-testid="tag-picker-search"
           />
         </div>
@@ -85,7 +87,7 @@ export function TagPickerModal({ open, onClose, selectedTags, onChange, onOpenMa
           })}
           {filteredTags.length === 0 && (
             <p className="text-sm text-[var(--muted)]">
-              {search.trim() ? "没有匹配的标签" : "暂无标签"}
+              {search.trim() ? t("modals:tagPicker.noMatch") : t("modals:tagPicker.noTags")}
             </p>
           )}
         </div>
@@ -99,7 +101,7 @@ export function TagPickerModal({ open, onClose, selectedTags, onChange, onOpenMa
               onClick={onOpenManager}
               data-testid="tag-picker-manage-btn"
             >
-              管理标签...
+              {t("modals:tagPicker.manage")}
             </button>
           )}
           <button
@@ -107,7 +109,7 @@ export function TagPickerModal({ open, onClose, selectedTags, onChange, onOpenMa
             type="button"
             onClick={onClose}
           >
-            完成
+            {t("modals:tagPicker.done")}
           </button>
         </div>
       </div>

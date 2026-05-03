@@ -20,6 +20,7 @@ import {
     type SyncResult,
     type SyncHistoryEntry,
     type ConflictInfo,
+    type ConflictResolutionChoice,
 } from "../services/tauriCommands";
 import { useItemStore } from "./itemStore";
 import { useTagStore } from "./tagStore";
@@ -69,7 +70,7 @@ interface SyncStore {
     refreshHistory: (page?: number, pageSize?: number) => Promise<void>;
 
     // 冲突解决
-    resolveConflicts: (resolutions: [string, string][]) => Promise<SyncResult>;
+    resolveConflicts: (resolutions: ConflictResolutionChoice[]) => Promise<SyncResult>;
     cancelConflicts: () => Promise<void>;
 
     // 配置更新
@@ -169,6 +170,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     },
 
     logout: async () => {
+        stopAutoSync();
         set({ isLoading: true, error: null });
         try {
             await syncLogout();

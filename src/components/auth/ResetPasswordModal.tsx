@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { KeyRound, Loader2, CheckCircle } from "lucide-react";
 import { Modal } from "../common/Modal";
 import { useSyncStore } from "../../stores/syncStore";
@@ -18,6 +19,7 @@ export function ResetPasswordModal({
     resetToken: initialToken,
     onSwitchToLogin,
 }: ResetPasswordModalProps) {
+    const { t } = useTranslation(["auth"]);
     const { config, resetPassword, isLoading, error, clearError } = useSyncStore();
     const [resetToken, setResetToken] = useState(initialToken);
     const [newPassword, setNewPassword] = useState("");
@@ -31,11 +33,11 @@ export function ResetPasswordModal({
 
         if (!resetToken.trim() || !newPassword.trim()) return;
         if (newPassword !== confirmPassword) {
-            setLocalError("两次输入的密码不一致");
+            setLocalError(t("resetPassword.passwordMismatch"));
             return;
         }
         if (newPassword.length < 6) {
-            setLocalError("密码长度至少 6 位");
+            setLocalError(t("resetPassword.passwordTooShort"));
             return;
         }
 
@@ -68,19 +70,19 @@ export function ResetPasswordModal({
     const displayError = localError || error;
 
     return (
-        <Modal open={open} onClose={handleClose} title="重置密码">
+        <Modal open={open} onClose={handleClose} title={t("resetPassword.title")}>
             <form onSubmit={handleSubmit} className="space-y-4">
                 {success ? (
                     <div className="rounded-lg bg-green-500/10 px-4 py-6 text-center">
                         <CheckCircle className="mx-auto mb-2 h-8 w-8 text-green-400" />
                         <p className="text-sm text-[var(--text)]">
-                            密码重置成功，正在跳转到登录页面...
+                            {t("resetPassword.success")}
                         </p>
                     </div>
                 ) : (
                     <>
                         <p className="text-sm text-[var(--muted)]">
-                            输入重置令牌和新密码。令牌已发送到{" "}
+                            {t("resetPassword.desc")}{" "}
                             <span className="font-medium text-[var(--text)]">
                                 {email}
                             </span>
@@ -88,13 +90,13 @@ export function ResetPasswordModal({
 
                         <div>
                             <label className="mb-1 block text-xs text-[var(--muted)]">
-                                重置令牌
+                                {t("resetPassword.token")}
                             </label>
                             <input
                                 type="text"
                                 value={resetToken}
                                 onChange={(e) => setResetToken(e.target.value)}
-                                placeholder="输入重置令牌"
+                                placeholder={t("resetPassword.tokenPlaceholder")}
                                 className="w-full rounded-xl border border-[var(--line)] bg-[var(--field)] px-4 py-2.5 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
                                 required
                             />
@@ -102,13 +104,13 @@ export function ResetPasswordModal({
 
                         <div>
                             <label className="mb-1 block text-xs text-[var(--muted)]">
-                                新密码
+                                {t("resetPassword.newPassword")}
                             </label>
                             <input
                                 type="password"
                                 value={newPassword}
                                 onChange={(e) => setNewPassword(e.target.value)}
-                                placeholder="至少 6 位"
+                                placeholder={t("resetPassword.newPasswordPlaceholder")}
                                 className="w-full rounded-xl border border-[var(--line)] bg-[var(--field)] px-4 py-2.5 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
                                 required
                                 minLength={6}
@@ -117,13 +119,13 @@ export function ResetPasswordModal({
 
                         <div>
                             <label className="mb-1 block text-xs text-[var(--muted)]">
-                                确认新密码
+                                {t("resetPassword.confirmPassword")}
                             </label>
                             <input
                                 type="password"
                                 value={confirmPassword}
                                 onChange={(e) => setConfirmPassword(e.target.value)}
-                                placeholder="再次输入新密码"
+                                placeholder={t("resetPassword.confirmPlaceholder")}
                                 className="w-full rounded-xl border border-[var(--line)] bg-[var(--field)] px-4 py-2.5 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
                                 required
                             />
@@ -150,7 +152,7 @@ export function ResetPasswordModal({
                             ) : (
                                 <KeyRound className="h-4 w-4" />
                             )}
-                            {isLoading ? "重置中..." : "重置密码"}
+                            {isLoading ? t("resetPassword.submitting") : t("resetPassword.submitBtn")}
                         </button>
                     </>
                 )}
@@ -161,7 +163,7 @@ export function ResetPasswordModal({
                         onClick={onSwitchToLogin}
                         className="text-[var(--accent)] hover:underline"
                     >
-                        返回登录
+                        {t("resetPassword.backToLogin")}
                     </button>
                 </div>
             </form>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { UserPlus, Loader2 } from "lucide-react";
 import { Modal } from "../common/Modal";
 import { useSyncStore } from "../../stores/syncStore";
@@ -14,6 +15,7 @@ export function RegisterModal({
     onClose,
     onSwitchToLogin,
 }: RegisterModalProps) {
+    const { t } = useTranslation(["auth"]);
     const { config, register, isLoading, error, clearError } = useSyncStore();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -27,11 +29,11 @@ export function RegisterModal({
 
         if (!email.trim() || !password.trim()) return;
         if (password !== confirmPassword) {
-            setLocalError("两次输入的密码不一致");
+            setLocalError(t("register.passwordMismatch"));
             return;
         }
         if (password.length < 6) {
-            setLocalError("密码长度至少 6 位");
+            setLocalError(t("register.passwordTooShort"));
             return;
         }
 
@@ -55,12 +57,12 @@ export function RegisterModal({
     const displayError = localError || error;
 
     return (
-        <Modal open={open} onClose={handleClose} title="注册同步账号">
+        <Modal open={open} onClose={handleClose} title={t("register.title")}>
             <form onSubmit={handleSubmit} className="space-y-4">
                 {!config.server_url && (
                     <div>
                         <label className="mb-1 block text-xs text-[var(--muted)]">
-                            服务器地址
+                            {t("register.serverUrl")}
                         </label>
                         <input
                             type="url"
@@ -74,7 +76,7 @@ export function RegisterModal({
                 )}
                 <div>
                     <label className="mb-1 block text-xs text-[var(--muted)]">
-                        邮箱
+                        {t("register.email")}
                     </label>
                     <input
                         type="email"
@@ -87,13 +89,13 @@ export function RegisterModal({
                 </div>
                 <div>
                     <label className="mb-1 block text-xs text-[var(--muted)]">
-                        密码
+                        {t("register.password")}
                     </label>
                     <input
                         type="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder="至少 6 位"
+                        placeholder={t("register.passwordPlaceholder")}
                         className="w-full rounded-xl border border-[var(--line)] bg-[var(--field)] px-4 py-2.5 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
                         required
                         minLength={6}
@@ -101,13 +103,13 @@ export function RegisterModal({
                 </div>
                 <div>
                     <label className="mb-1 block text-xs text-[var(--muted)]">
-                        确认密码
+                        {t("register.confirmPassword")}
                     </label>
                     <input
                         type="password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="再次输入密码"
+                        placeholder={t("register.confirmPlaceholder")}
                         className="w-full rounded-xl border border-[var(--line)] bg-[var(--field)] px-4 py-2.5 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
                         required
                     />
@@ -134,7 +136,7 @@ export function RegisterModal({
                     ) : (
                         <UserPlus className="h-4 w-4" />
                     )}
-                    {isLoading ? "注册中..." : "注册"}
+                    {isLoading ? t("register.submitting") : t("register.submitBtn")}
                 </button>
 
                 <div className="text-center text-xs">
@@ -143,7 +145,7 @@ export function RegisterModal({
                         onClick={onSwitchToLogin}
                         className="text-[var(--accent)] hover:underline"
                     >
-                        已有账号？登录
+                        {t("register.hasAccount")}
                     </button>
                 </div>
             </form>

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface ModalProps {
   open: boolean;
@@ -10,6 +11,7 @@ interface ModalProps {
 }
 
 export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg" }: ModalProps) {
+  const { t } = useTranslation(["common"]);
   const backdropRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
@@ -77,7 +79,7 @@ export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg" }:
           <button
             className="grid h-8 w-8 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
             type="button"
-            aria-label="关闭"
+            aria-label={t("common:buttons.close")}
             data-testid="modal-close-btn"
             onClick={onClose}
           >

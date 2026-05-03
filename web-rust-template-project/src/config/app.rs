@@ -1,4 +1,7 @@
-use super::{auth::AuthConfig, database::DatabaseConfig, redis::RedisConfig, server::ServerConfig, storage::StorageConfig};
+use super::{
+    auth::AuthConfig, database::DatabaseConfig, redis::RedisConfig, server::ServerConfig,
+    storage::StorageConfig,
+};
 use config::{Config, ConfigError, Environment, File};
 use serde::Deserialize;
 use std::path::PathBuf;

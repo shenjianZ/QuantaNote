@@ -6,8 +6,8 @@ use crate::db::DbState;
 use crate::error::AppError;
 use crate::models::sync::*;
 use crate::sync::state::SyncStateManager;
-use crate::sync::SyncEngine;
 use crate::sync::transport::SyncTransport;
+use crate::sync::SyncEngine;
 
 /// 确保 config 中有 device_id，如果没有则生成一个
 fn ensure_device_id(config: &mut SyncConfig) {
@@ -119,9 +119,7 @@ pub fn save_sync_config_cmd(
 }
 
 #[tauri::command]
-pub fn get_sync_state(
-    sync_state: State<'_, SyncEngineState>,
-) -> Result<SyncState, AppError> {
+pub fn get_sync_state(sync_state: State<'_, SyncEngineState>) -> Result<SyncState, AppError> {
     let engine = sync_state
         .engine
         .lock()
@@ -135,8 +133,14 @@ pub async fn trigger_sync(
     sync_state: State<'_, SyncEngineState>,
 ) -> Result<SyncResult, AppError> {
     // 防止并发同步
-    if sync_state.is_syncing.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_err() {
-        return Err(AppError::SyncError("同步正在进行中，请稍后再试".to_string()));
+    if sync_state
+        .is_syncing
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return Err(AppError::SyncError(
+            "同步正在进行中，请稍后再试".to_string(),
+        ));
     }
 
     // 确保同步结束后清除标记
@@ -191,7 +195,8 @@ pub async fn trigger_sync(
     state_manager.clear_progress();
 
     // 使用独立的 transport 执行同步（不持有 engine 锁）
-    let sync_output = match run_sync_with_transport(&transport, &state_manager, &config, &db).await {
+    let sync_output = match run_sync_with_transport(&transport, &state_manager, &config, &db).await
+    {
         Ok(r) => r,
         Err(e) => {
             state_manager.set_error(e.to_string());
@@ -272,7 +277,12 @@ async fn run_sync_with_transport(
 
     // 5. 比对差异（三方 diff）
     state_manager.set_progress("比对差异", 0, 1);
-    let diff_result = compute_diff(&local_records, &remote_metas, &baseline_map, &config.conflict_resolution);
+    let diff_result = compute_diff(
+        &local_records,
+        &remote_metas,
+        &baseline_map,
+        &config.conflict_resolution,
+    );
 
     // 记录冲突信息
     if !diff_result.conflicts.is_empty() {
@@ -284,15 +294,10 @@ async fn run_sync_with_transport(
         for conflict in &diff_result.conflicts {
             eprintln!(
                 "[INFO] 冲突: {} (表: {}) → {:?}",
-                conflict.record_id,
-                conflict.table_name,
-                conflict.resolution
+                conflict.record_id, conflict.table_name, conflict.resolution
             );
         }
     }
-
-    // 检查是否为 manual 模式且存在冲突
-    let is_manual_conflict = config.conflict_resolution == "manual" && !diff_result.conflicts.is_empty();
 
     let mut result = SyncResult {
         pushed: 0,
@@ -305,38 +310,8 @@ async fn run_sync_with_transport(
         snapshot_id: String::new(),
     };
 
-    // 6. 推送变更
-    let mut pushed_record_ids: Vec<String> = Vec::new();
-    if !diff_result.to_push.is_empty() {
-        state_manager.set_status(SyncStatus::Pushing);
-        let total = diff_result.to_push.len() as u32;
-        state_manager.set_progress("推送记录", 0, total);
-
-        pushed_record_ids = diff_result.to_push.iter().map(|r| r.record_id.clone()).collect();
-        let push_result = transport.push_records(diff_result.to_push).await?;
-        result.pushed = push_result.accepted.len() as u32;
-    }
-
-    // 7. 拉取变更并写入本地
-    if !diff_result.to_pull.is_empty() {
-        state_manager.set_status(SyncStatus::Pulling);
-        let total = diff_result.to_pull.len() as u32;
-        state_manager.set_progress("拉取记录", 0, total);
-
-        let pull_result = transport
-            .pull_records(
-                remote_snapshot
-                    .as_ref()
-                    .map(|s| s.snapshot_id.as_str()),
-            )
-            .await?;
-
-        apply_pulled_records(&pull_result.records, db)?;
-        result.pulled = pull_result.records.len() as u32;
-    }
-
-    // 8. manual 模式：有冲突时暂停，等待用户解决
-    if is_manual_conflict {
+    // 6. manual 模式：有冲突时立即返回，不执行 push/pull（避免提前产生副作用）
+    if config.conflict_resolution == "manual" && !diff_result.conflicts.is_empty() {
         let conflict_infos: Vec<ConflictInfo> = diff_result
             .conflicts
             .iter()
@@ -351,133 +326,278 @@ async fn run_sync_with_transport(
             .collect();
 
         result.pending_conflicts = Some(conflict_infos.clone());
+        result.skipped = diff_result.unchanged;
         state_manager.set_completed();
         return Ok(SyncOutput {
             result,
             pending_state: Some(PendingSyncState {
-                pushed_record_ids,
-                remote_snapshot_id: remote_snapshot.as_ref().map(|s| s.snapshot_id.clone()),
+                pushed_records: Vec::new(),
                 conflicts: conflict_infos,
+                to_push: diff_result.to_push,
+                to_pull: diff_result.to_pull,
             }),
         });
     }
 
-    // 9. 同步附件
-    if config.sync_attachments {
-        state_manager.set_status(SyncStatus::SyncingAttachments);
-        sync_attachments(transport, state_manager, &mut result, db).await?;
+    // 7. 推送变更
+    let mut pushed_records: Vec<PushedRecord> = Vec::new();
+    if !diff_result.to_push.is_empty() {
+        state_manager.set_status(SyncStatus::Pushing);
+        let total = diff_result.to_push.len() as u32;
+        state_manager.set_progress("推送记录", 0, total);
+
+        pushed_records = diff_result
+            .to_push
+            .iter()
+            .map(|r| PushedRecord {
+                record_id: r.record_id.clone(),
+                table_name: r.table_name.clone(),
+            })
+            .collect();
+        let push_result = transport.push_records(diff_result.to_push).await?;
+        result.pushed = push_result.accepted.len() as u32;
     }
 
-    // 10. 提交同步
+    // 8. 拉取变更并写入本地
+    // 使用上次同步的快照 ID 作为 since_snapshot_id，而非刚获取的最新快照
+    // 否则服务端发现 since == latest 会直接返回空
+    if !diff_result.to_pull.is_empty() {
+        state_manager.set_status(SyncStatus::Pulling);
+        let total = diff_result.to_pull.len() as u32;
+        state_manager.set_progress("拉取记录", 0, total);
+
+        let pull_result = transport
+            .pull_records(config.last_snapshot_id.as_deref())
+            .await?;
+
+        apply_pulled_records(&pull_result.records, db)?;
+        result.pulled = pull_result.records.len() as u32;
+    }
+
+    // 9. 上传附件（使用 "pending" snapshot_id，commit 后服务端会移动到新快照）
+    if config.sync_attachments {
+        state_manager.set_status(SyncStatus::SyncingAttachments);
+        sync_attachments_upload(transport, state_manager, &mut result, db).await?;
+    }
+
+    // 10. 收集附件元数据供 commit 使用
+    let attachment_metas = if config.sync_attachments {
+        collect_attachment_metas_for_commit(db)?
+    } else {
+        vec![]
+    };
+
+    // 11. 提交同步（服务端将 pending 文件移动到新 snapshot_id）
     state_manager.set_progress("提交同步", 0, 1);
-    let commit_result = transport.commit_sync(pushed_record_ids, vec![]).await?;
+    let commit_result = transport
+        .commit_sync(pushed_records, attachment_metas, config.sync_attachments)
+        .await?;
     result.snapshot_id = commit_result.snapshot_id;
+
+    // 12. 下载本地缺少的附件
+    if config.sync_attachments {
+        let sid = result.snapshot_id.clone();
+        sync_attachments_download(transport, &mut result, db, &sid).await?;
+    }
 
     // 11. 保存基线映射（同步成功后，使用 pull 后的实际数据库状态）
     let final_records = collect_local_records(db)?;
     save_baseline_map(db, &final_records, &result.snapshot_id)?;
 
     state_manager.set_completed();
-    Ok(SyncOutput { result, pending_state: None })
+    Ok(SyncOutput {
+        result,
+        pending_state: None,
+    })
 }
 
-async fn sync_attachments(
+/// 上传本地附件到服务端（在 commit 之前调用）
+async fn sync_attachments_upload(
     transport: &SyncTransport,
     _state_manager: &SyncStateManager,
     result: &mut SyncResult,
     db: &DbState,
 ) -> Result<(), AppError> {
-    use crate::utils::paths;
-
     let attachments = collect_local_attachments(db)?;
     let local_hashes: Vec<String> = attachments.iter().map(|a| a.1.clone()).collect();
 
     let diff = transport.diff_attachments(local_hashes).await?;
+    let remote_attachment_ids: std::collections::HashSet<&str> = diff
+        .remote_attachments
+        .iter()
+        .map(|a| a.attachment_id.as_str())
+        .collect();
 
-    // 构建本地 hash 集合，用于快速查找
-    let local_hash_set: std::collections::HashSet<&str> =
-        attachments.iter().map(|a| a.1.as_str()).collect();
-
-    // 上传服务端缺少的附件（直接使用预读的文件数据）
+    // 上传服务端缺少的附件（使用 "pending" snapshot_id）
     for (_path, hash, data, attachment_id, item_id, filename, mime_type) in &attachments {
-        if diff.missing.contains(hash) {
+        if diff.missing.contains(hash) || !remote_attachment_ids.contains(attachment_id.as_str()) {
+            let file_size = data.len() as i64;
             transport
-                .upload_attachment(attachment_id, item_id, filename, mime_type, hash, "", data.clone())
+                .upload_attachment(
+                    attachment_id,
+                    item_id,
+                    filename,
+                    mime_type,
+                    hash,
+                    file_size,
+                    "pending",
+                    data.clone(),
+                )
                 .await?;
             result.attachments_uploaded += 1;
-        }
-    }
-
-    // 下载本地缺少的附件
-    for remote in &diff.remote_attachments {
-        if !local_hash_set.contains(remote.file_hash.as_str()) {
-            // 查询本地附件记录（apply_pulled_records 可能已通过 apply_attachment 创建）
-            let local_info: Option<(String, bool)> = {
-                let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
-                conn.query_row(
-                    "SELECT file_path FROM attachments WHERE id = ?1",
-                    rusqlite::params![remote.attachment_id],
-                    |row| {
-                        let fp: String = row.get(0)?;
-                        let full = paths::quantanote_dir().join(&fp);
-                        Ok((fp, full.exists()))
-                    },
-                )
-                .ok()
-            };
-
-            let data = transport.download_attachment(&remote.attachment_id).await?;
-
-            match local_info {
-                Some((_file_path, file_exists)) if file_exists => {
-                    // 记录存在且文件也在 → 跳过（理论上不会走到这里，hash 不同但文件存在）
-                    continue;
-                }
-                Some((file_path, _)) => {
-                    // 记录存在但文件丢失，重新下载到已有路径
-                    let full_path = paths::quantanote_dir().join(&file_path);
-                    if let Some(parent) = full_path.parent() {
-                        std::fs::create_dir_all(parent).map_err(|e| AppError::Io(e.to_string()))?;
-                    }
-                    std::fs::write(&full_path, &data).map_err(|e| AppError::Io(e.to_string()))?;
-                    result.attachments_downloaded += 1;
-                }
-                None => {
-                    // 本地无记录（apply_attachment 未覆盖到），创建记录并下载文件
-                    let file_path_str = format!("attachments/{}/{}", remote.item_id, remote.filename);
-                    let full_path = paths::quantanote_dir().join(&file_path_str);
-                    if let Some(parent) = full_path.parent() {
-                        std::fs::create_dir_all(parent).map_err(|e| AppError::Io(e.to_string()))?;
-                    }
-                    std::fs::write(&full_path, &data).map_err(|e| AppError::Io(e.to_string()))?;
-
-                    // 创建本地附件记录
-                    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
-                    let now = chrono::Utc::now().to_rfc3339();
-                    conn.execute(
-                        "INSERT OR IGNORE INTO attachments (id, item_id, filename, file_path, mime_type, file_size, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                        rusqlite::params![
-                            remote.attachment_id,
-                            remote.item_id,
-                            remote.filename,
-                            file_path_str,
-                            remote.mime_type,
-                            remote.file_size,
-                            now
-                        ],
-                    ).map_err(|e| AppError::Database(e.to_string()))?;
-                    result.attachments_downloaded += 1;
-                }
-            }
         }
     }
 
     Ok(())
 }
 
+/// 下载服务端附件到本地（在 commit 之后调用）
+async fn sync_attachments_download(
+    transport: &SyncTransport,
+    result: &mut SyncResult,
+    db: &DbState,
+    _snapshot_id: &str,
+) -> Result<(), AppError> {
+    use crate::sync::diff::compute_file_hash;
+    use crate::utils::paths;
+
+    let attachments = collect_local_attachments(db)?;
+    let local_hashes: Vec<String> = attachments.iter().map(|a| a.1.clone()).collect();
+    let diff = transport.diff_attachments(local_hashes).await?;
+
+    // 下载本地缺少或损坏的附件
+    for remote in &diff.remote_attachments {
+        let local_info: Option<(String, bool)> = {
+            let conn = db
+                .conn
+                .lock()
+                .map_err(|e| AppError::Database(e.to_string()))?;
+            conn.query_row(
+                "SELECT file_path FROM attachments WHERE id = ?1",
+                rusqlite::params![remote.attachment_id],
+                |row| {
+                    let fp: String = row.get(0)?;
+                    let full = paths::quantanote_dir().join(&fp);
+                    Ok((fp, full.exists()))
+                },
+            )
+            .ok()
+        };
+
+        let (target_path, has_local_row) = match &local_info {
+            Some((file_path, true)) => {
+                // 本地行存在且文件存在，比较 hash 判断是否损坏
+                let full_path = paths::quantanote_dir().join(file_path);
+                let local_data = std::fs::read(&full_path).unwrap_or_default();
+                let local_hash = compute_file_hash(&local_data);
+                if local_hash == remote.file_hash {
+                    continue; // 文件完好，跳过
+                }
+                // hash 不匹配，需要重新下载
+                (file_path.clone(), true)
+            }
+            Some((file_path, false)) => (file_path.clone(), true),
+            None => (
+                format!("attachments/{}/{}", remote.item_id, remote.filename),
+                false,
+            ),
+        };
+
+        let data = transport.download_attachment(&remote.attachment_id).await?;
+        let downloaded_hash = compute_file_hash(&data);
+        if downloaded_hash != remote.file_hash {
+            return Err(AppError::SyncError(format!(
+                "附件下载校验失败: attachment_id={}, expected={}, actual={}",
+                remote.attachment_id, remote.file_hash, downloaded_hash
+            )));
+        }
+        let full_path = paths::quantanote_dir().join(&target_path);
+        if let Some(parent) = full_path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| AppError::Io(e.to_string()))?;
+        }
+        std::fs::write(&full_path, &data).map_err(|e| AppError::Io(e.to_string()))?;
+
+        if !has_local_row {
+            let conn = db
+                .conn
+                .lock()
+                .map_err(|e| AppError::Database(e.to_string()))?;
+            let now = chrono::Utc::now().to_rfc3339();
+            conn.execute(
+                "INSERT OR IGNORE INTO attachments (id, item_id, filename, file_path, mime_type, file_size, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                rusqlite::params![
+                    remote.attachment_id,
+                    remote.item_id,
+                    remote.filename,
+                    target_path,
+                    remote.mime_type,
+                    remote.file_size,
+                    now
+                ],
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+        result.attachments_downloaded += 1;
+    }
+
+    Ok(())
+}
+
+/// 收集附件元数据供 commit 时上报
+fn collect_attachment_metas_for_commit(db: &DbState) -> Result<Vec<serde_json::Value>, AppError> {
+    use crate::sync::diff::compute_file_hash;
+    use crate::utils::paths;
+
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    let mut stmt = conn
+        .prepare("SELECT id, item_id, filename, file_path, mime_type, file_size FROM attachments")
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    let rows = stmt
+        .query_map([], |row| {
+            let file_path: String = row.get(3)?;
+            let full_path = paths::quantanote_dir().join(&file_path);
+            let file_hash = if full_path.exists() {
+                std::fs::read(full_path)
+                    .map(|data| compute_file_hash(&data))
+                    .unwrap_or_default()
+            } else {
+                String::new()
+            };
+            Ok(serde_json::json!({
+                "attachment_id": row.get::<_, String>(0)?,
+                "item_id": row.get::<_, String>(1)?,
+                "filename": row.get::<_, String>(2)?,
+                "mime_type": row.get::<_, String>(4)?,
+                "file_size": row.get::<_, i64>(5)?,
+                "file_hash": file_hash,
+                "storage_key": "",
+            }))
+        })
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    let mut result = Vec::new();
+    for row in rows {
+        result.push(row.map_err(|e| AppError::Database(e.to_string()))?);
+    }
+    Ok(result)
+}
+
 fn collect_local_attachments(
     db: &DbState,
-) -> Result<Vec<(std::path::PathBuf, String, Vec<u8>, String, String, String, String)>, AppError> {
+) -> Result<
+    Vec<(
+        std::path::PathBuf,
+        String,
+        Vec<u8>,
+        String,
+        String,
+        String,
+        String,
+    )>,
+    AppError,
+> {
     use crate::sync::diff::compute_file_hash;
     use crate::utils::paths;
 
@@ -517,6 +637,18 @@ fn collect_local_attachments(
     Ok(result)
 }
 
+/// 获取表的依赖优先级（数值小的先应用）
+fn table_priority(table_name: &str) -> u8 {
+    match table_name {
+        "items" => 0,
+        "tags" => 1,
+        "item_tags" => 2,
+        "versions" => 3,
+        "attachments" => 4,
+        _ => 5,
+    }
+}
+
 fn apply_pulled_records(records: &[SyncRecordPayload], db: &DbState) -> Result<(), AppError> {
     use crate::sync::{apply_attachment, apply_item, apply_item_tag, apply_tag, apply_version};
 
@@ -525,10 +657,15 @@ fn apply_pulled_records(records: &[SyncRecordPayload], db: &DbState) -> Result<(
         .lock()
         .map_err(|e| AppError::Database(e.to_string()))?;
 
-    let tx = conn.unchecked_transaction()
+    let tx = conn
+        .unchecked_transaction()
         .map_err(|e| AppError::Database(format!("开始事务失败: {}", e)))?;
 
-    for record in records {
+    // 按依赖顺序排序：items → tags → item_tags → versions → attachments
+    let mut sorted_records: Vec<&SyncRecordPayload> = records.iter().collect();
+    sorted_records.sort_by_key(|r| table_priority(&r.table_name));
+
+    for record in sorted_records {
         let result = match record.table_name.as_str() {
             "items" => apply_item(&tx, &record.data),
             "tags" => apply_tag(&tx, &record.data),
@@ -538,12 +675,14 @@ fn apply_pulled_records(records: &[SyncRecordPayload], db: &DbState) -> Result<(
             _ => Ok(()),
         };
         if let Err(e) = result {
-            tx.rollback().map_err(|re| AppError::Database(format!("回滚事务失败: {}", re)))?;
+            tx.rollback()
+                .map_err(|re| AppError::Database(format!("回滚事务失败: {}", re)))?;
             return Err(e);
         }
     }
 
-    tx.commit().map_err(|e| AppError::Database(format!("提交事务失败: {}", e)))?;
+    tx.commit()
+        .map_err(|e| AppError::Database(format!("提交事务失败: {}", e)))?;
 
     Ok(())
 }
@@ -627,10 +766,7 @@ pub fn sync_logout(
 }
 
 #[tauri::command]
-pub async fn sync_forgot_password(
-    server_url: String,
-    email: String,
-) -> Result<String, AppError> {
+pub async fn sync_forgot_password(server_url: String, email: String) -> Result<String, AppError> {
     let transport = SyncTransport::new(&server_url, "", "", "");
     transport.forgot_password(&email).await
 }
@@ -661,7 +797,9 @@ pub async fn get_sync_history(
     page_size: u32,
 ) -> Result<crate::sync::transport::PaginatedSyncHistory, AppError> {
     let transport = sync_state.get_transport()?;
-    transport.get_sync_history(page.max(1), page_size.clamp(1, 100)).await
+    transport
+        .get_sync_history(page.max(1), page_size.clamp(1, 100))
+        .await
 }
 
 /// 获取待解决的冲突列表
@@ -681,18 +819,30 @@ pub fn get_pending_conflicts(
 pub async fn resolve_sync_conflicts(
     db: State<'_, DbState>,
     sync_state: State<'_, SyncEngineState>,
-    resolutions: Vec<(String, String)>,
+    resolutions: Vec<ConflictResolutionChoice>,
 ) -> Result<SyncResult, AppError> {
     use crate::sync::diff::collect_local_records;
     use crate::sync::save_baseline_map;
 
-    // 取出 pending 状态
+    // 防止并发同步
+    if sync_state
+        .is_syncing
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return Err(AppError::SyncError(
+            "同步正在进行中，请稍后再试".to_string(),
+        ));
+    }
+    let _guard = SyncGuard(&sync_state.is_syncing);
+
+    // 克隆 pending 状态（不立即 take），成功后再清空
     let pending = {
-        let mut pending_lock = sync_state
+        let pending_lock = sync_state
             .pending_conflicts
             .lock()
             .map_err(|e| AppError::Database(e.to_string()))?;
-        pending_lock.take()
+        pending_lock.clone()
     };
     let pending = pending.ok_or_else(|| AppError::SyncError("没有待解决的冲突".to_string()))?;
 
@@ -704,11 +854,11 @@ pub async fn resolve_sync_conflicts(
         cfg.clone()
     };
 
-    // 构建冲突 map: record_id → ConflictInfo
-    let conflict_map: std::collections::HashMap<&str, &ConflictInfo> = pending
+    // 构建冲突 map: (table_name, record_id) → ConflictInfo，避免跨表 record_id 碰撞。
+    let conflict_map: std::collections::HashMap<(&str, &str), &ConflictInfo> = pending
         .conflicts
         .iter()
-        .map(|c| (c.record_id.as_str(), c))
+        .map(|c| ((c.table_name.as_str(), c.record_id.as_str()), c))
         .collect();
 
     let transport = sync_state.get_transport()?;
@@ -724,16 +874,43 @@ pub async fn resolve_sync_conflicts(
         snapshot_id: String::new(),
     };
 
-    let mut all_pushed_ids = pending.pushed_record_ids.clone();
+    let mut all_pushed_records = pending.pushed_records.clone();
+
+    // 先处理非冲突的待推送记录
+    if !pending.to_push.is_empty() {
+        let push_result = transport.push_records(pending.to_push.clone()).await?;
+        for r in &pending.to_push {
+            all_pushed_records.push(PushedRecord {
+                record_id: r.record_id.clone(),
+                table_name: r.table_name.clone(),
+            });
+        }
+        result.pushed += push_result.accepted.len() as u32;
+    }
+
+    // 先处理非冲突的待拉取记录
+    if !pending.to_pull.is_empty() {
+        let pull_result = transport.pull_records(config.last_snapshot_id.as_deref()).await?;
+        apply_pulled_records(&pull_result.records, &db)?;
+        result.pulled += pull_result.records.len() as u32;
+    }
 
     // 按用户选择处理每条冲突
-    for (record_id, choice) in &resolutions {
-        let conflict = match conflict_map.get(record_id.as_str()) {
+    for resolution in &resolutions {
+        let conflict = match conflict_map.get(&(
+            resolution.table_name.as_str(),
+            resolution.record_id.as_str(),
+        )) {
             Some(c) => c,
-            None => continue,
+            None => {
+                return Err(AppError::SyncError(format!(
+                    "待解决冲突不存在: {}:{}",
+                    resolution.table_name, resolution.record_id
+                )));
+            }
         };
 
-        match choice.as_str() {
+        match resolution.choice.as_str() {
             "local" => {
                 // 推送本地记录到服务端
                 let payload = crate::models::sync::SyncRecordPayload {
@@ -744,43 +921,70 @@ pub async fn resolve_sync_conflicts(
                     data: conflict.local_data.clone(),
                 };
                 transport.push_records(vec![payload]).await?;
-                all_pushed_ids.push(record_id.clone());
+                all_pushed_records.push(PushedRecord {
+                    record_id: conflict.record_id.clone(),
+                    table_name: conflict.table_name.clone(),
+                });
                 result.pushed += 1;
             }
             "remote" => {
                 // 从服务端拉取该记录并 apply 到本地
-                let snapshot_id = pending
-                    .remote_snapshot_id
-                    .as_deref()
-                    .ok_or_else(|| AppError::SyncError("无远程快照".to_string()))?;
-                let pull_result = transport.pull_records(Some(snapshot_id)).await?;
+                // 传 None 获取最新快照的所有记录（传 since==latest 会返回空）
+                let pull_result = transport.pull_records(None).await?;
                 // 只 apply 与当前冲突 record_id 匹配的记录
                 let matching: Vec<_> = pull_result
                     .records
                     .into_iter()
-                    .filter(|r| r.record_id == *record_id)
+                    .filter(|r| {
+                        r.table_name == conflict.table_name && r.record_id == conflict.record_id
+                    })
                     .collect();
+                if matching.is_empty() {
+                    return Err(AppError::SyncError(format!(
+                        "远端冲突记录不存在: {}:{}",
+                        conflict.table_name, conflict.record_id
+                    )));
+                }
                 apply_pulled_records(&matching, &db)?;
                 result.pulled += 1;
             }
             _ => {
                 return Err(AppError::SyncError(format!(
                     "无效的解决选择: {}，必须为 'local' 或 'remote'",
-                    choice
+                    resolution.choice
                 )));
             }
         }
     }
 
-    // 同步附件
+    // 上传附件（在 commit 之前）
     if config.sync_attachments {
         let dummy_sm = SyncStateManager::new();
-        sync_attachments(&transport, &dummy_sm, &mut result, &db).await?;
+        sync_attachments_upload(&transport, &dummy_sm, &mut result, &db).await?;
     }
 
+    // 收集附件元数据
+    let attachment_metas = if config.sync_attachments {
+        collect_attachment_metas_for_commit(&db)?
+    } else {
+        vec![]
+    };
+
     // 提交同步
-    let commit_result = transport.commit_sync(all_pushed_ids, vec![]).await?;
+    let commit_result = transport
+        .commit_sync(
+            all_pushed_records,
+            attachment_metas,
+            config.sync_attachments,
+        )
+        .await?;
     result.snapshot_id = commit_result.snapshot_id;
+
+    // 下载本地缺少的附件
+    if config.sync_attachments {
+        let sid = result.snapshot_id.clone();
+        sync_attachments_download(&transport, &mut result, &db, &sid).await?;
+    }
 
     // 保存基线
     let final_records = collect_local_records(&db)?;
@@ -798,14 +1002,17 @@ pub async fn resolve_sync_conflicts(
         *cfg = updated_config;
     }
 
+    // 成功后清空 pending 状态
+    if let Ok(mut pending_lock) = sync_state.pending_conflicts.lock() {
+        *pending_lock = None;
+    }
+
     Ok(result)
 }
 
 /// 取消待解决的冲突同步
 #[tauri::command]
-pub fn cancel_sync_conflicts(
-    sync_state: State<'_, SyncEngineState>,
-) -> Result<(), AppError> {
+pub fn cancel_sync_conflicts(sync_state: State<'_, SyncEngineState>) -> Result<(), AppError> {
     let mut pending = sync_state
         .pending_conflicts
         .lock()

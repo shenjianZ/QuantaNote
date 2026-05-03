@@ -1,0 +1,35 @@
+{
+    "name": "docs",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "prepare:docs": "react-docs-ui generate-doc-git-meta && react-docs-ui generate-llms-files && react-docs-ui generate-changelog-index",
+        "predev": "react-docs-ui generate-doc-git-meta && react-docs-ui generate-llms-files && react-docs-ui generate-changelog-index && react-docs-ui generate-sitemap && react-docs-ui generate-feed",
+        "dev": "react-docs-ui generate-shiki-bundle && vite",
+        "prebuild": "react-docs-ui generate-doc-git-meta && react-docs-ui generate-llms-files && react-docs-ui generate-changelog-index && react-docs-ui generate-sitemap && react-docs-ui generate-feed",
+        "build": "react-docs-ui generate-search-index && react-docs-ui generate-shiki-bundle && tsc -b && vite build",
+        "preview": "vite preview",
+        "build:llms": "react-docs-ui generate-llms-files",
+        "build:search": "react-docs-ui generate-search-index",
+        "build:shiki": "react-docs-ui generate-shiki-bundle"
+    },
+    "dependencies": {
+        "buffer": "^6.0.3",
+        "react": "^19.0.0",
+        "react-docs-ui": "0.8.1",
+        "react-dom": "^19.0.0",
+        "react-router-dom": "^7.13.2",
+        "shiki": "^4.0.2"
+    },
+    "devDependencies": {
+        "@types/react": "^19.1.9",
+        "@types/react-dom": "^19.1.7",
+        "@vitejs/plugin-react": "^6.0.1",
+        "typescript": "^6.0.2",
+        "vite": "^8.0.2"
+    },
+    "engines": {
+        "node": ">=20.19.0"
+    }
+}

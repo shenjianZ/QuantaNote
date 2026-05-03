@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Eye, GitCompare, Pencil, Search, Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Modal } from "../common/Modal";
 import { VersionPreviewModal } from "../common/VersionPreviewModal";
 import { VersionDiffModal } from "../version/VersionDiffModal";
@@ -7,14 +8,14 @@ import type { VersionDto } from "../../types";
 
 export type { VersionDto };
 
-function formatRelativeTime(dateStr: string) {
+function formatRelativeTime(dateStr: string, t: (key: string, opts?: Record<string, unknown>) => string) {
   const diff = Date.now() - new Date(dateStr).getTime();
   const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return "刚刚";
-  if (minutes < 60) return `${minutes} 分钟前`;
+  if (minutes < 1) return t("editor:versionPanel.justNow");
+  if (minutes < 60) return t("editor:versionPanel.minutesAgo", { count: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} 小时前`;
-  return `${Math.floor(hours / 24)} 天前`;
+  if (hours < 24) return t("editor:versionPanel.hoursAgo", { count: hours });
+  return t("editor:versionPanel.daysAgo", { count: Math.floor(hours / 24) });
 }
 
 interface VersionPanelProps {
@@ -28,6 +29,7 @@ interface VersionPanelProps {
 }
 
 export function VersionPanel({ open, versions, onClose, onRestore, onUpdateMeta, onDelete, theme }: VersionPanelProps) {
+  const { t } = useTranslation(["editor", "common"]);
   const [search, setSearch] = useState("");
   const [previewVersion, setPreviewVersion] = useState<VersionDto | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -96,7 +98,7 @@ export function VersionPanel({ open, versions, onClose, onRestore, onUpdateMeta,
 
   return (
     <>
-      <Modal open={open} onClose={onClose} title={`版本记录 (${versions.length})`} maxWidth="max-w-lg">
+      <Modal open={open} onClose={onClose} title={t("editor:versionPanel.title", { count: versions.length })} maxWidth="max-w-lg">
         <div className="space-y-3" data-testid="version-panel">
           {/* Search + Compare */}
           <div className="flex items-center gap-2">
@@ -106,7 +108,7 @@ export function VersionPanel({ open, versions, onClose, onRestore, onUpdateMeta,
                 className="flex-1 bg-transparent text-sm text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="搜索版本"
+                placeholder={t("editor:versionPanel.searchPlaceholder")}
                 data-testid="version-panel-search"
               />
             </div>
@@ -118,7 +120,7 @@ export function VersionPanel({ open, versions, onClose, onRestore, onUpdateMeta,
                 data-testid="version-panel-compare-btn"
               >
                 <GitCompare className="h-3.5 w-3.5" />
-                对比
+                {t("editor:versionPanel.compare")}
               </button>
             )}
             <button
@@ -135,12 +137,12 @@ export function VersionPanel({ open, versions, onClose, onRestore, onUpdateMeta,
               data-testid="version-panel-compare-toggle"
             >
               <GitCompare className="h-3.5 w-3.5" />
-              {compareMode ? "取消" : "对比"}
+              {compareMode ? t("editor:versionPanel.cancel") : t("editor:versionPanel.compare")}
             </button>
           </div>
           {compareMode && selectedForDiff.length > 0 && selectedForDiff.length < 2 && (
             <div className="text-xs text-[var(--muted)]">
-              已选择 1 个版本，请再选择 1 个进行对比
+              {t("editor:versionPanel.selectHint")}
             </div>
           )}
 
@@ -148,7 +150,7 @@ export function VersionPanel({ open, versions, onClose, onRestore, onUpdateMeta,
           <div className="max-h-64 space-y-1 overflow-auto">
             {filtered.length === 0 ? (
               <div className="py-6 text-center text-sm text-[var(--muted)]">
-                {search.trim() ? "没有匹配的版本" : "暂无版本记录，点击\"保存版本\"创建"}
+                {search.trim() ? t("editor:versionPanel.noMatch") : t("editor:versionPanel.noVersions")}
               </div>
             ) : (
               filtered.map((version) => {
@@ -164,7 +166,7 @@ export function VersionPanel({ open, versions, onClose, onRestore, onUpdateMeta,
                           onChange={() => toggleVersionSelect(version.id)}
                           data-testid="version-panel-checkbox"
                         />
-                        <span className="text-[10px] text-[var(--muted)]">选择对比</span>
+                        <span className="text-[10px] text-[var(--muted)]">{t("editor:versionPanel.selectForCompare")}</span>
                       </label>
                     )}
                     {editingId === version.id ? (
@@ -173,14 +175,14 @@ export function VersionPanel({ open, versions, onClose, onRestore, onUpdateMeta,
                           className="w-full rounded-lg border border-[var(--line)] bg-[var(--field)] px-2 py-1 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
                           value={editName}
                           onChange={(e) => setEditName(e.target.value)}
-                          placeholder="版本名称"
+                          placeholder={t("editor:versionPanel.versionName")}
                           onKeyDown={(e) => e.key === "Enter" && saveEdit(version.id)}
                         />
                         <input
                           className="w-full rounded-lg border border-[var(--line)] bg-[var(--field)] px-2 py-1 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
                           value={editDesc}
                           onChange={(e) => setEditDesc(e.target.value)}
-                          placeholder="版本描述（可选）"
+                          placeholder={t("editor:versionPanel.versionDesc")}
                         />
                         <div className="flex gap-1.5">
                           <button
@@ -188,14 +190,14 @@ export function VersionPanel({ open, versions, onClose, onRestore, onUpdateMeta,
                             type="button"
                             onClick={() => saveEdit(version.id)}
                           >
-                            保存
+                            {t("editor:versionPanel.save")}
                           </button>
                           <button
                             className="rounded-full bg-[var(--field)] px-2.5 py-0.5 text-xs text-[var(--muted)]"
                             type="button"
                             onClick={() => setEditingId(null)}
                           >
-                            取消
+                            {t("editor:versionPanel.cancel")}
                           </button>
                         </div>
                       </div>
@@ -207,7 +209,7 @@ export function VersionPanel({ open, versions, onClose, onRestore, onUpdateMeta,
                               {version.name || `v${version.version_number}`}
                             </span>
                             <span className="shrink-0 text-xs text-[var(--muted)]">
-                              {formatRelativeTime(version.created_at)}
+                              {formatRelativeTime(version.created_at, t)}
                             </span>
                           </div>
                           {version.description && (
@@ -218,7 +220,7 @@ export function VersionPanel({ open, versions, onClose, onRestore, onUpdateMeta,
                           <button
                             className="grid h-6 w-6 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--field)] hover:text-[var(--text)]"
                             type="button"
-                            title="编辑"
+                            title={t("editor:versionPanel.edit")}
                             onClick={() => startEdit(version)}
                             data-testid="version-panel-edit-btn"
                           >
@@ -227,7 +229,7 @@ export function VersionPanel({ open, versions, onClose, onRestore, onUpdateMeta,
                           <button
                             className="grid h-6 w-6 place-items-center rounded-full text-[var(--accent)] hover:bg-[var(--accent-soft)]"
                             type="button"
-                            title="查看并恢复"
+                            title={t("editor:versionPanel.viewRestore")}
                             onClick={() => setPreviewVersion(version)}
                             data-testid="version-panel-view-btn"
                           >
@@ -240,13 +242,13 @@ export function VersionPanel({ open, versions, onClose, onRestore, onUpdateMeta,
                               onClick={() => handleDelete(version.id)}
                               data-testid="version-panel-delete-confirm"
                             >
-                              确认删除
+                              {t("editor:versionPanel.confirmDelete")}
                             </button>
                           ) : (
                             <button
                               className="grid h-6 w-6 place-items-center rounded-full text-red-400 hover:bg-red-500/10"
                               type="button"
-                              title="删除"
+                              title={t("editor:versionPanel.delete")}
                               onClick={() => setDeleteConfirm(version.id)}
                               data-testid="version-panel-delete-btn"
                             >

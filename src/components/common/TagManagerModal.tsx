@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Pencil, Plus, Search, Trash2, Palette } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Modal } from "./Modal";
 import { useTagStore } from "../../stores/tagStore";
 import { useToastStore } from "../../stores/toastStore";
@@ -24,6 +25,7 @@ interface TagManagerModalProps {
 }
 
 export function TagManagerModal({ open, onClose }: TagManagerModalProps) {
+  const { t } = useTranslation(["modals", "common"]);
   const allTags = useTagStore((s) => s.tags);
   const createTag = useTagStore((s) => s.createTag);
   const removeTag = useTagStore((s) => s.removeTag);
@@ -77,7 +79,7 @@ export function TagManagerModal({ open, onClose }: TagManagerModalProps) {
       setNewName("");
       setCreating(false);
     } catch {
-      useToastStore.getState().addToast("error", "创建标签失败");
+      useToastStore.getState().addToast("error", t("common:toast.tagCreateFailed"));
     }
   }
 
@@ -100,7 +102,7 @@ export function TagManagerModal({ open, onClose }: TagManagerModalProps) {
       }
       setEditingName(null);
     } catch {
-      useToastStore.getState().addToast("error", "保存标签失败");
+      useToastStore.getState().addToast("error", t("common:toast.tagSaveFailed"));
     }
   }
 
@@ -109,12 +111,12 @@ export function TagManagerModal({ open, onClose }: TagManagerModalProps) {
       await removeTag(name);
       setDeleteConfirm(null);
     } catch {
-      useToastStore.getState().addToast("error", "删除标签失败");
+      useToastStore.getState().addToast("error", t("common:toast.tagDeleteFailed"));
     }
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="标签管理" maxWidth="max-w-lg">
+    <Modal open={open} onClose={onClose} title={t("modals:tagManager.title")} maxWidth="max-w-lg">
       <div className="space-y-3" data-testid="tag-manager-modal">
         {/* Search + Create button */}
         <div className="flex items-center gap-2">
@@ -124,7 +126,7 @@ export function TagManagerModal({ open, onClose }: TagManagerModalProps) {
               className="flex-1 bg-transparent text-sm text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="搜索标签"
+              placeholder={t("modals:tagManager.searchPlaceholder")}
               data-testid="tag-manager-search"
             />
           </div>
@@ -135,7 +137,7 @@ export function TagManagerModal({ open, onClose }: TagManagerModalProps) {
             data-testid="tag-manager-create-btn"
           >
             <Plus className="h-3.5 w-3.5" />
-            新建
+            {t("modals:tagManager.newBtn")}
           </button>
         </div>
 
@@ -146,7 +148,7 @@ export function TagManagerModal({ open, onClose }: TagManagerModalProps) {
               className="w-full rounded-lg border border-[var(--line)] bg-[var(--paper)] px-3 py-1.5 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="标签名"
+              placeholder={t("modals:tagManager.namePlaceholder")}
               data-testid="tag-manager-name-input"
               onKeyDown={(e) => e.key === "Enter" && handleCreate()}
             />
@@ -169,14 +171,14 @@ export function TagManagerModal({ open, onClose }: TagManagerModalProps) {
                 type="button"
                 onClick={handleCreate}
               >
-                创建
+                {t("modals:tagManager.create")}
               </button>
               <button
                 className="rounded-full bg-[var(--field)] px-3 py-1 text-xs text-[var(--muted)] hover:text-[var(--text)]"
                 type="button"
                 onClick={() => setCreating(false)}
               >
-                取消
+                {t("common:buttons.cancel")}
               </button>
             </div>
           </div>
@@ -207,14 +209,14 @@ export function TagManagerModal({ open, onClose }: TagManagerModalProps) {
                       onClick={handleSaveEdit}
                       data-testid="tag-manager-save-btn"
                     >
-                      保存
+                      {t("modals:tagManager.save")}
                     </button>
                     <button
                       className="rounded-full px-2 py-1 text-xs text-[var(--muted)]"
                       type="button"
                       onClick={() => setEditingName(null)}
                     >
-                      取消
+                      {t("common:buttons.cancel")}
                     </button>
                   </div>
                   <div className="flex items-center gap-1">
@@ -245,7 +247,7 @@ export function TagManagerModal({ open, onClose }: TagManagerModalProps) {
                   style={{ background: colorValue }}
                 />
                 <span className="flex-1 truncate text-sm text-[var(--text)]">#{tag.name}</span>
-                <span className="shrink-0 text-xs text-[var(--muted)]">{count} 条</span>
+                <span className="shrink-0 text-xs text-[var(--muted)]">{t("modals:tagManager.recordCount", { count })}</span>
                 <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                   {isDeleteConfirm ? (
                     <>
@@ -255,14 +257,14 @@ export function TagManagerModal({ open, onClose }: TagManagerModalProps) {
                         onClick={() => handleDelete(tag.name)}
                         data-testid="tag-manager-delete-confirm"
                       >
-                        确认删除
+                        {t("modals:tagManager.confirmDelete")}
                       </button>
                       <button
                         className="rounded-full px-2 py-0.5 text-xs text-[var(--muted)]"
                         type="button"
                         onClick={() => setDeleteConfirm(null)}
                       >
-                        取消
+                        {t("common:buttons.cancel")}
                       </button>
                     </>
                   ) : (
@@ -270,7 +272,7 @@ export function TagManagerModal({ open, onClose }: TagManagerModalProps) {
                       <button
                         className="grid h-6 w-6 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--field)] hover:text-[var(--text)]"
                         type="button"
-                        title="重命名"
+                        title={t("modals:tagManager.rename")}
                         onClick={() => startEdit(tag.name, tag.color)}
                         data-testid="tag-manager-rename-btn"
                       >
@@ -279,7 +281,7 @@ export function TagManagerModal({ open, onClose }: TagManagerModalProps) {
                       <button
                         className="grid h-6 w-6 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--field)] hover:text-[var(--text)]"
                         type="button"
-                        title="颜色"
+                        title={t("modals:tagManager.color")}
                         onClick={() => setColorPickerFor(colorPickerFor === tag.name ? null : tag.name)}
                       >
                         <Palette className="h-3 w-3" />
@@ -287,7 +289,7 @@ export function TagManagerModal({ open, onClose }: TagManagerModalProps) {
                       <button
                         className="grid h-6 w-6 place-items-center rounded-full text-red-400 hover:bg-red-500/10"
                         type="button"
-                        title="删除"
+                        title={t("modals:tagManager.delete")}
                         onClick={() => setDeleteConfirm(tag.name)}
                         data-testid="tag-manager-delete-btn"
                       >
@@ -320,7 +322,7 @@ export function TagManagerModal({ open, onClose }: TagManagerModalProps) {
           })}
           {filteredTags.length === 0 && (
             <p className="py-3 text-center text-sm text-[var(--muted)]">
-              {search.trim() ? "没有匹配的标签" : "暂无标签，点击上方按钮创建"}
+              {search.trim() ? t("modals:tagManager.noMatch") : t("modals:tagManager.noTags")}
             </p>
           )}
         </div>

@@ -91,7 +91,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/auth/register", post(handlers::auth::register))
         .route("/auth/login", post(handlers::auth::login))
         .route("/auth/refresh", post(handlers::auth::refresh))
-        .route("/auth/forgot-password", post(handlers::auth::forgot_password))
+        .route(
+            "/auth/forgot-password",
+            post(handlers::auth::forgot_password),
+        )
         .route("/auth/reset-password", post(handlers::auth::reset_password));
 
     // ========== 受保护路由 ==========
@@ -102,13 +105,28 @@ async fn main() -> anyhow::Result<()> {
             post(handlers::auth::delete_refresh_token),
         )
         // 同步端点
-        .route("/sync/snapshot/latest", get(handlers::sync::get_latest_snapshot))
-        .route("/sync/snapshot/:snapshot_id/records", get(handlers::sync::get_snapshot_records))
+        .route(
+            "/sync/snapshot/latest",
+            get(handlers::sync::get_latest_snapshot),
+        )
+        .route(
+            "/sync/snapshot/:snapshot_id/records",
+            get(handlers::sync::get_snapshot_records),
+        )
         .route("/sync/records/push", post(handlers::sync::push_records))
         .route("/sync/records/pull", post(handlers::sync::pull_records))
-        .route("/sync/attachments/diff", post(handlers::sync::diff_attachments))
-        .route("/sync/attachments/upload", post(handlers::sync::upload_attachment))
-        .route("/sync/attachments/download/:attachment_id", get(handlers::sync::download_attachment))
+        .route(
+            "/sync/attachments/diff",
+            post(handlers::sync::diff_attachments),
+        )
+        .route(
+            "/sync/attachments/upload",
+            post(handlers::sync::upload_attachment),
+        )
+        .route(
+            "/sync/attachments/download/:attachment_id",
+            get(handlers::sync::download_attachment),
+        )
         .route("/sync/commit", post(handlers::sync::commit_sync))
         .route("/sync/history", get(handlers::sync::sync_history))
         .route("/sync/reset", post(handlers::sync::reset_sync_data))
@@ -125,8 +143,8 @@ async fn main() -> anyhow::Result<()> {
         .layer(
             CorsLayer::new()
                 .allow_origin(Any)
-                        .allow_methods(Any)
-                .allow_headers(Any)
+                .allow_methods(Any)
+                .allow_headers(Any),
         )
         // 日志中间件（应用于所有路由）
         .layer(axum::middleware::from_fn_with_state(

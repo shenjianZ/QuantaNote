@@ -17,21 +17,24 @@ import { adaptItem } from "../adapters/itemAdapter";
 import { deriveRecordTitle } from "../utils/recordTitle";
 import { preloadVditorResources } from "../utils/vditorPreload";
 import type { AppPage, Item } from "../types";
+import i18n from "../i18n";
 import "../styles/themes.css";
 import "../styles/global.css";
 
-const EMPTY_ITEM: Item = {
-    id: "",
-    type: "note",
-    title: "选择一条记录",
-    summary: "从左侧列表选择或创建新记录",
-    tags: [],
-    time: "",
-    icon: FileText,
-    accent: "cyan",
-    createdAt: "",
-    updatedAt: "",
-};
+function getEmptyItem(): Item {
+    return {
+        id: "",
+        type: "note",
+        title: i18n.t("common:emptyItem.title"),
+        summary: i18n.t("common:emptyItem.summary"),
+        tags: [],
+        time: "",
+        icon: FileText,
+        accent: "cyan",
+        createdAt: "",
+        updatedAt: "",
+    };
+}
 
 type TrayCommand =
     | "new-note"
@@ -111,11 +114,11 @@ export function QuantaNoteApp() {
                 return adaptItem(selectedDbItem);
             return (
                 displayItems.find((item) => item.id === selectedItemId) ??
-                EMPTY_ITEM
+                getEmptyItem()
             );
         }
         if (selectedDbItem) return adaptItem(selectedDbItem);
-        return displayItems[0] ?? EMPTY_ITEM;
+        return displayItems[0] ?? getEmptyItem();
     }, [selectedDbItem, displayItems, selectedItemId]);
 
     const handleSelectItem = useCallback(
@@ -161,7 +164,7 @@ export function QuantaNoteApp() {
     }, [navigate, selectedItemId]);
 
     const handleCreateNote = useCallback(async () => {
-        const item = await createItem("未命名笔记", "note", "");
+        const item = await createItem(i18n.t("common:emptyItem.untitled"), "note", "");
         selectItem(item.id);
         await getItem(item.id);
         navigate("document");

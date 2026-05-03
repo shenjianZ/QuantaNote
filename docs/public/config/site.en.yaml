@@ -1,0 +1,346 @@
+# yaml-language-server: $schema=./site.schema.json
+# Website Configuration
+site:
+    title: "QuantaNote Docs"
+    description: "QuantaNote - Local-first desktop information management tool documentation"
+    url: "https://shenjianz.github.io/QuantaNote"
+    logo:
+        light: "/images/favicon.svg"
+        dark: "/images/favicon-dark.svg"
+    author: "QuantaNote Team"
+
+# Navigation Bar Configuration
+navbar:
+    showLogo: true
+    showTitle: true
+    showLanguageSwitcher: true
+    items:
+        - title: "Home"
+          link: "/"
+          active: true
+        - title: "Docs"
+          link: "/docs"
+        - title: "Changelog"
+          link: "/changelog"
+    actions:
+        - type: "github"
+          link: "https://github.com/shenjianZ/QuantaNote"
+          enabled: true
+
+announcement:
+    enabled: true
+    text: "QuantaNote — Local-first, privacy-first desktop information management tool"
+    link: "https://github.com/shenjianZ/QuantaNote"
+    dismissible: true
+
+versions:
+    enabled: false
+
+changelog:
+    enabled: true
+    title: "Changelog"
+    pageSize: 5
+
+# Sidebar Navigation Configuration
+sidebar:
+    enabled: true
+    collections:
+        docs:
+            sections:
+                - title: "Getting Started"
+                  path: "/docs/guide"
+                  children:
+                      - title: "Introduction"
+                        path: "/docs/guide/introduction"
+                      - title: "Installation"
+                        path: "/docs/guide/installation"
+                      - title: "Quick Start"
+                        path: "/docs/guide/quick-start"
+                - title: "Features"
+                  path: "/docs/features"
+                  children:
+                      - title: "Workspace"
+                        path: "/docs/features/workspace"
+                      - title: "Library"
+                        path: "/docs/features/library"
+                      - title: "Document Editor"
+                        path: "/docs/features/document-editor"
+                      - title: "Markdown Editor"
+                        path: "/docs/features/markdown-editor"
+                      - title: "Tags"
+                        path: "/docs/features/tags"
+                      - title: "Attachments"
+                        path: "/docs/features/attachments"
+                      - title: "Version History"
+                        path: "/docs/features/version-history"
+                      - title: "Full-Text Search"
+                        path: "/docs/features/search"
+                      - title: "Command Palette"
+                        path: "/docs/features/command-palette"
+                - title: "Data Management"
+                  path: "/docs/data"
+                  children:
+                      - title: "Import & Export"
+                        path: "/docs/data/import-export"
+                      - title: "Backup"
+                        path: "/docs/data/backup"
+                - title: "Sync"
+                  path: "/docs/sync"
+                  children:
+                      - title: "Server Setup"
+                        path: "/docs/sync/server-setup"
+                      - title: "Authentication"
+                        path: "/docs/sync/authentication"
+                      - title: "Syncing Your Data"
+                        path: "/docs/sync/syncing"
+                      - title: "Conflict Resolution"
+                        path: "/docs/sync/conflict-resolution"
+                - title: "Settings"
+                  path: "/docs/settings"
+                  children:
+                      - title: "Appearance"
+                        path: "/docs/settings/appearance"
+                      - title: "Fonts"
+                        path: "/docs/settings/fonts"
+                      - title: "System Integration"
+                        path: "/docs/settings/system"
+                      - title: "Diagnostics"
+                        path: "/docs/settings/diagnostics"
+                      - title: "Keyboard Shortcuts"
+                        path: "/docs/settings/shortcuts"
+                - title: "Architecture"
+                  path: "/docs/architecture"
+                  children:
+                      - title: "Architecture Overview"
+                        path: "/docs/architecture/overview"
+                      - title: "Frontend Architecture"
+                        path: "/docs/architecture/frontend"
+                      - title: "Backend Architecture"
+                        path: "/docs/architecture/backend"
+                      - title: "Database Schema"
+                        path: "/docs/architecture/database"
+                      - title: "IPC Commands"
+                        path: "/docs/architecture/ipc"
+                      - title: "State Management"
+                        path: "/docs/architecture/state-management"
+                - title: "Development"
+                  path: "/docs/development"
+                  children:
+                      - title: "Building from Source"
+                        path: "/docs/development/building"
+                      - title: "Technology Stack"
+                        path: "/docs/development/tech-stack"
+                      - title: "Project Structure"
+                        path: "/docs/development/project-structure"
+                      - title: "Development Commands"
+                        path: "/docs/development/commands"
+                      - title: "Testing Guide"
+                        path: "/docs/development/testing"
+                      - title: "Contributing"
+                        path: "/docs/development/contributing"
+
+# Theme Configuration
+theme:
+    defaultMode: "auto"
+    allowToggle: true
+
+# Table of Contents Configuration
+toc:
+    maxLevel: 4
+    enabled: true
+    title: "On This Page"
+
+# Image viewer configuration
+imageViewer:
+    enabled: true
+    labels:
+        preview: "Preview image"
+        zoomIn: "Zoom in"
+        zoomOut: "Zoom out"
+        fit: "Fit to viewport"
+        actualSize: "Actual size"
+        reset: "Reset"
+        rotateLeft: "Rotate left"
+        rotateRight: "Rotate right"
+        fullscreen: "Fullscreen"
+        download: "Download"
+        openInNewTab: "Open in new tab"
+        close: "Close image viewer"
+
+# Footer Configuration
+footer:
+    enabled: true
+    copyright: "© 2026 QuantaNote. All rights reserved."
+    repository:
+        url: "https://github.com/shenjianZ/QuantaNote"
+        branch: "master"
+    lastUpdated: "2026-05-03"
+    version: "v0.1.0"
+    groups:
+        - title: "Community"
+          items:
+              - title: "Issues"
+                link: "https://github.com/shenjianZ/QuantaNote/issues"
+                external: true
+              - title: "Releases"
+                link: "https://github.com/shenjianZ/QuantaNote/releases"
+                external: true
+              - title: "Source Code"
+                link: "https://github.com/shenjianZ/QuantaNote"
+                external: true
+        - title: "Help & Support"
+          items:
+              - title: "Getting Started"
+                link: "/docs/guide"
+              - title: "Features"
+                link: "/docs/features"
+              - title: "Contributing"
+                link: "/docs/development/contributing"
+              - title: "Back to Top"
+                link: "#"
+                action: "scrollTop"
+    links:
+        - title: "Documentation"
+          link: "/docs/guide/introduction"
+        - title: "GitHub"
+          link: "https://github.com/shenjianZ/QuantaNote"
+          external: true
+    social:
+        - name: "github"
+          url: "https://github.com/shenjianZ/QuantaNote"
+          icon: "github"
+
+# PWA Configuration
+pwa:
+    enabled: true
+    name: "QuantaNote"
+    shortName: "QuantaNote"
+    description: "QuantaNote documentation website"
+    themeColor: "#ffffff"
+    backgroundColor: "#ffffff"
+
+# Context Menu Configuration
+contextMenu:
+    enabled: true
+    page:
+        copySelectedText: true
+        copyUrl: true
+        copyTitle: false
+        copyMarkdownLink: false
+        openInNewTab: false
+        reload: true
+        printPage: true
+        scrollToTop: true
+        scrollToBottom: true
+    site:
+        goHome: true
+        quickNav: false
+        language: false
+    appearance:
+        theme: false
+        resetThemePref: false
+
+# MDX Component Configuration
+mdx:
+    componentsPath: "/src/components"
+    enabled: true
+
+pageMeta:
+    showLastUpdated: true
+    showEditLink: true
+    showAuthors: true
+    preferGitMeta: true
+
+editLink:
+    enabled: true
+    label: "Edit this page"
+    urlTemplate: "https://github.com/shenjianZ/QuantaNote/edit/master/docs/{filePath}"
+
+feedback:
+    enabled: true
+    endpoint: ""
+    method: "POST"
+    includePageMeta: true
+    labels:
+        helpful: "Helpful"
+        unhelpful: "Not helpful"
+        inputPlaceholder: "Tell us what is unclear or missing"
+        submit: "Submit feedback"
+        thanks: "Thanks for your feedback"
+
+ai:
+    enabled: false
+
+# Fonts Configuration
+fonts:
+    fontFamilyZhCn: "MiSans, PingFang SC, Noto Sans SC, Microsoft YaHei, sans-serif"
+    fontFamilyEn: "Fragment Mono, system-ui, sans-serif"
+    downloadFonts:
+        - "FragmentMono-Italic.woff2"
+        - "FragmentMono-Regular.woff2"
+        - "MiSans-Bold.woff2"
+        - "MiSans-Medium.woff2"
+        - "MiSans-Regular.woff2"
+
+# Code highlight configuration
+codeHighlight:
+    langs:
+        - "bash"
+        - "markdown"
+        - "yaml"
+        - "javascript"
+        - "typescript"
+        - "tsx"
+        - "json"
+        - "rust"
+        - "sql"
+        - "css"
+    lightTheme: "github-light"
+    darkTheme: "github-dark"
+
+# Full-text Search Configuration
+search:
+    enabled: true
+    placeholder: "Search docs..."
+    maxResults: 20
+    snippetLength: 120
+
+seo:
+    enabled: true
+    defaultTitle: "QuantaNote Docs"
+    titleTemplate: "{title} | QuantaNote"
+    defaultDescription: "QuantaNote - Local-first desktop information management tool documentation"
+    robots: "index, follow"
+    twitterCard: "summary_large_image"
+
+# Breadcrumb Configuration
+breadcrumb:
+    enabled: true
+    showHome: true
+
+# Reading Experience Configuration
+reading:
+    showTime: true
+    showProgress: true
+
+# Sitemap Configuration
+sitemap:
+    enabled: true
+    changefreq: "weekly"
+    priority: 0.7
+    exclude: []
+
+# RSS Feed Configuration
+feed:
+    enabled: true
+    title: "QuantaNote Docs"
+    description: "QuantaNote changelog"
+    limit: 20
+
+# Export Configuration
+export:
+    enabled: true
+    markdown: true
+    pdf: true
+    word: true
+    allDocs: true

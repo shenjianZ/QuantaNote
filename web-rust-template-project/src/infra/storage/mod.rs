@@ -1,6 +1,6 @@
 pub mod local;
-pub mod s3;
 pub mod openlist;
+pub mod s3;
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -42,6 +42,23 @@ pub trait StorageBackend: Send + Sync {
     /// 检查对象是否存在
     async fn exists(&self, key: &str) -> anyhow::Result<bool>;
 
+    /// 移动/重命名对象（幂等：目标已存在或源不存在时跳过）
+    async fn move_object(&self, from_key: &str, to_key: &str) -> anyhow::Result<()> {
+        if self.exists(to_key).await? {
+            if self.exists(from_key).await? && from_key != to_key {
+                let _ = self.delete_object(from_key).await;
+            }
+            return Ok(());
+        }
+        if !self.exists(from_key).await? {
+            return Ok(());
+        }
+        let obj = self.get_object(from_key).await?;
+        self.put_object(to_key, obj.data, &obj.content_type).await?;
+        self.delete_object(from_key).await?;
+        Ok(())
+    }
+
     /// 批量删除
     async fn delete_objects(&self, keys: &[String]) -> anyhow::Result<()> {
         for key in keys {
@@ -57,10 +74,7 @@ pub fn create_storage_backend(
 ) -> anyhow::Result<Box<dyn StorageBackend>> {
     match config.backend_type.as_str() {
         "local" => {
-            let base_path = config
-                .base_path
-                .as_deref()
-                .unwrap_or("./sync_data");
+            let base_path = config.base_path.as_deref().unwrap_or("./sync_data");
             Ok(Box::new(local::LocalStorage::new(base_path)?))
         }
         "s3" => {

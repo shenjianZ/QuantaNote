@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Replace, ReplaceAll, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface SearchReplaceBarProps {
   onSearch: (query: string, caseSensitive: boolean) => number;
@@ -18,6 +19,7 @@ export function SearchReplaceBar({
   onPrev,
   onClose,
 }: SearchReplaceBarProps) {
+  const { t } = useTranslation(["editor"]);
   const [query, setQuery] = useState("");
   const [replacement, setReplacement] = useState("");
   const [caseSensitive, setCaseSensitive] = useState(false);
@@ -96,18 +98,18 @@ export function SearchReplaceBar({
         <input
           ref={inputRef}
           className="h-8 w-48 rounded-lg border border-[var(--line)] bg-[var(--field)] px-2 text-sm text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
-          placeholder="搜索"
+          placeholder={t("editor:searchReplace.search")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
         <span className="min-w-[4rem] text-center text-xs text-[var(--muted)]">
-          {matchCount > 0 ? `${currentIdx}/${matchCount}` : "无匹配"}
+          {matchCount > 0 ? `${currentIdx}/${matchCount}` : t("editor:searchReplace.noMatch")}
         </span>
         <button
           className="grid h-7 w-7 place-items-center rounded text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
           type="button"
           onClick={handlePrev}
-          title="上一个 (Shift+Enter)"
+          title={t("editor:searchReplace.prev")}
         >
           <ChevronUp className="h-4 w-4" />
         </button>
@@ -115,7 +117,7 @@ export function SearchReplaceBar({
           className="grid h-7 w-7 place-items-center rounded text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
           type="button"
           onClick={handleNext}
-          title="下一个 (Enter)"
+          title={t("editor:searchReplace.next")}
         >
           <ChevronDown className="h-4 w-4" />
         </button>
@@ -123,7 +125,7 @@ export function SearchReplaceBar({
           className={`grid h-7 w-7 place-items-center rounded text-xs font-bold ${caseSensitive ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"}`}
           type="button"
           onClick={() => setCaseSensitive(!caseSensitive)}
-          title="区分大小写"
+          title={t("editor:searchReplace.caseSensitive")}
         >
           Aa
         </button>
@@ -131,7 +133,7 @@ export function SearchReplaceBar({
           className="grid h-7 w-7 place-items-center rounded text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
           type="button"
           onClick={onClose}
-          title="关闭 (Escape)"
+          title={t("editor:searchReplace.close")}
         >
           <X className="h-4 w-4" />
         </button>
@@ -139,7 +141,7 @@ export function SearchReplaceBar({
       <div className="flex items-center gap-2">
         <input
           className="h-8 w-48 rounded-lg border border-[var(--line)] bg-[var(--field)] px-2 text-sm text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
-          placeholder="替换"
+          placeholder={t("editor:searchReplace.replace")}
           value={replacement}
           onChange={(e) => setReplacement(e.target.value)}
         />
@@ -147,19 +149,19 @@ export function SearchReplaceBar({
           className="inline-flex h-7 items-center gap-1 rounded px-2 text-xs text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
           type="button"
           onClick={handleReplace}
-          title="替换"
+          title={t("editor:searchReplace.replace")}
         >
           <Replace className="h-3.5 w-3.5" />
-          替换
+          {t("editor:searchReplace.replace")}
         </button>
         <button
           className="inline-flex h-7 items-center gap-1 rounded px-2 text-xs text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
           type="button"
           onClick={handleReplaceAll}
-          title="全部替换"
+          title={t("editor:searchReplace.replaceAll")}
         >
           <ReplaceAll className="h-3.5 w-3.5" />
-          全部
+          {t("editor:searchReplace.replaceAll")}
         </button>
       </div>
     </div>

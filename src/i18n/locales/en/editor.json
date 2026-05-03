@@ -1,0 +1,44 @@
+{
+  "searchReplace": {
+    "search": "Search",
+    "replace": "Replace",
+    "replaceAll": "All",
+    "prev": "Previous (Shift+Enter)",
+    "next": "Next (Enter)",
+    "caseSensitive": "Case Sensitive",
+    "close": "Close (Escape)",
+    "noMatch": "No match"
+  },
+  "versionPanel": {
+    "title": "Version History ({{count}})",
+    "searchPlaceholder": "Search versions",
+    "compare": "Compare",
+    "cancel": "Cancel",
+    "selectHint": "1 version selected, please select 1 more to compare",
+    "selectForCompare": "Select to compare",
+    "noVersions": "No versions yet, click \"Save Version\" to create one",
+    "noMatch": "No matching versions",
+    "versionName": "Version name",
+    "versionDesc": "Version description (optional)",
+    "save": "Save",
+    "edit": "Edit",
+    "viewRestore": "View & Restore",
+    "delete": "Delete",
+    "confirmDelete": "Confirm Delete",
+    "justNow": "Just now",
+    "minutesAgo": "{{count}} min ago",
+    "hoursAgo": "{{count}} hours ago",
+    "daysAgo": "{{count}} days ago"
+  },
+  "versionPreview": {
+    "title": "Version Preview — {{name}}",
+    "close": "Close",
+    "restore": "Restore to This Version",
+    "confirmRestore": "Confirm restore to this version?"
+  },
+  "versionDiff": {
+    "title": "Version Comparison",
+    "identical": "Both versions have identical content",
+    "close": "Close"
+  }
+}

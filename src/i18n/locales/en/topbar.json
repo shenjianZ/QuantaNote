@@ -1,0 +1,15 @@
+{
+  "workspace": "Workspace",
+  "library": "Library",
+  "settings": "Settings",
+  "search": "Search",
+  "menu": "Menu",
+  "pin": "Pin Window",
+  "unpin": "Window Pinned, Click to Unpin",
+  "minimize": "Minimize",
+  "maximize": "Fullscreen",
+  "restore": "Restore",
+  "close": "Close",
+  "openWorkspace": "Open Workspace",
+  "openLibrary": "Open Library"
+}

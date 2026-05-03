@@ -12,6 +12,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { open } from "@tauri-apps/plugin-dialog";
 import { MarkdownRenderer } from "../components/common/MarkdownRenderer";
 import { Select } from "../components/common/Select";
@@ -44,12 +45,6 @@ interface LibraryPageProps {
   onPreviewRequestClear?: () => void;
 }
 
-const FILTERS: Array<{ key: TabKey; label: string }> = [
-  { key: "recent", label: "全部" },
-  { key: "pinned", label: "置顶" },
-  { key: "favorite", label: "收藏" },
-];
-
 export function LibraryPage({
   items,
   selectedItem,
@@ -60,6 +55,14 @@ export function LibraryPage({
   onPreviewItemOpen,
   onPreviewRequestClear,
 }: LibraryPageProps) {
+  const { t } = useTranslation(["library", "common"]);
+
+  const FILTERS: Array<{ key: TabKey; label: string }> = [
+    { key: "recent", label: t("library:filter.all") },
+    { key: "pinned", label: t("library:filter.pinned") },
+    { key: "favorite", label: t("library:filter.favorite") },
+  ];
+
   const [query, setQuery] = useState("");
   const [activeTab, setActiveTab] = useState<TabKey>("recent");
   const [activeTag, setActiveTag] = useState("all");
@@ -161,7 +164,7 @@ export function LibraryPage({
         title: result.title,
         summary: result.summary,
         tags: [],
-        time: "搜索结果",
+        time: t("library:searchResult"),
         icon: FileText,
         accent: "cyan",
         createdAt: "",
@@ -187,7 +190,7 @@ export function LibraryPage({
       if (sortOrder === "created") return (b.createdAt || "").localeCompare(a.createdAt || "");
       return 0;
     });
-  }, [activeTab, activeTag, itemTagNames, items, query, searchResults, sortOrder]);
+  }, [activeTab, activeTag, itemTagNames, items, query, searchResults, sortOrder, t]);
 
   async function handleCopy() {
     const selectedContent =
@@ -195,9 +198,9 @@ export function LibraryPage({
     const text = selectedContent || selectedItem.summary || selectedItem.title;
     try {
       await navigator.clipboard.writeText(text);
-      useToastStore.getState().addToast("success", "已复制到剪贴板");
+      useToastStore.getState().addToast("success", t("common:toast.copySuccess"));
     } catch {
-      useToastStore.getState().addToast("error", "复制失败");
+      useToastStore.getState().addToast("error", t("common:toast.copyFailed"));
     }
   }
 
@@ -217,9 +220,9 @@ export function LibraryPage({
       await deleteItem(selectedItem.id);
       setReaderOpen(false);
       onPreviewRequestClear?.();
-      useToastStore.getState().addToast("success", "记录已删除");
+      useToastStore.getState().addToast("success", t("common:toast.deleteSuccess"));
     } catch {
-      useToastStore.getState().addToast("error", "删除失败");
+      useToastStore.getState().addToast("error", t("common:toast.deleteFailed"));
     }
   }
 
@@ -255,8 +258,8 @@ export function LibraryPage({
       <section className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col">
           <div className="mb-4 flex shrink-0 items-center justify-between gap-4">
             <div>
-              <h1 className="app-hero-title text-[var(--text)]">记录库</h1>
-              <p className="mt-1 text-sm text-[var(--muted)]">搜索、查看和管理已经保存的记录。</p>
+              <h1 className="app-hero-title text-[var(--text)]">{t("library:title")}</h1>
+              <p className="mt-1 text-sm text-[var(--muted)]">{t("library:subtitle")}</p>
             </div>
             <button
               className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full bg-[var(--accent)] px-3 text-sm font-medium text-white hover:opacity-90"
@@ -265,7 +268,7 @@ export function LibraryPage({
               onClick={onCreateItem}
             >
               <Edit3 className="h-4 w-4" />
-              新建
+              {t("library:newBtn")}
             </button>
           </div>
           <div className="mb-3 flex items-center gap-2">
@@ -274,11 +277,11 @@ export function LibraryPage({
               <input
                 className="min-w-0 flex-1 bg-transparent text-sm text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
                 value={query}
-                placeholder="搜索记录"
+                placeholder={t("library:searchPlaceholder")}
                 data-testid="library-search-input"
                 onChange={(e) => setQuery(e.currentTarget.value)}
               />
-              {searching && <span className="text-xs">搜索中</span>}
+              {searching && <span className="text-xs">{t("library:searching")}</span>}
             </div>
 
             <details ref={filterDetailsRef} className="relative">
@@ -286,7 +289,7 @@ export function LibraryPage({
                 <SlidersHorizontal className="h-4 w-4" />
               </summary>
               <div className="absolute right-0 top-12 z-20 w-64 rounded-2xl border border-[var(--line)] bg-[var(--popover)] p-4 shadow-2xl" data-testid="library-filter-panel">
-                <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">筛选</div>
+                <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">{t("library:filter.title")}</div>
                 <div className="mb-4 grid grid-cols-3 gap-1 rounded-xl bg-[var(--field)] p-1">
                   {FILTERS.map((filter) => (
                     <button
@@ -300,24 +303,24 @@ export function LibraryPage({
                   ))}
                 </div>
                 <label className="mb-4 block">
-                  <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">排序</span>
+                  <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.sort")}</span>
                   <Select
                     value={sortOrder}
                     onChange={(v) => setSortOrder(v as SortOption)}
                     options={[
-                      { value: "updated", label: "最近更新" },
-                      { value: "created", label: "创建时间" },
-                      { value: "title", label: "标题排序" },
+                      { value: "updated", label: t("library:filter.sortUpdated") },
+                      { value: "created", label: t("library:filter.sortCreated") },
+                      { value: "title", label: t("library:filter.sortTitle") },
                     ]}
                   />
                 </label>
                 <label className="block">
-                  <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">标签</span>
+                  <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.tag")}</span>
                   <Select
                     value={activeTag}
                     onChange={setActiveTag}
                     options={[
-                      { value: "all", label: "全部标签" },
+                      { value: "all", label: t("library:filter.allTags") },
                       ...allTags.map((tag) => ({ value: tag.name, label: tag.name })),
                     ]}
                   />
@@ -335,8 +338,8 @@ export function LibraryPage({
                   <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-full bg-[var(--field)] text-[var(--muted)]">
                     <FileText className="h-5 w-5" />
                   </div>
-                  <div className="text-sm font-medium text-[var(--text)]">还没有可显示的记录</div>
-                  <div className="mt-1 text-sm text-[var(--muted)]">写下第一条，或者换个关键词搜索。</div>
+                  <div className="text-sm font-medium text-[var(--text)]">{t("library:empty.title")}</div>
+                  <div className="mt-1 text-sm text-[var(--muted)]">{t("library:empty.subtitle")}</div>
                 </div>
               </div>
             ) : (
@@ -359,10 +362,10 @@ export function LibraryPage({
                     })()}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <div className="truncate text-sm font-semibold text-[var(--text)]">{item.title || "未命名"}</div>
+                        <div className="truncate text-sm font-semibold text-[var(--text)]">{item.title || t("library:unnamed")}</div>
                         {item.pinned && <Star className="h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />}
                       </div>
-                      <div className="mt-1 line-clamp-2 text-sm leading-relaxed text-[var(--muted)]">{item.summary || "无正文预览"}</div>
+                      <div className="mt-1 line-clamp-2 text-sm leading-relaxed text-[var(--muted)]">{item.summary || t("library:noPreview")}</div>
                       <div className="mt-1.5 min-h-[1.25rem]">
                         {itemTagNames[item.id] && itemTagNames[item.id].length > 0 && (
                           <div className="flex flex-wrap items-center gap-1">
@@ -408,27 +411,27 @@ export function LibraryPage({
                 </div>
               </div>
               <details ref={menuDetailsRef} className="relative shrink-0">
-                <summary className="grid h-8 w-8 cursor-pointer list-none place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)] [&::-webkit-details-marker]:hidden" data-testid="reader-menu-btn" aria-label="更多操作">
+                <summary className="grid h-8 w-8 cursor-pointer list-none place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)] [&::-webkit-details-marker]:hidden" data-testid="reader-menu-btn" aria-label={t("library:reader.moreActions")}>
                   <MoreHorizontal className="h-4 w-4" />
                 </summary>
                 <div className="absolute right-0 top-10 z-40 w-48 overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--popover)] p-1 shadow-xl">
-                  <button className="menu-item" type="button" onClick={() => { handleTogglePin(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Star className="h-4 w-4" />{selectedItem.pinned ? "取消置顶" : "置顶"}</button>
-                  <button className="menu-item" type="button" onClick={() => { handleToggleFavorite(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Star className="h-4 w-4" />{selectedItem.favorite ? "取消收藏" : "收藏"}</button>
-                  <button className="menu-item" type="button" onClick={() => { handleCopy(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Copy className="h-4 w-4" />复制内容</button>
-                  <button className="menu-item" type="button" onClick={() => { handleAddAttachment(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Paperclip className="h-4 w-4" />添加附件</button>
-                  <button className="menu-item" type="button" onClick={() => { onOpenDocument(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Edit3 className="h-4 w-4" />完整编辑</button>
-                  <button className="menu-item text-red-400" type="button" onClick={() => { handleDelete(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Trash2 className="h-4 w-4" />删除</button>
+                  <button className="menu-item" type="button" onClick={() => { handleTogglePin(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Star className="h-4 w-4" />{selectedItem.pinned ? t("library:reader.unpin") : t("library:reader.pin")}</button>
+                  <button className="menu-item" type="button" onClick={() => { handleToggleFavorite(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Star className="h-4 w-4" />{selectedItem.favorite ? t("library:reader.unfavorite") : t("library:reader.favorite")}</button>
+                  <button className="menu-item" type="button" onClick={() => { handleCopy(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Copy className="h-4 w-4" />{t("library:reader.copy")}</button>
+                  <button className="menu-item" type="button" onClick={() => { handleAddAttachment(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Paperclip className="h-4 w-4" />{t("library:reader.addAttachment")}</button>
+                  <button className="menu-item" type="button" onClick={() => { onOpenDocument(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Edit3 className="h-4 w-4" />{t("library:reader.fullEdit")}</button>
+                  <button className="menu-item text-red-400" type="button" onClick={() => { handleDelete(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Trash2 className="h-4 w-4" />{t("library:reader.delete")}</button>
                 </div>
               </details>
-              <button className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="reader-edit-btn" aria-label="编辑当前笔记" onClick={onOpenDocument} title="编辑当前笔记">
+              <button className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="reader-edit-btn" aria-label={t("library:reader.editCurrent")} onClick={onOpenDocument} title={t("library:reader.editCurrent")}>
                 <Edit3 className="h-4 w-4" />
               </button>
-              <button className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="reader-close-btn" aria-label="关闭" onClick={handleCloseReader} title="关闭">
+              <button className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="reader-close-btn" aria-label={t("common:buttons.close")} onClick={handleCloseReader} title={t("common:buttons.close")}>
                 <X className="h-4 w-4" />
               </button>
             </header>
 
-            <div className="min-h-0 flex-1 overflow-auto px-4 py-4" onCopy={() => useToastStore.getState().addToast("success", "已复制到剪贴板")}>
+            <div className="min-h-0 flex-1 overflow-auto px-4 py-4" onCopy={() => useToastStore.getState().addToast("success", t("common:toast.copySuccess"))}>
               <MarkdownRenderer
                 content={previewContent || selectedItem.summary || ""}
                 theme={theme === "light" ? "light" : "dark"}
@@ -449,7 +452,7 @@ export function LibraryPage({
                   onClick={() => setTagModalOpen(true)}
                 >
                   <Tag className="h-3.5 w-3.5" />
-                  标签
+                  {t("library:reader.tags")}
                 </button>
                 <button
                   className="inline-flex items-center gap-1 rounded-full bg-[var(--field)] px-2.5 py-1 text-xs text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
@@ -458,7 +461,7 @@ export function LibraryPage({
                   onClick={() => setAttachmentModalOpen(true)}
                 >
                   <Paperclip className="h-3.5 w-3.5" />
-                  附件{attachments.length > 0 ? ` (${attachments.length})` : ""}
+                  {t("library:reader.attachments")}{attachments.length > 0 ? ` (${attachments.length})` : ""}
                 </button>
               </div>
 

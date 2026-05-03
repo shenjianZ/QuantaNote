@@ -28,12 +28,25 @@ pub struct AttachmentDiffRequest {
     pub hashes: Vec<String>,
 }
 
+/// 推送的记录标识
+#[derive(Debug, Deserialize, Clone)]
+pub struct PushedRecordId {
+    pub record_id: String,
+    pub table_name: String,
+}
+
 /// 提交同步请求
 #[derive(Debug, Deserialize)]
 pub struct CommitSyncRequest {
-    /// 本次推送的 record_id 列表（只关联这些记录到新快照）
+    /// 本次推送的记录列表（只关联这些记录到新快照）
+    #[serde(default)]
+    pub pushed_records: Vec<PushedRecordId>,
+    /// 兼容旧客户端：如果 pushed_records 为空但 pushed_record_ids 不为空，退化为只按 record_id 查询
     #[serde(default)]
     pub pushed_record_ids: Vec<String>,
+    /// true 表示 attachments 是客户端当前完整附件视图，服务端可据此删除缺失的旧附件元数据
+    #[serde(default)]
+    pub attachments_complete: bool,
     #[serde(default)]
     pub attachments: Vec<CommitAttachmentMeta>,
 }

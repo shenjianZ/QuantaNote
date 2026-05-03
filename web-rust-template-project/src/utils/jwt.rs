@@ -71,10 +71,18 @@ impl TokenService {
         refresh_token_expiration_days: i64,
         jwt_secret: &str,
     ) -> Result<(String, String)> {
-        let access_token =
-            Self::generate_access_token(user_id, device_id, access_token_expiration_minutes, jwt_secret)?;
-        let refresh_token =
-            Self::generate_refresh_token(user_id, device_id, refresh_token_expiration_days, jwt_secret)?;
+        let access_token = Self::generate_access_token(
+            user_id,
+            device_id,
+            access_token_expiration_minutes,
+            jwt_secret,
+        )?;
+        let refresh_token = Self::generate_refresh_token(
+            user_id,
+            device_id,
+            refresh_token_expiration_days,
+            jwt_secret,
+        )?;
 
         Ok((access_token, refresh_token))
     }

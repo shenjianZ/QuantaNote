@@ -1,0 +1,40 @@
+{
+  "title": "Library",
+  "subtitle": "Search, view, and manage your saved notes.",
+  "newBtn": "New",
+  "searchPlaceholder": "Search notes",
+  "searching": "Searching",
+  "filter": {
+    "title": "Filter",
+    "all": "All",
+    "pinned": "Pinned",
+    "favorite": "Favorites",
+    "sort": "Sort",
+    "sortUpdated": "Last Updated",
+    "sortCreated": "Created",
+    "sortTitle": "Title",
+    "tag": "Tag",
+    "allTags": "All Tags"
+  },
+  "empty": {
+    "title": "No notes to display",
+    "subtitle": "Write your first note, or try a different search."
+  },
+  "searchResult": "Search Result",
+  "unnamed": "Untitled",
+  "noPreview": "No preview",
+  "reader": {
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "favorite": "Favorite",
+    "unfavorite": "Unfavorite",
+    "copy": "Copy Content",
+    "addAttachment": "Add Attachment",
+    "fullEdit": "Full Edit",
+    "delete": "Delete",
+    "tags": "Tags",
+    "attachments": "Attachments",
+    "editCurrent": "Edit Current Note",
+    "moreActions": "More Actions"
+  }
+}

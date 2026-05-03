@@ -5,7 +5,6 @@ import {
     Download,
     FileText,
     Globe2,
-    Keyboard,
     Laptop,
     Moon,
     Palette,
@@ -16,6 +15,7 @@ import {
     X,
 } from "lucide-react";
 import { openPath } from "@tauri-apps/plugin-opener";
+import { useTranslation } from "react-i18next";
 import type { ThemeMode } from "../hooks/useTheme";
 import { BackupManagerModal } from "../components/common/BackupManagerModal";
 import { ColorPickerModal } from "../components/common/ColorPickerModal";
@@ -26,38 +26,30 @@ import { SyncSettingsPanel } from "../components/sync/SyncSettingsPanel";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useToastStore } from "../stores/toastStore";
 
-const settingsMenu = [
-    { icon: Palette, label: "外观" },
-    { icon: Keyboard, label: "字体" },
-    { icon: Database, label: "数据" },
-    { icon: Cloud, label: "同步" },
-    { icon: Globe2, label: "关于" },
-];
-
-const FONT_OPTIONS = [
+const FONT_OPTIONS_KEYS = [
     { value: "Noto Sans SC", label: "Noto Sans SC" },
-    { value: "system-ui", label: "系统默认" },
+    { value: "system-ui", labelKey: "settings:font.systemDefault" },
 ];
 
-const MONO_OPTIONS = [
+const MONO_OPTIONS_KEYS = [
     { value: "JetBrains Mono", label: "JetBrains Mono" },
     { value: "Consolas", label: "Consolas" },
-    { value: "monospace", label: "系统等宽" },
+    { value: "monospace", labelKey: "settings:font.systemMono" },
 ];
 
-const ACCENT_COLORS = [
-    { value: "#386c5f", label: "松绿" },
-    { value: "#2563eb", label: "蓝色" },
-    { value: "#7c3aed", label: "紫色" },
-    { value: "#c47b12", label: "琥珀" },
-    { value: "#b64242", label: "红色" },
-    { value: "#0891b2", label: "青色" },
-    { value: "#059669", label: "翠绿" },
-    { value: "#d97706", label: "橙色" },
-    { value: "#e11d48", label: "玫红" },
-    { value: "#6366f1", label: "靛蓝" },
-    { value: "#8b5cf6", label: "紫罗兰" },
-    { value: "#64748b", label: "石板灰" },
+const ACCENT_COLOR_KEYS = [
+    { value: "#386c5f", labelKey: "settings:appearance.colors.green" },
+    { value: "#2563eb", labelKey: "settings:appearance.colors.blue" },
+    { value: "#7c3aed", labelKey: "settings:appearance.colors.purple" },
+    { value: "#c47b12", labelKey: "settings:appearance.colors.amber" },
+    { value: "#b64242", labelKey: "settings:appearance.colors.red" },
+    { value: "#0891b2", labelKey: "settings:appearance.colors.cyan" },
+    { value: "#059669", labelKey: "settings:appearance.colors.emerald" },
+    { value: "#d97706", labelKey: "settings:appearance.colors.orange" },
+    { value: "#e11d48", labelKey: "settings:appearance.colors.rose" },
+    { value: "#6366f1", labelKey: "settings:appearance.colors.indigo" },
+    { value: "#8b5cf6", labelKey: "settings:appearance.colors.violet" },
+    { value: "#64748b", labelKey: "settings:appearance.colors.slate" },
 ];
 
 interface SettingsPageProps {
@@ -73,6 +65,7 @@ export function SettingsPage({
     theme = "system",
     onThemeChange,
 }: SettingsPageProps) {
+    const { t } = useTranslation(["settings", "common"]);
     const [activeSection, setActiveSection] = useState(0);
     const [colorPickerOpen, setColorPickerOpen] = useState(false);
     const [exportModalOpen, setExportModalOpen] = useState(false);
@@ -125,30 +118,38 @@ export function SettingsPage({
         );
     }
 
+    const settingsMenu = [
+        { label: t("settings:menu.appearance"), icon: Palette },
+        { label: t("settings:menu.font"), icon: Globe2 },
+        { label: t("settings:menu.data"), icon: Database },
+        { label: t("settings:menu.sync"), icon: Cloud },
+        { label: t("settings:menu.about"), icon: Settings2 },
+    ];
+
     function renderSection() {
         if (activeSection === 0) {
             return (
                 <>
                     <section className="mb-6">
                         <h2 className="mb-3 text-sm font-semibold text-[var(--text)]">
-                            外观主题
+                            {t("settings:appearance.theme")}
                         </h2>
                         <div className="flex flex-wrap gap-2">
                             {[
                                 {
                                     value: "system" as ThemeMode,
                                     icon: Laptop,
-                                    label: "跟随系统",
+                                    label: t("settings:appearance.system"),
                                 },
                                 {
                                     value: "light" as ThemeMode,
                                     icon: Sun,
-                                    label: "浅色",
+                                    label: t("settings:appearance.light"),
                                 },
                                 {
                                     value: "dark" as ThemeMode,
                                     icon: Moon,
-                                    label: "深色",
+                                    label: t("settings:appearance.dark"),
                                 },
                             ].map((opt) => {
                                 const Icon = opt.icon;
@@ -174,17 +175,17 @@ export function SettingsPage({
                     </section>
                     <section className="mb-6">
                         <h2 className="mb-3 text-sm font-semibold text-[var(--text)]">
-                            强调色
+                            {t("settings:appearance.accentColor")}
                         </h2>
-                        <div className="mb-1.5 text-xs font-medium text-[var(--muted)]">预定义</div>
+                        <div className="mb-1.5 text-xs font-medium text-[var(--muted)]">{t("settings:appearance.predefined")}</div>
                         <div className="mb-4 flex flex-wrap gap-2.5">
-                            {ACCENT_COLORS.map((c) => (
+                            {ACCENT_COLOR_KEYS.map((c) => (
                                 <button
                                     className={`h-7 w-7 rounded-full border border-[var(--line)] transition-transform hover:scale-110 ${c.value === settings.accentColor ? "outline outline-2 outline-offset-2 outline-[var(--accent)]" : ""}`}
                                     key={c.value}
                                     data-testid="accent-color"
                                     style={{ background: c.value }}
-                                    title={c.label}
+                                    title={t(c.labelKey)}
                                     type="button"
                                     onClick={() =>
                                         updateSetting("accentColor", c.value)
@@ -192,7 +193,7 @@ export function SettingsPage({
                                 />
                             ))}
                         </div>
-                        <div className="mb-1.5 text-xs font-medium text-[var(--muted)]">自定义</div>
+                        <div className="mb-1.5 text-xs font-medium text-[var(--muted)]">{t("settings:appearance.custom")}</div>
                         <div className="flex flex-wrap items-center gap-2.5">
                             {settings.customAccentColors.map((c) => (
                                 <div className="group relative" key={c.hex}>
@@ -220,7 +221,7 @@ export function SettingsPage({
                             <button
                                 type="button"
                                 className="flex h-7 w-7 items-center justify-center rounded-full border border-dashed border-[var(--line)] text-[var(--muted)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
-                                title="添加自定义颜色"
+                                title={t("settings:appearance.addCustomColor")}
                                 onClick={() => setColorPickerOpen(true)}
                             >
                                 <span className="text-sm leading-none">+</span>
@@ -238,18 +239,18 @@ export function SettingsPage({
                     </section>
                     <section>
                         <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">
-                            窗口行为
+                            {t("settings:appearance.windowBehavior")}
                         </h2>
                         {[
                             {
                                 key: "minimizeToTray" as const,
-                                label: "最小化到系统托盘",
-                                desc: "点击最小化按钮时，将窗口隐藏到托盘",
+                                label: t("settings:appearance.minimizeToTray"),
+                                desc: t("settings:appearance.minimizeToTrayDesc"),
                             },
                             {
                                 key: "closeKeepRunning" as const,
-                                label: "关闭窗口时隐藏到托盘",
-                                desc: "点击关闭按钮时，不退出应用，而是隐藏到托盘",
+                                label: t("settings:appearance.closeKeepRunning"),
+                                desc: t("settings:appearance.closeKeepRunningDesc"),
                             },
                         ].map((item) => (
                             <div className={rowClass} key={item.key}>
@@ -269,15 +270,39 @@ export function SettingsPage({
                     </section>
                     <section>
                         <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">
-                            系统
+                            {t("settings:appearance.systemSection")}
                         </h2>
                         <div className={rowClass}>
                             <span className="text-sm text-[var(--text)]">
-                                开机自动启动
+                                {t("settings:appearance.autostart")}
                             </span>
                             {renderToggle(settings.autostart, (v) =>
                                 updateSetting("autostart", v),
                             )}
+                        </div>
+                    </section>
+                    <section>
+                        <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">
+                            {t("settings:data.locale")}
+                        </h2>
+                        <div className={rowClass}>
+                            <div>
+                                <span className="text-sm text-[var(--text)]">
+                                    {t("settings:data.locale")}
+                                </span>
+                                <div className="mt-0.5 text-xs text-[var(--muted)]">
+                                    {t("settings:data.localeDesc")}
+                                </div>
+                            </div>
+                            <Select
+                                className="w-36"
+                                options={[
+                                    { value: "zh-CN", label: t("settings:localeOptions.zh-CN") },
+                                    { value: "en", label: t("settings:localeOptions.en") },
+                                ]}
+                                value={settings.locale}
+                                onChange={(v) => updateSetting("locale", v as "zh-CN" | "en")}
+                            />
                         </div>
                     </section>
                 </>
@@ -289,26 +314,26 @@ export function SettingsPage({
                 <>
                     <section className="mb-6">
                         <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">
-                            字体
+                            {t("settings:font.title")}
                         </h2>
                         <div className={rowClass}>
                             <span className="text-sm text-[var(--text)]">
-                                界面字体
+                                {t("settings:font.uiFont")}
                             </span>
                             <Select
                                 className="w-48"
-                                options={FONT_OPTIONS}
+                                options={FONT_OPTIONS_KEYS.map(o => ({ value: o.value, label: o.label ?? t(o.labelKey!) }))}
                                 value={settings.fontFamily}
                                 onChange={(v) => updateSetting("fontFamily", v)}
                             />
                         </div>
                         <div className={rowClass}>
                             <span className="text-sm text-[var(--text)]">
-                                等宽字体
+                                {t("settings:font.monoFont")}
                             </span>
                             <Select
                                 className="w-48"
-                                options={MONO_OPTIONS}
+                                options={MONO_OPTIONS_KEYS.map(o => ({ value: o.value, label: o.label ?? t(o.labelKey!) }))}
                                 value={settings.fontMono}
                                 onChange={(v) => updateSetting("fontMono", v)}
                             />
@@ -316,11 +341,11 @@ export function SettingsPage({
                     </section>
                     <section>
                         <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">
-                            字号
+                            {t("settings:font.fontSize")}
                         </h2>
                         <div className={rowClass}>
                             <span className="text-sm text-[var(--text)]">
-                                界面字号
+                                {t("settings:font.uiFontSize")}
                             </span>
                             <Select
                                 className="w-24"
@@ -336,7 +361,7 @@ export function SettingsPage({
                             />
                         </div>
                         <div className="mt-4 rounded-2xl bg-[var(--field)] p-4 text-sm text-[var(--text)]">
-                            这是一段预览文字 The quick brown fox
+                            {t("settings:font.preview")}
                         </div>
                     </section>
                 </>
@@ -348,15 +373,15 @@ export function SettingsPage({
                 <>
                     <section className="mb-6">
                         <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">
-                            自动备份
+                            {t("settings:data.autoBackup")}
                         </h2>
                         <div className={rowClass}>
                             <div>
                                 <span className="text-sm text-[var(--text)]">
-                                    启用自动备份
+                                    {t("settings:data.enableAutoBackup")}
                                 </span>
                                 <div className="mt-0.5 text-xs text-[var(--muted)]">
-                                    定时在后台创建 ZIP 备份
+                                    {t("settings:data.enableAutoBackupDesc")}
                                 </div>
                             </div>
                             {renderToggle(autoBackupConfig?.enabled ?? false, (v) => {
@@ -369,7 +394,7 @@ export function SettingsPage({
                             <>
                                 <div className={rowClass}>
                                     <span className="text-sm text-[var(--text)]">
-                                        备份间隔
+                                        {t("settings:data.backupInterval")}
                                     </span>
                                     <div className="flex items-center gap-2">
                                         <Select
@@ -386,12 +411,12 @@ export function SettingsPage({
                                                 })
                                             }
                                         />
-                                        <span className="text-sm text-[var(--muted)]">天</span>
+                                        <span className="text-sm text-[var(--muted)]">{t("settings:data.days")}</span>
                                     </div>
                                 </div>
                                 <div className={rowClass}>
                                     <span className="text-sm text-[var(--text)]">
-                                        最多保留
+                                        {t("settings:data.maxBackups")}
                                     </span>
                                     <div className="flex items-center gap-2">
                                         <Select
@@ -408,12 +433,12 @@ export function SettingsPage({
                                                 })
                                             }
                                         />
-                                        <span className="text-sm text-[var(--muted)]">个备份</span>
+                                        <span className="text-sm text-[var(--muted)]">{t("settings:data.backupsUnit")}</span>
                                     </div>
                                 </div>
                                 <div className={rowClass}>
                                     <span className="text-sm text-[var(--text)]">
-                                        过期时长
+                                        {t("settings:data.expireDays")}
                                     </span>
                                     <div className="flex items-center gap-2">
                                         <Select
@@ -430,27 +455,27 @@ export function SettingsPage({
                                                 })
                                             }
                                         />
-                                        <span className="text-sm text-[var(--muted)]">天</span>
+                                        <span className="text-sm text-[var(--muted)]">{t("settings:data.days")}</span>
                                     </div>
                                 </div>
                             </>
                         )}
                         <div className={rowClass}>
                             <span className="text-sm text-[var(--text)]">
-                                备份目录
+                                {t("settings:data.backupDir")}
                             </span>
                             <span className="max-w-[60%] truncate text-sm text-[var(--muted)]">
-                                {backupDirPath || "加载中..."}
+                                {backupDirPath || t("common:buttons.loading")}
                             </span>
                         </div>
                         <div className={rowClass}>
                             <span className="text-sm text-[var(--text)]">
-                                上次备份
+                                {t("settings:data.lastBackup")}
                             </span>
                             <span className="text-sm text-[var(--muted)]">
                                 {autoBackupConfig?.last_backup_at
                                     ? new Date(autoBackupConfig.last_backup_at).toLocaleString()
-                                    : "从未备份"}
+                                    : t("settings:data.neverBackup")}
                             </span>
                         </div>
                         <div className="mt-3 flex gap-2">
@@ -459,7 +484,7 @@ export function SettingsPage({
                                 type="button"
                                 onClick={() => triggerBackupNow()}
                             >
-                                立即备份
+                                {t("settings:data.backupNow")}
                             </button>
                             <button
                                 className="inline-flex items-center gap-2 rounded-full bg-[var(--field)] px-4 py-2 text-sm hover:bg-[var(--hover)]"
@@ -467,7 +492,7 @@ export function SettingsPage({
                                 onClick={() => setBackupManagerOpen(true)}
                             >
                                 <Settings2 className="h-4 w-4" />
-                                备份管理
+                                {t("settings:data.backupManager")}
                             </button>
                             <BackupManagerModal
                                 open={backupManagerOpen}
@@ -477,10 +502,10 @@ export function SettingsPage({
                     </section>
                     <section className="mb-6">
                         <h2 className="mb-2 text-sm font-semibold text-[var(--text)]">
-                            导入导出
+                            {t("settings:data.importExport")}
                         </h2>
                         <div className="mb-3 text-sm text-[var(--muted)]">
-                            导出为 ZIP 格式，可选择包含标签、附件和版本历史。
+                            {t("settings:data.importExportDesc")}
                         </div>
                         <div className="flex gap-2">
                             <button
@@ -489,7 +514,7 @@ export function SettingsPage({
                                 onClick={() => setExportModalOpen(true)}
                             >
                                 <Download className="h-4 w-4" />
-                                导出
+                                {t("settings:data.export")}
                             </button>
                             <button
                                 className="inline-flex items-center gap-2 rounded-full bg-[var(--field)] px-3 py-2 text-sm hover:bg-[var(--hover)]"
@@ -497,7 +522,7 @@ export function SettingsPage({
                                 onClick={() => setImportModalOpen(true)}
                             >
                                 <Upload className="h-4 w-4" />
-                                导入
+                                {t("settings:data.import")}
                             </button>
                         </div>
                         <ExportModal
@@ -511,11 +536,11 @@ export function SettingsPage({
                     </section>
                     <section>
                         <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">
-                            数据库
+                            {t("settings:data.database")}
                         </h2>
                         <div className={rowClass}>
                             <span className="text-sm text-[var(--text)]">
-                                数据库大小
+                                {t("settings:data.dbSize")}
                             </span>
                             <span className="text-sm text-[var(--muted)]">
                                 {dbSize}
@@ -523,7 +548,7 @@ export function SettingsPage({
                         </div>
                         <div className={rowClass}>
                             <span className="text-sm text-[var(--text)]">
-                                存储位置
+                                {t("settings:data.dbPath")}
                             </span>
                             <button
                                 className="max-w-[60%] truncate rounded-full bg-[var(--field)] px-3 py-1.5 text-sm text-[var(--muted)] hover:bg-[var(--hover)]"
@@ -538,26 +563,25 @@ export function SettingsPage({
                                             .getState()
                                             .addToast(
                                                 "success",
-                                                "路径已复制到剪贴板",
+                                                t("common:toast.pathCopied"),
                                             );
                                     } catch {
                                         useToastStore
                                             .getState()
-                                            .addToast("error", "复制失败");
+                                            .addToast("error", t("common:toast.copyFailed"));
                                     }
                                 }}
                             >
-                                {dbPath || "加载中..."}
+                                {dbPath || t("common:buttons.loading")}
                             </button>
                         </div>
                         <div className={rowClass}>
                             <div>
                                 <span className="text-sm text-[var(--text)]">
-                                    优化
+                                    {t("settings:data.optimize")}
                                 </span>
                                 <div className="mt-1 text-xs text-[var(--muted)]">
-                                    回收未使用空间并重建全文索引（VACUUM + FTS
-                                    rebuild）
+                                    {t("settings:data.optimizeDesc")}
                                 </div>
                             </div>
                             <button
@@ -566,21 +590,21 @@ export function SettingsPage({
                                 data-testid="optimize-db-btn"
                                 onClick={() => optimizeDb()}
                             >
-                                优化与清理
+                                {t("settings:data.optimizeBtn")}
                             </button>
                         </div>
                     </section>
                     <section className="mt-6">
                         <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">
-                            诊断日志
+                            {t("settings:data.diagnostics")}
                         </h2>
                         <div className={rowClass}>
                             <div>
                                 <span className="text-sm text-[var(--text)]">
-                                    SQL 日志
+                                    {t("settings:data.sqlLog")}
                                 </span>
                                 <div className="mt-1 text-xs text-[var(--muted)]">
-                                    仅用于排查问题，可能包含笔记内容、搜索词和文件路径
+                                    {t("settings:data.sqlLogDesc")}
                                 </div>
                             </div>
                             {renderToggle(settings.sqlLogging.enabled, (v) =>
@@ -589,7 +613,7 @@ export function SettingsPage({
                         </div>
                         <div className={rowClass}>
                             <span className="text-sm text-[var(--text)]">
-                                输出到控制台
+                                {t("settings:data.outputToConsole")}
                             </span>
                             {renderToggle(settings.sqlLogging.toConsole, (v) =>
                                 updateSqlLogging({ toConsole: v }),
@@ -597,7 +621,7 @@ export function SettingsPage({
                         </div>
                         <div className={rowClass}>
                             <span className="text-sm text-[var(--text)]">
-                                输出到 SQL 日志文件
+                                {t("settings:data.outputToFile")}
                             </span>
                             {renderToggle(settings.sqlLogging.toFile, (v) =>
                                 updateSqlLogging({ toFile: v }),
@@ -605,7 +629,7 @@ export function SettingsPage({
                         </div>
                         <div className={rowClass}>
                             <span className="text-sm text-[var(--text)]">
-                                格式化 SQL
+                                {t("settings:data.formatSql")}
                             </span>
                             {renderToggle(settings.sqlLogging.pretty, (v) =>
                                 updateSqlLogging({ pretty: v }),
@@ -613,7 +637,7 @@ export function SettingsPage({
                         </div>
                         <div className={rowClass}>
                             <span className="text-sm text-[var(--text)]">
-                                单条最大长度
+                                {t("settings:data.maxLen")}
                             </span>
                             <Select
                                 className="w-28"
@@ -629,7 +653,7 @@ export function SettingsPage({
                         </div>
                         <div className={rowClass}>
                             <span className="text-sm text-[var(--text)]">
-                                SQL 日志文件
+                                {t("settings:data.sqlLogFile")}
                             </span>
                             <button
                                 className="max-w-[60%] truncate rounded-full bg-[var(--field)] px-3 py-1.5 text-sm text-[var(--muted)] hover:bg-[var(--hover)]"
@@ -640,15 +664,15 @@ export function SettingsPage({
                                         await navigator.clipboard.writeText(sqlLogPath);
                                         useToastStore
                                             .getState()
-                                            .addToast("success", "SQL 日志路径已复制");
+                                            .addToast("success", t("common:toast.sqlLogPathCopied"));
                                     } catch {
                                         useToastStore
                                             .getState()
-                                            .addToast("error", "复制失败");
+                                            .addToast("error", t("common:toast.copyFailed"));
                                     }
                                 }}
                             >
-                                {sqlLogPath || "加载中..."}
+                                {sqlLogPath || t("common:buttons.loading")}
                             </button>
                         </div>
                         <div className="mt-3 flex flex-wrap gap-2">
@@ -658,7 +682,7 @@ export function SettingsPage({
                                 onClick={() => logDir && openPath(logDir)}
                             >
                                 <FileText className="h-4 w-4" />
-                                打开日志目录
+                                {t("settings:data.openLogDir")}
                             </button>
                             <button
                                 className="inline-flex items-center gap-2 rounded-full bg-[var(--field)] px-4 py-2 text-sm hover:bg-[var(--hover)]"
@@ -666,7 +690,7 @@ export function SettingsPage({
                                 onClick={() => clearSqlLogFile()}
                             >
                                 <Trash2 className="h-4 w-4" />
-                                清空 SQL 日志
+                                {t("settings:data.clearSqlLog")}
                             </button>
                         </div>
                     </section>
@@ -678,7 +702,7 @@ export function SettingsPage({
             return (
                 <section>
                     <h2 className="mb-3 text-sm font-semibold text-[var(--text)]">
-                        数据同步
+                        {t("settings:data.syncTitle")}
                     </h2>
                     <SyncSettingsPanel />
                 </section>
@@ -692,12 +716,12 @@ export function SettingsPage({
                     <span className="inline-block rounded-md bg-[var(--accent-soft)] px-2.5 py-1 text-[var(--accent)]">v0.1.0</span>
                 </h2>
                 <div className="mb-4 text-sm text-[var(--muted)]">
-                    本地优先的笔记管理工具
+                    {t("settings:about.description")}
                 </div>
                 <div className="space-y-2 text-sm text-[var(--muted)]">
-                    <div>作者：shenjianZ</div>
-                    <div>技术栈：Tauri 2 + React 19 + Rust + SQLite</div>
-                    <div>搜索引擎：SQLite FTS5 全文搜索</div>
+                    <div>{t("settings:about.author")}</div>
+                    <div>{t("settings:about.techStack")}</div>
+                    <div>{t("settings:about.searchEngine")}</div>
                 </div>
                 <div className="mt-5 flex flex-wrap gap-2">
                     <a
@@ -706,7 +730,7 @@ export function SettingsPage({
                         target="_blank"
                         rel="noopener noreferrer"
                     >
-                        GitHub 仓库
+                        {t("settings:about.github")}
                     </a>
                     <a
                         className="inline-flex items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--field)] px-3 py-1.5 text-sm text-[var(--text)] hover:bg-[var(--hover)]"
@@ -714,7 +738,7 @@ export function SettingsPage({
                         target="_blank"
                         rel="noopener noreferrer"
                     >
-                        使用文档
+                        {t("settings:about.docs")}
                     </a>
                     <a
                         className="inline-flex items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--field)] px-3 py-1.5 text-sm text-[var(--text)] hover:bg-[var(--hover)]"
@@ -722,7 +746,7 @@ export function SettingsPage({
                         target="_blank"
                         rel="noopener noreferrer"
                     >
-                        反馈问题
+                        {t("settings:about.feedback")}
                     </a>
                 </div>
             </section>
@@ -731,7 +755,7 @@ export function SettingsPage({
 
     return (
         <div className="flex h-full min-h-0 gap-3 bg-[var(--app-bg)] p-4">
-            <nav className="w-28 shrink-0 space-y-1">
+            <nav className="w-36 shrink-0 space-y-1">
                 {settingsMenu.map((item, index) => {
                     const Icon = item.icon;
                     return (

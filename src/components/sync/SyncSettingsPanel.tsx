@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
     Cloud,
     CloudOff,
@@ -23,6 +24,7 @@ import { ConflictResolutionModal } from "./ConflictResolutionModal";
 type AuthModal = "login" | "register" | "forgot" | "reset" | null;
 
 export function SyncSettingsPanel() {
+    const { t } = useTranslation(["sync", "common"]);
     const {
         config,
         state,
@@ -100,10 +102,10 @@ export function SyncSettingsPanel() {
             <div className="flex items-center justify-between">
                 <div>
                     <div className="text-sm font-medium text-[var(--text)]">
-                        启用同步
+                        {t("enableSync")}
                     </div>
                     <div className="text-xs text-[var(--muted)]">
-                        开启后可将数据同步到远程服务器
+                        {t("enableSyncDesc")}
                     </div>
                 </div>
                 <label className="relative inline-flex cursor-pointer items-center">
@@ -122,7 +124,7 @@ export function SyncSettingsPanel() {
             {/* 服务器地址 */}
             <div className="space-y-2">
                 <label className="text-sm font-medium text-[var(--text)]">
-                    服务器地址
+                    {t("serverUrl")}
                 </label>
                 <div className="flex gap-2">
                     <input
@@ -143,7 +145,7 @@ export function SyncSettingsPanel() {
                         ) : (
                             <RefreshCw className="h-3.5 w-3.5" />
                         )}
-                        测试
+                        {t("testBtn")}
                     </button>
                 </div>
                 {testResult !== null && (
@@ -155,7 +157,7 @@ export function SyncSettingsPanel() {
                         ) : (
                             <AlertCircle className="h-3.5 w-3.5" />
                         )}
-                        {testResult ? "连接成功" : "连接失败"}
+                        {testResult ? t("testSuccess") : t("testFailed")}
                     </div>
                 )}
             </div>
@@ -163,14 +165,14 @@ export function SyncSettingsPanel() {
             {/* 账号状态 */}
             <div className="space-y-2">
                 <label className="text-sm font-medium text-[var(--text)]">
-                    账号
+                    {t("account")}
                 </label>
                 {isLoggedIn ? (
                     <div className="flex items-center justify-between rounded-xl bg-[var(--field)] px-4 py-3">
                         <div className="flex items-center gap-2">
                             <Cloud className="h-4 w-4 text-[var(--accent)]" />
                             <span className="text-sm text-[var(--text)]">
-                                已登录
+                                {t("loggedIn")}
                             </span>
                         </div>
                         <button
@@ -178,7 +180,7 @@ export function SyncSettingsPanel() {
                             className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-500/10"
                         >
                             <LogOut className="h-3.5 w-3.5" />
-                            注销
+                            {t("logout")}
                         </button>
                     </div>
                 ) : (
@@ -188,14 +190,14 @@ export function SyncSettingsPanel() {
                             className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white hover:opacity-90"
                         >
                             <LogIn className="h-4 w-4" />
-                            登录
+                            {t("login")}
                         </button>
                         <button
                             onClick={() => setAuthModal("register")}
                             className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-[var(--line)] px-4 py-2.5 text-sm text-[var(--text)] hover:bg-[var(--hover)]"
                         >
                             <UserPlus className="h-4 w-4" />
-                            注册
+                            {t("register")}
                         </button>
                     </div>
                 )}
@@ -206,11 +208,11 @@ export function SyncSettingsPanel() {
                 <>
                     <div className="space-y-3">
                         <label className="text-sm font-medium text-[var(--text)]">
-                            同步策略
+                            {t("syncStrategy")}
                         </label>
                         <div className="flex items-center justify-between">
                             <span className="text-xs text-[var(--muted)]">
-                                自动同步
+                                {t("autoSync")}
                             </span>
                             <label className="relative inline-flex cursor-pointer items-center">
                                 <input
@@ -229,7 +231,7 @@ export function SyncSettingsPanel() {
                         {config.auto_sync && (
                             <div className="flex items-center justify-between">
                                 <span className="text-xs text-[var(--muted)]">
-                                    同步间隔（分钟）
+                                    {t("syncInterval")}
                                 </span>
                                 <input
                                     type="number"
@@ -250,7 +252,7 @@ export function SyncSettingsPanel() {
                         )}
                         <div className="flex items-center justify-between">
                             <span className="text-xs text-[var(--muted)]">
-                                同步附件
+                                {t("syncAttachments")}
                             </span>
                             <label className="relative inline-flex cursor-pointer items-center">
                                 <input
@@ -268,7 +270,7 @@ export function SyncSettingsPanel() {
                         </div>
                         <div className="flex items-center justify-between">
                             <span className="text-xs text-[var(--muted)]">
-                                冲突解决策略
+                                {t("conflictResolution")}
                             </span>
                             <select
                                 value={config.conflict_resolution}
@@ -279,10 +281,10 @@ export function SyncSettingsPanel() {
                                 }
                                 className="rounded-lg border border-[var(--line)] bg-[var(--field)] px-2.5 py-1.5 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
                             >
-                                <option value="auto">自动（最新优先）</option>
-                                <option value="local-wins">本地优先</option>
-                                <option value="remote-wins">远端优先</option>
-                                <option value="manual">手动选择</option>
+                                <option value="auto">{t("conflictAuto")}</option>
+                                <option value="local-wins">{t("conflictLocal")}</option>
+                                <option value="remote-wins">{t("conflictRemote")}</option>
+                                <option value="manual">{t("conflictManual")}</option>
                             </select>
                         </div>
                     </div>
@@ -290,14 +292,14 @@ export function SyncSettingsPanel() {
                     {/* 待解决冲突提示 */}
                     {pendingConflicts && pendingConflicts.length > 0 && (
                         <div className="rounded-xl bg-amber-500/10 px-4 py-3 text-xs text-amber-300">
-                            有 {pendingConflicts.length} 条同步冲突等待解决，请在弹出的对话框中选择处理方式。
+                            {t("pendingConflicts", { count: pendingConflicts.length })}
                         </div>
                     )}
 
                     {/* 同步状态 */}
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-[var(--text)]">
-                            同步状态
+                            {t("syncStatus")}
                         </label>
                         <div className="rounded-xl bg-[var(--field)] px-4 py-3">
                             <div className="flex items-center justify-between">
@@ -311,12 +313,12 @@ export function SyncSettingsPanel() {
                                     )}
                                     <span className="text-sm text-[var(--text)]">
                                         {isSyncing
-                                            ? `同步中${state.progress ? `: ${state.progress.phase}` : ""}`
+                                            ? `${t("syncing")}${state.progress ? `: ${state.progress.phase}` : ""}`
                                             : state.status === "completed"
-                                              ? "同步完成"
+                                              ? t("syncCompleted")
                                               : state.status === "error"
-                                                ? "同步错误"
-                                                : "空闲"}
+                                                ? t("syncError")
+                                                : t("idle")}
                                     </span>
                                 </div>
                                 <button
@@ -329,7 +331,7 @@ export function SyncSettingsPanel() {
                                     ) : (
                                         <RefreshCw className="h-3.5 w-3.5" />
                                     )}
-                                    {isSyncing ? "同步中..." : "立即同步"}
+                                    {isSyncing ? t("syncingBtn") : t("syncNow")}
                                 </button>
                             </div>
                             {state.progress && isSyncing && (
@@ -350,10 +352,9 @@ export function SyncSettingsPanel() {
                             )}
                             {(state.last_sync_at || config.last_sync_at) && !isSyncing && (
                                 <div className="mt-1.5 text-xs text-[var(--muted)]">
-                                    上次同步:{" "}
-                                    {new Date(
+                                    {t("lastSync", { time: new Date(
                                         state.last_sync_at || config.last_sync_at!,
-                                    ).toLocaleString()}
+                                    ).toLocaleString() })}
                                 </div>
                             )}
                             {state.last_error && state.status === "error" && (
@@ -370,10 +371,10 @@ export function SyncSettingsPanel() {
                             <div className="flex items-center gap-2">
                                 <History className="h-4 w-4 text-[var(--muted)]" />
                                 <label className="text-sm font-medium text-[var(--text)]">
-                                    同步历史
+                                    {t("syncHistory")}
                                 </label>
                                 <span className="text-xs text-[var(--muted)]">
-                                    共 {historyTotal} 条
+                                    {t("totalRecords", { count: historyTotal })}
                                 </span>
                             </div>
                             <div className="max-h-60 space-y-1 overflow-auto">
@@ -388,7 +389,7 @@ export function SyncSettingsPanel() {
                                             ).toLocaleString()}
                                         </span>
                                         <span className="text-[var(--text)]">
-                                            {entry.record_count} 条记录
+                                            {t("recordCount", { count: entry.record_count })}
                                         </span>
                                     </div>
                                 ))}
@@ -402,7 +403,7 @@ export function SyncSettingsPanel() {
                                         className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)] disabled:opacity-30 disabled:cursor-not-allowed"
                                     >
                                         <ChevronLeft className="h-3.5 w-3.5" />
-                                        上一页
+                                        {t("prevPage")}
                                     </button>
                                     <span className="text-xs text-[var(--muted)]">
                                         {historyPage} / {Math.ceil(historyTotal / historyPageSize)}
@@ -412,7 +413,7 @@ export function SyncSettingsPanel() {
                                         disabled={historyPage >= Math.ceil(historyTotal / historyPageSize)}
                                         className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)] disabled:opacity-30 disabled:cursor-not-allowed"
                                     >
-                                        下一页
+                                        {t("nextPage")}
                                         <ChevronRight className="h-3.5 w-3.5" />
                                     </button>
                                 </div>

@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { AlertTriangle, RotateCcw } from "lucide-react";
+import i18n from "../../i18n";
 
 interface Props {
   children: ReactNode;
@@ -37,10 +38,10 @@ export class ErrorBoundary extends Component<Props, State> {
               <AlertTriangle className="h-8 w-8" />
             </div>
             <h1 className="text-lg font-semibold text-[var(--text)]">
-              应用出现了问题
+              {i18n.t("common:error.appError")}
             </h1>
             <p className="mt-2 text-sm text-[var(--muted)]">
-              {this.state.error?.message || "渲染过程中发生未知错误"}
+              {this.state.error?.message || i18n.t("common:error.unknownError")}
             </p>
             <button
               className="mt-6 inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
@@ -48,7 +49,7 @@ export class ErrorBoundary extends Component<Props, State> {
               onClick={this.handleReset}
             >
               <RotateCcw className="h-4 w-4" />
-              重新加载
+              {i18n.t("common:buttons.retry")}
             </button>
           </div>
         </div>

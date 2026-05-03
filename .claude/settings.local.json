@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo check *)",
+      "Bash(pnpm build *)",
+      "Bash(npm list *)",
+      "Bash(npm install *)",
+      "Bash(node compile.js)",
+      "Bash(node -e \"const pptxgen = require\\('pptxgenjs'\\); console.log\\('pptxgenjs loaded successfully'\\);\")",
+      "Bash(powershell -Command \"cd D:\\\\rustproject\\\\QuantaNote\\\\slides; node compile.js\")",
+      "Bash(npm init *)",
+      "Bash(node compile.cjs)",
+      "Bash(cargo test *)",
+      "Bash(git check-ignore *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git checkout *)",
+      "Bash(git push *)",
+      "Bash(gh pr create --title 'feat: 同步模块增强 — 消除编译警告、分页历史、token 过期处理、冲突解决' --body ' *)",
+      "Bash(git pull *)",
+      "Bash(git branch *)",
+      "Bash(python3)",
+      "mcp__browser-use__browser_screenshot"
+    ]
+  }
+}

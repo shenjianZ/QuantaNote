@@ -94,6 +94,7 @@ pub fn collect_local_records(db: &DbState) -> Result<Vec<SyncRecordPayload>, App
     )?;
 
     // tags 表（使用 uuid 作为同步标识，避免自增 ID 跨设备冲突）
+    let tags_fallback_time = chrono::Utc::now().to_rfc3339();
     collect_table_records(
         &conn,
         "tags",
@@ -105,13 +106,14 @@ pub fn collect_local_records(db: &DbState) -> Result<Vec<SyncRecordPayload>, App
                 "name": row.get::<_, String>(1)?,
                 "color": row.get::<_, String>(2)?,
             });
-            // tags 表无 updated_at，使用空字符串（content_hash 仍可区分变更）
-            Ok((uuid, data, String::new()))
+            // tags 表无 updated_at，使用当前时间（每次同步时重新生成，确保可解析）
+            Ok((uuid, data, tags_fallback_time.clone()))
         },
         &mut all_records,
     )?;
 
     // item_tags 表（使用 tag uuid 作为同步标识）
+    let item_tags_fallback_time = chrono::Utc::now().to_rfc3339();
     collect_table_records(
         &conn,
         "item_tags",
@@ -124,8 +126,8 @@ pub fn collect_local_records(db: &DbState) -> Result<Vec<SyncRecordPayload>, App
                 "item_id": item_id,
                 "tag_uuid": tag_uuid,
             });
-            // item_tags 表无 updated_at，使用空字符串
-            Ok((id, data, String::new()))
+            // item_tags 表无 updated_at，使用当前时间
+            Ok((id, data, item_tags_fallback_time.clone()))
         },
         &mut all_records,
     )?;
@@ -193,11 +195,29 @@ pub fn collect_local_records(db: &DbState) -> Result<Vec<SyncRecordPayload>, App
     for row in rows {
         let (record_id, table_name, deleted_at) =
             row.map_err(|e| AppError::Database(format!("读取行失败 (tombstones): {}", e)))?;
-        let data = serde_json::json!({
-            "id": record_id,
-            "_deleted": true,
-            "deleted_at": deleted_at,
-        });
+        let data = match table_name.as_str() {
+            "tags" => serde_json::json!({
+                "uuid": record_id,
+                "_deleted": true,
+                "deleted_at": deleted_at,
+            }),
+            "item_tags" => {
+                let mut parts = record_id.splitn(2, '_');
+                let item_id = parts.next().unwrap_or("");
+                let tag_uuid = parts.next().unwrap_or("");
+                serde_json::json!({
+                    "item_id": item_id,
+                    "tag_uuid": tag_uuid,
+                    "_deleted": true,
+                    "deleted_at": deleted_at,
+                })
+            }
+            _ => serde_json::json!({
+                "id": record_id,
+                "_deleted": true,
+                "deleted_at": deleted_at,
+            }),
+        };
         let content_hash = compute_record_hash(&data);
         all_records.push(SyncRecordPayload {
             table_name,
@@ -207,6 +227,31 @@ pub fn collect_local_records(db: &DbState) -> Result<Vec<SyncRecordPayload>, App
             data,
         });
     }
+
+    // 去重：如果同一 (record_id, table_name) 同时有 live 记录和 tombstone，优先保留 live
+    let live_keys: HashSet<String> = all_records
+        .iter()
+        .filter(|r| {
+            !r.data
+                .get("_deleted")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false)
+        })
+        .map(|r| format!("{}:{}", r.table_name, r.record_id))
+        .collect();
+
+    all_records.retain(|r| {
+        if r.data
+            .get("_deleted")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
+        {
+            let key = format!("{}:{}", r.table_name, r.record_id);
+            !live_keys.contains(&key)
+        } else {
+            true
+        }
+    });
 
     Ok(all_records)
 }
@@ -257,14 +302,14 @@ pub fn compute_diff(
     baseline_map: &HashMap<String, String>,
     conflict_strategy: &str,
 ) -> DiffResult {
-    // 构建映射
-    let remote_map: HashMap<&str, &RecordMetaInfo> = remote_metas
+    // 构建映射，使用 "table_name:record_id" 作为复合键避免跨表 ID 碰撞
+    let remote_map: HashMap<String, &RecordMetaInfo> = remote_metas
         .iter()
-        .map(|m| (m.record_id.as_str(), m))
+        .map(|m| (format!("{}:{}", m.table_name, m.record_id), m))
         .collect();
-    let local_map: HashMap<&str, &SyncRecordPayload> = local_records
+    let local_map: HashMap<String, &SyncRecordPayload> = local_records
         .iter()
-        .map(|r| (r.record_id.as_str(), r))
+        .map(|r| (format!("{}:{}", r.table_name, r.record_id), r))
         .collect();
 
     let mut to_push = Vec::new();
@@ -272,17 +317,13 @@ pub fn compute_diff(
     let mut conflicts = Vec::new();
     let mut unchanged: u32 = 0;
 
-    // 合并所有 record_id
-    let all_ids: HashSet<String> = local_records
-        .iter()
-        .map(|r| r.record_id.clone())
-        .chain(remote_metas.iter().map(|m| m.record_id.clone()))
-        .collect();
+    // 合并所有复合键
+    let all_keys: HashSet<String> = local_map.keys().chain(remote_map.keys()).cloned().collect();
 
-    for id in all_ids {
-        let local = local_map.get(id.as_str());
-        let remote = remote_map.get(id.as_str());
-        let baseline_hash = baseline_map.get(&id).map(|s| s.as_str());
+    for key in all_keys {
+        let local = local_map.get(&key);
+        let remote = remote_map.get(&key);
+        let baseline_hash = baseline_map.get(&key).map(|s| s.as_str());
 
         match (local, remote, baseline_hash) {
             // 本地独有 → 推送
@@ -313,12 +354,14 @@ pub fn compute_diff(
                                 "remote-wins" => ConflictResolution::RemoteWins,
                                 "auto" => {
                                     // 解析时间戳后比较，选择更新的一方
-                                    let local_time = chrono::DateTime::parse_from_rfc3339(&l.updated_at)
-                                        .ok()
-                                        .map(|dt| dt.with_timezone(&chrono::Utc));
-                                    let remote_time = chrono::DateTime::parse_from_rfc3339(&r.updated_at)
-                                        .ok()
-                                        .map(|dt| dt.with_timezone(&chrono::Utc));
+                                    let local_time =
+                                        chrono::DateTime::parse_from_rfc3339(&l.updated_at)
+                                            .ok()
+                                            .map(|dt| dt.with_timezone(&chrono::Utc));
+                                    let remote_time =
+                                        chrono::DateTime::parse_from_rfc3339(&r.updated_at)
+                                            .ok()
+                                            .map(|dt| dt.with_timezone(&chrono::Utc));
                                     match (local_time, remote_time) {
                                         (Some(lt), Some(rt)) => {
                                             if lt >= rt {
@@ -327,14 +370,20 @@ pub fn compute_diff(
                                                 ConflictResolution::RemoteWins
                                             }
                                         }
-                                        // 解析失败时 fallback 到远程优先
-                                        _ => ConflictResolution::RemoteWins,
+                                        // 时间解析失败时，使用 content_hash 字典序作为确定性 tie-breaker
+                                        _ => {
+                                            if l.content_hash >= r.content_hash {
+                                                ConflictResolution::LocalWins
+                                            } else {
+                                                ConflictResolution::RemoteWins
+                                            }
+                                        }
                                     }
                                 }
                                 _ => ConflictResolution::RemoteWins,
                             };
                             conflicts.push(SyncConflict {
-                                record_id: id,
+                                record_id: l.record_id.clone(),
                                 table_name: l.table_name.clone(),
                                 local_record: (*l).clone(),
                                 remote_meta: (*r).clone(),

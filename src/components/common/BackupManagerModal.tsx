@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Modal } from "./Modal";
 import { useSettingsStore } from "../../stores/settingsStore";
 
@@ -16,6 +17,7 @@ interface BackupManagerModalProps {
 }
 
 export function BackupManagerModal({ open, onClose }: BackupManagerModalProps) {
+    const { t } = useTranslation(["modals"]);
     const backupFiles = useSettingsStore((s) => s.backupFiles);
     const fetchBackups = useSettingsStore((s) => s.fetchBackups);
     const deleteBackup = useSettingsStore((s) => s.deleteBackup);
@@ -27,11 +29,11 @@ export function BackupManagerModal({ open, onClose }: BackupManagerModalProps) {
     }, [open, fetchBackups]);
 
     return (
-        <Modal open={open} onClose={onClose} title="备份管理" maxWidth="max-w-lg">
+        <Modal open={open} onClose={onClose} title={t("modals:backupManager.title")} maxWidth="max-w-lg">
             <div className="space-y-3">
                 {backupFiles.length === 0 ? (
                     <p className="py-8 text-center text-sm text-[var(--muted)]">
-                        暂无备份记录
+                        {t("modals:backupManager.noBackups")}
                     </p>
                 ) : (
                     <div className="max-h-80 space-y-1 overflow-auto">
@@ -52,7 +54,7 @@ export function BackupManagerModal({ open, onClose }: BackupManagerModalProps) {
                                 <button
                                     className="shrink-0 rounded-full p-2 text-[var(--muted)] opacity-0 transition-opacity hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100"
                                     type="button"
-                                    title="删除此备份"
+                                    title={t("modals:backupManager.deleteBackup")}
                                     onClick={() => deleteBackup(file.filename)}
                                 >
                                     <Trash2 className="h-4 w-4" />
@@ -68,7 +70,7 @@ export function BackupManagerModal({ open, onClose }: BackupManagerModalProps) {
                         type="button"
                         onClick={onClose}
                     >
-                        关闭
+                        {t("modals:backupManager.close")}
                     </button>
                 </div>
             </div>

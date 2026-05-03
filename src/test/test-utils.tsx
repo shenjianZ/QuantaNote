@@ -3,6 +3,7 @@ import { render } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import type { Item } from "../types";
+import "../i18n";
 
 export * from "@testing-library/react";
 

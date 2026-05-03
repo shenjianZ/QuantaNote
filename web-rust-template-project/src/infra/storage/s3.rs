@@ -18,13 +18,7 @@ impl S3Storage {
         access_key: &str,
         secret_key: &str,
     ) -> anyhow::Result<Self> {
-        let credentials = Credentials::new(
-            Some(access_key),
-            Some(secret_key),
-            None,
-            None,
-            None,
-        )?;
+        let credentials = Credentials::new(Some(access_key), Some(secret_key), None, None, None)?;
 
         let mut bucket = if let Some(ep) = endpoint {
             // MinIO 或其他 S3 兼容存储
@@ -80,7 +74,10 @@ impl StorageBackend for S3Storage {
     }
 
     async fn list_objects(&self, prefix: &str) -> anyhow::Result<Vec<StorageMetadata>> {
-        let list = self.bucket.list(prefix.to_string(), Some("/".to_string())).await?;
+        let list = self
+            .bucket
+            .list(prefix.to_string(), Some("/".to_string()))
+            .await?;
         let mut results = Vec::new();
         for item in list {
             for object in &item.contents {

@@ -1,0 +1,7 @@
+{
+  "workspace": "工作台",
+  "library": "记录库",
+  "document": "文档编辑",
+  "settings": "设置",
+  "recordCount": "{{count}} 条记录"
+}

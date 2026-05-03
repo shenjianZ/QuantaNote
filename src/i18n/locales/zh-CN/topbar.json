@@ -1,0 +1,15 @@
+{
+  "workspace": "工作台",
+  "library": "记录库",
+  "settings": "设置",
+  "search": "搜索",
+  "menu": "菜单",
+  "pin": "窗口置顶",
+  "unpin": "窗口已置顶，点击取消",
+  "minimize": "最小化",
+  "maximize": "全屏",
+  "restore": "恢复",
+  "close": "关闭",
+  "openWorkspace": "打开工作台",
+  "openLibrary": "打开记录库"
+}

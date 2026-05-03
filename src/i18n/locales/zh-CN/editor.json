@@ -1,0 +1,44 @@
+{
+  "searchReplace": {
+    "search": "搜索",
+    "replace": "替换",
+    "replaceAll": "全部",
+    "prev": "上一个 (Shift+Enter)",
+    "next": "下一个 (Enter)",
+    "caseSensitive": "区分大小写",
+    "close": "关闭 (Escape)",
+    "noMatch": "无匹配"
+  },
+  "versionPanel": {
+    "title": "版本记录 ({{count}})",
+    "searchPlaceholder": "搜索版本",
+    "compare": "对比",
+    "cancel": "取消",
+    "selectHint": "已选择 1 个版本，请再选择 1 个进行对比",
+    "selectForCompare": "选择对比",
+    "noVersions": "暂无版本记录，点击\"保存版本\"创建",
+    "noMatch": "没有匹配的版本",
+    "versionName": "版本名称",
+    "versionDesc": "版本描述（可选）",
+    "save": "保存",
+    "edit": "编辑",
+    "viewRestore": "查看并恢复",
+    "delete": "删除",
+    "confirmDelete": "确认删除",
+    "justNow": "刚刚",
+    "minutesAgo": "{{count}} 分钟前",
+    "hoursAgo": "{{count}} 小时前",
+    "daysAgo": "{{count}} 天前"
+  },
+  "versionPreview": {
+    "title": "版本预览 — {{name}}",
+    "close": "关闭",
+    "restore": "恢复到此版本",
+    "confirmRestore": "确认恢复到此版本？"
+  },
+  "versionDiff": {
+    "title": "版本对比",
+    "identical": "两个版本内容相同",
+    "close": "关闭"
+  }
+}

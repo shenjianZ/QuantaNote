@@ -99,12 +99,30 @@ pub struct ConflictInfo {
     pub content_hash: String,
 }
 
+/// 前端提交的单条冲突解决选择
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ConflictResolutionChoice {
+    pub table_name: String,
+    pub record_id: String,
+    pub choice: String,
+}
+
 /// 待解决的同步状态（manual 模式暂停时保存）
 #[derive(Debug, Clone)]
 pub struct PendingSyncState {
-    pub pushed_record_ids: Vec<String>,
-    pub remote_snapshot_id: Option<String>,
+    pub pushed_records: Vec<PushedRecord>,
     pub conflicts: Vec<ConflictInfo>,
+    /// 非冲突的待推送记录
+    pub to_push: Vec<SyncRecordPayload>,
+    /// 非冲突的待拉取记录元信息
+    pub to_pull: Vec<crate::sync::transport::RecordMetaInfo>,
+}
+
+/// 推送的记录标识（包含 record_id 和 table_name）
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PushedRecord {
+    pub record_id: String,
+    pub table_name: String,
 }
 
 /// 同步结果

@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "React Docs UI site config",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "breadcrumb": { "$ref": "#/$defs/breadcrumb" },
+    "reading": { "$ref": "#/$defs/reading" },
+    "sitemap": { "$ref": "#/$defs/sitemap" },
+    "feed": { "$ref": "#/$defs/feed" }
+  },
+  "$defs": {
+    "breadcrumb": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "showHome": { "type": "boolean" }
+      }
+    },
+    "reading": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "showTime": { "type": "boolean" },
+        "showProgress": { "type": "boolean" }
+      }
+    },
+    "sitemap": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "changefreq": {
+          "type": "string",
+          "enum": ["always", "hourly", "daily", "weekly", "monthly", "yearly", "never"]
+        },
+        "priority": { "type": "number", "minimum": 0, "maximum": 1 },
+        "exclude": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "feed": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "limit": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

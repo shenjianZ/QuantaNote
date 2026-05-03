@@ -1,0 +1,7 @@
+{
+  "workspace": "Workspace",
+  "library": "Library",
+  "document": "Document Editor",
+  "settings": "Settings",
+  "recordCount": "{{count}} records"
+}

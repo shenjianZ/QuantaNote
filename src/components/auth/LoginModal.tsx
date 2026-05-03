@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { LogIn, Loader2 } from "lucide-react";
 import { Modal } from "../common/Modal";
 import { useSyncStore } from "../../stores/syncStore";
@@ -16,6 +17,7 @@ export function LoginModal({
     onSwitchToRegister,
     onSwitchToForgotPassword,
 }: LoginModalProps) {
+    const { t } = useTranslation(["auth"]);
     const { config, login, isLoading, error, clearError } = useSyncStore();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -41,12 +43,12 @@ export function LoginModal({
     }
 
     return (
-        <Modal open={open} onClose={handleClose} title="登录同步账号">
+        <Modal open={open} onClose={handleClose} title={t("login.title")}>
             <form onSubmit={handleSubmit} className="space-y-4">
                 {!config.server_url && (
                     <div>
                         <label className="mb-1 block text-xs text-[var(--muted)]">
-                            服务器地址
+                            {t("login.serverUrl")}
                         </label>
                         <input
                             type="url"
@@ -60,7 +62,7 @@ export function LoginModal({
                 )}
                 <div>
                     <label className="mb-1 block text-xs text-[var(--muted)]">
-                        邮箱
+                        {t("login.email")}
                     </label>
                     <input
                         type="email"
@@ -73,13 +75,13 @@ export function LoginModal({
                 </div>
                 <div>
                     <label className="mb-1 block text-xs text-[var(--muted)]">
-                        密码
+                        {t("login.password")}
                     </label>
                     <input
                         type="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder="输入密码"
+                        placeholder={t("login.passwordPlaceholder")}
                         className="w-full rounded-xl border border-[var(--line)] bg-[var(--field)] px-4 py-2.5 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
                         required
                     />
@@ -101,7 +103,7 @@ export function LoginModal({
                     ) : (
                         <LogIn className="h-4 w-4" />
                     )}
-                    {isLoading ? "登录中..." : "登录"}
+                    {isLoading ? t("login.submitting") : t("login.submitBtn")}
                 </button>
 
                 <div className="flex items-center justify-between text-xs">
@@ -110,14 +112,14 @@ export function LoginModal({
                         onClick={onSwitchToRegister}
                         className="text-[var(--accent)] hover:underline"
                     >
-                        没有账号？注册
+                        {t("login.noAccount")}
                     </button>
                     <button
                         type="button"
                         onClick={onSwitchToForgotPassword}
                         className="text-[var(--muted)] hover:text-[var(--text)]"
                     >
-                        忘记密码？
+                        {t("login.forgotPassword")}
                     </button>
                 </div>
             </form>

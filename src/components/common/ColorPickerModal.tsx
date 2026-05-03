@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface ColorPickerModalProps {
   open: boolean;
@@ -35,6 +36,7 @@ export function ColorPickerModal({
   onConfirm,
   onCancel,
 }: ColorPickerModalProps) {
+  const { t } = useTranslation(["modals", "common"]);
   const [selected, setSelected] = useState(initialColor);
   const [hexInput, setHexInput] = useState(initialColor);
   const [name, setName] = useState("");
@@ -76,7 +78,7 @@ export function ColorPickerModal({
       >
         {/* 标题 */}
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-[var(--text)]">选择颜色</h3>
+          <h3 className="text-sm font-semibold text-[var(--text)]">{t("modals:colorPicker.title")}</h3>
           <button
             type="button"
             className="flex h-6 w-6 items-center justify-center rounded-lg text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
@@ -93,7 +95,7 @@ export function ColorPickerModal({
             style={{ background: selected }}
           />
           <div className="flex-1">
-            <div className="mb-1 text-xs text-[var(--muted)]">HEX 色值</div>
+            <div className="mb-1 text-xs text-[var(--muted)]">{t("modals:colorPicker.hexValue")}</div>
             <input
               className="h-8 w-full rounded-lg border border-[var(--line)] bg-[var(--field)] px-2.5 font-mono text-sm text-[var(--text)] focus:border-[var(--accent)] focus:outline-none"
               value={hexInput}
@@ -105,7 +107,7 @@ export function ColorPickerModal({
 
         {/* 调色板 */}
         <div className="mb-4">
-          <div className="mb-2 text-xs text-[var(--muted)]">调色板</div>
+          <div className="mb-2 text-xs text-[var(--muted)]">{t("modals:colorPicker.palette")}</div>
           <div className="flex flex-col gap-1">
             {PALETTE_ROWS.map((row, ri) => (
               <div key={ri} className="flex gap-1">
@@ -127,11 +129,11 @@ export function ColorPickerModal({
 
         {/* 名称 */}
         <div className="mb-4">
-          <div className="mb-1 text-xs text-[var(--muted)]">颜色名称</div>
+          <div className="mb-1 text-xs text-[var(--muted)]">{t("modals:colorPicker.colorName")}</div>
           <input
             ref={nameRef}
             className="h-9 w-full rounded-lg border border-[var(--line)] bg-[var(--field)] px-3 text-sm text-[var(--text)] focus:border-[var(--accent)] focus:outline-none"
-            placeholder="例如：松绿、深蓝"
+            placeholder={t("modals:colorPicker.namePlaceholder")}
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => {
@@ -148,7 +150,7 @@ export function ColorPickerModal({
             className="h-8 rounded-lg border border-[var(--line)] px-3 text-sm text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
             onClick={onCancel}
           >
-            取消
+            {t("common:buttons.cancel")}
           </button>
           <button
             type="button"
@@ -156,7 +158,7 @@ export function ColorPickerModal({
             onClick={handleConfirm}
           >
             <Check className="h-4 w-4" />
-            确认
+            {t("common:buttons.confirm")}
           </button>
         </div>
       </div>
