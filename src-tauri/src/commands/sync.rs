@@ -275,11 +275,13 @@ async fn run_sync_with_transport(
     };
 
     // 6. 推送变更
+    let mut pushed_record_ids: Vec<String> = Vec::new();
     if !diff_result.to_push.is_empty() {
         state_manager.set_status(SyncStatus::Pushing);
         let total = diff_result.to_push.len() as u32;
         state_manager.set_progress("推送记录", 0, total);
 
+        pushed_record_ids = diff_result.to_push.iter().map(|r| r.record_id.clone()).collect();
         let push_result = transport.push_records(diff_result.to_push).await?;
         result.pushed = push_result.accepted.len() as u32;
     }
@@ -310,11 +312,12 @@ async fn run_sync_with_transport(
 
     // 9. 提交同步
     state_manager.set_progress("提交同步", 0, 1);
-    let commit_result = transport.commit_sync(vec![], vec![]).await?;
+    let commit_result = transport.commit_sync(pushed_record_ids, vec![]).await?;
     result.snapshot_id = commit_result.snapshot_id;
 
-    // 10. 保存基线映射（同步成功后）
-    save_baseline_map(db, &local_records, &result.snapshot_id)?;
+    // 10. 保存基线映射（同步成功后，使用 pull 后的实际数据库状态）
+    let final_records = collect_local_records(db)?;
+    save_baseline_map(db, &final_records, &result.snapshot_id)?;
 
     state_manager.set_completed();
     Ok(result)
@@ -338,9 +341,8 @@ async fn sync_attachments(
         attachments.iter().map(|a| a.1.as_str()).collect();
 
     // 上传服务端缺少的附件（直接使用预读的文件数据）
-    for (_path, hash, data, item_id, filename, mime_type) in &attachments {
+    for (_path, hash, data, attachment_id, item_id, filename, mime_type) in &attachments {
         if diff.missing.contains(hash) {
-            let attachment_id = filename;
             transport
                 .upload_attachment(attachment_id, item_id, filename, mime_type, hash, "", data.clone())
                 .await?;
@@ -351,41 +353,64 @@ async fn sync_attachments(
     // 下载本地缺少的附件
     for remote in &diff.remote_attachments {
         if !local_hash_set.contains(remote.file_hash.as_str()) {
-            // 检查本地 attachments 表是否已有此附件的记录（可能有记录但文件丢失）
-            let local_has_record = {
+            // 查询本地附件记录（apply_pulled_records 可能已通过 apply_attachment 创建）
+            let local_info: Option<(String, bool)> = {
                 let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
-                let exists: bool = conn
-                    .query_row(
-                        "SELECT 1 FROM attachments WHERE id = ?1",
-                        rusqlite::params![remote.attachment_id],
-                        |_| Ok(true),
-                    )
-                    .unwrap_or(false);
-                exists
+                conn.query_row(
+                    "SELECT file_path FROM attachments WHERE id = ?1",
+                    rusqlite::params![remote.attachment_id],
+                    |row| {
+                        let fp: String = row.get(0)?;
+                        let full = paths::quantanote_dir().join(&fp);
+                        Ok((fp, full.exists()))
+                    },
+                )
+                .ok()
             };
 
-            if local_has_record {
-                // 记录存在但文件丢失，重新下载到已有路径
-                let file_path = {
-                    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
-                    conn.query_row(
-                        "SELECT file_path FROM attachments WHERE id = ?1",
-                        rusqlite::params![remote.attachment_id],
-                        |row| row.get::<_, String>(0),
-                    )
-                    .map_err(|e| AppError::Database(e.to_string()))?
-                };
-                let data = transport.download_attachment(&remote.attachment_id).await?;
-                let full_path = paths::quantanote_dir().join(&file_path);
-                if let Some(parent) = full_path.parent() {
-                    std::fs::create_dir_all(parent).map_err(|e| AppError::Io(e.to_string()))?;
+            let data = transport.download_attachment(&remote.attachment_id).await?;
+
+            match local_info {
+                Some((_file_path, file_exists)) if file_exists => {
+                    // 记录存在且文件也在 → 跳过（理论上不会走到这里，hash 不同但文件存在）
+                    continue;
                 }
-                std::fs::write(&full_path, &data).map_err(|e| AppError::Io(e.to_string()))?;
-                result.attachments_downloaded += 1;
+                Some((file_path, _)) => {
+                    // 记录存在但文件丢失，重新下载到已有路径
+                    let full_path = paths::quantanote_dir().join(&file_path);
+                    if let Some(parent) = full_path.parent() {
+                        std::fs::create_dir_all(parent).map_err(|e| AppError::Io(e.to_string()))?;
+                    }
+                    std::fs::write(&full_path, &data).map_err(|e| AppError::Io(e.to_string()))?;
+                    result.attachments_downloaded += 1;
+                }
+                None => {
+                    // 本地无记录（apply_attachment 未覆盖到），创建记录并下载文件
+                    let file_path_str = format!("attachments/{}/{}", remote.item_id, remote.filename);
+                    let full_path = paths::quantanote_dir().join(&file_path_str);
+                    if let Some(parent) = full_path.parent() {
+                        std::fs::create_dir_all(parent).map_err(|e| AppError::Io(e.to_string()))?;
+                    }
+                    std::fs::write(&full_path, &data).map_err(|e| AppError::Io(e.to_string()))?;
+
+                    // 创建本地附件记录
+                    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
+                    let now = chrono::Utc::now().to_rfc3339();
+                    conn.execute(
+                        "INSERT OR IGNORE INTO attachments (id, item_id, filename, file_path, mime_type, file_size, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                        rusqlite::params![
+                            remote.attachment_id,
+                            remote.item_id,
+                            remote.filename,
+                            file_path_str,
+                            remote.mime_type,
+                            remote.file_size,
+                            now
+                        ],
+                    ).map_err(|e| AppError::Database(e.to_string()))?;
+                    result.attachments_downloaded += 1;
+                }
             }
-            // 如果本地连记录都没有，说明是来自远程的新附件。
-            // 此时 attachments 表的元数据应该已通过记录同步（apply_item 等）获得，
-            // 但 attachments 表的 apply 逻辑尚不完善，此处暂跳过。
         }
     }
 
@@ -394,7 +419,7 @@ async fn sync_attachments(
 
 fn collect_local_attachments(
     db: &DbState,
-) -> Result<Vec<(std::path::PathBuf, String, Vec<u8>, String, String, String)>, AppError> {
+) -> Result<Vec<(std::path::PathBuf, String, Vec<u8>, String, String, String, String)>, AppError> {
     use crate::sync::diff::compute_file_hash;
     use crate::utils::paths;
 
@@ -421,13 +446,13 @@ fn collect_local_attachments(
 
     let mut result = Vec::new();
     for row in rows {
-        let (_id, item_id, filename, file_path, mime_type) =
+        let (id, item_id, filename, file_path, mime_type) =
             row.map_err(|e| AppError::Database(e.to_string()))?;
         let full_path = paths::quantanote_dir().join(&file_path);
         if full_path.exists() {
             let data = std::fs::read(&full_path).map_err(|e| AppError::Io(e.to_string()))?;
             let hash = compute_file_hash(&data);
-            result.push((full_path, hash, data, item_id, filename, mime_type));
+            result.push((full_path, hash, data, id, item_id, filename, mime_type));
         }
     }
 
@@ -435,7 +460,7 @@ fn collect_local_attachments(
 }
 
 fn apply_pulled_records(records: &[SyncRecordPayload], db: &DbState) -> Result<(), AppError> {
-    use crate::sync::{apply_item, apply_item_tag, apply_tag, apply_version};
+    use crate::sync::{apply_attachment, apply_item, apply_item_tag, apply_tag, apply_version};
 
     let conn = db
         .conn
@@ -451,6 +476,7 @@ fn apply_pulled_records(records: &[SyncRecordPayload], db: &DbState) -> Result<(
             "tags" => apply_tag(&tx, &record.data),
             "item_tags" => apply_item_tag(&tx, &record.data),
             "versions" => apply_version(&tx, &record.data),
+            "attachments" => apply_attachment(&tx, &record.data),
             _ => Ok(()),
         };
         if let Err(e) = result {

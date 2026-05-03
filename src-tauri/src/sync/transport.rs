@@ -61,6 +61,10 @@ pub struct PullResult {
 pub struct RemoteAttachmentInfo {
     pub attachment_id: String,
     pub file_hash: String,
+    pub item_id: String,
+    pub filename: String,
+    pub mime_type: String,
+    pub file_size: i64,
 }
 
 /// 附件差异结果
@@ -556,12 +560,12 @@ impl SyncTransport {
     /// 提交同步
     pub async fn commit_sync(
         &self,
-        records: Vec<serde_json::Value>,
+        pushed_record_ids: Vec<String>,
         attachments: Vec<serde_json::Value>,
     ) -> Result<CommitResult, AppError> {
         let url = format!("{}/sync/commit", self.server_url);
         let builder = self.client.post(&url).json(&serde_json::json!({
-            "records": records,
+            "pushed_record_ids": pushed_record_ids,
             "attachments": attachments
         }));
         let resp = self.send_auth_with_refresh(builder).await?;

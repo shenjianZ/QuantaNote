@@ -209,9 +209,9 @@ pub async fn commit_sync(
         &request_id,
         "提交同步",
         &format!(
-            "user_id={}, records={}, attachments={}",
+            "user_id={}, pushed_records={}, attachments={}",
             user_id,
-            payload.records.len(),
+            payload.pushed_record_ids.len(),
             payload.attachments.len()
         ),
     );

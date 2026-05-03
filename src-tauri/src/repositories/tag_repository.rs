@@ -32,9 +32,10 @@ pub fn create_tag(db: &DbState, name: &str, color: &str) -> Result<TagDto, AppEr
         .conn
         .lock()
         .map_err(|e| AppError::Database(e.to_string()))?;
+    let uuid = uuid::Uuid::new_v4().to_string();
     conn.execute(
-        "INSERT INTO tags (name, color) VALUES (?1, ?2)",
-        params![name, color],
+        "INSERT INTO tags (uuid, name, color) VALUES (?1, ?2, ?3)",
+        params![uuid, name, color],
     )
     .map_err(|e| AppError::Database(e.to_string()))?;
 

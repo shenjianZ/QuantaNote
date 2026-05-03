@@ -48,6 +48,10 @@ pub struct SyncRecordData {
 pub struct RemoteAttachmentInfo {
     pub attachment_id: String,
     pub file_hash: String,
+    pub item_id: String,
+    pub filename: String,
+    pub mime_type: String,
+    pub file_size: i64,
 }
 
 /// 附件差异结果

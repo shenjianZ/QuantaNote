@@ -73,13 +73,15 @@ pub fn apply_tag(
     conn: &rusqlite::Connection,
     data: &serde_json::Value,
 ) -> Result<(), AppError> {
-    let id = data["id"].as_i64().unwrap_or_default();
+    let uuid = data["uuid"].as_str().unwrap_or_default();
     let name = data["name"].as_str().unwrap_or_default();
     let color = data["color"].as_str().unwrap_or_default();
 
+    // 使用 uuid 做冲突判断，避免自增 ID 跨设备冲突
     conn.execute(
-        "INSERT INTO tags (id, name, color) VALUES (?1, ?2, ?3) ON CONFLICT(id) DO UPDATE SET name=excluded.name, color=excluded.color",
-        rusqlite::params![id, name, color],
+        "INSERT INTO tags (uuid, name, color) VALUES (?1, ?2, ?3)
+         ON CONFLICT(uuid) DO UPDATE SET name=excluded.name, color=excluded.color",
+        rusqlite::params![uuid, name, color],
     )
     .map_err(|e| AppError::Database(e.to_string()))?;
 
@@ -91,13 +93,44 @@ pub fn apply_item_tag(
     data: &serde_json::Value,
 ) -> Result<(), AppError> {
     let item_id = data["item_id"].as_str().unwrap_or_default();
-    let tag_id = data["tag_id"].as_i64().unwrap_or_default();
+    let tag_uuid = data["tag_uuid"].as_str().unwrap_or_default();
+
+    // 通过 uuid 查找本地 tag_id（自增 ID 跨设备不一致，uuid 才是稳定标识）
+    let tag_id: i64 = match conn.query_row(
+        "SELECT id FROM tags WHERE uuid = ?1",
+        rusqlite::params![tag_uuid],
+        |row| row.get(0),
+    ) {
+        Ok(id) => id,
+        Err(_) => return Ok(()), // tag 尚未同步到本地，跳过（下次同步时会补上）
+    };
 
     conn.execute(
         "INSERT OR REPLACE INTO item_tags (item_id, tag_id) VALUES (?1, ?2)",
         rusqlite::params![item_id, tag_id],
     )
     .map_err(|e| AppError::Database(e.to_string()))?;
+
+    Ok(())
+}
+
+pub fn apply_attachment(
+    conn: &rusqlite::Connection,
+    data: &serde_json::Value,
+) -> Result<(), AppError> {
+    let id = data["id"].as_str().unwrap_or_default();
+    let item_id = data["item_id"].as_str().unwrap_or_default();
+    let filename = data["filename"].as_str().unwrap_or_default();
+    let file_path = data["file_path"].as_str().unwrap_or_default();
+    let mime_type = data["mime_type"].as_str().unwrap_or_default();
+    let file_size = data["file_size"].as_i64().unwrap_or_default();
+    let created_at = data["created_at"].as_str().unwrap_or_default();
+
+    conn.execute(
+        "INSERT INTO attachments (id, item_id, filename, file_path, mime_type, file_size, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+         ON CONFLICT(id) DO UPDATE SET item_id=excluded.item_id, filename=excluded.filename, file_path=excluded.file_path, mime_type=excluded.mime_type, file_size=excluded.file_size, created_at=excluded.created_at",
+        rusqlite::params![id, item_id, filename, file_path, mime_type, file_size, created_at],
+    ).map_err(|e| AppError::Database(e.to_string()))?;
 
     Ok(())
 }
@@ -187,8 +220,8 @@ pub fn save_baseline_map(
 
     drop(stmt);
 
-    // 清理 30 天前的旧 tombstone（已足够传播到所有设备）
-    let cutoff = (chrono::Utc::now() - chrono::Duration::days(30)).to_rfc3339();
+    // 清理 90 天前的旧 tombstone（保留足够长以覆盖长期离线设备）
+    let cutoff = (chrono::Utc::now() - chrono::Duration::days(90)).to_rfc3339();
     tx.execute("DELETE FROM sync_tombstones WHERE deleted_at < ?1", rusqlite::params![cutoff])
         .map_err(|e| AppError::Database(e.to_string()))?;
 

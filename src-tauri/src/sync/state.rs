@@ -27,41 +27,56 @@ impl SyncStateManager {
     }
 
     pub fn set_status(&self, status: SyncStatus) {
-        let mut state = self.state.lock().unwrap();
-        state.status = status;
-        self.emit_state(&state);
+        let snapshot = {
+            let mut state = self.state.lock().unwrap();
+            state.status = status;
+            state.clone()
+        };
+        self.emit_state(&snapshot);
     }
 
     pub fn set_progress(&self, phase: &str, current: u32, total: u32) {
-        let mut state = self.state.lock().unwrap();
-        state.progress = Some(SyncProgress {
-            phase: phase.to_string(),
-            current,
-            total,
-        });
-        self.emit_state(&state);
+        let snapshot = {
+            let mut state = self.state.lock().unwrap();
+            state.progress = Some(SyncProgress {
+                phase: phase.to_string(),
+                current,
+                total,
+            });
+            state.clone()
+        };
+        self.emit_state(&snapshot);
     }
 
     pub fn set_error(&self, error: String) {
-        let mut state = self.state.lock().unwrap();
-        state.status = SyncStatus::Error;
-        state.last_error = Some(error);
-        self.emit_state(&state);
+        let snapshot = {
+            let mut state = self.state.lock().unwrap();
+            state.status = SyncStatus::Error;
+            state.last_error = Some(error);
+            state.clone()
+        };
+        self.emit_state(&snapshot);
     }
 
     pub fn set_completed(&self) {
-        let mut state = self.state.lock().unwrap();
-        state.status = SyncStatus::Completed;
-        state.progress = None;
-        state.last_error = None;
-        state.last_sync_at = Some(chrono::Utc::now().to_rfc3339());
-        self.emit_state(&state);
+        let snapshot = {
+            let mut state = self.state.lock().unwrap();
+            state.status = SyncStatus::Completed;
+            state.progress = None;
+            state.last_error = None;
+            state.last_sync_at = Some(chrono::Utc::now().to_rfc3339());
+            state.clone()
+        };
+        self.emit_state(&snapshot);
     }
 
     pub fn clear_progress(&self) {
-        let mut state = self.state.lock().unwrap();
-        state.progress = None;
-        self.emit_state(&state);
+        let snapshot = {
+            let mut state = self.state.lock().unwrap();
+            state.progress = None;
+            state.clone()
+        };
+        self.emit_state(&snapshot);
     }
 
     fn emit_state(&self, state: &SyncState) {

@@ -77,13 +77,35 @@ impl SyncRepository {
         Ok(records)
     }
 
-    /// 批量写入记录
+    /// 批量写入记录（真正的 upsert：按自然键冲突时更新）
     pub async fn upsert_records(
         &self,
         records: Vec<sync_records::ActiveModel>,
     ) -> anyhow::Result<()> {
         for record in records {
-            record.insert(&self.db).await?;
+            let user_id = match &record.user_id { Set(v) => v.as_str(), _ => "" };
+            let table_name = match &record.table_name { Set(v) => v.as_str(), _ => "" };
+            let rid = match &record.record_id { Set(v) => v.as_str(), _ => "" };
+
+            let existing = sync_records::Entity::find()
+                .filter(sync_records::Column::UserId.eq(user_id))
+                .filter(sync_records::Column::TableName.eq(table_name))
+                .filter(sync_records::Column::RecordId.eq(rid))
+                .one(&self.db)
+                .await?;
+
+            if let Some(existing_model) = existing {
+                // 已存在 → 更新
+                let mut active: sync_records::ActiveModel = existing_model.into();
+                active.content_hash = record.content_hash;
+                active.updated_at = record.updated_at;
+                active.snapshot_id = record.snapshot_id;
+                active.storage_key = record.storage_key;
+                active.update(&self.db).await?;
+            } else {
+                // 不存在 → 插入
+                record.insert(&self.db).await?;
+            }
         }
         Ok(())
     }
@@ -137,6 +159,32 @@ impl SyncRepository {
         Ok(result.rows_affected)
     }
 
+    /// 只关联指定 record_id 的 pending 记录到新快照
+    pub async fn update_specific_records_snapshot_id(
+        &self,
+        user_id: &str,
+        record_ids: &[String],
+        new_snapshot_id: &str,
+    ) -> anyhow::Result<u64> {
+        if record_ids.is_empty() {
+            return Ok(0);
+        }
+        let result = sync_records::Entity::update_many()
+            .filter(
+                sync_records::Column::UserId
+                    .eq(user_id)
+                    .and(sync_records::Column::SnapshotId.eq("pending"))
+                    .and(sync_records::Column::RecordId.is_in(record_ids.to_vec())),
+            )
+            .set(sync_records::ActiveModel {
+                snapshot_id: Set(new_snapshot_id.to_string()),
+                ..Default::default()
+            })
+            .exec(&self.db)
+            .await?;
+        Ok(result.rows_affected)
+    }
+
     // ========== 附件操作 ==========
 
     /// 获取用户所有附件元信息
@@ -151,13 +199,34 @@ impl SyncRepository {
         Ok(attachments)
     }
 
-    /// 批量写入附件元信息
+    /// 批量写入附件元信息（真正的 upsert：按自然键冲突时更新）
     pub async fn upsert_attachments(
         &self,
         attachments: Vec<sync_attachments::ActiveModel>,
     ) -> anyhow::Result<()> {
         for attachment in attachments {
-            attachment.insert(&self.db).await?;
+            let uid = match &attachment.user_id { Set(v) => v.as_str(), _ => "" };
+            let aid = match &attachment.attachment_id { Set(v) => v.as_str(), _ => "" };
+
+            let existing = sync_attachments::Entity::find()
+                .filter(sync_attachments::Column::UserId.eq(uid))
+                .filter(sync_attachments::Column::AttachmentId.eq(aid))
+                .one(&self.db)
+                .await?;
+
+            if let Some(existing_model) = existing {
+                let mut active: sync_attachments::ActiveModel = existing_model.into();
+                active.item_id = attachment.item_id;
+                active.filename = attachment.filename;
+                active.mime_type = attachment.mime_type;
+                active.file_size = attachment.file_size;
+                active.file_hash = attachment.file_hash;
+                active.storage_key = attachment.storage_key;
+                active.snapshot_id = attachment.snapshot_id;
+                active.update(&self.db).await?;
+            } else {
+                attachment.insert(&self.db).await?;
+            }
         }
         Ok(())
     }

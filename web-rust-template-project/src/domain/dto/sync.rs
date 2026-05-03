@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 /// 推送记录请求
 #[derive(Debug, Deserialize)]
@@ -31,18 +31,11 @@ pub struct AttachmentDiffRequest {
 /// 提交同步请求
 #[derive(Debug, Deserialize)]
 pub struct CommitSyncRequest {
-    pub records: Vec<CommitRecordMeta>,
+    /// 本次推送的 record_id 列表（只关联这些记录到新快照）
+    #[serde(default)]
+    pub pushed_record_ids: Vec<String>,
+    #[serde(default)]
     pub attachments: Vec<CommitAttachmentMeta>,
-}
-
-/// 提交记录元数据
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct CommitRecordMeta {
-    pub table_name: String,
-    pub record_id: String,
-    pub content_hash: String,
-    pub updated_at: String,
-    pub storage_key: String,
 }
 
 /// 提交附件元数据

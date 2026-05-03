@@ -62,6 +62,23 @@ impl SyncService {
         let skipped = Vec::new();
 
         for record in &records {
+            // 验证 content_hash 与实际数据是否匹配
+            let computed_hash = {
+                use sha2::{Digest, Sha256};
+                let json_str = serde_json::to_string(&record.data).unwrap_or_default();
+                let mut hasher = Sha256::new();
+                hasher.update(json_str.as_bytes());
+                format!("{:x}", hasher.finalize())
+            };
+            if computed_hash != record.content_hash {
+                return Err(anyhow::anyhow!(
+                    "记录 {} 的 content_hash 不匹配: 声称={}, 实际={}",
+                    record.record_id,
+                    record.content_hash,
+                    computed_hash
+                ));
+            }
+
             // 存储记录数据到对象存储
             let storage_key = format!(
                 "{}/{}/{}/{}.json",
@@ -179,6 +196,10 @@ impl SyncService {
             .map(|a| RemoteAttachmentInfo {
                 attachment_id: a.attachment_id.clone(),
                 file_hash: a.file_hash.clone(),
+                item_id: a.item_id.clone(),
+                filename: a.filename.clone(),
+                mime_type: a.mime_type.clone(),
+                file_size: a.file_size,
             })
             .collect();
 
@@ -248,14 +269,25 @@ impl SyncService {
     pub async fn commit(
         &self,
         user_id: &str,
-        _request: CommitSyncRequest,
+        request: CommitSyncRequest,
     ) -> anyhow::Result<CommitResult> {
         let snapshot_id = uuid::Uuid::new_v4().to_string();
 
-        // 将 pending 状态的记录关联到新快照
-        self.repo
-            .update_records_snapshot_id(user_id, "pending", &snapshot_id)
-            .await?;
+        // 只关联本次推送的 pending 记录到新快照（避免多设备竞态）
+        if request.pushed_record_ids.is_empty() {
+            // 兼容旧客户端：关联所有 pending 记录
+            self.repo
+                .update_records_snapshot_id(user_id, "pending", &snapshot_id)
+                .await?;
+        } else {
+            self.repo
+                .update_specific_records_snapshot_id(
+                    user_id,
+                    &request.pushed_record_ids,
+                    &snapshot_id,
+                )
+                .await?;
+        }
 
         // 统计实际记录数
         let record_count = self.repo.count_user_records(user_id).await?;

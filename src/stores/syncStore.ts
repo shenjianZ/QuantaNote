@@ -106,7 +106,9 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
                 startAutoSync(config.sync_interval_minutes, async () => {
                     try {
                         await get().triggerSync();
-                    } catch {}
+                    } catch (e) {
+                        console.warn("自动同步失败:", e);
+                    }
                 });
             }
         } catch (e) {
@@ -218,7 +220,9 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
             startAutoSync(updated.sync_interval_minutes, async () => {
                 try {
                     await get().triggerSync();
-                } catch {}
+                } catch (e) {
+                    console.warn("自动同步失败:", e);
+                }
             });
         } else {
             stopAutoSync();

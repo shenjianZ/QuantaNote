@@ -92,37 +92,36 @@ pub fn collect_local_records(db: &DbState) -> Result<Vec<SyncRecordPayload>, App
         &mut all_records,
     )?;
 
-    // tags 表
+    // tags 表（使用 uuid 作为同步标识，避免自增 ID 跨设备冲突）
     collect_table_records(
         &conn,
         "tags",
-        "SELECT id, name, color FROM tags",
+        "SELECT uuid, name, color FROM tags",
         |row| {
-            let id: i64 = row.get(0)?;
-            let id_str = id.to_string();
+            let uuid: String = row.get(0)?;
             let data = serde_json::json!({
-                "id": id,
+                "uuid": uuid,
                 "name": row.get::<_, String>(1)?,
                 "color": row.get::<_, String>(2)?,
             });
             // tags 表无 updated_at，使用空字符串（content_hash 仍可区分变更）
-            Ok((id_str, data, String::new()))
+            Ok((uuid, data, String::new()))
         },
         &mut all_records,
     )?;
 
-    // item_tags 表
+    // item_tags 表（使用 tag uuid 作为同步标识）
     collect_table_records(
         &conn,
         "item_tags",
-        "SELECT item_id, tag_id FROM item_tags",
+        "SELECT it.item_id, t.uuid FROM item_tags it JOIN tags t ON t.id = it.tag_id",
         |row| {
             let item_id: String = row.get(0)?;
-            let tag_id: i64 = row.get(1)?;
-            let id = format!("{}_{}", item_id, tag_id);
+            let tag_uuid: String = row.get(1)?;
+            let id = format!("{}_{}", item_id, tag_uuid);
             let data = serde_json::json!({
                 "item_id": item_id,
-                "tag_id": tag_id,
+                "tag_uuid": tag_uuid,
             });
             // item_tags 表无 updated_at，使用空字符串
             Ok((id, data, String::new()))
@@ -312,11 +311,23 @@ pub fn compute_diff(
                                 "local-wins" => ConflictResolution::LocalWins,
                                 "remote-wins" => ConflictResolution::RemoteWins,
                                 "auto" => {
-                                    // 比较时间戳，选择更新的一方
-                                    if l.updated_at >= r.updated_at {
-                                        ConflictResolution::LocalWins
-                                    } else {
-                                        ConflictResolution::RemoteWins
+                                    // 解析时间戳后比较，选择更新的一方
+                                    let local_time = chrono::DateTime::parse_from_rfc3339(&l.updated_at)
+                                        .ok()
+                                        .map(|dt| dt.with_timezone(&chrono::Utc));
+                                    let remote_time = chrono::DateTime::parse_from_rfc3339(&r.updated_at)
+                                        .ok()
+                                        .map(|dt| dt.with_timezone(&chrono::Utc));
+                                    match (local_time, remote_time) {
+                                        (Some(lt), Some(rt)) => {
+                                            if lt >= rt {
+                                                ConflictResolution::LocalWins
+                                            } else {
+                                                ConflictResolution::RemoteWins
+                                            }
+                                        }
+                                        // 解析失败时 fallback 到远程优先
+                                        _ => ConflictResolution::RemoteWins,
                                     }
                                 }
                                 _ => ConflictResolution::RemoteWins,
