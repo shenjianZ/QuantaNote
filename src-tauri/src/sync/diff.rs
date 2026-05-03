@@ -13,6 +13,7 @@ pub enum ConflictResolution {
     /// 远程优先
     RemoteWins,
     /// 手动解决（暂不实现，fallback 到 RemoteWins）
+    #[allow(dead_code)]
     Manual,
 }
 

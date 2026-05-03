@@ -12,6 +12,8 @@ pub enum AppError {
     Io(String),
     #[error("同步错误: {0}")]
     SyncError(String),
+    #[error("登录已过期，请重新登录")]
+    TokenExpired,
 }
 
 impl Serialize for AppError {

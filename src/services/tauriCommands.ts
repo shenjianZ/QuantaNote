@@ -341,10 +341,21 @@ export interface SyncState {
     last_sync_at: string | null;
 }
 
+export interface ConflictInfo {
+    record_id: string;
+    table_name: string;
+    local_data: any;
+    local_updated_at: string;
+    remote_updated_at: string;
+    content_hash: string;
+}
+
 export interface SyncResult {
     pushed: number;
     pulled: number;
     skipped: number;
+    conflicts: number;
+    pending_conflicts: ConflictInfo[] | null;
     attachments_uploaded: number;
     attachments_downloaded: number;
     snapshot_id: string;
@@ -362,6 +373,13 @@ export interface SyncHistoryEntry {
     record_count: number;
     total_size: number;
     created_at: string;
+}
+
+export interface PaginatedSyncHistory {
+    items: SyncHistoryEntry[];
+    total: number;
+    page: number;
+    page_size: number;
 }
 
 // Sync commands
@@ -426,6 +444,18 @@ export async function testSyncConnection(serverUrl: string) {
     return invoke<boolean>("test_sync_connection", { serverUrl });
 }
 
-export async function getSyncHistory() {
-    return invoke<SyncHistoryEntry[]>("get_sync_history");
+export async function getSyncHistory(page: number = 1, pageSize: number = 10) {
+    return invoke<PaginatedSyncHistory>("get_sync_history", { page, pageSize });
+}
+
+export async function getPendingConflicts() {
+    return invoke<ConflictInfo[] | null>("get_pending_conflicts");
+}
+
+export async function resolveSyncConflicts(resolutions: [string, string][]) {
+    return invoke<SyncResult>("resolve_sync_conflicts", { resolutions });
+}
+
+export async function cancelSyncConflicts() {
+    return invoke("cancel_sync_conflicts");
 }

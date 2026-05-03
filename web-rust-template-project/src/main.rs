@@ -111,6 +111,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/sync/attachments/download/:attachment_id", get(handlers::sync::download_attachment))
         .route("/sync/commit", post(handlers::sync::commit_sync))
         .route("/sync/history", get(handlers::sync::sync_history))
+        .route("/sync/reset", post(handlers::sync::reset_sync_data))
         // JWT 认证中间件（仅应用于受保护路由）
         .route_layer(axum::middleware::from_fn_with_state(
             app_state.clone(),

@@ -3,8 +3,8 @@ use crate::domain::dto::sync::{
 };
 use crate::domain::entities::{sync_attachments, sync_records};
 use crate::domain::vo::sync::{
-    AttachmentDiffResult, CommitResult, PullResult, PushResult, RecordMetaInfo,
-    RemoteAttachmentInfo, SnapshotInfo, SyncHistoryEntry, SyncRecordData,
+    AttachmentDiffResult, CommitResult, PaginatedSyncHistory, PullResult, PushResult,
+    RecordMetaInfo, RemoteAttachmentInfo, SnapshotInfo, SyncHistoryEntry, SyncRecordData,
 };
 use crate::infra::storage::StorageBackend;
 use crate::repositories::sync_repository::SyncRepository;
@@ -289,6 +289,23 @@ impl SyncService {
                 .await?;
         }
 
+        // 更新附件元信息（客户端在 commit 时上报完整元数据）
+        for attachment in &request.attachments {
+            let _ = self
+                .repo
+                .update_attachment_metadata(
+                    user_id,
+                    &attachment.attachment_id,
+                    &attachment.item_id,
+                    &attachment.filename,
+                    &attachment.mime_type,
+                    attachment.file_size,
+                    &attachment.file_hash,
+                    &attachment.storage_key,
+                )
+                .await;
+        }
+
         // 统计实际记录数
         let record_count = self.repo.count_user_records(user_id).await?;
 
@@ -315,6 +332,9 @@ impl SyncService {
             )
             .await?;
 
+        // 清理旧快照（保留最近 20 个）
+        let _ = self.cleanup_old_snapshots(user_id, 20).await;
+
         Ok(CommitResult {
             snapshot_id: snapshot.snapshot_id,
             created_at: snapshot
@@ -324,10 +344,36 @@ impl SyncService {
         })
     }
 
-    /// 获取同步历史
-    pub async fn get_history(&self, user_id: &str) -> anyhow::Result<Vec<SyncHistoryEntry>> {
-        let snapshots = self.repo.get_sync_history(user_id, 20).await?;
-        Ok(snapshots
+    /// 清理旧快照，保留最近 keep_count 个
+    async fn cleanup_old_snapshots(
+        &self,
+        user_id: &str,
+        keep_count: usize,
+    ) -> anyhow::Result<()> {
+        let (history, _) = self.repo.get_sync_history(user_id, 0, keep_count as u32 + 1).await?;
+        if history.len() <= keep_count {
+            return Ok(());
+        }
+        // history 按 created_at 降序排列，第 keep_count 个是保留的最旧快照
+        if let Some(boundary) = history.get(keep_count - 1) {
+            let _ = self
+                .repo
+                .delete_snapshots_before(user_id, &boundary.snapshot_id)
+                .await;
+        }
+        Ok(())
+    }
+
+    /// 获取同步历史（分页）
+    pub async fn get_history(
+        &self,
+        user_id: &str,
+        page: u32,
+        page_size: u32,
+    ) -> anyhow::Result<PaginatedSyncHistory> {
+        let offset = (page - 1) * page_size;
+        let (snapshots, total) = self.repo.get_sync_history(user_id, offset, page_size).await?;
+        let items = snapshots
             .into_iter()
             .map(|s| SyncHistoryEntry {
                 snapshot_id: s.snapshot_id,
@@ -335,6 +381,20 @@ impl SyncService {
                 total_size: s.total_size,
                 created_at: s.created_at.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string(),
             })
-            .collect())
+            .collect();
+        Ok(PaginatedSyncHistory {
+            items,
+            total,
+            page,
+            page_size,
+        })
+    }
+
+    /// 重置用户所有同步数据（删除所有快照、记录和附件元信息）
+    pub async fn reset_sync_data(&self, user_id: &str) -> anyhow::Result<()> {
+        self.repo.delete_user_records(user_id).await?;
+        self.repo.delete_user_attachments(user_id).await?;
+        self.repo.delete_all_snapshots(user_id).await?;
+        Ok(())
     }
 }

@@ -10,12 +10,15 @@ import {
     History,
     CheckCircle,
     AlertCircle,
+    ChevronLeft,
+    ChevronRight,
 } from "lucide-react";
 import { useSyncStore } from "../../stores/syncStore";
 import { LoginModal } from "../auth/LoginModal";
 import { RegisterModal } from "../auth/RegisterModal";
 import { ForgotPasswordModal } from "../auth/ForgotPasswordModal";
 import { ResetPasswordModal } from "../auth/ResetPasswordModal";
+import { ConflictResolutionModal } from "./ConflictResolutionModal";
 
 type AuthModal = "login" | "register" | "forgot" | "reset" | null;
 
@@ -24,8 +27,12 @@ export function SyncSettingsPanel() {
         config,
         state,
         history,
+        historyTotal,
+        historyPage,
+        historyPageSize,
         isLoading,
         error,
+        pendingConflicts,
         updateConfig,
         triggerSync,
         logout,
@@ -280,6 +287,13 @@ export function SyncSettingsPanel() {
                         </div>
                     </div>
 
+                    {/* 待解决冲突提示 */}
+                    {pendingConflicts && pendingConflicts.length > 0 && (
+                        <div className="rounded-xl bg-amber-500/10 px-4 py-3 text-xs text-amber-300">
+                            有 {pendingConflicts.length} 条同步冲突等待解决，请在弹出的对话框中选择处理方式。
+                        </div>
+                    )}
+
                     {/* 同步状态 */}
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-[var(--text)]">
@@ -334,11 +348,11 @@ export function SyncSettingsPanel() {
                                     </div>
                                 </div>
                             )}
-                            {state.last_sync_at && !isSyncing && (
+                            {(state.last_sync_at || config.last_sync_at) && !isSyncing && (
                                 <div className="mt-1.5 text-xs text-[var(--muted)]">
                                     上次同步:{" "}
                                     {new Date(
-                                        state.last_sync_at,
+                                        state.last_sync_at || config.last_sync_at!,
                                     ).toLocaleString()}
                                 </div>
                             )}
@@ -351,16 +365,19 @@ export function SyncSettingsPanel() {
                     </div>
 
                     {/* 同步历史 */}
-                    {history.length > 0 && (
+                    {historyTotal > 0 && (
                         <div className="space-y-2">
                             <div className="flex items-center gap-2">
                                 <History className="h-4 w-4 text-[var(--muted)]" />
                                 <label className="text-sm font-medium text-[var(--text)]">
                                     同步历史
                                 </label>
+                                <span className="text-xs text-[var(--muted)]">
+                                    共 {historyTotal} 条
+                                </span>
                             </div>
-                            <div className="max-h-40 space-y-1 overflow-auto">
-                                {history.slice(0, 10).map((entry) => (
+                            <div className="max-h-60 space-y-1 overflow-auto">
+                                {history.map((entry) => (
                                     <div
                                         key={entry.snapshot_id}
                                         className="flex items-center justify-between rounded-lg px-3 py-2 text-xs"
@@ -376,6 +393,30 @@ export function SyncSettingsPanel() {
                                     </div>
                                 ))}
                             </div>
+                            {/* 分页导航 */}
+                            {Math.ceil(historyTotal / historyPageSize) > 1 && (
+                                <div className="flex items-center justify-between pt-1">
+                                    <button
+                                        onClick={() => refreshHistory(historyPage - 1)}
+                                        disabled={historyPage <= 1}
+                                        className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)] disabled:opacity-30 disabled:cursor-not-allowed"
+                                    >
+                                        <ChevronLeft className="h-3.5 w-3.5" />
+                                        上一页
+                                    </button>
+                                    <span className="text-xs text-[var(--muted)]">
+                                        {historyPage} / {Math.ceil(historyTotal / historyPageSize)}
+                                    </span>
+                                    <button
+                                        onClick={() => refreshHistory(historyPage + 1)}
+                                        disabled={historyPage >= Math.ceil(historyTotal / historyPageSize)}
+                                        className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)] disabled:opacity-30 disabled:cursor-not-allowed"
+                                    >
+                                        下一页
+                                        <ChevronRight className="h-3.5 w-3.5" />
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </>
@@ -416,6 +457,12 @@ export function SyncSettingsPanel() {
                 email={resetEmail}
                 resetToken={resetToken}
                 onSwitchToLogin={() => setAuthModal("login")}
+            />
+
+            {/* 冲突解决对话框 */}
+            <ConflictResolutionModal
+                open={Boolean(pendingConflicts && pendingConflicts.length > 0)}
+                onClose={() => {}}
             />
         </div>
     );

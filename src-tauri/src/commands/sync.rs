@@ -28,23 +28,19 @@ impl Drop for SyncGuard<'_> {
 pub struct SyncEngineState {
     pub engine: Mutex<SyncEngine>,
     pub config: Mutex<SyncConfig>,
-    /// 共享的 transport，用于异步命令（避免跨 await 持有 MutexGuard）
-    pub transport: Mutex<Option<SyncTransport>>,
-    /// 共享的状态管理器
-    pub state_manager: Mutex<SyncStateManager>,
     /// 防止并发同步
     is_syncing: AtomicBool,
+    /// manual 模式下待解决的冲突
+    pub pending_conflicts: Mutex<Option<PendingSyncState>>,
 }
 
 impl SyncEngineState {
     pub fn new(engine: SyncEngine, config: SyncConfig) -> Self {
-        let state_manager = engine.state_manager().clone();
         Self {
             engine: Mutex::new(engine),
             config: Mutex::new(config),
-            transport: Mutex::new(None),
-            state_manager: Mutex::new(state_manager),
             is_syncing: AtomicBool::new(false),
+            pending_conflicts: Mutex::new(None),
         }
     }
 
@@ -191,16 +187,41 @@ pub async fn trigger_sync(
         (transport, sm, shared_config)
     };
 
+    // 清除上次残留的进度状态
+    state_manager.clear_progress();
+
     // 使用独立的 transport 执行同步（不持有 engine 锁）
-    let result = run_sync_with_transport(&transport, &state_manager, &config, &db).await?;
+    let sync_output = match run_sync_with_transport(&transport, &state_manager, &config, &db).await {
+        Ok(r) => r,
+        Err(e) => {
+            state_manager.set_error(e.to_string());
+            return Err(e);
+        }
+    };
 
     // 获取可能已刷新的 tokens（回调可能已更新了 shared_config）
     let (new_access, new_refresh) = transport.get_tokens().await;
 
+    // manual 模式有冲突时：保存 pending 状态，不更新 last_sync_at
+    if let Some(pending_state) = sync_output.pending_state {
+        if let Ok(mut pending) = sync_state.pending_conflicts.lock() {
+            *pending = Some(pending_state);
+        }
+        // 仍需更新 token
+        let mut updated_config = config;
+        updated_config.access_token = new_access;
+        updated_config.refresh_token = new_refresh;
+        save_sync_config(&db, &updated_config)?;
+        if let Ok(mut cfg) = sync_state.config.lock() {
+            *cfg = updated_config;
+        }
+        return Ok(sync_output.result);
+    }
+
     // 更新配置（含 last_sync_at 等字段）
     let mut updated_config = config;
     updated_config.last_sync_at = Some(chrono::Utc::now().to_rfc3339());
-    updated_config.last_snapshot_id = Some(result.snapshot_id.clone());
+    updated_config.last_snapshot_id = Some(sync_output.result.snapshot_id.clone());
     // 回调可能已更新了 token，以 transport 中的为准
     updated_config.access_token = new_access;
     updated_config.refresh_token = new_refresh;
@@ -209,7 +230,13 @@ pub async fn trigger_sync(
         *cfg = updated_config;
     }
 
-    Ok(result)
+    Ok(sync_output.result)
+}
+
+/// 同步输出（包含结果和可选的待解决冲突状态）
+struct SyncOutput {
+    result: SyncResult,
+    pending_state: Option<PendingSyncState>,
 }
 
 /// 使用独立的 transport 执行同步
@@ -218,7 +245,7 @@ async fn run_sync_with_transport(
     state_manager: &SyncStateManager,
     config: &SyncConfig,
     db: &DbState,
-) -> Result<SyncResult, AppError> {
+) -> Result<SyncOutput, AppError> {
     use crate::sync::diff::{collect_local_records, compute_diff};
     use crate::sync::{load_baseline_map, save_baseline_map};
 
@@ -264,11 +291,15 @@ async fn run_sync_with_transport(
         }
     }
 
+    // 检查是否为 manual 模式且存在冲突
+    let is_manual_conflict = config.conflict_resolution == "manual" && !diff_result.conflicts.is_empty();
+
     let mut result = SyncResult {
         pushed: 0,
         pulled: 0,
         skipped: diff_result.unchanged,
         conflicts: diff_result.conflicts.len() as u32,
+        pending_conflicts: None,
         attachments_uploaded: 0,
         attachments_downloaded: 0,
         snapshot_id: String::new(),
@@ -304,23 +335,50 @@ async fn run_sync_with_transport(
         result.pulled = pull_result.records.len() as u32;
     }
 
-    // 8. 同步附件
+    // 8. manual 模式：有冲突时暂停，等待用户解决
+    if is_manual_conflict {
+        let conflict_infos: Vec<ConflictInfo> = diff_result
+            .conflicts
+            .iter()
+            .map(|c| ConflictInfo {
+                record_id: c.record_id.clone(),
+                table_name: c.table_name.clone(),
+                local_data: c.local_record.data.clone(),
+                local_updated_at: c.local_record.updated_at.clone(),
+                remote_updated_at: c.remote_meta.updated_at.clone(),
+                content_hash: c.local_record.content_hash.clone(),
+            })
+            .collect();
+
+        result.pending_conflicts = Some(conflict_infos.clone());
+        state_manager.set_completed();
+        return Ok(SyncOutput {
+            result,
+            pending_state: Some(PendingSyncState {
+                pushed_record_ids,
+                remote_snapshot_id: remote_snapshot.as_ref().map(|s| s.snapshot_id.clone()),
+                conflicts: conflict_infos,
+            }),
+        });
+    }
+
+    // 9. 同步附件
     if config.sync_attachments {
         state_manager.set_status(SyncStatus::SyncingAttachments);
         sync_attachments(transport, state_manager, &mut result, db).await?;
     }
 
-    // 9. 提交同步
+    // 10. 提交同步
     state_manager.set_progress("提交同步", 0, 1);
     let commit_result = transport.commit_sync(pushed_record_ids, vec![]).await?;
     result.snapshot_id = commit_result.snapshot_id;
 
-    // 10. 保存基线映射（同步成功后，使用 pull 后的实际数据库状态）
+    // 11. 保存基线映射（同步成功后，使用 pull 后的实际数据库状态）
     let final_records = collect_local_records(db)?;
     save_baseline_map(db, &final_records, &result.snapshot_id)?;
 
     state_manager.set_completed();
-    Ok(result)
+    Ok(SyncOutput { result, pending_state: None })
 }
 
 async fn sync_attachments(
@@ -599,7 +657,159 @@ pub async fn test_sync_connection(server_url: String) -> Result<bool, AppError> 
 #[tauri::command]
 pub async fn get_sync_history(
     sync_state: State<'_, SyncEngineState>,
-) -> Result<Vec<crate::sync::transport::SyncHistoryEntry>, AppError> {
+    page: u32,
+    page_size: u32,
+) -> Result<crate::sync::transport::PaginatedSyncHistory, AppError> {
     let transport = sync_state.get_transport()?;
-    transport.get_sync_history().await
+    transport.get_sync_history(page.max(1), page_size.clamp(1, 100)).await
+}
+
+/// 获取待解决的冲突列表
+#[tauri::command]
+pub fn get_pending_conflicts(
+    sync_state: State<'_, SyncEngineState>,
+) -> Result<Option<Vec<ConflictInfo>>, AppError> {
+    let pending = sync_state
+        .pending_conflicts
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    Ok(pending.as_ref().map(|p| p.conflicts.clone()))
+}
+
+/// 解决手动冲突并完成同步
+#[tauri::command]
+pub async fn resolve_sync_conflicts(
+    db: State<'_, DbState>,
+    sync_state: State<'_, SyncEngineState>,
+    resolutions: Vec<(String, String)>,
+) -> Result<SyncResult, AppError> {
+    use crate::sync::diff::collect_local_records;
+    use crate::sync::save_baseline_map;
+
+    // 取出 pending 状态
+    let pending = {
+        let mut pending_lock = sync_state
+            .pending_conflicts
+            .lock()
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        pending_lock.take()
+    };
+    let pending = pending.ok_or_else(|| AppError::SyncError("没有待解决的冲突".to_string()))?;
+
+    let config = {
+        let cfg = sync_state
+            .config
+            .lock()
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        cfg.clone()
+    };
+
+    // 构建冲突 map: record_id → ConflictInfo
+    let conflict_map: std::collections::HashMap<&str, &ConflictInfo> = pending
+        .conflicts
+        .iter()
+        .map(|c| (c.record_id.as_str(), c))
+        .collect();
+
+    let transport = sync_state.get_transport()?;
+
+    let mut result = SyncResult {
+        pushed: 0,
+        pulled: 0,
+        skipped: 0,
+        conflicts: resolutions.len() as u32,
+        pending_conflicts: None,
+        attachments_uploaded: 0,
+        attachments_downloaded: 0,
+        snapshot_id: String::new(),
+    };
+
+    let mut all_pushed_ids = pending.pushed_record_ids.clone();
+
+    // 按用户选择处理每条冲突
+    for (record_id, choice) in &resolutions {
+        let conflict = match conflict_map.get(record_id.as_str()) {
+            Some(c) => c,
+            None => continue,
+        };
+
+        match choice.as_str() {
+            "local" => {
+                // 推送本地记录到服务端
+                let payload = crate::models::sync::SyncRecordPayload {
+                    table_name: conflict.table_name.clone(),
+                    record_id: conflict.record_id.clone(),
+                    content_hash: conflict.content_hash.clone(),
+                    updated_at: conflict.local_updated_at.clone(),
+                    data: conflict.local_data.clone(),
+                };
+                transport.push_records(vec![payload]).await?;
+                all_pushed_ids.push(record_id.clone());
+                result.pushed += 1;
+            }
+            "remote" => {
+                // 从服务端拉取该记录并 apply 到本地
+                let snapshot_id = pending
+                    .remote_snapshot_id
+                    .as_deref()
+                    .ok_or_else(|| AppError::SyncError("无远程快照".to_string()))?;
+                let pull_result = transport.pull_records(Some(snapshot_id)).await?;
+                // 只 apply 与当前冲突 record_id 匹配的记录
+                let matching: Vec<_> = pull_result
+                    .records
+                    .into_iter()
+                    .filter(|r| r.record_id == *record_id)
+                    .collect();
+                apply_pulled_records(&matching, &db)?;
+                result.pulled += 1;
+            }
+            _ => {
+                return Err(AppError::SyncError(format!(
+                    "无效的解决选择: {}，必须为 'local' 或 'remote'",
+                    choice
+                )));
+            }
+        }
+    }
+
+    // 同步附件
+    if config.sync_attachments {
+        let dummy_sm = SyncStateManager::new();
+        sync_attachments(&transport, &dummy_sm, &mut result, &db).await?;
+    }
+
+    // 提交同步
+    let commit_result = transport.commit_sync(all_pushed_ids, vec![]).await?;
+    result.snapshot_id = commit_result.snapshot_id;
+
+    // 保存基线
+    let final_records = collect_local_records(&db)?;
+    save_baseline_map(&db, &final_records, &result.snapshot_id)?;
+
+    // 更新配置
+    let (new_access, new_refresh) = transport.get_tokens().await;
+    let mut updated_config = config;
+    updated_config.last_sync_at = Some(chrono::Utc::now().to_rfc3339());
+    updated_config.last_snapshot_id = Some(result.snapshot_id.clone());
+    updated_config.access_token = new_access;
+    updated_config.refresh_token = new_refresh;
+    save_sync_config(&db, &updated_config)?;
+    if let Ok(mut cfg) = sync_state.config.lock() {
+        *cfg = updated_config;
+    }
+
+    Ok(result)
+}
+
+/// 取消待解决的冲突同步
+#[tauri::command]
+pub fn cancel_sync_conflicts(
+    sync_state: State<'_, SyncEngineState>,
+) -> Result<(), AppError> {
+    let mut pending = sync_state
+        .pending_conflicts
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    *pending = None;
+    Ok(())
 }

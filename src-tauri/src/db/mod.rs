@@ -158,6 +158,10 @@ impl DbState {
             )
             .map_err(|e| AppError::Database(e.to_string()))?;
 
+        if current_version >= SCHEMA_VERSION {
+            return Ok(());
+        }
+
         if current_version < 2 {
             conn.execute_batch(
                 "INSERT INTO items_fts_trigram(items_fts_trigram) VALUES('rebuild');

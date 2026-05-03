@@ -78,15 +78,6 @@ pub struct SyncProgress {
     pub total: u32,
 }
 
-/// 记录元信息
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct RecordMeta {
-    pub table_name: String,
-    pub record_id: String,
-    pub content_hash: String,
-    pub updated_at: String,
-}
-
 /// 同步记录（带数据）
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SyncRecordPayload {
@@ -97,6 +88,25 @@ pub struct SyncRecordPayload {
     pub data: serde_json::Value,
 }
 
+/// 冲突记录信息（传递给前端）
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ConflictInfo {
+    pub record_id: String,
+    pub table_name: String,
+    pub local_data: serde_json::Value,
+    pub local_updated_at: String,
+    pub remote_updated_at: String,
+    pub content_hash: String,
+}
+
+/// 待解决的同步状态（manual 模式暂停时保存）
+#[derive(Debug, Clone)]
+pub struct PendingSyncState {
+    pub pushed_record_ids: Vec<String>,
+    pub remote_snapshot_id: Option<String>,
+    pub conflicts: Vec<ConflictInfo>,
+}
+
 /// 同步结果
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SyncResult {
@@ -104,6 +114,7 @@ pub struct SyncResult {
     pub pulled: u32,
     pub skipped: u32,
     pub conflicts: u32,
+    pub pending_conflicts: Option<Vec<ConflictInfo>>,
     pub attachments_uploaded: u32,
     pub attachments_downloaded: u32,
     pub snapshot_id: String,

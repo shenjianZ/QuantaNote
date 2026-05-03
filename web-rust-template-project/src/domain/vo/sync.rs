@@ -78,3 +78,12 @@ pub struct SyncHistoryEntry {
     pub total_size: i64,
     pub created_at: String,
 }
+
+/// 分页同步历史响应
+#[derive(Debug, Serialize)]
+pub struct PaginatedSyncHistory {
+    pub items: Vec<SyncHistoryEntry>,
+    pub total: i64,
+    pub page: u32,
+    pub page_size: u32,
+}

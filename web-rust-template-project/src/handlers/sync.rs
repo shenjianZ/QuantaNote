@@ -225,23 +225,55 @@ pub async fn commit_sync(
     Ok(Json(ApiResponse::success(result)))
 }
 
-/// 获取同步历史
+/// 同步历史查询参数
+#[derive(Debug, Deserialize)]
+pub struct SyncHistoryQuery {
+    pub page: Option<u32>,
+    pub page_size: Option<u32>,
+}
+
+/// 获取同步历史（分页）
 pub async fn sync_history(
     Extension(request_id): Extension<RequestId>,
     Extension(user_id): Extension<String>,
     State(state): State<AppState>,
-) -> Result<Json<ApiResponse<Vec<SyncHistoryEntry>>>, ErrorResponse> {
+    Query(query): Query<SyncHistoryQuery>,
+) -> Result<Json<ApiResponse<PaginatedSyncHistory>>, ErrorResponse> {
+    let page = query.page.unwrap_or(1).max(1);
+    let page_size = query.page_size.unwrap_or(10).clamp(1, 100);
+
     log_info(
         &request_id,
         "获取同步历史",
-        &format!("user_id={}", user_id),
+        &format!("user_id={}, page={}, page_size={}", user_id, page, page_size),
     );
 
     let service = create_sync_service(&state).map_err(|e| ErrorResponse::new(e.to_string()))?;
     let history = service
-        .get_history(&user_id)
+        .get_history(&user_id, page, page_size)
         .await
         .map_err(|e| ErrorResponse::new(e.to_string()))?;
 
     Ok(Json(ApiResponse::success(history)))
+}
+
+/// 重置用户所有同步数据
+pub async fn reset_sync_data(
+    Extension(request_id): Extension<RequestId>,
+    Extension(user_id): Extension<String>,
+    State(state): State<AppState>,
+) -> Result<Json<ApiResponse<()>>, ErrorResponse> {
+    log_info(
+        &request_id,
+        "重置同步数据",
+        &format!("user_id={}", user_id),
+    );
+
+    let service = create_sync_service(&state).map_err(|e| ErrorResponse::new(e.to_string()))?;
+    service
+        .reset_sync_data(&user_id)
+        .await
+        .map_err(|e| ErrorResponse::new(e.to_string()))?;
+
+    Ok(Json(ApiResponse::success(())))
 }

@@ -25,6 +25,7 @@ struct ApiResponse<T> {
 
 /// 快照信息
 #[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)]
 pub struct SnapshotInfo {
     pub snapshot_id: String,
     pub data_hash: String,
@@ -35,6 +36,7 @@ pub struct SnapshotInfo {
 
 /// 记录元信息（从服务端返回）
 #[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)]
 pub struct RecordMetaInfo {
     pub table_name: String,
     pub record_id: String,
@@ -44,6 +46,7 @@ pub struct RecordMetaInfo {
 
 /// 推送结果
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct PushResult {
     pub accepted: Vec<String>,
     pub skipped: Vec<String>,
@@ -51,6 +54,7 @@ pub struct PushResult {
 
 /// 拉取结果
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct PullResult {
     pub records: Vec<SyncRecordPayload>,
     pub snapshot_id: String,
@@ -78,6 +82,7 @@ pub struct AttachmentDiffResult {
 
 /// 提交结果
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct CommitResult {
     pub snapshot_id: String,
     pub created_at: String,
@@ -90,6 +95,15 @@ pub struct SyncHistoryEntry {
     pub record_count: i32,
     pub total_size: i64,
     pub created_at: String,
+}
+
+/// 分页同步历史响应
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PaginatedSyncHistory {
+    pub items: Vec<SyncHistoryEntry>,
+    pub total: i64,
+    pub page: u32,
+    pub page_size: u32,
 }
 
 /// token 刷新后的回调类型
@@ -220,10 +234,10 @@ impl SyncTransport {
                 }
                 Ok(())
             } else {
-                Err(AppError::SyncError("刷新响应数据为空".to_string()))
+                Err(AppError::TokenExpired)
             }
         } else {
-            Err(AppError::SyncError(format!("刷新 token 失败: {}", body.message)))
+            Err(AppError::TokenExpired)
         }
     }
 
@@ -549,9 +563,9 @@ impl SyncTransport {
         }
     }
 
-    /// 获取同步历史
-    pub async fn get_sync_history(&self) -> Result<Vec<SyncHistoryEntry>, AppError> {
-        let url = format!("{}/sync/history", self.server_url);
+    /// 获取同步历史（分页）
+    pub async fn get_sync_history(&self, page: u32, page_size: u32) -> Result<PaginatedSyncHistory, AppError> {
+        let url = format!("{}/sync/history?page={}&page_size={}", self.server_url, page, page_size);
         let builder = self.client.get(&url);
         let resp = self.send_auth_with_refresh(builder).await?;
         self.handle_response(resp).await

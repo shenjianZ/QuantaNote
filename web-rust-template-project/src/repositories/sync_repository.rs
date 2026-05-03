@@ -48,19 +48,27 @@ impl SyncRepository {
         Ok(result)
     }
 
-    /// 获取同步历史
+    /// 获取同步历史（分页）
     pub async fn get_sync_history(
         &self,
         user_id: &str,
+        offset: u32,
         limit: u32,
-    ) -> anyhow::Result<Vec<sync_snapshots::Model>> {
+    ) -> anyhow::Result<(Vec<sync_snapshots::Model>, i64)> {
+        let total = sync_snapshots::Entity::find()
+            .filter(sync_snapshots::Column::UserId.eq(user_id))
+            .count(&self.db)
+            .await? as i64;
+
         let snapshots = sync_snapshots::Entity::find()
             .filter(sync_snapshots::Column::UserId.eq(user_id))
             .order_by_desc(sync_snapshots::Column::CreatedAt)
+            .offset(offset as u64)
             .limit(limit as u64)
             .all(&self.db)
             .await?;
-        Ok(snapshots)
+
+        Ok((snapshots, total))
     }
 
     // ========== 记录操作 ==========
@@ -235,6 +243,98 @@ impl SyncRepository {
     pub async fn delete_user_attachments(&self, user_id: &str) -> anyhow::Result<()> {
         sync_attachments::Entity::delete_many()
             .filter(sync_attachments::Column::UserId.eq(user_id))
+            .exec(&self.db)
+            .await?;
+        Ok(())
+    }
+
+    /// 更新附件元信息（commit 时由客户端上报完整元数据）
+    pub async fn update_attachment_metadata(
+        &self,
+        user_id: &str,
+        attachment_id: &str,
+        item_id: &str,
+        filename: &str,
+        mime_type: &str,
+        file_size: i64,
+        file_hash: &str,
+        storage_key: &str,
+    ) -> anyhow::Result<()> {
+        let model = sync_attachments::Entity::find()
+            .filter(sync_attachments::Column::UserId.eq(user_id))
+            .filter(sync_attachments::Column::AttachmentId.eq(attachment_id))
+            .one(&self.db)
+            .await?;
+        if let Some(m) = model {
+            let mut active: sync_attachments::ActiveModel = m.into();
+            active.item_id = Set(item_id.to_string());
+            active.filename = Set(filename.to_string());
+            active.mime_type = Set(mime_type.to_string());
+            active.file_size = Set(file_size);
+            active.file_hash = Set(file_hash.to_string());
+            active.storage_key = Set(storage_key.to_string());
+            active.update(&self.db).await?;
+        }
+        Ok(())
+    }
+
+    /// 删除指定快照 ID 之前的旧快照
+    pub async fn delete_snapshots_before(
+        &self,
+        user_id: &str,
+        before_snapshot_id: &str,
+    ) -> anyhow::Result<Vec<String>> {
+        // 找到 before_snapshot_id 的创建时间
+        let reference = sync_snapshots::Entity::find()
+            .filter(sync_snapshots::Column::UserId.eq(user_id))
+            .filter(sync_snapshots::Column::SnapshotId.eq(before_snapshot_id))
+            .one(&self.db)
+            .await?;
+        let reference = match reference {
+            Some(r) => r,
+            None => return Ok(vec![]),
+        };
+
+        // 查找比它更旧的快照
+        let old_snapshots = sync_snapshots::Entity::find()
+            .filter(sync_snapshots::Column::UserId.eq(user_id))
+            .filter(sync_snapshots::Column::CreatedAt.lt(reference.created_at))
+            .all(&self.db)
+            .await?;
+
+        let old_ids: Vec<String> = old_snapshots.iter().map(|s| s.snapshot_id.clone()).collect();
+        if old_ids.is_empty() {
+            return Ok(old_ids);
+        }
+
+        // 删除旧快照关联的记录
+        sync_records::Entity::delete_many()
+            .filter(sync_records::Column::UserId.eq(user_id))
+            .filter(sync_records::Column::SnapshotId.is_in(old_ids.clone()))
+            .exec(&self.db)
+            .await?;
+
+        // 删除旧快照关联的附件元信息
+        sync_attachments::Entity::delete_many()
+            .filter(sync_attachments::Column::UserId.eq(user_id))
+            .filter(sync_attachments::Column::SnapshotId.is_in(old_ids.clone()))
+            .exec(&self.db)
+            .await?;
+
+        // 删除旧快照本身
+        sync_snapshots::Entity::delete_many()
+            .filter(sync_snapshots::Column::UserId.eq(user_id))
+            .filter(sync_snapshots::Column::SnapshotId.is_in(old_ids.clone()))
+            .exec(&self.db)
+            .await?;
+
+        Ok(old_ids)
+    }
+
+    /// 删除用户所有快照
+    pub async fn delete_all_snapshots(&self, user_id: &str) -> anyhow::Result<()> {
+        sync_snapshots::Entity::delete_many()
+            .filter(sync_snapshots::Column::UserId.eq(user_id))
             .exec(&self.db)
             .await?;
         Ok(())
