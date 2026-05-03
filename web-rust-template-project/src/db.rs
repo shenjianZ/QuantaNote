@@ -318,10 +318,13 @@ async fn create_tables(db: &DatabaseConnection) -> anyhow::Result<()> {
     let schema = Schema::new(builder);
 
     // 导入所有 entities
-    use crate::domain::entities::users;
+    use crate::domain::entities::{users, sync_snapshots, sync_records, sync_attachments};
 
     // 创建所有表（添加新表只需一行！）
     create_single_table(db, &schema, &builder, users::Entity, "用户表").await?;
+    create_single_table(db, &schema, &builder, sync_snapshots::Entity, "同步快照表").await?;
+    create_single_table(db, &schema, &builder, sync_records::Entity, "同步记录表").await?;
+    create_single_table(db, &schema, &builder, sync_attachments::Entity, "同步附件表").await?;
 
     tracing::info!("✅ 数据库表结构检查完成");
 

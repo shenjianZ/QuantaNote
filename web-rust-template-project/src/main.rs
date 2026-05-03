@@ -64,6 +64,9 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("Environment: {}", args.env.as_str());
     tracing::info!("Debug mode: {}", args.is_debug_enabled());
 
+    // 打印最终生效的配置（敏感字段已掩码）
+    utils::config_logger::print_final_config(&config);
+
     // 初始化数据库（自动创建数据库和表）
     let pool = db::init_database(&config.database).await?;
 
@@ -87,7 +90,9 @@ async fn main() -> anyhow::Result<()> {
         .route("/info", get(handlers::health::server_info))
         .route("/auth/register", post(handlers::auth::register))
         .route("/auth/login", post(handlers::auth::login))
-        .route("/auth/refresh", post(handlers::auth::refresh));
+        .route("/auth/refresh", post(handlers::auth::refresh))
+        .route("/auth/forgot-password", post(handlers::auth::forgot_password))
+        .route("/auth/reset-password", post(handlers::auth::reset_password));
 
     // ========== 受保护路由 ==========
     let protected_routes = Router::new()
@@ -96,6 +101,17 @@ async fn main() -> anyhow::Result<()> {
             "/auth/delete-refresh-token",
             post(handlers::auth::delete_refresh_token),
         )
+        // 同步端点
+        .route("/sync/snapshot/latest", get(handlers::sync::get_latest_snapshot))
+        .route("/sync/snapshot/:snapshot_id/records", get(handlers::sync::get_snapshot_records))
+        .route("/sync/records/push", post(handlers::sync::push_records))
+        .route("/sync/records/pull", post(handlers::sync::pull_records))
+        .route("/sync/attachments/diff", post(handlers::sync::diff_attachments))
+        .route("/sync/attachments/upload", post(handlers::sync::upload_attachment))
+        .route("/sync/attachments/download/:attachment_id", get(handlers::sync::download_attachment))
+        .route("/sync/commit", post(handlers::sync::commit_sync))
+        .route("/sync/history", get(handlers::sync::sync_history))
+        .route("/sync/reset", post(handlers::sync::reset_sync_data))
         // JWT 认证中间件（仅应用于受保护路由）
         .route_layer(axum::middleware::from_fn_with_state(
             app_state.clone(),

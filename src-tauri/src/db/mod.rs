@@ -1,12 +1,13 @@
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use rusqlite::Connection;
 
 use crate::error::AppError;
 use crate::utils::logging;
 
+#[derive(Clone)]
 pub struct DbState {
-    pub conn: Mutex<Connection>,
+    pub conn: Arc<Mutex<Connection>>,
 }
 
 const SCHEMA_SQL: &str = "
@@ -29,6 +30,7 @@ CREATE TABLE IF NOT EXISTS items (
 
 CREATE TABLE IF NOT EXISTS tags (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    uuid TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL UNIQUE,
     color TEXT NOT NULL DEFAULT 'cyan'
 );
@@ -120,7 +122,7 @@ CREATE TABLE IF NOT EXISTS settings (
 INSERT OR IGNORE INTO schema_version (version) VALUES (1);
 ";
 
-const SCHEMA_VERSION: i64 = 3;
+const SCHEMA_VERSION: i64 = 5;
 
 impl DbState {
     pub fn open(db_path: &str) -> Result<Self, AppError> {
@@ -132,7 +134,7 @@ impl DbState {
             .map_err(|e| AppError::Database(e.to_string()))?;
 
         Ok(Self {
-            conn: Mutex::new(conn),
+            conn: Arc::new(Mutex::new(conn)),
         })
     }
 
@@ -156,6 +158,10 @@ impl DbState {
             )
             .map_err(|e| AppError::Database(e.to_string()))?;
 
+        if current_version >= SCHEMA_VERSION {
+            return Ok(());
+        }
+
         if current_version < 2 {
             conn.execute_batch(
                 "INSERT INTO items_fts_trigram(items_fts_trigram) VALUES('rebuild');
@@ -164,13 +170,40 @@ impl DbState {
             .map_err(|e| AppError::Database(e.to_string()))?;
         }
 
-        if current_version < SCHEMA_VERSION {
+        if current_version < 3 {
             conn.execute_batch(
                 "CREATE TABLE IF NOT EXISTS settings (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL
                  );
                  INSERT OR IGNORE INTO schema_version (version) VALUES (3);",
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+
+        if current_version < 4 {
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS sync_baseline (
+                    record_id TEXT NOT NULL,
+                    table_name TEXT NOT NULL,
+                    content_hash TEXT NOT NULL,
+                    synced_at TEXT NOT NULL,
+                    PRIMARY KEY (record_id, table_name)
+                 );
+                 INSERT OR IGNORE INTO schema_version (version) VALUES (4);",
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+
+        if current_version < 5 {
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS sync_tombstones (
+                    record_id TEXT NOT NULL,
+                    table_name TEXT NOT NULL,
+                    deleted_at TEXT NOT NULL,
+                    PRIMARY KEY (record_id, table_name)
+                 );
+                 INSERT OR IGNORE INTO schema_version (version) VALUES (5);",
             )
             .map_err(|e| AppError::Database(e.to_string()))?;
         }

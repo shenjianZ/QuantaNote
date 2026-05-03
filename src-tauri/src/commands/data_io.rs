@@ -89,12 +89,12 @@ fn export_data_from_db(db: &DbState) -> Result<String, AppError> {
 
     let tags: Vec<serde_json::Value> = {
         let mut stmt = conn
-            .prepare("SELECT id, name, color FROM tags")
+            .prepare("SELECT uuid, name, color FROM tags")
             .map_err(|e| AppError::Database(e.to_string()))?;
         let rows = stmt
             .query_map([], |row| {
                 Ok(serde_json::json!({
-                    "id": row.get::<_, i64>(0)?,
+                    "uuid": row.get::<_, String>(0)?,
                     "name": row.get::<_, String>(1)?,
                     "color": row.get::<_, String>(2)?,
                 }))
@@ -106,13 +106,13 @@ fn export_data_from_db(db: &DbState) -> Result<String, AppError> {
 
     let item_tags: Vec<serde_json::Value> = {
         let mut stmt = conn
-            .prepare("SELECT item_id, tag_id FROM item_tags")
+            .prepare("SELECT it.item_id, t.uuid FROM item_tags it JOIN tags t ON t.id = it.tag_id")
             .map_err(|e| AppError::Database(e.to_string()))?;
         let rows = stmt
             .query_map([], |row| {
                 Ok(serde_json::json!({
                     "item_id": row.get::<_, String>(0)?,
-                    "tag_id": row.get::<_, i64>(1)?,
+                    "tag_uuid": row.get::<_, String>(1)?,
                 }))
             })
             .map_err(|e| AppError::Database(e.to_string()))?;
@@ -219,9 +219,9 @@ fn import_data_into_db(db: &DbState, json: String) -> Result<(), AppError> {
 
     for tag in data.tags {
         tx.execute(
-            "INSERT OR REPLACE INTO tags (id, name, color) VALUES (?1, ?2, ?3)",
+            "INSERT OR REPLACE INTO tags (uuid, name, color) VALUES (?1, ?2, ?3)",
             rusqlite::params![
-                value_i64(&tag, "id"),
+                value_str(&tag, "uuid"),
                 value_str(&tag, "name"),
                 tag["color"].as_str().unwrap_or("cyan")
             ],
@@ -230,12 +230,18 @@ fn import_data_into_db(db: &DbState, json: String) -> Result<(), AppError> {
     }
 
     for item_tag in data.item_tags {
+        let tag_uuid = value_str(&item_tag, "tag_uuid");
+        let tag_id: i64 = match tx.query_row(
+            "SELECT id FROM tags WHERE uuid = ?1",
+            rusqlite::params![tag_uuid],
+            |row| row.get(0),
+        ) {
+            Ok(id) => id,
+            Err(_) => continue,
+        };
         tx.execute(
             "INSERT OR IGNORE INTO item_tags (item_id, tag_id) VALUES (?1, ?2)",
-            rusqlite::params![
-                value_str(&item_tag, "item_id"),
-                value_i64(&item_tag, "tag_id")
-            ],
+            rusqlite::params![value_str(&item_tag, "item_id"), tag_id],
         )
         .map_err(|e| AppError::Database(e.to_string()))?;
     }
@@ -381,12 +387,12 @@ fn query_items_json(conn: &rusqlite::Connection) -> Result<Vec<serde_json::Value
 
 fn query_tags_json(conn: &rusqlite::Connection) -> Result<Vec<serde_json::Value>, AppError> {
     let mut stmt = conn
-        .prepare("SELECT id, name, color FROM tags")
+        .prepare("SELECT uuid, name, color FROM tags")
         .map_err(|e| AppError::Database(e.to_string()))?;
     let rows = stmt
         .query_map([], |row| {
             Ok(serde_json::json!({
-                "id": row.get::<_, i64>(0)?,
+                "uuid": row.get::<_, String>(0)?,
                 "name": row.get::<_, String>(1)?,
                 "color": row.get::<_, String>(2)?,
             }))
@@ -398,13 +404,13 @@ fn query_tags_json(conn: &rusqlite::Connection) -> Result<Vec<serde_json::Value>
 
 fn query_item_tags_json(conn: &rusqlite::Connection) -> Result<Vec<serde_json::Value>, AppError> {
     let mut stmt = conn
-        .prepare("SELECT item_id, tag_id FROM item_tags")
+        .prepare("SELECT it.item_id, t.uuid FROM item_tags it JOIN tags t ON t.id = it.tag_id")
         .map_err(|e| AppError::Database(e.to_string()))?;
     let rows = stmt
         .query_map([], |row| {
             Ok(serde_json::json!({
                 "item_id": row.get::<_, String>(0)?,
-                "tag_id": row.get::<_, i64>(1)?,
+                "tag_uuid": row.get::<_, String>(1)?,
             }))
         })
         .map_err(|e| AppError::Database(e.to_string()))?;
@@ -712,34 +718,36 @@ pub fn import_data_zip(
     if options.include_tags {
         if let Some(tags) = data["tags"].as_array() {
             for tag in tags {
-                if options.overwrite {
-                    tx.execute(
-                        "INSERT OR REPLACE INTO tags (id, name, color) VALUES (?1, ?2, ?3)",
-                        rusqlite::params![
-                            value_i64(tag, "id"),
-                            value_str(tag, "name"),
-                            tag["color"].as_str().unwrap_or("cyan")
-                        ],
-                    )
-                    .map_err(|e| AppError::Database(e.to_string()))?;
+                let sql = if options.overwrite {
+                    "INSERT OR REPLACE INTO tags (uuid, name, color) VALUES (?1, ?2, ?3)"
                 } else {
-                    tx.execute(
-                        "INSERT OR IGNORE INTO tags (id, name, color) VALUES (?1, ?2, ?3)",
-                        rusqlite::params![
-                            value_i64(tag, "id"),
-                            value_str(tag, "name"),
-                            tag["color"].as_str().unwrap_or("cyan")
-                        ],
-                    )
-                    .map_err(|e| AppError::Database(e.to_string()))?;
-                }
+                    "INSERT OR IGNORE INTO tags (uuid, name, color) VALUES (?1, ?2, ?3)"
+                };
+                tx.execute(
+                    sql,
+                    rusqlite::params![
+                        value_str(tag, "uuid"),
+                        value_str(tag, "name"),
+                        tag["color"].as_str().unwrap_or("cyan")
+                    ],
+                )
+                .map_err(|e| AppError::Database(e.to_string()))?;
             }
         }
         if let Some(item_tags) = data["item_tags"].as_array() {
             for it in item_tags {
+                let tag_uuid = value_str(it, "tag_uuid");
+                let tag_id: i64 = match tx.query_row(
+                    "SELECT id FROM tags WHERE uuid = ?1",
+                    rusqlite::params![tag_uuid],
+                    |row| row.get(0),
+                ) {
+                    Ok(id) => id,
+                    Err(_) => continue,
+                };
                 tx.execute(
                     "INSERT OR IGNORE INTO item_tags (item_id, tag_id) VALUES (?1, ?2)",
-                    rusqlite::params![value_str(it, "item_id"), value_i64(it, "tag_id")],
+                    rusqlite::params![value_str(it, "item_id"), tag_id],
                 )
                 .map_err(|e| AppError::Database(e.to_string()))?;
             }

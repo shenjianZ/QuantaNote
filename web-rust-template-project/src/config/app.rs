@@ -1,4 +1,4 @@
-use super::{auth::AuthConfig, database::DatabaseConfig, redis::RedisConfig, server::ServerConfig};
+use super::{auth::AuthConfig, database::DatabaseConfig, redis::RedisConfig, server::ServerConfig, storage::StorageConfig};
 use config::{Config, ConfigError, Environment, File};
 use serde::Deserialize;
 use std::path::PathBuf;
@@ -12,6 +12,8 @@ pub struct AppConfig {
     pub database: DatabaseConfig,
     pub auth: AuthConfig,
     pub redis: RedisConfig,
+    #[serde(default)]
+    pub storage: StorageConfig,
 }
 
 impl AppConfig {
@@ -61,6 +63,11 @@ impl AppConfig {
             builder = builder.set_default("redis.host", default_redis_host())?;
             builder = builder.set_default("redis.port", 6379)?;
             builder = builder.set_default("redis.db", 0)?;
+
+            // 设置 storage 默认值
+            builder = builder.set_default("storage.backend_type", "local")?;
+            builder = builder.set_default("storage.base_path", "./sync_data")?;
+            builder = builder.set_default("storage.region", "us-east-1")?;
         }
 
         // 添加环境变量源（会覆盖配置文件的值）

@@ -19,5 +19,6 @@ Thumbs.db
 .env
 db.sqlite*
 data
+sync_data/
 API_FLOW*
 SEAORM*

@@ -24,6 +24,24 @@ port = 6379                   # Redis 端口（默认 6379）
 password = ""                  # Redis 密码（强烈建议设置密码）
 db = 0                         # Redis 数据库编号（0-15）
 
+[storage]
+# 存储后端类型: "local" | "s3" | "openlist"
+backend_type = "local"
+
+# 本地存储路径（backend_type = "local" 时使用）
+base_path = "./sync_data"
+
+# S3/MinIO 配置（backend_type = "s3" 时使用）
+# bucket = "quantanote-sync"
+# endpoint = "http://127.0.0.1:9000"
+# region = "us-east-1"
+# access_key = "minioadmin"
+# secret_key = "minioadmin"
+
+# OpenList 配置（backend_type = "openlist" 时使用）
+# openlist_url = "http://127.0.0.1:5244"
+# openlist_token = "your-openlist-token"
+
 # 安全检查清单：部署前请确认
 # ✅ 1. 已修改 jwt_secret 为强随机字符串
 # ✅ 2. 已修改数据库密码为强密码
