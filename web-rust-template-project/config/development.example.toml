@@ -21,7 +21,7 @@ path = "data/app.db"
 max_connections = 10
 
 [auth]
-jwt_secret = "9f7d3c7a564dfkopp26smb2644nqzfvbsao9f7d3c7a1a8f28544b5e6d7a"
+jwt_secret = "CHANGE_ME_TO_A_STRONG_RANDOM_STRING"
 # 分开配置两个 token 的过期时间
 access_token_expiration_minutes = 15   # access_token 15 分钟
 refresh_token_expiration_days = 7      # refresh_token 7 天

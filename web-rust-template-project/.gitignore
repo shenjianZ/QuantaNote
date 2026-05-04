@@ -22,3 +22,6 @@ data
 sync_data/
 API_FLOW*
 SEAORM*
+
+config/development.toml
+config/production.toml

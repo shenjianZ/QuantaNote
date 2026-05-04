@@ -9,14 +9,14 @@ database_type = "postgresql"  # 数据库类型：sqlite/mysql/postgresql
 host = "localhost"            # PostgreSQL 服务器地址
 port = 5432                   # PostgreSQL 端口（默认 5432）
 user = "postgres"              # PostgreSQL 用户名（请创建专用用户）
-password = "postgres"          # PostgreSQL 密码（请修改为强密码）
-database = "web_template"   # 数据库名称（不存在会自动创建）
+password = "CHANGE_ME_TO_A_STRONG_PASSWORD"  # PostgreSQL 密码
+database = "web_template"     # 数据库名称（不存在会自动创建）
 max_connections = 20          # 最大连接数（生产环境建议 20-100）
 
 [auth]
-jwt_secret = "9f7d3c7a564dfkopp26smb2644nqzfvbsao9f7d3c7a1a8f28544b5e6d7a"  # JWT 签名密钥（必须修改为强随机字符串！）
+jwt_secret = "CHANGE_ME_TO_A_STRONG_RANDOM_STRING"  # JWT 签名密钥（必须修改为强随机字符串！）
 access_token_expiration_minutes = 15            # Access Token 过期时间（分钟）
-refresh_token_expiration_days = 7             # Refresh Token 过期时间（天）
+refresh_token_expiration_days = 7               # Refresh Token 过期时间（天）
 
 [redis]
 host = "localhost"           # Redis 服务器地址
