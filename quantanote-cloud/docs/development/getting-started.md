@@ -64,7 +64,7 @@ redis-cli --version
 
 ```bash
 git clone <repository-url>
-cd web-rust-template
+cd quantanote-cloud
 ```
 
 ### 2. 安装依赖
@@ -281,7 +281,7 @@ cargo run -- -e production
 nohup cargo run -- -e production > app.log 2>&1 &
 
 # 使用 screen
-screen -S web-rust-template
+screen -S quantanote-cloud
 cargo run -- -e production
 # 按 Ctrl+A 然后 D 分离会话
 ```
@@ -312,7 +312,7 @@ curl http://localhost:3000/info
 预期响应：
 ```json
 {
-  "name": "web-rust-template",
+  "name": "quantanote-cloud",
   "version": "0.1.0",
   "status": "running",
   "timestamp": 1704112800
@@ -442,7 +442,7 @@ lsof -ti:3000 | xargs kill -9
 
 ```bash
 # Linux/macOS
-chmod +x target/debug/web-rust-template
+chmod +x target/debug/quantanote-cloud
 
 # 或使用 sudo 运行（不推荐生产环境）
 sudo cargo run

@@ -17,7 +17,7 @@ pub async fn health_check(State(state): State<AppState>) -> impl IntoResponse {
 /// 获取服务器信息
 pub async fn server_info() -> impl IntoResponse {
     Json(json!({
-        "name": "web-rust-template",
+        "name": "quantanote-cloud",
         "version": "0.1.0",
         "status": "running",
         "timestamp": chrono::Utc::now().timestamp()

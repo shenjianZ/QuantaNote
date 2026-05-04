@@ -2,7 +2,7 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct StorageConfig {
-    /// 存储后端类型: "local" | "s3" | "openlist"
+    /// 存储后端类型: "local" | "s3" | "webdav"
     #[serde(default = "default_backend_type")]
     pub backend_type: String,
 
@@ -24,11 +24,14 @@ pub struct StorageConfig {
     /// S3 秘密密钥
     pub secret_key: Option<String>,
 
-    /// OpenList API 基础 URL
-    pub openlist_url: Option<String>,
+    /// WebDAV 服务器 URL
+    pub webdav_url: Option<String>,
 
-    /// OpenList 认证令牌
-    pub openlist_token: Option<String>,
+    /// WebDAV 用户名
+    pub webdav_username: Option<String>,
+
+    /// WebDAV 密码
+    pub webdav_password: Option<String>,
 }
 
 fn default_backend_type() -> String {
@@ -45,8 +48,9 @@ impl Default for StorageConfig {
             region: Some("us-east-1".to_string()),
             access_key: None,
             secret_key: None,
-            openlist_url: None,
-            openlist_token: None,
+            webdav_url: None,
+            webdav_username: None,
+            webdav_password: None,
         }
     }
 }

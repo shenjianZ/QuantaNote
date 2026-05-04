@@ -1,10 +1,16 @@
 use crate::config::app::AppConfig;
 use crate::config::database::DatabaseType;
 
-/// 将敏感字符串掩码为 `****`，空值显示为 `<未设置>`
+/// 将敏感字符串部分掩码（显示前2后2位），空值显示为 `<未设置>`
 fn mask_secret(opt: &Option<String>) -> String {
     match opt {
-        Some(s) if !s.is_empty() => "****".to_string(),
+        Some(s) if !s.is_empty() => {
+            if s.len() <= 4 {
+                "****".to_string()
+            } else {
+                format!("{}****{}", &s[..2], &s[s.len() - 2..])
+            }
+        }
         _ => "<未设置>".to_string(),
     }
 }
@@ -80,7 +86,10 @@ pub fn print_final_config(config: &AppConfig) {
 
     // ── Auth ──
     tracing::info!("║ [auth]                                          ║");
-    tracing::info!("║   jwt_secret                     = ****");
+    tracing::info!(
+        "║   jwt_secret                     = {}",
+        mask_secret(&Some(config.auth.jwt_secret.clone()))
+    );
     tracing::info!(
         "║   access_token_expiration_minutes = {}",
         config.auth.access_token_expiration_minutes
@@ -125,12 +134,16 @@ pub fn print_final_config(config: &AppConfig) {
         mask_secret(&config.storage.secret_key)
     );
     tracing::info!(
-        "║   openlist_url    = {}",
-        display_opt(&config.storage.openlist_url)
+        "║   webdav_url      = {}",
+        display_opt(&config.storage.webdav_url)
     );
     tracing::info!(
-        "║   openlist_token  = {}",
-        mask_secret(&config.storage.openlist_token)
+        "║   webdav_username = {}",
+        display_opt(&config.storage.webdav_username)
+    );
+    tracing::info!(
+        "║   webdav_password = {}",
+        mask_secret(&config.storage.webdav_password)
     );
 
     tracing::info!("╚══════════════════════════════════════════════════╝");

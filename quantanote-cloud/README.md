@@ -22,7 +22,7 @@
 
 ```bash
 git clone <repository>
-cd web-rust-template
+cd quantanote-cloud
 cargo build
 ```
 
@@ -96,6 +96,90 @@ curl -X POST http://localhost:3000/auth/register \
 ```
 
 > 查看 [完整 API 文档](docs/api/api-overview.md) 了解所有接口
+
+## 存储配置
+
+服务端支持三种文件存储后端，通过 `[storage]` 配置段选择：
+
+### local（默认）
+
+文件存储在本地磁盘，零配置即可使用：
+
+```toml
+[storage]
+backend_type = "local"
+base_path = "./sync_data"
+```
+
+### S3 / MinIO
+
+适合自建对象存储或云上部署：
+
+```toml
+[storage]
+backend_type = "s3"
+bucket = "quantanote-sync"
+endpoint = "http://127.0.0.1:9000"   # MinIO 地址，AWS S3 不填
+region = "us-east-1"
+access_key = "minioadmin"
+secret_key = "minioadmin"
+```
+
+**部署 MinIO（Docker 一键启动）：**
+
+```bash
+docker run -d \
+  --name quantanote-minio \
+  -p 9000:9000 \
+  -p 9001:9001 \
+  -e MINIO_ROOT_USER=minioadmin \
+  -e MINIO_ROOT_PASSWORD=minioadmin \
+  -v minio-data:/data \
+  minio/minio server /data --console-address ':9001'
+
+# 创建 bucket
+docker exec quantanote-minio mc alias set local http://localhost:9000 minioadmin minioadmin
+docker exec quantanote-minio mc mb --ignore-existing local/quantanote-sync
+```
+
+**权限要求：** bucket 需要 `readwrite` 策略（PutObject、GetObject、DeleteObject、ListObjects、HeadObject）。
+
+```bash
+# 推荐：创建专用用户（生产环境）
+docker exec quantanote-minio mc admin user add local quantanote 你的密码
+docker exec quantanote-minio mc admin policy attach local readwrite --user quantanote
+```
+
+### WebDAV
+
+兼容 OpenList、NextCloud、坚果云等 WebDAV 服务：
+
+```toml
+[storage]
+backend_type = "webdav"
+webdav_url = "https://your-openlist.example.com/dav/QuantaNote"
+webdav_username = "quantanote"
+webdav_password = "your-password"
+```
+
+**权限要求：** 用户需要对目标目录拥有读写权限（PUT、GET、DELETE、PROPFIND、HEAD）。
+
+**OpenList 配置步骤：**
+1. 管理后台 → 设置 → 用户 → 创建 `quantanote` 专用用户
+2. 文件管理中创建 `/QuantaNote` 目录
+3. 给 `quantanote` 用户只授权该目录的读写权限（不给管理权限）
+
+### 权限对比
+
+| 操作 | S3 权限 | WebDAV 权限 |
+|------|---------|-------------|
+| 上传文件 | `PutObject` | `PUT`（写） |
+| 下载文件 | `GetObject` | `GET`（读） |
+| 删除文件 | `DeleteObject` | `DELETE`（删） |
+| 列出文件 | `ListObjects` | `PROPFIND`（读） |
+| 判断存在 | `HeadObject` | `HEAD`（读） |
+
+> 两种方式都是只给目标 bucket/目录的读写权限，不给全局管理权限。
 
 ## 核心配置
 

@@ -1,5 +1,5 @@
 [package]
-name = "web-rust-template"
+name = "quantanote-cloud"
 version = "0.1.0"
 edition = "2021"
 
@@ -49,8 +49,8 @@ clap = { version = "4", features = ["derive", "env"] }
 # ===== 存储后端 =====
 # S3 兼容存储（MinIO / AWS S3）
 rust-s3 = { version = "0.35", features = ["with-tokio"] }
-# HTTP 客户端（OpenList API）
-reqwest = { version = "0.12", features = ["json", "multipart", "stream"] }
+# HTTP 客户端（WebDAV / S3 等）
+reqwest = { version = "0.12", features = ["json", "multipart", "stream", "rustls-tls"] }
 # 字节处理
 bytes = "1"
 

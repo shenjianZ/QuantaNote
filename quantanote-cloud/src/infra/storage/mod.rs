@@ -1,6 +1,6 @@
 pub mod local;
-pub mod openlist;
 pub mod s3;
+pub mod webdav;
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -96,13 +96,22 @@ pub fn create_storage_backend(
                 bucket, endpoint, region, access_key, secret_key,
             )?))
         }
-        "openlist" => {
-            let base_url = config
-                .openlist_url
+        "webdav" => {
+            let url = config
+                .webdav_url
                 .as_deref()
-                .ok_or_else(|| anyhow::anyhow!("OpenList 存储需要配置 openlist_url"))?;
-            let token = config.openlist_token.as_deref().unwrap_or("");
-            Ok(Box::new(openlist::OpenListStorage::new(base_url, token)?))
+                .ok_or_else(|| anyhow::anyhow!("WebDAV 存储需要配置 webdav_url"))?;
+            let username = config
+                .webdav_username
+                .as_deref()
+                .ok_or_else(|| anyhow::anyhow!("WebDAV 存储需要配置 webdav_username"))?;
+            let password = config
+                .webdav_password
+                .as_deref()
+                .ok_or_else(|| anyhow::anyhow!("WebDAV 存储需要配置 webdav_password"))?;
+            Ok(Box::new(webdav::WebDAVStorage::new(
+                url, username, password,
+            )?))
         }
         other => Err(anyhow::anyhow!("不支持的存储后端类型: {}", other)),
     }

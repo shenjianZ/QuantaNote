@@ -801,7 +801,7 @@ export function SettingsPage({
                                     case "downloading": return t("settings:about.updateStatusDownloading");
                                     case "downloaded": return t("settings:about.updateStatusDownloaded");
                                     case "up-to-date": return t("settings:about.updateStatusUpToDate");
-                                    case "error": return `${t("settings:about.updateStatusError")}${updateState.error ? `: ${updateState.error}` : ""}`;
+                                    case "error": return updateState.error || t("settings:about.updateStatusError");
                                     default: return "";
                                 }
                             })()}

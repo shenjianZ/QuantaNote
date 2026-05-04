@@ -10,6 +10,7 @@ use crate::error::ErrorResponse;
 use crate::infra::middleware::logging::{log_info, RequestId};
 use crate::repositories::user_repository::UserRepository;
 use crate::services::auth_service::AuthService;
+use crate::utils::jwt::TokenService;
 use crate::AppState;
 use axum::{
     extract::{Extension, State},
@@ -81,10 +82,14 @@ pub async fn refresh(
     State(state): State<AppState>,
     Json(payload): Json<RefreshRequest>,
 ) -> Result<Json<ApiResponse<RefreshResult>>, ErrorResponse> {
+    let device_id =
+        TokenService::decode_device_id(&payload.refresh_token, &state.config.auth.jwt_secret)
+            .unwrap_or_else(|_| "unknown".to_string());
+
     log_info(
         &request_id,
         "刷新 token 请求",
-        &json!({"device_id": "default"}),
+        &json!({"device_id": device_id}),
     );
 
     let user_repo = UserRepository::new(state.pool.clone());

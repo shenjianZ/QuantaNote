@@ -53,7 +53,7 @@
 ## 项目目录结构
 
 ```
-web-rust-template/
+quantanote-cloud/
 ├── src/                          # 源代码目录
 │   ├── main.rs                   # 应用入口
 │   ├── cli.rs                   # 命令行参数解析

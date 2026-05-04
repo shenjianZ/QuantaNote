@@ -112,7 +112,11 @@
     "updateDownloaded": "Update downloaded successfully",
     "updateDownloadFailed": "Failed to download update",
     "updateInstallFailed": "Failed to install update",
-    "updateLatestVersion": "Latest Version"
+    "updateLatestVersion": "Latest Version",
+    "updateErrorNetwork": "No network connection",
+    "updateErrorUnreachable": "Update server unreachable",
+    "updateErrorNoRelease": "No update available",
+    "updateErrorUnknown": "Update check failed"
   },
   "localeOptions": {
     "zh-CN": "简体中文",

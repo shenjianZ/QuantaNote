@@ -466,7 +466,7 @@ version: '3.8'
 
 services:
   web:
-    image: web-rust-template:latest
+    image: quantanote-cloud:latest
     ports:
       - "3000:3000"
     environment:

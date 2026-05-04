@@ -6,6 +6,28 @@ import { useSettingsStore } from "./settingsStore";
 import { useToastStore } from "./toastStore";
 import i18n from "../i18n";
 
+function classifyUpdateError(err: unknown): string {
+    const msg = err instanceof Error ? err.message : String(err);
+    const lower = msg.toLowerCase();
+    if (lower.includes("dns") || lower.includes("getaddr") || lower.includes("resolve")) {
+        return i18n.t("settings:updateErrorNetwork");
+    }
+    if (lower.includes("timed out") || lower.includes("timeout") || lower.includes("connection refused")) {
+        return i18n.t("settings:updateErrorUnreachable");
+    }
+    if (
+        lower.includes("did not respond with a successful status code") ||
+        lower.includes("404") ||
+        lower.includes("not found")
+    ) {
+        return i18n.t("settings:updateErrorNoRelease");
+    }
+    if (lower.includes("cert") || lower.includes("tls") || lower.includes("ssl")) {
+        return i18n.t("settings:updateErrorNetwork");
+    }
+    return i18n.t("settings:updateErrorUnknown");
+}
+
 type UpdaterState = {
     updateState: UpdateState;
     pendingUpdate: Update | null;
@@ -60,12 +82,11 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
                 pendingUpdate: update,
             });
         } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
             set({
                 updateState: {
                     ...get().updateState,
                     status: "error",
-                    error: message,
+                    error: classifyUpdateError(err),
                 },
             });
         }
@@ -122,12 +143,11 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
             });
             useToastStore.getState().addToast("success", i18n.t("settings:about.updateDownloaded"));
         } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
             set({
                 updateState: {
                     ...get().updateState,
                     status: "error",
-                    error: message,
+                    error: classifyUpdateError(err),
                 },
             });
             useToastStore.getState().addToast("error", i18n.t("settings:about.updateDownloadFailed"));

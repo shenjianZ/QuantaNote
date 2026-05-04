@@ -33,7 +33,7 @@ password = ""  # 可选
 db = 0
 
 [storage]
-# 存储后端类型: "local" | "s3" | "openlist"
+# 存储后端类型: "local" | "s3" | "webdav"
 backend_type = "local"
 
 # 本地存储路径（backend_type = "local" 时使用）
@@ -46,6 +46,7 @@ base_path = "./sync_data"
 # access_key = "minioadmin"
 # secret_key = "minioadmin"
 
-# OpenList 配置（backend_type = "openlist" 时使用）
-# openlist_url = "http://127.0.0.1:5244"
-# openlist_token = "your-openlist-token"
+# WebDAV 配置（backend_type = "webdav" 时使用）
+# webdav_url = "https://your-openlist.example.com/dav/QuantaNote"
+# webdav_username = "your-username"
+# webdav_password = "your-password"

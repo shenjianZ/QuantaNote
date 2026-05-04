@@ -78,7 +78,7 @@ GET /info
 
 ```json
 {
-  "name": "web-rust-template",
+  "name": "quantanote-cloud",
   "version": "0.1.0",
   "status": "running",
   "timestamp": 1704112800

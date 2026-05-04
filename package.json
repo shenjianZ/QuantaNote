@@ -17,7 +17,13 @@
     "test:e2e:serial": "node e2e-tests/run-serial.mjs",
     "test:e2e:headed": "cross-env E2E_HEADED=1 wdio run e2e-tests/wdio.conf.js",
     "test:e2e:headed:serial": "cross-env E2E_HEADED=1 node e2e-tests/run-serial.mjs",
-    "test": "pnpm test:unit && pnpm test:rust"
+    "test": "pnpm test:unit && pnpm test:rust",
+    "check": "pnpm build && cargo check --manifest-path src-tauri/Cargo.toml",
+    "server:check": "cargo check --manifest-path quantanote-cloud/Cargo.toml",
+    "server:build": "cargo build --manifest-path quantanote-cloud/Cargo.toml --release",
+    "docs:dev": "cd docs && pnpm dev",
+    "docs:build": "cd docs && pnpm build",
+    "bump": "node scripts/bump-version.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

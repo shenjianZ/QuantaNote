@@ -70,7 +70,7 @@ const DEFAULTS: AppSettings = {
     closeKeepRunning: false,
     autoBackup: true,
     autostart: false,
-    autoUpdateEnabled: true,
+    autoUpdateEnabled: false,
     sqlLogging: {
         enabled: false,
         toConsole: false,

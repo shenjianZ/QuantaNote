@@ -24,9 +24,9 @@ impl Environment {
 
 /// 命令行参数
 #[derive(Parser, Debug)]
-#[command(name = "web-rust-template")]
-#[command(about = "Web Server Template", long_about = None)]
-#[command(author = "Your Name <your.email@example.com>")]
+#[command(name = "quantanote-cloud")]
+#[command(about = "QuantaNote Cloud Server", long_about = None)]
+#[command(author = "shenjianZ")]
 #[command(version = "0.1.0")]
 #[command(propagate_version = true)]
 pub struct CliArgs {
@@ -109,9 +109,9 @@ impl CliArgs {
     pub fn get_log_filter(&self) -> String {
         let level = self.get_log_level();
         match level {
-            "trace" => "web_rust_template=trace,tower_http=trace,axum=trace,sqlx=debug".into(),
-            "debug" => "web_rust_template=debug,tower_http=debug,axum=debug,sqlx=debug".into(),
-            _ => "web_rust_template=info,tower_http=info,axum=info".into(),
+            "trace" => "quantanote_cloud=trace,tower_http=trace,axum=trace,sqlx=debug".into(),
+            "debug" => "quantanote_cloud=debug,tower_http=debug,axum=debug,sqlx=debug".into(),
+            _ => "quantanote_cloud=info,tower_http=info,axm=info".into(),
         }
     }
 
