@@ -8,6 +8,7 @@ import {
     Laptop,
     Moon,
     Palette,
+    RefreshCw,
     Settings2,
     Sun,
     Trash2,
@@ -25,6 +26,7 @@ import { Select } from "../components/common/Select";
 import { SyncSettingsPanel } from "../components/sync/SyncSettingsPanel";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useToastStore } from "../stores/toastStore";
+import { useUpdaterStore } from "../stores/updaterStore";
 
 const FONT_OPTIONS_KEYS = [
     { value: "Noto Sans SC", label: "Noto Sans SC" },
@@ -93,6 +95,10 @@ export function SettingsPage({
     const fetchDiagnosticsPaths = useSettingsStore((s) => s.fetchDiagnosticsPaths);
     const updateSqlLogging = useSettingsStore((s) => s.updateSqlLogging);
     const clearSqlLogFile = useSettingsStore((s) => s.clearSqlLogFile);
+    const updateState = useUpdaterStore((s) => s.updateState);
+    const checkForUpdates = useUpdaterStore((s) => s.checkForUpdates);
+    const downloadUpdate = useUpdaterStore((s) => s.downloadUpdate);
+    const installUpdate = useUpdaterStore((s) => s.installUpdate);
 
     useEffect(() => {
         init();
@@ -171,6 +177,25 @@ export function SettingsPage({
                                     </button>
                                 );
                             })}
+                        </div>
+                    </section>
+                    <section className="mb-6">
+                        <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">
+                            {t("settings:data.locale")}
+                        </h2>
+                        <div className={rowClass}>
+                            <span className="text-xs text-[var(--muted)]">
+                                {t("settings:data.localeDesc")}
+                            </span>
+                            <Select
+                                className="w-36"
+                                options={[
+                                    { value: "zh-CN", label: t("settings:localeOptions.zh-CN") },
+                                    { value: "en", label: t("settings:localeOptions.en") },
+                                ]}
+                                value={settings.locale}
+                                onChange={(v) => updateSetting("locale", v as "zh-CN" | "en")}
+                            />
                         </div>
                     </section>
                     <section className="mb-6">
@@ -280,30 +305,6 @@ export function SettingsPage({
                             {renderToggle(settings.autostart, (v) =>
                                 updateSetting("autostart", v),
                             )}
-                        </div>
-                    </section>
-                    <section>
-                        <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">
-                            {t("settings:data.locale")}
-                        </h2>
-                        <div className={rowClass}>
-                            <div>
-                                <span className="text-sm text-[var(--text)]">
-                                    {t("settings:data.locale")}
-                                </span>
-                                <div className="mt-0.5 text-xs text-[var(--muted)]">
-                                    {t("settings:data.localeDesc")}
-                                </div>
-                            </div>
-                            <Select
-                                className="w-36"
-                                options={[
-                                    { value: "zh-CN", label: t("settings:localeOptions.zh-CN") },
-                                    { value: "en", label: t("settings:localeOptions.en") },
-                                ]}
-                                value={settings.locale}
-                                onChange={(v) => updateSetting("locale", v as "zh-CN" | "en")}
-                            />
                         </div>
                     </section>
                 </>
@@ -753,6 +754,109 @@ export function SettingsPage({
                         {t("settings:about.feedback")}
                     </a>
                 </div>
+
+                {/* 更新检查 */}
+                <section className="mt-6">
+                    <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">
+                        {t("settings:about.updateSection")}
+                    </h2>
+                    <div className={rowClass}>
+                        <div>
+                            <span className="text-sm text-[var(--text)]">
+                                {t("settings:about.autoUpdateEnabled")}
+                            </span>
+                            <div className="mt-0.5 text-xs text-[var(--muted)]">
+                                {t("settings:about.autoUpdateEnabledDesc")}
+                            </div>
+                        </div>
+                        {renderToggle(settings.autoUpdateEnabled, (v) =>
+                            updateSetting("autoUpdateEnabled", v),
+                        )}
+                    </div>
+                    <div className={rowClass}>
+                        <span className="text-sm text-[var(--text)]">
+                            {t("settings:about.currentVersion")}
+                        </span>
+                        <span className="text-sm text-[var(--muted)]">
+                            v{updateState.currentVersion}
+                        </span>
+                    </div>
+                    {updateState.latestVersion && (
+                        <div className={rowClass}>
+                            <span className="text-sm text-[var(--text)]">
+                                {t("settings:about.updateLatestVersion")}
+                            </span>
+                            <span className="text-sm text-[var(--muted)]">
+                                v{updateState.latestVersion}
+                            </span>
+                        </div>
+                    )}
+                    <div className="py-2">
+                        <span className="text-sm text-[var(--muted)]">
+                            {(() => {
+                                switch (updateState.status as string) {
+                                    case "idle": return t("settings:about.updateStatusIdle");
+                                    case "checking": return t("settings:about.updateStatusChecking");
+                                    case "available": return t("settings:about.updateStatusAvailable");
+                                    case "downloading": return t("settings:about.updateStatusDownloading");
+                                    case "downloaded": return t("settings:about.updateStatusDownloaded");
+                                    case "up-to-date": return t("settings:about.updateStatusUpToDate");
+                                    case "error": return `${t("settings:about.updateStatusError")}${updateState.error ? `: ${updateState.error}` : ""}`;
+                                    default: return "";
+                                }
+                            })()}
+                        </span>
+                        {updateState.status === "downloaded" && (
+                            <div className="mt-1 text-xs text-[var(--accent)]">
+                                {t("settings:about.updateReadyToInstall")}
+                            </div>
+                        )}
+                    </div>
+                    {updateState.status === "downloading" && updateState.contentLength !== null && (
+                        <div className="mb-3 space-y-1.5">
+                            <div className="h-2 rounded-full bg-[var(--field)]">
+                                <div
+                                    className="h-2 rounded-full bg-[var(--accent)] transition-[width]"
+                                    style={{
+                                        width: `${Math.min(100, Math.round((updateState.downloadedBytes / updateState.contentLength) * 100))}%`,
+                                    }}
+                                />
+                            </div>
+                            <div className="text-xs text-[var(--muted)]">
+                                {Math.round((updateState.downloadedBytes / updateState.contentLength) * 100)}%
+                            </div>
+                        </div>
+                    )}
+                    <div className="flex gap-2">
+                        <button
+                            className="inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2 text-sm text-white hover:opacity-90"
+                            type="button"
+                            disabled={updateState.status === "checking" || updateState.status === "downloading"}
+                            onClick={() => checkForUpdates()}
+                        >
+                            <RefreshCw className={`h-4 w-4 ${updateState.status === "checking" ? "animate-spin" : ""}`} />
+                            {t("settings:about.updateCheck")}
+                        </button>
+                        <button
+                            className="inline-flex items-center gap-2 rounded-full bg-[var(--field)] px-4 py-2 text-sm hover:bg-[var(--hover)] disabled:opacity-50"
+                            type="button"
+                            disabled={
+                                updateState.status !== "available" &&
+                                updateState.status !== "downloaded"
+                            }
+                            onClick={() =>
+                                updateState.status === "downloaded"
+                                    ? installUpdate()
+                                    : downloadUpdate()
+                            }
+                        >
+                            <Download className="h-4 w-4" />
+                            {updateState.status === "downloaded"
+                                ? t("settings:about.updateInstall")
+                                : t("settings:about.updateDownload")}
+                        </button>
+                    </div>
+                </section>
             </section>
         );
     }

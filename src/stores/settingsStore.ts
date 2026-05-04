@@ -47,6 +47,7 @@ export interface AppSettings {
     closeKeepRunning: boolean;
     autoBackup: boolean;
     autostart: boolean;
+    autoUpdateEnabled: boolean;
     sqlLogging: SqlLogSettings;
     locale: "zh-CN" | "en";
 }
@@ -69,6 +70,7 @@ const DEFAULTS: AppSettings = {
     closeKeepRunning: false,
     autoBackup: true,
     autostart: false,
+    autoUpdateEnabled: true,
     sqlLogging: {
         enabled: false,
         toConsole: false,
@@ -104,6 +106,7 @@ function normalizeSettings(settings: AppSettings): AppSettings {
         closeKeepRunning: Boolean(settings.closeKeepRunning),
         autoBackup: Boolean(settings.autoBackup),
         autostart: Boolean(settings.autostart),
+        autoUpdateEnabled: Boolean(settings.autoUpdateEnabled),
         sqlLogging: normalizeSqlLogSettings(settings.sqlLogging),
         locale,
     };
@@ -313,6 +316,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
                 }
             })
             .catch(() => {});
+        // 触发自动更新检查
+        import("./updaterStore").then(({ useUpdaterStore }) => {
+            useUpdaterStore.getState().startAutoUpdateCheck();
+        }).catch(() => {});
     },
 
     updateSetting: async (key, value) => {

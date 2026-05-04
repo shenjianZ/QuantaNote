@@ -34,8 +34,20 @@
             }
         }
     },
+    "plugins": {
+        "updater": {
+            "pubkey": "__QUANTANOTE_TAURI_UPDATER_PUBLIC_KEY__",
+            "endpoints": [
+                "https://github.com/shenjianZ/QuantaNote/releases/latest/download/latest.json"
+            ],
+            "windows": {
+                "installMode": "passive"
+            }
+        }
+    },
     "bundle": {
         "active": true,
+        "createUpdaterArtifacts": true,
         "targets": "all",
         "icon": [
             "icons/32x32.png",

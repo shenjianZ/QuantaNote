@@ -478,4 +478,70 @@ impl SyncService {
         self.repo.delete_all_snapshots(user_id).await?;
         Ok(())
     }
+
+    /// 清理过期的 pending 孤儿数据（记录 + 附件 + 存储文件）
+    pub async fn cleanup_stale_pending(&self, age_hours: i64) -> anyhow::Result<CleanupStats> {
+        let mut stats = CleanupStats::default();
+
+        // 1. 清理过期 pending 记录
+        let stale_records = self.repo.get_stale_pending_records(age_hours).await?;
+        if !stale_records.is_empty() {
+            let storage_keys: Vec<String> = stale_records
+                .iter()
+                .map(|r| r.storage_key.clone())
+                .filter(|k| !k.is_empty())
+                .collect();
+            let ids: Vec<i64> = stale_records.iter().map(|r| r.id).collect();
+
+            // 先删存储文件（单条失败不中断）
+            for key in &storage_keys {
+                if let Err(e) = self.storage.delete_object(key).await {
+                    tracing::warn!("清理 pending 存储文件失败 key={}: {}", key, e);
+                    stats.storage_errors += 1;
+                }
+            }
+            // 再删 DB 记录
+            match self.repo.delete_records_by_ids(&ids).await {
+                Ok(n) => stats.records_deleted = n,
+                Err(e) => tracing::error!("清理 pending 记录 DB 失败: {}", e),
+            }
+        }
+
+        // 2. 清理过期 pending 附件
+        let stale_attachments = self.repo.get_stale_pending_attachments(age_hours).await?;
+        if !stale_attachments.is_empty() {
+            let storage_keys: Vec<String> = stale_attachments
+                .iter()
+                .map(|a| a.storage_key.clone())
+                .filter(|k| !k.is_empty())
+                .collect();
+            let ids: Vec<i64> = stale_attachments.iter().map(|a| a.id).collect();
+            let total_size: i64 = stale_attachments.iter().map(|a| a.file_size).sum();
+
+            // 先删存储文件
+            for key in &storage_keys {
+                if let Err(e) = self.storage.delete_object(key).await {
+                    tracing::warn!("清理 pending 附件存储失败 key={}: {}", key, e);
+                    stats.storage_errors += 1;
+                }
+            }
+            // 再删 DB 记录
+            match self.repo.delete_attachments_by_ids(&ids).await {
+                Ok(n) => stats.attachments_deleted = n,
+                Err(e) => tracing::error!("清理 pending 附件 DB 失败: {}", e),
+            }
+            stats.bytes_freed = total_size;
+        }
+
+        Ok(stats)
+    }
+}
+
+/// Pending 清理统计
+#[derive(Debug, Default)]
+pub struct CleanupStats {
+    pub records_deleted: u64,
+    pub attachments_deleted: u64,
+    pub bytes_freed: i64,
+    pub storage_errors: u64,
 }

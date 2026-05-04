@@ -10,11 +10,14 @@ mod services;
 mod utils;
 
 use axum::{
+    extract::DefaultBodyLimit,
     routing::{get, post},
     Router,
 };
 use clap::Parser;
 use cli::CliArgs;
+use services::sync_service::SyncService;
+use std::time::Duration;
 use tower_http::cors::{Any, CorsLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -121,7 +124,8 @@ async fn main() -> anyhow::Result<()> {
         )
         .route(
             "/sync/attachments/upload",
-            post(handlers::sync::upload_attachment),
+            post(handlers::sync::upload_attachment)
+                .layer(DefaultBodyLimit::max(50 * 1024 * 1024)), // 附件上传限制 50MB
         )
         .route(
             "/sync/attachments/download/:attachment_id",
@@ -151,7 +155,11 @@ async fn main() -> anyhow::Result<()> {
             app_state.clone(),
             infra::middleware::logging::request_logging_middleware,
         ))
-        .with_state(app_state);
+        .with_state(app_state.clone());
+
+    // 启动 pending 孤儿文件定时清理任务
+    tokio::spawn(pending_cleanup_task(app_state.clone()));
+    tracing::info!("Pending 清理定时任务已启动 (每6小时, 清理超过24小时的孤儿数据)");
 
     // 启动服务器
     let addr = format!("{}:{}", config.server.host, config.server.port);
@@ -162,4 +170,61 @@ async fn main() -> anyhow::Result<()> {
     axum::serve(listener, app).await?;
 
     Ok(())
+}
+
+/// Pending 孤儿文件定时清理任务
+///
+/// 生命周期：
+/// 1. 启动后等待 30 秒（给服务启动缓冲）
+/// 2. 每 6 小时执行一次清理
+/// 3. 清理超过 24 小时的 pending 记录和附件（DB + 存储文件）
+/// 4. 每次清理有 5 分钟超时保护
+/// 5. 单条文件删除失败不影响其他文件
+async fn pending_cleanup_task(state: AppState) {
+    let initial_delay = Duration::from_secs(30);
+    let interval_duration = Duration::from_secs(6 * 3600);
+    let age_hours: i64 = 24;
+    let cleanup_timeout = Duration::from_secs(5 * 60);
+
+    tracing::info!("pending 清理任务: 等待 {}s 后首次执行", initial_delay.as_secs());
+    tokio::time::sleep(initial_delay).await;
+
+    let mut interval = tokio::time::interval(interval_duration);
+    interval.tick().await; // 消耗首次立即触发
+
+    loop {
+        interval.tick().await;
+        tracing::info!("开始清理过期 pending 数据 (age >= {}h)", age_hours);
+
+        let result = tokio::time::timeout(cleanup_timeout, run_cleanup(&state, age_hours)).await;
+
+        match result {
+            Ok(Ok(stats)) => {
+                if stats.records_deleted > 0 || stats.attachments_deleted > 0 {
+                    tracing::info!(
+                        "pending 清理完成: 删除 {} 条记录, {} 个附件, 释放 {} bytes, 存储错误 {} 次",
+                        stats.records_deleted,
+                        stats.attachments_deleted,
+                        stats.bytes_freed,
+                        stats.storage_errors,
+                    );
+                } else {
+                    tracing::info!("pending 清理完成: 无过期数据");
+                }
+            }
+            Ok(Err(e)) => {
+                tracing::error!("pending 清理执行失败: {}", e);
+            }
+            Err(_) => {
+                tracing::error!("pending 清理超时 (>{:.0}s), 跳过本轮", cleanup_timeout.as_secs_f64());
+            }
+        }
+    }
+}
+
+async fn run_cleanup(state: &AppState, age_hours: i64) -> anyhow::Result<services::sync_service::CleanupStats> {
+    let repo = repositories::sync_repository::SyncRepository::new(state.pool.clone());
+    let storage = infra::storage::create_storage_backend(&state.config.storage)?;
+    let service = SyncService::new(repo, storage);
+    service.cleanup_stale_pending(age_hours).await
 }

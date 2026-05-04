@@ -75,6 +75,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate release version
+        shell: pwsh
+        run: |
+          $tagVersion = $env:GITHUB_REF_NAME.TrimStart("v")
+          $packageVersion = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $tauriVersion = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          $cargoVersion = (Select-String -Path src-tauri/Cargo.toml -Pattern '^version = "([^"]+)"$').Matches[0].Groups[1].Value
+          if ($packageVersion -ne $tagVersion) { throw "package.json version $packageVersion != tag $tagVersion" }
+          if ($tauriVersion -ne $tagVersion) { throw "tauri.conf.json version $tauriVersion != tag $tagVersion" }
+          if ($cargoVersion -ne $tagVersion) { throw "Cargo.toml version $cargoVersion != tag $tagVersion" }
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
@@ -95,11 +106,96 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
+      - name: Inject updater public key
+        shell: pwsh
+        env:
+          QUANTANOTE_TAURI_UPDATER_PUBLIC_KEY: ${{ secrets.QUANTANOTE_TAURI_UPDATER_PUBLIC_KEY }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:QUANTANOTE_TAURI_UPDATER_PUBLIC_KEY)) {
+            Write-Warning "QUANTANOTE_TAURI_UPDATER_PUBLIC_KEY not set, updater will not work"
+          } else {
+            $path = "src-tauri/tauri.conf.json"
+            $content = Get-Content $path -Raw
+            $content = $content.Replace(
+              "__QUANTANOTE_TAURI_UPDATER_PUBLIC_KEY__",
+              $env:QUANTANOTE_TAURI_UPDATER_PUBLIC_KEY.Trim()
+            )
+            Set-Content -Path $path -Value $content
+          }
+
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Build app
         run: pnpm tauri build ${{ matrix.args }}
+        env:
+          QUANTANOTE_TAURI_UPDATER_PUBLIC_KEY: ${{ secrets.QUANTANOTE_TAURI_UPDATER_PUBLIC_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.QUANTANOTE_TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.QUANTANOTE_TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      - name: Build updater manifest
+        shell: pwsh
+        run: |
+          $target = "${{ matrix.rust_target }}"
+          if ([string]::IsNullOrWhiteSpace($target)) {
+            $bundleRoot = "src-tauri/target/release/bundle"
+          } else {
+            $bundleRoot = "src-tauri/target/$target/release/bundle"
+          }
+
+          # Platform-specific: file filter, platform key, URL suffix
+          $platformKey = ""
+          $filter = ""
+          $urlSuffix = ""
+
+          switch ("${{ matrix.platform }}") {
+            "windows-latest" {
+              $platformKey = "windows-x86_64"
+              $filter = "*.exe"
+              $urlSuffix = ".exe"
+            }
+            "ubuntu-latest" {
+              $platformKey = "linux-x86_64"
+              $filter = "*.AppImage"
+              $urlSuffix = ".AppImage"
+            }
+            default {
+              # macOS
+              $urlSuffix = ".tar.gz"
+              $filter = "*.app.tar.gz"
+              if ("${{ matrix.rust_target }}" -eq "aarch64-apple-darwin") {
+                $platformKey = "darwin-aarch64"
+              } else {
+                $platformKey = "darwin-x86_64"
+              }
+            }
+          }
+
+          $artifact = Get-ChildItem -Path $bundleRoot -Recurse -Filter $filter |
+            Select-Object -First 1
+          if ($null -eq $artifact) { throw "$filter not found in $bundleRoot" }
+
+          $sigPath = "$($artifact.FullName).sig"
+          if (!(Test-Path $sigPath)) { throw "Signature file not found: $sigPath" }
+          $signature = Get-Content $sigPath -Raw
+
+          # Use the same renamed filename as "Prepare release assets" step
+          $tag = $env:GITHUB_REF_NAME
+          $renamedAsset = "QuantaNote-$tag-${{ matrix.artifact_name }}$urlSuffix"
+
+          $version = $tag.TrimStart("v")
+          $manifest = @{
+            version = $version
+            notes = "See GitHub release notes."
+            pub_date = (Get-Date).ToUniversalTime().ToString("o")
+            platforms = @{
+              $platformKey = @{
+                signature = $signature.Trim()
+                url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$tag/$renamedAsset"
+              }
+            }
+          } | ConvertTo-Json -Depth 5
+          Set-Content -Path (Join-Path $bundleRoot "latest-${{ matrix.artifact_name }}.json") -Value $manifest
 
       - name: Prepare release assets
         shell: pwsh
@@ -160,6 +256,12 @@ jobs:
             Copy-Item -LiteralPath $asset.FullName -Destination $destination -Force
           }
 
+          # Also copy per-platform updater manifest
+          $manifestFile = Join-Path $bundleRoot "latest-$platform.json"
+          if (Test-Path $manifestFile) {
+            Copy-Item -LiteralPath $manifestFile -Destination (Join-Path $outDir "latest-$platform.json") -Force
+          }
+
           Get-ChildItem -Path $outDir -File | ForEach-Object {
             Write-Host "Prepared release asset: $($_.Name)"
           }
@@ -176,10 +278,51 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload ${{ github.ref_name }} release-assets/* --clobber
 
+  merge-updater-manifest:
+    needs:
+      - create-release
+      - build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-artifacts
+          merge-multiple: true
+
+      - name: Merge per-platform manifests into latest.json
+        shell: pwsh
+        run: |
+          $manifestFiles = Get-ChildItem -Path "all-artifacts" -Recurse -Filter "latest-*.json"
+          if ($manifestFiles.Count -eq 0) { throw "No latest-*.json manifests found" }
+
+          $merged = $null
+          foreach ($file in $manifestFiles) {
+            $partial = Get-Content $file.FullName -Raw | ConvertFrom-Json
+            if ($null -eq $merged) {
+              $merged = $partial
+            } else {
+              # Merge platforms from this partial into the merged manifest
+              foreach ($prop in $partial.platforms.PSObject.Properties) {
+                $merged.platforms | Add-Member -MemberType NoteProperty -Name $prop.Name -Value $prop.Value -Force
+              }
+            }
+          }
+
+          $mergedJson = $merged | ConvertTo-Json -Depth 5
+          Set-Content -Path "latest.json" -Value $mergedJson
+          Write-Host "Merged manifest:`n$mergedJson"
+
+      - name: Upload merged manifest to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload ${{ github.ref_name }} latest.json --clobber
+
   publish-release:
     needs:
       - create-release
       - build
+      - merge-updater-manifest
     runs-on: ubuntu-latest
 
     steps:

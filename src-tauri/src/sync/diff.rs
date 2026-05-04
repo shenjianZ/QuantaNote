@@ -407,7 +407,7 @@ pub fn compute_diff(
             ConflictResolution::RemoteWins => {
                 to_pull.push(conflict.remote_meta.clone());
             }
-            _ => {} // Manual 暂不处理，后续可扩展 UI
+            _ => {} // Manual 模式由调用方拦截处理，不在此处自动解决
         }
     }
 

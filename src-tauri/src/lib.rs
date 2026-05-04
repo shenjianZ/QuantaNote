@@ -19,6 +19,7 @@ use utils::logging::tauri_log_plugin;
 use utils::paths;
 
 const AUTOSTART_HIDDEN_ARG: &str = "--quantanote-start-hidden";
+const DEFAULT_UPDATER_PUBLIC_KEY: &str = "__QUANTANOTE_TAURI_UPDATER_PUBLIC_KEY__";
 
 /// 窗口行为设置状态，由前端同步
 pub struct WindowBehavior {
@@ -79,6 +80,11 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec![AUTOSTART_HIDDEN_ARG]),
         ))
+        .plugin(
+            tauri_plugin_updater::Builder::new()
+                .pubkey(DEFAULT_UPDATER_PUBLIC_KEY)
+                .build(),
+        )
         .manage(WindowBehavior {
             minimize_to_tray: AtomicBool::new(true),
             close_keep_running: AtomicBool::new(false),

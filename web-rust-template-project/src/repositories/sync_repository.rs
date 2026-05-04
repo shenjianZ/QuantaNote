@@ -498,4 +498,58 @@ impl SyncRepository {
             .await?;
         Ok(())
     }
+
+    // ========== Pending 孤儿清理 ==========
+
+    /// 查询所有用户中超过指定小时数的 pending 记录
+    pub async fn get_stale_pending_records(
+        &self,
+        age_hours: i64,
+    ) -> anyhow::Result<Vec<sync_records::Model>> {
+        let cutoff = chrono::Utc::now().naive_utc() - chrono::Duration::hours(age_hours);
+        let records = sync_records::Entity::find()
+            .filter(sync_records::Column::SnapshotId.eq("pending"))
+            .filter(sync_records::Column::CreatedAt.lt(cutoff))
+            .all(&self.db)
+            .await?;
+        Ok(records)
+    }
+
+    /// 查询所有用户中超过指定小时数的 pending 附件
+    pub async fn get_stale_pending_attachments(
+        &self,
+        age_hours: i64,
+    ) -> anyhow::Result<Vec<sync_attachments::Model>> {
+        let cutoff = chrono::Utc::now().naive_utc() - chrono::Duration::hours(age_hours);
+        let attachments = sync_attachments::Entity::find()
+            .filter(sync_attachments::Column::SnapshotId.eq("pending"))
+            .filter(sync_attachments::Column::CreatedAt.lt(cutoff))
+            .all(&self.db)
+            .await?;
+        Ok(attachments)
+    }
+
+    /// 按主键批量删除记录
+    pub async fn delete_records_by_ids(&self, ids: &[i64]) -> anyhow::Result<u64> {
+        if ids.is_empty() {
+            return Ok(0);
+        }
+        let result = sync_records::Entity::delete_many()
+            .filter(sync_records::Column::Id.is_in(ids.to_vec()))
+            .exec(&self.db)
+            .await?;
+        Ok(result.rows_affected)
+    }
+
+    /// 按主键批量删除附件
+    pub async fn delete_attachments_by_ids(&self, ids: &[i64]) -> anyhow::Result<u64> {
+        if ids.is_empty() {
+            return Ok(0);
+        }
+        let result = sync_attachments::Entity::delete_many()
+            .filter(sync_attachments::Column::Id.is_in(ids.to_vec()))
+            .exec(&self.db)
+            .await?;
+        Ok(result.rows_affected)
+    }
 }

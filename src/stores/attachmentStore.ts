@@ -43,7 +43,8 @@ export const useAttachmentStore = create<AttachmentState>((set, get) => ({
       useToastStore.getState().addToast("success", "附件已添加");
     } catch (e) {
       set({ error: String(e) });
-      useToastStore.getState().addToast("error", "添加附件失败");
+      const reason = typeof e === "string" ? e : (e instanceof Error ? e.message : String(e));
+      useToastStore.getState().addToast("error", `添加附件失败: ${reason}`);
     }
   },
 
@@ -54,7 +55,8 @@ export const useAttachmentStore = create<AttachmentState>((set, get) => ({
       useToastStore.getState().addToast("success", "附件已删除");
     } catch (e) {
       set({ error: String(e) });
-      useToastStore.getState().addToast("error", "删除附件失败");
+      const reason = typeof e === "string" ? e : (e instanceof Error ? e.message : String(e));
+      useToastStore.getState().addToast("error", `删除附件失败: ${reason}`);
     }
   },
 }));
