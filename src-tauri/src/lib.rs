@@ -104,7 +104,7 @@ pub fn run() {
             app.manage(db_state);
 
             // 启动自动备份调度器
-            auto_backup::start_backup_scheduler(app.handle());
+            services::backup_service::start_backup_scheduler(app.handle());
 
             // 初始化同步引擎
             {

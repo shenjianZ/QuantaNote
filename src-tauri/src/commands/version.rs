@@ -42,11 +42,7 @@ pub fn update_version(
 
 #[tauri::command]
 pub fn restore_version(db: State<'_, DbState>, version_id: String) -> Result<ItemDto, AppError> {
-    // Get version to find item_id before restoring
-    let version = crate::repositories::version_repository::get_version(&db, &version_id)?;
-    let item_id = version.item_id.clone();
-    version_service::restore_version(&db, &version_id)?;
-    crate::repositories::item_repository::get_item(&db, &item_id)
+    version_service::restore_version_and_get_item(&db, &version_id)
 }
 
 #[tauri::command]

@@ -5,7 +5,6 @@ use crate::db::DbState;
 use crate::error::AppError;
 use crate::models::item::{ItemDto, TagDto, UpdateItemPayload};
 use crate::services::{item_service, tag_service};
-use crate::utils::paths;
 
 #[derive(Serialize)]
 pub struct LibraryData {
@@ -89,47 +88,17 @@ pub fn get_recent_items(
 
 #[tauri::command]
 pub fn get_db_size(db: State<'_, DbState>) -> Result<String, AppError> {
-    let conn = db
-        .conn
-        .lock()
-        .map_err(|e| AppError::Database(e.to_string()))?;
-    let page_count: i64 = conn
-        .query_row("PRAGMA page_count", [], |r| r.get(0))
-        .unwrap_or(0);
-    let page_size: i64 = conn
-        .query_row("PRAGMA page_size", [], |r| r.get(0))
-        .unwrap_or(4096);
-    let bytes = page_count * page_size;
-    if bytes < 1024 {
-        Ok(format!("{} B", bytes))
-    } else if bytes < 1024 * 1024 {
-        Ok(format!("{:.1} KB", bytes as f64 / 1024.0))
-    } else {
-        Ok(format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0)))
-    }
+    item_service::get_db_size(&db)
 }
 
 #[tauri::command]
 pub fn optimize_db(db: State<'_, DbState>) -> Result<(), AppError> {
-    let conn = db
-        .conn
-        .lock()
-        .map_err(|e| AppError::Database(e.to_string()))?;
-    conn.execute_batch(
-        "PRAGMA incremental_vacuum;
-         INSERT INTO items_fts(items_fts) VALUES('rebuild');
-         INSERT INTO items_fts_trigram(items_fts_trigram) VALUES('rebuild');",
-    )
-    .map_err(|e| AppError::Database(e.to_string()))?;
-    Ok(())
+    item_service::optimize_db(&db)
 }
 
 #[tauri::command]
 pub fn get_db_path() -> Result<String, AppError> {
-    Ok(paths::quantanote_dir()
-        .join("quanta_note.sqlite")
-        .to_string_lossy()
-        .to_string())
+    item_service::get_db_path()
 }
 
 #[tauri::command]

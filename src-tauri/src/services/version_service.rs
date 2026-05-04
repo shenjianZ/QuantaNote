@@ -56,6 +56,16 @@ pub fn restore_version(db: &DbState, version_id: &str) -> Result<(), AppError> {
     Ok(())
 }
 
+pub fn restore_version_and_get_item(
+    db: &DbState,
+    version_id: &str,
+) -> Result<crate::models::item::ItemDto, AppError> {
+    let version = version_repository::get_version(db, version_id)?;
+    let item_id = version.item_id.clone();
+    restore_version(db, version_id)?;
+    item_repository::get_item(db, &item_id)
+}
+
 pub fn delete_version(db: &DbState, version_id: &str) -> Result<(), AppError> {
     version_repository::delete_version(db, version_id)
 }
