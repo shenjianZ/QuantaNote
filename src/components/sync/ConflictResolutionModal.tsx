@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { Modal } from "../common/Modal";
+import { Select } from "../common/Select";
 import { useSyncStore } from "../../stores/syncStore";
 import type { ConflictInfo } from "../../services/tauriCommands";
 
@@ -124,7 +125,6 @@ export function ConflictResolutionModal({
                             <ConflictRow
                                 key={key}
                                 conflict={conflict}
-                                conflictKey={key}
                                 choice={resolutions[key]}
                                 onChoice={(c) => setChoice(key, c)}
                             />
@@ -162,12 +162,10 @@ export function ConflictResolutionModal({
 
 function ConflictRow({
     conflict,
-    conflictKey,
     choice,
     onChoice,
 }: {
     conflict: ConflictInfo;
-    conflictKey: string;
     choice: "local" | "remote" | undefined;
     onChoice: (c: "local" | "remote") => void;
 }) {
@@ -192,38 +190,21 @@ function ConflictRow({
                     {conflict.record_id.slice(0, 8)}...
                 </span>
             </div>
-            <div className="flex gap-4 text-xs">
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                        type="radio"
-                        name={`conflict-${conflictKey}`}
-                        checked={currentChoice === "local"}
-                        onChange={() => onChoice("local")}
-                        className="accent-[var(--accent)]"
-                    />
-                    <span className="text-[var(--text)]">
-                        {t("local")}{" "}
-                        <span className="text-[var(--muted)]">
-                            ({formatTime(conflict.local_updated_at)})
-                        </span>
-                    </span>
-                </label>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                        type="radio"
-                        name={`conflict-${conflictKey}`}
-                        checked={currentChoice === "remote"}
-                        onChange={() => onChoice("remote")}
-                        className="accent-[var(--accent)]"
-                    />
-                    <span className="text-[var(--text)]">
-                        {t("remote")}{" "}
-                        <span className="text-[var(--muted)]">
-                            ({formatTime(conflict.remote_updated_at)})
-                        </span>
-                    </span>
-                </label>
-            </div>
+            <Select
+                className="w-56"
+                value={currentChoice}
+                onChange={(v) => onChoice(v as "local" | "remote")}
+                options={[
+                    {
+                        value: "local",
+                        label: `${t("local")} (${formatTime(conflict.local_updated_at)})`,
+                    },
+                    {
+                        value: "remote",
+                        label: `${t("remote")} (${formatTime(conflict.remote_updated_at)})`,
+                    },
+                ]}
+            />
         </div>
     );
 }

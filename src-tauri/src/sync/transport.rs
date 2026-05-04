@@ -118,6 +118,8 @@ pub struct SyncTransport {
     device_id: String,
     /// 防止并发刷新：true 表示正在刷新中
     refreshing: Arc<Mutex<bool>>,
+    /// 刷新完成后通知等待者
+    refresh_notify: Arc<tokio::sync::Notify>,
     /// token 刷新成功后的回调（用于即时持久化）
     on_token_refreshed: Option<Arc<TokenRefreshCallback>>,
 }
@@ -131,6 +133,7 @@ impl Clone for SyncTransport {
             refresh_token: Arc::clone(&self.refresh_token),
             device_id: self.device_id.clone(),
             refreshing: Arc::clone(&self.refreshing),
+            refresh_notify: Arc::clone(&self.refresh_notify),
             on_token_refreshed: self.on_token_refreshed.clone(),
         }
     }
@@ -145,6 +148,7 @@ impl SyncTransport {
             refresh_token: Arc::new(Mutex::new(refresh_token.to_string())),
             device_id: device_id.to_string(),
             refreshing: Arc::new(Mutex::new(false)),
+            refresh_notify: Arc::new(tokio::sync::Notify::new()),
             on_token_refreshed: None,
         }
     }
@@ -164,6 +168,7 @@ impl SyncTransport {
             refresh_token: Arc::new(Mutex::new(refresh_token.to_string())),
             device_id: device_id.to_string(),
             refreshing: Arc::new(Mutex::new(false)),
+            refresh_notify: Arc::new(tokio::sync::Notify::new()),
             on_token_refreshed: Some(Arc::new(callback)),
         }
     }
@@ -186,15 +191,23 @@ impl SyncTransport {
         {
             let mut flag = self.refreshing.lock().await;
             if *flag {
-                // 已有请求在刷新，等待完成后直接返回（新 token 已就绪）
+                // 已有请求在刷新，等待完成通知
                 drop(flag);
-                for _ in 0..50 {
-                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-                    if !*self.refreshing.lock().await {
+                let notified = self.refresh_notify.notified();
+                // notified 是 Future，等待刷新完成后会收到通知
+                // 加超时防止死锁
+                tokio::pin!(notified);
+                let timeout = tokio::time::sleep(std::time::Duration::from_secs(5));
+                tokio::pin!(timeout);
+                tokio::select! {
+                    _ = &mut notified => {
+                        // 刷新完成，新 token 已就绪
                         return Ok(());
                     }
+                    _ = &mut timeout => {
+                        return Err(AppError::SyncError("等待 token 刷新超时".to_string()));
+                    }
                 }
-                return Err(AppError::SyncError("等待 token 刷新超时".to_string()));
             }
             *flag = true;
         }
@@ -202,8 +215,9 @@ impl SyncTransport {
         // 执行刷新
         let result = self.do_refresh().await;
 
-        // 清除刷新标记
+        // 清除刷新标记并通知等待者
         *self.refreshing.lock().await = false;
+        self.refresh_notify.notify_waiters();
 
         result
     }
@@ -230,9 +244,13 @@ impl SyncTransport {
 
         if body.code == 200 {
             if let Some(data) = body.data {
-                // 更新内存中的 token
-                *self.access_token.lock().await = data.access_token.clone();
-                *self.refresh_token.lock().await = data.refresh_token.clone();
+                // 原子更新内存中的 token（同时持有两把锁，避免中间状态）
+                {
+                    let mut at = self.access_token.lock().await;
+                    let mut rt = self.refresh_token.lock().await;
+                    *at = data.access_token.clone();
+                    *rt = data.refresh_token.clone();
+                }
                 // 立即持久化（在返回 Ok 之前，确保不丢失）
                 if let Some(ref cb) = self.on_token_refreshed {
                     cb(data.access_token, data.refresh_token);

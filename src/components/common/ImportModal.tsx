@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Modal } from "./Modal";
+import { Select } from "./Select";
 import { useSettingsStore } from "../../stores/settingsStore";
 import type { ImportOptions } from "../../services/tauriCommands";
 
@@ -90,36 +91,15 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
 
                 <div className="rounded-xl bg-[var(--field)] px-4 py-3">
                     <div className="mb-2 text-sm font-medium text-[var(--text)]">{t("modals:import.conflict")}</div>
-                    <div className="space-y-2">
-                        <label className="flex items-center gap-3">
-                            <input
-                                data-testid="import-conflict-skip"
-                                type="radio"
-                                name="conflict"
-                                checked={!options.overwrite}
-                                onChange={() => setOptions({ ...options, overwrite: false })}
-                                className="accent-[var(--accent)]"
-                            />
-                            <div>
-                                <div className="text-sm text-[var(--text)]">{t("modals:import.skipExisting")}</div>
-                                <div className="text-xs text-[var(--muted)]">{t("modals:import.skipDesc")}</div>
-                            </div>
-                        </label>
-                        <label className="flex items-center gap-3">
-                            <input
-                                data-testid="import-conflict-overwrite"
-                                type="radio"
-                                name="conflict"
-                                checked={options.overwrite}
-                                onChange={() => setOptions({ ...options, overwrite: true })}
-                                className="accent-[var(--accent)]"
-                            />
-                            <div>
-                                <div className="text-sm text-[var(--text)]">{t("modals:import.overwrite")}</div>
-                                <div className="text-xs text-[var(--muted)]">{t("modals:import.overwriteDesc")}</div>
-                            </div>
-                        </label>
-                    </div>
+                    <Select
+                        className="w-48"
+                        value={options.overwrite ? "overwrite" : "skip"}
+                        onChange={(v) => setOptions({ ...options, overwrite: v === "overwrite" })}
+                        options={[
+                            { value: "skip", label: t("modals:import.skipExisting") },
+                            { value: "overwrite", label: t("modals:import.overwrite") },
+                        ]}
+                    />
                 </div>
 
                 <div className="flex justify-end gap-2 pt-2">

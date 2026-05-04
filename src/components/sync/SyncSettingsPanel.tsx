@@ -20,6 +20,7 @@ import { RegisterModal } from "../auth/RegisterModal";
 import { ForgotPasswordModal } from "../auth/ForgotPasswordModal";
 import { ResetPasswordModal } from "../auth/ResetPasswordModal";
 import { ConflictResolutionModal } from "./ConflictResolutionModal";
+import { Select } from "../common/Select";
 
 type AuthModal = "login" | "register" | "forgot" | "reset" | null;
 
@@ -282,21 +283,21 @@ export function SyncSettingsPanel() {
                             <span className="text-xs text-[var(--muted)]">
                                 {t("conflictResolution")}
                             </span>
-                            <select
-                                data-testid="sync-conflict-select"
+                            <Select
+                                className="w-32"
                                 value={config.conflict_resolution}
-                                onChange={(e) =>
+                                onChange={(v) =>
                                     updateConfig({
-                                        conflict_resolution: e.target.value,
+                                        conflict_resolution: v,
                                     })
                                 }
-                                className="rounded-lg border border-[var(--line)] bg-[var(--field)] px-2.5 py-1.5 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
-                            >
-                                <option value="auto">{t("conflictAuto")}</option>
-                                <option value="local-wins">{t("conflictLocal")}</option>
-                                <option value="remote-wins">{t("conflictRemote")}</option>
-                                <option value="manual">{t("conflictManual")}</option>
-                            </select>
+                                options={[
+                                    { value: "auto", label: t("conflictAuto") },
+                                    { value: "local-wins", label: t("conflictLocal") },
+                                    { value: "remote-wins", label: t("conflictRemote") },
+                                    { value: "manual", label: t("conflictManual") },
+                                ]}
+                            />
                         </div>
                     </div>
 

@@ -1,6 +1,8 @@
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager, State};
+use tokio::sync::Mutex as AsyncMutex;
 
 use crate::db::DbState;
 use crate::error::AppError;
@@ -24,8 +26,10 @@ impl Drop for SyncGuard<'_> {
 
 pub struct SyncEngineState {
     pub engine: Mutex<crate::sync::SyncEngine>,
-    pub config: Mutex<SyncConfig>,
+    pub config: Arc<Mutex<SyncConfig>>,
     is_syncing: AtomicBool,
+    /// 串行化会自动刷新 token 的同步请求，避免多个请求同时消费同一个 refresh_token。
+    auth_request_lock: AsyncMutex<()>,
     pub pending_conflicts: Mutex<Option<PendingSyncState>>,
 }
 
@@ -33,23 +37,11 @@ impl SyncEngineState {
     pub fn new(engine: crate::sync::SyncEngine, config: SyncConfig) -> Self {
         Self {
             engine: Mutex::new(engine),
-            config: Mutex::new(config),
+            config: Arc::new(Mutex::new(config)),
             is_syncing: AtomicBool::new(false),
+            auth_request_lock: AsyncMutex::new(()),
             pending_conflicts: Mutex::new(None),
         }
-    }
-
-    pub fn get_transport(&self) -> Result<SyncTransport, AppError> {
-        let config = self
-            .config
-            .lock()
-            .map_err(|e| AppError::Database(e.to_string()))?;
-        Ok(SyncTransport::new(
-            &config.server_url,
-            &config.access_token,
-            &config.refresh_token,
-            &config.device_id,
-        ))
     }
 }
 
@@ -106,6 +98,7 @@ pub async fn trigger_sync(
     }
 
     let _guard = SyncGuard(&sync_state.is_syncing);
+    let _auth_guard = sync_state.auth_request_lock.lock().await;
 
     let config = {
         let mut cfg = sync_state
@@ -124,12 +117,13 @@ pub async fn trigger_sync(
         return Err(AppError::SyncError("未登录".to_string()));
     }
 
+    let state_cfg_clone = sync_state.config.clone();
     let (transport, state_manager, _shared_config) = {
         let engine = sync_state
             .engine
             .lock()
             .map_err(|e| AppError::Database(e.to_string()))?;
-        let shared_config = std::sync::Arc::new(std::sync::Mutex::new(config.clone()));
+        let shared_config = Arc::new(Mutex::new(config.clone()));
         let db_clone = db.inner().clone();
         let shared_cfg_clone = shared_config.clone();
         let transport = SyncTransport::new_with_callback(
@@ -139,9 +133,14 @@ pub async fn trigger_sync(
             &config.device_id,
             Box::new(move |new_access, new_refresh| {
                 if let Ok(mut cfg) = shared_cfg_clone.lock() {
-                    cfg.access_token = new_access;
-                    cfg.refresh_token = new_refresh;
+                    cfg.access_token = new_access.clone();
+                    cfg.refresh_token = new_refresh.clone();
                     let _ = sync_service::save_sync_config(&db_clone, &cfg);
+                }
+                // 同步更新 sync_state.config，确保后续 command 能拿到最新 token
+                if let Ok(mut state_cfg) = state_cfg_clone.lock() {
+                    state_cfg.access_token = new_access;
+                    state_cfg.refresh_token = new_refresh;
                 }
             }),
         );
@@ -151,14 +150,23 @@ pub async fn trigger_sync(
 
     state_manager.clear_progress();
 
-    let sync_output = match sync_service::run_sync_with_transport(&transport, &state_manager, &config, &db).await
-    {
-        Ok(r) => r,
-        Err(e) => {
-            state_manager.set_error(e.to_string());
-            return Err(e);
-        }
-    };
+    let sync_output =
+        match sync_service::run_sync_with_transport(&transport, &state_manager, &config, &db).await
+        {
+            Ok(r) => r,
+            Err(e) => {
+                state_manager.set_error(e.to_string());
+                let (new_access, new_refresh) = transport.get_tokens().await;
+                let mut updated_config = config;
+                updated_config.access_token = new_access;
+                updated_config.refresh_token = new_refresh;
+                sync_service::save_sync_config(&db, &updated_config)?;
+                if let Ok(mut cfg) = sync_state.config.lock() {
+                    *cfg = updated_config;
+                }
+                return Err(e);
+            }
+        };
 
     let (new_access, new_refresh) = transport.get_tokens().await;
 
@@ -292,14 +300,54 @@ pub async fn test_sync_connection(server_url: String) -> Result<bool, AppError> 
 
 #[tauri::command]
 pub async fn get_sync_history(
+    db: State<'_, DbState>,
     sync_state: State<'_, SyncEngineState>,
     page: u32,
     page_size: u32,
 ) -> Result<crate::sync::transport::PaginatedSyncHistory, AppError> {
-    let transport = sync_state.get_transport()?;
-    transport
+    let _auth_guard = sync_state.auth_request_lock.lock().await;
+    let config = {
+        let cfg = sync_state
+            .config
+            .lock()
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        cfg.clone()
+    };
+    let shared_config = Arc::new(Mutex::new(config.clone()));
+    let db_clone = db.inner().clone();
+    let shared_cfg_clone = shared_config.clone();
+    let state_cfg_clone = sync_state.config.clone();
+    let transport = SyncTransport::new_with_callback(
+        &config.server_url,
+        &config.access_token,
+        &config.refresh_token,
+        &config.device_id,
+        Box::new(move |new_access, new_refresh| {
+            if let Ok(mut cfg) = shared_cfg_clone.lock() {
+                cfg.access_token = new_access.clone();
+                cfg.refresh_token = new_refresh.clone();
+                let _ = sync_service::save_sync_config(&db_clone, &cfg);
+            }
+            if let Ok(mut state_cfg) = state_cfg_clone.lock() {
+                state_cfg.access_token = new_access;
+                state_cfg.refresh_token = new_refresh;
+            }
+        }),
+    );
+    let result = transport
         .get_sync_history(page.max(1), page_size.clamp(1, 100))
-        .await
+        .await;
+
+    let (new_access, new_refresh) = transport.get_tokens().await;
+    let mut updated_config = config;
+    updated_config.access_token = new_access;
+    updated_config.refresh_token = new_refresh;
+    sync_service::save_sync_config(&db, &updated_config)?;
+    if let Ok(mut cfg) = sync_state.config.lock() {
+        *cfg = updated_config;
+    }
+
+    result
 }
 
 #[tauri::command]
@@ -332,6 +380,7 @@ pub async fn resolve_sync_conflicts(
         ));
     }
     let _guard = SyncGuard(&sync_state.is_syncing);
+    let _auth_guard = sync_state.auth_request_lock.lock().await;
 
     let pending = {
         let pending_lock = sync_state
@@ -356,7 +405,27 @@ pub async fn resolve_sync_conflicts(
         .map(|c| ((c.table_name.as_str(), c.record_id.as_str()), c))
         .collect();
 
-    let transport = sync_state.get_transport()?;
+    let shared_config = Arc::new(Mutex::new(config.clone()));
+    let db_clone = db.inner().clone();
+    let shared_cfg_clone = shared_config.clone();
+    let state_cfg_clone = sync_state.config.clone();
+    let transport = SyncTransport::new_with_callback(
+        &config.server_url,
+        &config.access_token,
+        &config.refresh_token,
+        &config.device_id,
+        Box::new(move |new_access, new_refresh| {
+            if let Ok(mut cfg) = shared_cfg_clone.lock() {
+                cfg.access_token = new_access.clone();
+                cfg.refresh_token = new_refresh.clone();
+                let _ = sync_service::save_sync_config(&db_clone, &cfg);
+            }
+            if let Ok(mut state_cfg) = state_cfg_clone.lock() {
+                state_cfg.access_token = new_access;
+                state_cfg.refresh_token = new_refresh;
+            }
+        }),
+    );
 
     let mut result = SyncResult {
         pushed: 0,
@@ -383,7 +452,9 @@ pub async fn resolve_sync_conflicts(
     }
 
     if !pending.to_pull.is_empty() {
-        let pull_result = transport.pull_records(config.last_snapshot_id.as_deref()).await?;
+        let pull_result = transport
+            .pull_records(config.last_snapshot_id.as_deref())
+            .await?;
         sync_service::apply_pulled_records(&pull_result.records, &db)?;
         result.pulled += pull_result.records.len() as u32;
     }
