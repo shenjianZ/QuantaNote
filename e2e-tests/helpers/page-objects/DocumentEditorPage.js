@@ -170,6 +170,55 @@ class DocumentEditorPage {
       { timeout: 5000, timeoutMsg: `Version name "${name}" was not saved` },
     );
   }
+
+  // --- Version Panel Extended ---
+
+  async searchVersions(query) {
+    const input = await $("[data-testid='version-panel-search']");
+    await input.clearValue();
+    await input.setValue(query);
+    await observePause();
+  }
+
+  async getVersionEntryCount() {
+    const entries = await $$("[data-testid='version-panel-entry']");
+    return entries.length;
+  }
+
+  async toggleCompareMode() {
+    const btn = await $("[data-testid='version-panel-compare-toggle']");
+    await btn.click();
+    await observePause();
+  }
+
+  async selectVersionCheckbox(index) {
+    const checkboxes = await $$("[data-testid='version-panel-checkbox']");
+    if (checkboxes[index]) {
+      await checkboxes[index].click();
+      await observePause();
+    }
+  }
+
+  async clickCompareBtn() {
+    const btn = await $("[data-testid='version-panel-compare-btn']");
+    await btn.click();
+    await observePause();
+  }
+
+  async clickDeleteVersion(index) {
+    await this.hoverVersion(index);
+    const btns = await $$("[data-testid='version-panel-delete-btn']");
+    if (btns[index]) {
+      await btns[index].click();
+      await observePause();
+    }
+  }
+
+  async clickDeleteConfirm() {
+    const btn = await $("[data-testid='version-panel-delete-confirm']");
+    await btn.click();
+    await observePause();
+  }
 }
 
 export default new DocumentEditorPage();

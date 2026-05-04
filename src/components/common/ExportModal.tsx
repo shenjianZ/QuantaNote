@@ -54,7 +54,7 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
 
     return (
         <Modal open={open} onClose={onClose} title={t("modals:export.title")}>
-            <div className="space-y-4">
+            <div data-testid="export-modal" className="space-y-4">
                 <p className="text-sm text-[var(--muted)]">
                     {t("modals:export.desc")}
                 </p>
@@ -74,6 +74,7 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
 
                     <label className="flex items-center gap-3 rounded-xl bg-[var(--field)] px-4 py-3 hover:bg-[var(--hover)]">
                         <input
+                            data-testid="export-include-tags"
                             type="checkbox"
                             checked={options.includeTags}
                             onChange={(e) => setOptions({ ...options, includeTags: e.target.checked })}
@@ -92,6 +93,7 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
 
                     <label className="flex items-center gap-3 rounded-xl bg-[var(--field)] px-4 py-3 hover:bg-[var(--hover)]">
                         <input
+                            data-testid="export-include-attachments"
                             type="checkbox"
                             checked={options.includeAttachments}
                             onChange={(e) => setOptions({ ...options, includeAttachments: e.target.checked })}
@@ -110,6 +112,7 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
 
                     <label className="flex items-center gap-3 rounded-xl bg-[var(--field)] px-4 py-3 hover:bg-[var(--hover)]">
                         <input
+                            data-testid="export-include-versions"
                             type="checkbox"
                             checked={options.includeVersions}
                             onChange={(e) => setOptions({ ...options, includeVersions: e.target.checked })}
@@ -128,7 +131,7 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
                 </div>
 
                 {exportSizeEstimate && (
-                    <div className="rounded-xl bg-[var(--field)] px-4 py-3 text-sm">
+                    <div data-testid="export-size-estimate" className="rounded-xl bg-[var(--field)] px-4 py-3 text-sm">
                         <span className="text-[var(--muted)]">{t("modals:export.estimatedSize")}</span>
                         <span className="font-medium text-[var(--text)]">{formatSize(estimatedSize)}</span>
                         <span className="ml-1 text-xs text-[var(--muted)]">{t("modals:export.compressedHint")}</span>
@@ -137,6 +140,7 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
 
                 <div className="flex justify-end gap-2 pt-2">
                     <button
+                        data-testid="export-cancel-btn"
                         className="rounded-full px-4 py-2 text-sm text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
                         type="button"
                         onClick={onClose}
@@ -144,6 +148,7 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
                         {t("common:buttons.cancel")}
                     </button>
                     <button
+                        data-testid="export-btn"
                         className="inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2 text-sm text-white hover:opacity-90"
                         type="button"
                         onClick={handleExport}

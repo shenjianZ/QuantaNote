@@ -39,7 +39,7 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
 
     return (
         <Modal open={open} onClose={onClose} title={t("modals:import.title")}>
-            <div className="space-y-4">
+            <div data-testid="import-modal" className="space-y-4">
                 <p className="text-sm text-[var(--muted)]">
                     {t("modals:import.desc")}
                 </p>
@@ -47,6 +47,7 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
                 <div className="space-y-3">
                     <label className="flex items-center gap-3 rounded-xl bg-[var(--field)] px-4 py-3 hover:bg-[var(--hover)]">
                         <input
+                            data-testid="import-include-tags"
                             type="checkbox"
                             checked={options.includeTags}
                             onChange={(e) => setOptions({ ...options, includeTags: e.target.checked })}
@@ -60,6 +61,7 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
 
                     <label className="flex items-center gap-3 rounded-xl bg-[var(--field)] px-4 py-3 hover:bg-[var(--hover)]">
                         <input
+                            data-testid="import-include-attachments"
                             type="checkbox"
                             checked={options.includeAttachments}
                             onChange={(e) => setOptions({ ...options, includeAttachments: e.target.checked })}
@@ -73,6 +75,7 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
 
                     <label className="flex items-center gap-3 rounded-xl bg-[var(--field)] px-4 py-3 hover:bg-[var(--hover)]">
                         <input
+                            data-testid="import-include-versions"
                             type="checkbox"
                             checked={options.includeVersions}
                             onChange={(e) => setOptions({ ...options, includeVersions: e.target.checked })}
@@ -90,6 +93,7 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
                     <div className="space-y-2">
                         <label className="flex items-center gap-3">
                             <input
+                                data-testid="import-conflict-skip"
                                 type="radio"
                                 name="conflict"
                                 checked={!options.overwrite}
@@ -103,6 +107,7 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
                         </label>
                         <label className="flex items-center gap-3">
                             <input
+                                data-testid="import-conflict-overwrite"
                                 type="radio"
                                 name="conflict"
                                 checked={options.overwrite}
@@ -119,6 +124,7 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
 
                 <div className="flex justify-end gap-2 pt-2">
                     <button
+                        data-testid="import-cancel-btn"
                         className="rounded-full px-4 py-2 text-sm text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
                         type="button"
                         onClick={onClose}
@@ -126,6 +132,7 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
                         {t("common:buttons.cancel")}
                     </button>
                     <button
+                        data-testid="import-btn"
                         className="inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2 text-sm text-white hover:opacity-90"
                         type="button"
                         onClick={handleImport}

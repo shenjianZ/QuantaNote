@@ -30,16 +30,17 @@ export function BackupManagerModal({ open, onClose }: BackupManagerModalProps) {
 
     return (
         <Modal open={open} onClose={onClose} title={t("modals:backupManager.title")} maxWidth="max-w-lg">
-            <div className="space-y-3">
+            <div data-testid="backup-manager-modal" className="space-y-3">
                 {backupFiles.length === 0 ? (
-                    <p className="py-8 text-center text-sm text-[var(--muted)]">
+                    <p data-testid="backup-empty" className="py-8 text-center text-sm text-[var(--muted)]">
                         {t("modals:backupManager.noBackups")}
                     </p>
                 ) : (
-                    <div className="max-h-80 space-y-1 overflow-auto">
+                    <div data-testid="backup-list" className="max-h-80 space-y-1 overflow-auto">
                         {backupFiles.map((file) => (
                             <div
                                 key={file.filename}
+                                data-testid="backup-item"
                                 className="group flex items-center gap-3 rounded-xl bg-[var(--field)] px-4 py-3 hover:bg-[var(--hover)]"
                             >
                                 <div className="min-w-0 flex-1">
@@ -52,6 +53,7 @@ export function BackupManagerModal({ open, onClose }: BackupManagerModalProps) {
                                     </div>
                                 </div>
                                 <button
+                                    data-testid="backup-delete-btn"
                                     className="shrink-0 rounded-full p-2 text-[var(--muted)] opacity-0 transition-opacity hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100"
                                     type="button"
                                     title={t("modals:backupManager.deleteBackup")}
@@ -66,6 +68,7 @@ export function BackupManagerModal({ open, onClose }: BackupManagerModalProps) {
 
                 <div className="flex justify-end pt-2">
                     <button
+                        data-testid="backup-close-btn"
                         className="rounded-full px-4 py-2 text-sm text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
                         type="button"
                         onClick={onClose}

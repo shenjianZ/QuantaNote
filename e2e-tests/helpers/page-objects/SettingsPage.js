@@ -6,10 +6,18 @@ import { pause, observePause } from "../config.js";
 
 class SettingsPage {
   async selectSection(label) {
-    // "外观" / "字体" / "数据" / "关于"
+    // "外观" / "字体" / "数据" / "关于" / "同步"
     const btn = await $(`//nav//button[contains(., '${label}')]`);
     await btn.click();
     await observePause();
+  }
+
+  async selectSectionByIndex(index) {
+    const btns = await $$("//nav//button");
+    if (btns[index]) {
+      await btns[index].click();
+      await observePause();
+    }
   }
 
   async setTheme(mode) {
@@ -45,6 +53,14 @@ class SettingsPage {
     await observePause();
   }
 
+  async selectMonoFont(fontName) {
+    const select = await $("//div[contains(@class, 'min-h-12')][.//span[contains(., '等宽字体')]]//button");
+    await select.click();
+    const option = await $(`//button[normalize-space(.)='${fontName}']`);
+    await option.click();
+    await observePause();
+  }
+
   async getFontSize() {
     const select = await $("//div[contains(@class, 'min-h-12')][.//span[contains(., '界面字号')]]//button");
     const text = await select.getText();
@@ -60,7 +76,6 @@ class SettingsPage {
   }
 
   async toggleSetting(label) {
-    // 通过 label 文本找到对应的 toggle 按钮
     const toggle = await $(`//div[contains(@class, 'min-h-12')][.//span[contains(., '${label}')]]//button[contains(@class, 'rounded-full')]`);
     await toggle.click();
     await observePause();
@@ -84,6 +99,51 @@ class SettingsPage {
   async clickImport() {
     const btn = await $("//button[contains(., '导入')]");
     await btn.click();
+  }
+
+  // --- Extended settings methods ---
+
+  async clickAddCustomColor() {
+    await $("[data-testid='settings-add-custom-color-btn']").then(b => b.click());
+    await observePause();
+  }
+
+  async getCustomColorCount() {
+    const colors = await $$("//div[contains(@class, 'group relative')]");
+    return colors.length;
+  }
+
+  async clickBackupNow() {
+    await $("[data-testid='settings-backup-now-btn']").then(b => b.click());
+    await observePause();
+  }
+
+  async clickBackupManager() {
+    await $("[data-testid='settings-backup-manager-btn']").then(b => b.click());
+    await observePause();
+  }
+
+  async clickClearSqlLog() {
+    await $("[data-testid='settings-clear-sql-log-btn']").then(b => b.click());
+    await observePause();
+  }
+
+  async getAboutVersion() {
+    const el = await $("[data-testid='settings-about-version']");
+    return el.getText();
+  }
+
+  async toggleAutostart() {
+    await this.toggleSetting("开机自启");
+  }
+
+  async selectLocale(locale) {
+    // Find the locale Select by its label text
+    const select = await $("//div[contains(@class, 'min-h-12')][.//span[contains(., '语言')]]//button");
+    await select.click();
+    const option = await $(`//button[normalize-space(.)='${locale}']`);
+    await option.click();
+    await observePause();
   }
 }
 

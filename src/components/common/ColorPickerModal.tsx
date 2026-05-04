@@ -73,6 +73,7 @@ export function ColorPickerModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onCancel}>
       <div
+        data-testid="color-picker-modal"
         className="w-80 rounded-2xl border border-[var(--line)] bg-[var(--popover)] p-5 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
@@ -81,6 +82,7 @@ export function ColorPickerModal({
           <h3 className="text-sm font-semibold text-[var(--text)]">{t("modals:colorPicker.title")}</h3>
           <button
             type="button"
+            data-testid="color-picker-cancel-btn"
             className="flex h-6 w-6 items-center justify-center rounded-lg text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
             onClick={onCancel}
           >
@@ -91,12 +93,14 @@ export function ColorPickerModal({
         {/* 预览 + HEX */}
         <div className="mb-4 flex items-center gap-3">
           <div
+            data-testid="color-picker-preview"
             className="h-12 w-12 shrink-0 rounded-xl border border-[var(--line)] shadow-inner"
             style={{ background: selected }}
           />
           <div className="flex-1">
             <div className="mb-1 text-xs text-[var(--muted)]">{t("modals:colorPicker.hexValue")}</div>
             <input
+              data-testid="color-picker-hex-input"
               className="h-8 w-full rounded-lg border border-[var(--line)] bg-[var(--field)] px-2.5 font-mono text-sm text-[var(--text)] focus:border-[var(--accent)] focus:outline-none"
               value={hexInput}
               maxLength={7}
@@ -108,12 +112,14 @@ export function ColorPickerModal({
         {/* 调色板 */}
         <div className="mb-4">
           <div className="mb-2 text-xs text-[var(--muted)]">{t("modals:colorPicker.palette")}</div>
-          <div className="flex flex-col gap-1">
+          <div data-testid="color-picker-palette" className="flex flex-col gap-1">
             {PALETTE_ROWS.map((row, ri) => (
               <div key={ri} className="flex gap-1">
                 {row.map((hex) => (
                   <button
                     key={hex}
+                    data-testid="color-picker-swatch"
+                    data-color={hex}
                     type="button"
                     className={`h-6 flex-1 rounded transition-transform hover:scale-110 ${
                       hex === selected ? "outline outline-2 outline-offset-1 outline-[var(--accent)]" : ""
@@ -132,6 +138,7 @@ export function ColorPickerModal({
           <div className="mb-1 text-xs text-[var(--muted)]">{t("modals:colorPicker.colorName")}</div>
           <input
             ref={nameRef}
+            data-testid="color-picker-name-input"
             className="h-9 w-full rounded-lg border border-[var(--line)] bg-[var(--field)] px-3 text-sm text-[var(--text)] focus:border-[var(--accent)] focus:outline-none"
             placeholder={t("modals:colorPicker.namePlaceholder")}
             value={name}
@@ -154,6 +161,7 @@ export function ColorPickerModal({
           </button>
           <button
             type="button"
+            data-testid="color-picker-confirm-btn"
             className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[var(--accent)] px-4 text-sm font-medium text-white hover:opacity-90"
             onClick={handleConfirm}
           >

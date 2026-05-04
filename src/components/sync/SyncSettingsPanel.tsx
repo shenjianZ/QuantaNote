@@ -110,6 +110,7 @@ export function SyncSettingsPanel() {
                 </div>
                 <label className="relative inline-flex cursor-pointer items-center">
                     <input
+                        data-testid="sync-toggle"
                         type="checkbox"
                         checked={config.enabled}
                         onChange={(e) =>
@@ -128,6 +129,7 @@ export function SyncSettingsPanel() {
                 </label>
                 <div className="flex gap-2">
                     <input
+                        data-testid="sync-server-url-input"
                         type="url"
                         value={serverUrlInput}
                         onChange={(e) => setServerUrlInput(e.target.value)}
@@ -136,6 +138,7 @@ export function SyncSettingsPanel() {
                         className="flex-1 rounded-xl border border-[var(--line)] bg-[var(--field)] px-4 py-2.5 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
                     />
                     <button
+                        data-testid="sync-test-connection-btn"
                         onClick={handleTestConnection}
                         disabled={isTesting || !serverUrlInput.trim()}
                         className="flex items-center gap-1.5 rounded-xl border border-[var(--line)] px-3 py-2.5 text-xs text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)] disabled:opacity-50"
@@ -150,6 +153,7 @@ export function SyncSettingsPanel() {
                 </div>
                 {testResult !== null && (
                     <div
+                        data-testid="sync-test-result"
                         className={`flex items-center gap-1.5 text-xs ${testResult ? "text-green-400" : "text-red-400"}`}
                     >
                         {testResult ? (
@@ -176,6 +180,7 @@ export function SyncSettingsPanel() {
                             </span>
                         </div>
                         <button
+                            data-testid="sync-logout-btn"
                             onClick={logout}
                             className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-500/10"
                         >
@@ -186,6 +191,7 @@ export function SyncSettingsPanel() {
                 ) : (
                     <div className="flex gap-2">
                         <button
+                            data-testid="sync-login-btn"
                             onClick={() => setAuthModal("login")}
                             className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white hover:opacity-90"
                         >
@@ -193,6 +199,7 @@ export function SyncSettingsPanel() {
                             {t("login")}
                         </button>
                         <button
+                            data-testid="sync-register-btn"
                             onClick={() => setAuthModal("register")}
                             className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-[var(--line)] px-4 py-2.5 text-sm text-[var(--text)] hover:bg-[var(--hover)]"
                         >
@@ -216,6 +223,7 @@ export function SyncSettingsPanel() {
                             </span>
                             <label className="relative inline-flex cursor-pointer items-center">
                                 <input
+                                    data-testid="sync-auto-sync-toggle"
                                     type="checkbox"
                                     checked={config.auto_sync}
                                     onChange={(e) =>
@@ -234,6 +242,7 @@ export function SyncSettingsPanel() {
                                     {t("syncInterval")}
                                 </span>
                                 <input
+                                    data-testid="sync-interval-input"
                                     type="number"
                                     min={5}
                                     max={1440}
@@ -256,6 +265,7 @@ export function SyncSettingsPanel() {
                             </span>
                             <label className="relative inline-flex cursor-pointer items-center">
                                 <input
+                                    data-testid="sync-attachments-toggle"
                                     type="checkbox"
                                     checked={config.sync_attachments}
                                     onChange={(e) =>
@@ -273,6 +283,7 @@ export function SyncSettingsPanel() {
                                 {t("conflictResolution")}
                             </span>
                             <select
+                                data-testid="sync-conflict-select"
                                 value={config.conflict_resolution}
                                 onChange={(e) =>
                                     updateConfig({
@@ -291,7 +302,7 @@ export function SyncSettingsPanel() {
 
                     {/* 待解决冲突提示 */}
                     {pendingConflicts && pendingConflicts.length > 0 && (
-                        <div className="rounded-xl bg-amber-500/10 px-4 py-3 text-xs text-amber-300">
+                        <div data-testid="sync-pending-conflicts" className="rounded-xl bg-amber-500/10 px-4 py-3 text-xs text-amber-300">
                             {t("pendingConflicts", { count: pendingConflicts.length })}
                         </div>
                     )}
@@ -301,7 +312,7 @@ export function SyncSettingsPanel() {
                         <label className="text-sm font-medium text-[var(--text)]">
                             {t("syncStatus")}
                         </label>
-                        <div className="rounded-xl bg-[var(--field)] px-4 py-3">
+                        <div data-testid="sync-status" className="rounded-xl bg-[var(--field)] px-4 py-3">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     {isSyncing ? (
@@ -322,6 +333,7 @@ export function SyncSettingsPanel() {
                                     </span>
                                 </div>
                                 <button
+                                    data-testid="sync-now-btn"
                                     onClick={handleSync}
                                     disabled={isSyncing || isLoading}
                                     className="flex items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
@@ -335,7 +347,7 @@ export function SyncSettingsPanel() {
                                 </button>
                             </div>
                             {state.progress && isSyncing && (
-                                <div className="mt-2">
+                                <div data-testid="sync-progress" className="mt-2">
                                     <div className="h-1.5 overflow-hidden rounded-full bg-[var(--line)]">
                                         <div
                                             className="h-full rounded-full bg-[var(--accent)] transition-all"
@@ -377,7 +389,7 @@ export function SyncSettingsPanel() {
                                     {t("totalRecords", { count: historyTotal })}
                                 </span>
                             </div>
-                            <div className="max-h-60 space-y-1 overflow-auto">
+                            <div data-testid="sync-history-list" className="max-h-60 space-y-1 overflow-auto">
                                 {history.map((entry) => (
                                     <div
                                         key={entry.snapshot_id}
@@ -425,7 +437,7 @@ export function SyncSettingsPanel() {
 
             {/* 错误提示 */}
             {error && (
-                <div className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">
+                <div data-testid="sync-error" className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">
                     {error}
                 </div>
             )}

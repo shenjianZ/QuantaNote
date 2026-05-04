@@ -70,15 +70,15 @@ export function VersionDiffModal({ open, versionA, versionB, onClose }: VersionD
               {versionB.name || `v${versionB.version_number}`}
             </span>
           </div>
-          <div className="flex items-center gap-2 text-xs text-[var(--muted)]">
+          <div data-testid="version-diff-stats" className="flex items-center gap-2 text-xs text-[var(--muted)]">
             <span className="text-green-400">+{stats.added}</span>
             <span className="text-red-400">-{stats.removed}</span>
           </div>
         </div>
 
-        <div className="max-h-[60vh] overflow-auto rounded-xl border border-[var(--line)] bg-[var(--field)] p-3">
+        <div data-testid="version-diff-content" className="max-h-[60vh] overflow-auto rounded-xl border border-[var(--line)] bg-[var(--field)] p-3">
           {diffResult.length === 0 ? (
-            <div className="py-8 text-center text-sm text-[var(--muted)]">
+            <div data-testid="version-diff-identical" className="py-8 text-center text-sm text-[var(--muted)]">
               {t("editor:versionDiff.identical")}
             </div>
           ) : (
@@ -88,6 +88,7 @@ export function VersionDiffModal({ open, versionA, versionB, onClose }: VersionD
 
         <div className="flex justify-end">
           <button
+            data-testid="version-diff-close-btn"
             className="inline-flex items-center gap-1.5 rounded-full bg-[var(--field)] px-3 py-1.5 text-sm text-[var(--text)] hover:bg-[var(--hover)]"
             type="button"
             onClick={onClose}

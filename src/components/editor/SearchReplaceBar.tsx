@@ -91,21 +91,24 @@ export function SearchReplaceBar({
 
   return (
     <div
+      data-testid="search-replace-bar"
       className="absolute right-4 top-2 z-20 flex flex-col gap-2 rounded-xl border border-[var(--line)] bg-[var(--popover)] p-3 shadow-xl"
       onKeyDown={handleKeyDown}
     >
       <div className="flex items-center gap-2">
         <input
           ref={inputRef}
+          data-testid="search-input"
           className="h-8 w-48 rounded-lg border border-[var(--line)] bg-[var(--field)] px-2 text-sm text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
           placeholder={t("editor:searchReplace.search")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <span className="min-w-[4rem] text-center text-xs text-[var(--muted)]">
+        <span data-testid="search-match-count" className="min-w-[4rem] text-center text-xs text-[var(--muted)]">
           {matchCount > 0 ? `${currentIdx}/${matchCount}` : t("editor:searchReplace.noMatch")}
         </span>
         <button
+          data-testid="search-prev-btn"
           className="grid h-7 w-7 place-items-center rounded text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
           type="button"
           onClick={handlePrev}
@@ -114,6 +117,7 @@ export function SearchReplaceBar({
           <ChevronUp className="h-4 w-4" />
         </button>
         <button
+          data-testid="search-next-btn"
           className="grid h-7 w-7 place-items-center rounded text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
           type="button"
           onClick={handleNext}
@@ -122,6 +126,7 @@ export function SearchReplaceBar({
           <ChevronDown className="h-4 w-4" />
         </button>
         <button
+          data-testid="search-case-sensitive-btn"
           className={`grid h-7 w-7 place-items-center rounded text-xs font-bold ${caseSensitive ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"}`}
           type="button"
           onClick={() => setCaseSensitive(!caseSensitive)}
@@ -130,6 +135,7 @@ export function SearchReplaceBar({
           Aa
         </button>
         <button
+          data-testid="search-close-btn"
           className="grid h-7 w-7 place-items-center rounded text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
           type="button"
           onClick={onClose}
@@ -140,12 +146,14 @@ export function SearchReplaceBar({
       </div>
       <div className="flex items-center gap-2">
         <input
+          data-testid="replace-input"
           className="h-8 w-48 rounded-lg border border-[var(--line)] bg-[var(--field)] px-2 text-sm text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
           placeholder={t("editor:searchReplace.replace")}
           value={replacement}
           onChange={(e) => setReplacement(e.target.value)}
         />
         <button
+          data-testid="replace-btn"
           className="inline-flex h-7 items-center gap-1 rounded px-2 text-xs text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
           type="button"
           onClick={handleReplace}
@@ -155,6 +163,7 @@ export function SearchReplaceBar({
           {t("editor:searchReplace.replace")}
         </button>
         <button
+          data-testid="replace-all-btn"
           className="inline-flex h-7 items-center gap-1 rounded px-2 text-xs text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
           type="button"
           onClick={handleReplaceAll}

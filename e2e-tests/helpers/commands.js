@@ -260,3 +260,61 @@ export async function cleanupAll() {
   await cleanupAllTags();
   await notifyDataChanged();
 }
+
+// --- Sync 配置 ---
+
+export async function getSyncConfig() {
+  return tauriInvoke("get_sync_config");
+}
+
+export async function saveSyncConfig(config) {
+  return tauriInvoke("save_sync_config_cmd", { config });
+}
+
+// --- 备份 ---
+
+export async function getAutoBackupConfig() {
+  return tauriInvoke("get_auto_backup_config");
+}
+
+export async function updateAutoBackupConfig(config) {
+  return tauriInvoke("update_auto_backup_config", { config });
+}
+
+export async function triggerBackupNow() {
+  return tauriInvoke("trigger_backup_now");
+}
+
+export async function listBackups() {
+  return tauriInvoke("list_backups");
+}
+
+export async function deleteBackup(filename) {
+  return tauriInvoke("delete_backup", { filename });
+}
+
+// --- SQL 诊断 ---
+
+export async function getSqlLogConfig() {
+  return tauriInvoke("get_sql_log_config");
+}
+
+export async function updateSqlLogConfig(config) {
+  return tauriInvoke("update_sql_log_config", { config });
+}
+
+export async function clearSqlLog() {
+  return tauriInvoke("clear_sql_log");
+}
+
+// --- 版本 ---
+
+export async function deleteVersion(versionId) {
+  return tauriInvoke("delete_version", { versionId });
+}
+
+// --- 导出/导入扩展 ---
+
+export async function getExportSizeEstimate() {
+  return tauriInvoke("get_export_size_estimate");
+}

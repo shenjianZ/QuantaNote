@@ -220,6 +220,7 @@ export function SettingsPage({
                             ))}
                             <button
                                 type="button"
+                                data-testid="settings-add-custom-color-btn"
                                 className="flex h-7 w-7 items-center justify-center rounded-full border border-dashed border-[var(--line)] text-[var(--muted)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
                                 title={t("settings:appearance.addCustomColor")}
                                 onClick={() => setColorPickerOpen(true)}
@@ -481,6 +482,7 @@ export function SettingsPage({
                         <div className="mt-3 flex gap-2">
                             <button
                                 className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm text-white hover:opacity-90"
+                                data-testid="settings-backup-now-btn"
                                 type="button"
                                 onClick={() => triggerBackupNow()}
                             >
@@ -488,6 +490,7 @@ export function SettingsPage({
                             </button>
                             <button
                                 className="inline-flex items-center gap-2 rounded-full bg-[var(--field)] px-4 py-2 text-sm hover:bg-[var(--hover)]"
+                                data-testid="settings-backup-manager-btn"
                                 type="button"
                                 onClick={() => setBackupManagerOpen(true)}
                             >
@@ -686,6 +689,7 @@ export function SettingsPage({
                             </button>
                             <button
                                 className="inline-flex items-center gap-2 rounded-full bg-[var(--field)] px-4 py-2 text-sm hover:bg-[var(--hover)]"
+                                data-testid="settings-clear-sql-log-btn"
                                 type="button"
                                 onClick={() => clearSqlLogFile()}
                             >
@@ -713,7 +717,7 @@ export function SettingsPage({
             <section>
                 <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
                     <span className="inline-block rounded-md bg-[var(--accent)] px-2.5 py-1 text-white">QuantaNote</span>
-                    <span className="inline-block rounded-md bg-[var(--accent-soft)] px-2.5 py-1 text-[var(--accent)]">v0.1.0</span>
+                    <span data-testid="settings-about-version" className="inline-block rounded-md bg-[var(--accent-soft)] px-2.5 py-1 text-[var(--accent)]">v0.1.0</span>
                 </h2>
                 <div className="mb-4 text-sm text-[var(--muted)]">
                     {t("settings:about.description")}

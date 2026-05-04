@@ -48,13 +48,14 @@ export function ForgotPasswordModal({
 
     return (
         <Modal open={open} onClose={handleClose} title={t("forgotPassword.title")}>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4" data-testid="forgot-password-modal">
                 {!config.server_url && (
                     <div>
                         <label className="mb-1 block text-xs text-[var(--muted)]">
                             {t("forgotPassword.serverUrl")}
                         </label>
                         <input
+                            data-testid="forgot-server-url-input"
                             type="url"
                             value={serverUrl}
                             onChange={(e) => setServerUrl(e.target.value)}
@@ -66,7 +67,7 @@ export function ForgotPasswordModal({
                 )}
 
                 {sent ? (
-                    <div className="rounded-lg bg-green-500/10 px-4 py-6 text-center">
+                    <div data-testid="forgot-success" className="rounded-lg bg-green-500/10 px-4 py-6 text-center">
                         <Mail className="mx-auto mb-2 h-8 w-8 text-green-400" />
                         <p className="text-sm text-[var(--text)]">
                             {t("forgotPassword.sent")}
@@ -82,6 +83,7 @@ export function ForgotPasswordModal({
                                 {t("forgotPassword.email")}
                             </label>
                             <input
+                                data-testid="forgot-email-input"
                                 type="email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
@@ -92,12 +94,13 @@ export function ForgotPasswordModal({
                         </div>
 
                         {error && (
-                            <div className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">
+                            <div data-testid="forgot-error" className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">
                                 {error}
                             </div>
                         )}
 
                         <button
+                            data-testid="forgot-submit-btn"
                             type="submit"
                             disabled={isLoading || !email.trim()}
                             className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
@@ -114,6 +117,7 @@ export function ForgotPasswordModal({
 
                 <div className="text-center text-xs">
                     <button
+                        data-testid="forgot-switch-to-login"
                         type="button"
                         onClick={onSwitchToLogin}
                         className="text-[var(--accent)] hover:underline"

@@ -23,3 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 slides
+
+# Claude Code worktrees
+.claude/worktrees/

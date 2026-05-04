@@ -58,13 +58,14 @@ export function RegisterModal({
 
     return (
         <Modal open={open} onClose={handleClose} title={t("register.title")}>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4" data-testid="register-modal">
                 {!config.server_url && (
                     <div>
                         <label className="mb-1 block text-xs text-[var(--muted)]">
                             {t("register.serverUrl")}
                         </label>
                         <input
+                            data-testid="register-server-url-input"
                             type="url"
                             value={serverUrl}
                             onChange={(e) => setServerUrl(e.target.value)}
@@ -79,6 +80,7 @@ export function RegisterModal({
                         {t("register.email")}
                     </label>
                     <input
+                        data-testid="register-email-input"
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
@@ -92,6 +94,7 @@ export function RegisterModal({
                         {t("register.password")}
                     </label>
                     <input
+                        data-testid="register-password-input"
                         type="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
@@ -106,6 +109,7 @@ export function RegisterModal({
                         {t("register.confirmPassword")}
                     </label>
                     <input
+                        data-testid="register-confirm-password-input"
                         type="password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
@@ -116,12 +120,13 @@ export function RegisterModal({
                 </div>
 
                 {displayError && (
-                    <div className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">
+                    <div data-testid="register-error" className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">
                         {displayError}
                     </div>
                 )}
 
                 <button
+                    data-testid="register-submit-btn"
                     type="submit"
                     disabled={
                         isLoading ||
@@ -141,6 +146,7 @@ export function RegisterModal({
 
                 <div className="text-center text-xs">
                     <button
+                        data-testid="register-switch-to-login"
                         type="button"
                         onClick={onSwitchToLogin}
                         className="text-[var(--accent)] hover:underline"

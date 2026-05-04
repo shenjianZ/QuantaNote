@@ -44,13 +44,14 @@ export function LoginModal({
 
     return (
         <Modal open={open} onClose={handleClose} title={t("login.title")}>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4" data-testid="login-modal">
                 {!config.server_url && (
                     <div>
                         <label className="mb-1 block text-xs text-[var(--muted)]">
                             {t("login.serverUrl")}
                         </label>
                         <input
+                            data-testid="login-server-url-input"
                             type="url"
                             value={serverUrl}
                             onChange={(e) => setServerUrl(e.target.value)}
@@ -65,6 +66,7 @@ export function LoginModal({
                         {t("login.email")}
                     </label>
                     <input
+                        data-testid="login-email-input"
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
@@ -78,6 +80,7 @@ export function LoginModal({
                         {t("login.password")}
                     </label>
                     <input
+                        data-testid="login-password-input"
                         type="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
@@ -88,12 +91,13 @@ export function LoginModal({
                 </div>
 
                 {error && (
-                    <div className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">
+                    <div data-testid="login-error" className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">
                         {error}
                     </div>
                 )}
 
                 <button
+                    data-testid="login-submit-btn"
                     type="submit"
                     disabled={isLoading || !email.trim() || !password.trim()}
                     className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
@@ -108,6 +112,7 @@ export function LoginModal({
 
                 <div className="flex items-center justify-between text-xs">
                     <button
+                        data-testid="login-switch-to-register"
                         type="button"
                         onClick={onSwitchToRegister}
                         className="text-[var(--accent)] hover:underline"
@@ -115,6 +120,7 @@ export function LoginModal({
                         {t("login.noAccount")}
                     </button>
                     <button
+                        data-testid="login-switch-to-forgot"
                         type="button"
                         onClick={onSwitchToForgotPassword}
                         className="text-[var(--muted)] hover:text-[var(--text)]"

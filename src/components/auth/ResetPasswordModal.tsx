@@ -71,9 +71,9 @@ export function ResetPasswordModal({
 
     return (
         <Modal open={open} onClose={handleClose} title={t("resetPassword.title")}>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4" data-testid="reset-password-modal">
                 {success ? (
-                    <div className="rounded-lg bg-green-500/10 px-4 py-6 text-center">
+                    <div data-testid="reset-success" className="rounded-lg bg-green-500/10 px-4 py-6 text-center">
                         <CheckCircle className="mx-auto mb-2 h-8 w-8 text-green-400" />
                         <p className="text-sm text-[var(--text)]">
                             {t("resetPassword.success")}
@@ -93,6 +93,7 @@ export function ResetPasswordModal({
                                 {t("resetPassword.token")}
                             </label>
                             <input
+                                data-testid="reset-token-input"
                                 type="text"
                                 value={resetToken}
                                 onChange={(e) => setResetToken(e.target.value)}
@@ -107,6 +108,7 @@ export function ResetPasswordModal({
                                 {t("resetPassword.newPassword")}
                             </label>
                             <input
+                                data-testid="reset-new-password-input"
                                 type="password"
                                 value={newPassword}
                                 onChange={(e) => setNewPassword(e.target.value)}
@@ -122,6 +124,7 @@ export function ResetPasswordModal({
                                 {t("resetPassword.confirmPassword")}
                             </label>
                             <input
+                                data-testid="reset-confirm-password-input"
                                 type="password"
                                 value={confirmPassword}
                                 onChange={(e) => setConfirmPassword(e.target.value)}
@@ -132,12 +135,13 @@ export function ResetPasswordModal({
                         </div>
 
                         {displayError && (
-                            <div className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">
+                            <div data-testid="reset-error" className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">
                                 {displayError}
                             </div>
                         )}
 
                         <button
+                            data-testid="reset-submit-btn"
                             type="submit"
                             disabled={
                                 isLoading ||
@@ -159,6 +163,7 @@ export function ResetPasswordModal({
 
                 <div className="text-center text-xs">
                     <button
+                        data-testid="reset-switch-to-login"
                         type="button"
                         onClick={onSwitchToLogin}
                         className="text-[var(--accent)] hover:underline"

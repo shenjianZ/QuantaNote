@@ -90,7 +90,7 @@ export function ConflictResolutionModal({
             title={t("syncConflictTitle")}
             maxWidth="max-w-2xl"
         >
-            <div className="space-y-4">
+            <div data-testid="conflict-resolution-modal" className="space-y-4">
                 <div className="flex items-start gap-2.5 rounded-xl bg-amber-500/10 px-4 py-3">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
                     <p className="text-xs text-amber-300">
@@ -100,6 +100,7 @@ export function ConflictResolutionModal({
 
                 <div className="flex gap-2">
                     <button
+                        data-testid="conflict-all-local-btn"
                         type="button"
                         onClick={selectAllLocal}
                         className="rounded-lg border border-[var(--line)] px-2.5 py-1 text-xs text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
@@ -107,6 +108,7 @@ export function ConflictResolutionModal({
                         {t("allLocal")}
                     </button>
                     <button
+                        data-testid="conflict-all-remote-btn"
                         type="button"
                         onClick={selectAllRemote}
                         className="rounded-lg border border-[var(--line)] px-2.5 py-1 text-xs text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
@@ -132,6 +134,7 @@ export function ConflictResolutionModal({
 
                 <div className="flex justify-end gap-2 border-t border-[var(--line)] pt-3">
                     <button
+                        data-testid="conflict-cancel-btn"
                         type="button"
                         onClick={handleCancel}
                         disabled={isLoading}
@@ -140,6 +143,7 @@ export function ConflictResolutionModal({
                         {t("cancelSync")}
                     </button>
                     <button
+                        data-testid="conflict-apply-btn"
                         type="button"
                         onClick={handleResolve}
                         disabled={isLoading}
