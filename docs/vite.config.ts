@@ -397,7 +397,7 @@ function publicHmrPlugin() {
 }
 
 export default defineConfig({
-    base: process.env.NODE_ENV === "production" ? "/QuantaNote/" : "/",
+    base: "/",
     plugins: [
         react(),
         mdxComponentsPlugin({

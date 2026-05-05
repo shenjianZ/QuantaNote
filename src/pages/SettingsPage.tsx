@@ -753,7 +753,7 @@ export function SettingsPage({
                     </a>
                     <a
                         className="inline-flex items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--field)] px-3 py-1.5 text-sm text-[var(--text)] hover:bg-[var(--hover)]"
-                        href="https://shenjianz.github.io/QuantaNote"
+                        href="https://quantanote-docs.shenjianl.cn/"
                         target="_blank"
                         rel="noopener noreferrer"
                     >

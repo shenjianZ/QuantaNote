@@ -1,0 +1,1 @@
+{"root":["./src/main.tsx","./src/shiki-modules.d.ts","./src/vite-env.d.ts","./src/components/alert.tsx","./src/components/badgelist.tsx","./src/components/callout.tsx","./src/components/feature.tsx","./src/components/mytip.tsx","./src/generated/mdx-components.ts","./src/generated/shiki-bundle.ts","./src/utils/docs-bootstrap.package.ts"],"version":"6.0.3"}

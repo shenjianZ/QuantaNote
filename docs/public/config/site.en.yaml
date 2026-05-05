@@ -3,7 +3,7 @@
 site:
     title: "QuantaNote Docs"
     description: "QuantaNote - Local-first desktop information management tool documentation"
-    url: "https://shenjianz.github.io/QuantaNote"
+    url: "https://quantanote-docs.shenjianl.cn"
     logo:
         light: "/images/favicon.svg"
         dark: "/images/favicon-dark.svg"
