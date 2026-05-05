@@ -1,84 +1,97 @@
+<div align="center">
+
 # QuantaNote
 
-[![Version](https://img.shields.io/badge/version-0.1.0-blue)](https://github.com/shenjianZ/QuantaNote/releases)
-[![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)]()
-[![Tauri](https://img.shields.io/badge/Tauri-2.0-FFC131?logo=tauri)](https://tauri.app)
-[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)](https://react.dev)
-[![Rust](https://img.shields.io/badge/Rust-000000?logo=rust)](https://www.rust-lang.org)
+**🌐 Language**: [English](#) | [中文](./README_ZH.md)
 
-本地优先的桌面信息管理工具，支持 Markdown 笔记、全文搜索、标签管理、附件、版本历史和自动备份。基于 Tauri 2.0，数据全部本地存储。
+![Tauri](https://img.shields.io/badge/Tauri-2.0-FFC131?logo=tauri&logoColor=000000)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=000000)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=FFFFFF)
+![Rust](https://img.shields.io/badge/Rust-1.70+-000000?logo=rust&logoColor=FFFFFF)
+![Vite](https://img.shields.io/badge/Vite-6.0-646CFF?logo=vite&logoColor=FFFFFF)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind-4.0-06B6D4?logo=tailwindcss&logoColor=FFFFFF)
+![Zustand](https://img.shields.io/badge/Zustand-5.0-FFB84D?logoColor=FFFFFF)
+![SQLite](https://img.shields.io/badge/SQLite-0.31-003B57?logo=sqlite&logoColor=FFFFFF)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-## 功能
+A local-first desktop note management app with Markdown editing, full-text search, tag management, attachments, version history, and auto backup. All data stays on your machine.
 
-### 笔记编辑
-- Markdown 编辑器 (Vditor IR 模式)，支持快捷键工具栏
-- 全文查找替换 (Ctrl+F / Ctrl+H)，支持区分大小写
+**[Features](#-features)** • **[Screenshots](#-screenshots)** • **[Quick Start](#-quick-start)** • **[Tech Stack](#-tech-stack)** • **[Download](#-download)**
 
-### 搜索与组织
-- 全文搜索 (FTS5 + trigram 双引擎)，支持中文子串检索
-- 标签管理 (CRUD + 多对多关联 + 筛选)
-- 命令面板 (Ctrl+K) 全局快速搜索
+<img src="app-img/library.png" alt="Library" width="800" />
 
-### 版本管理
-- 版本历史记录，支持创建/预览/恢复
-- 版本 Diff 对比，选择两个版本进行差异比较
+</div>
 
-### 附件管理
-- 支持图片/音频/视频/PDF/文本预览
+## Features
 
-### 数据导入导出
-- JSON 格式导入导出 (含附件)
-- ZIP 格式选择性导出/导入 (可选标签、附件、版本历史)
+- **Markdown Editor** — Vditor IR mode with toolbar shortcuts, find & replace (`Ctrl+F` / `Ctrl+H`)
+- **Full-Text Search** — FTS5 + trigram dual engine, Chinese substring search supported
+- **Tag Management** — Create, edit, filter; many-to-many tag-item associations
+- **Command Palette** — `Ctrl+K` global quick search
+- **Version History** — Create, preview, restore versions; diff comparison between two versions
+- **Attachments** — Preview images, audio, video, PDF, and text files
+- **Import / Export** — JSON (with attachments) or ZIP (selectable: tags, attachments, version history)
+- **Auto Backup** — Scheduled backups with configurable interval and retention
+- **Themes** — Dark / light / system-follow, custom accent colors and fonts
+- **System Tray** — Minimize or close to tray, context menu, auto-start on boot
 
-### 自动备份
-- 定时自动备份，可配置间隔和保留数量
-- 备份管理器，查看/删除历史备份，手动触发即时备份
+## Screenshots
 
-### 界面与主题
-- 深色/浅色主题，跟随系统或手动设置
-- 自定义强调色与字体
+<div align="center">
+<table>
+  <tr>
+    <td align="center"><img src="app-img/note-preview.png" alt="Note Preview" width="400" /><br /><b>Note Preview</b></td>
+    <td align="center"><img src="app-img/note-edit.png" alt="Note Editing" width="400" /><br /><b>Note Editing</b></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="app-img/workspace.png" alt="Workspace" width="400" /><br /><b>Workspace</b></td>
+    <td align="center"><img src="app-img/settings-appearance.png" alt="Settings" width="400" /><br /><b>Settings</b></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="app-img/search-cmd.png" alt="Command Palette" width="400" /><br /><b>Command Palette</b></td>
+    <td align="center"><img src="app-img/note-version.png" alt="Version History" width="400" /><br /><b>Version History</b></td>
+  </tr>
+</table>
 
-### 系统集成
-- 系统托盘 (最小化/关闭到托盘，右键菜单)
-- 开机自启动
+**[View all screenshots →](./SCREENSHOTS.md)**
+</div>
 
-## 技术栈
+## Tech Stack
 
-| 层级 | 技术 |
-|------|------|
-| 前端 | React 19, TypeScript, Zustand 5, TailwindCSS 4, Vditor 3 |
-| 后端 | Tauri 2, Rust, rusqlite 0.31 |
-| 数据库 | SQLite (WAL 模式, FTS5 全文搜索) |
-| 测试 | Vitest, Playwright, cargo test |
+| Layer | Technology |
+|-------|------------|
+| Frontend | React 19, TypeScript, Zustand 5, TailwindCSS 4, Vditor 3 |
+| Backend | Tauri 2, Rust, rusqlite 0.31 |
+| Database | SQLite (WAL mode, FTS5 full-text search) |
+| Testing | Vitest, Playwright, cargo test |
 
-## 快速开始
+## Quick Start
 
 ```bash
-# 安装依赖
+# Install dependencies
 pnpm install
 
-# 开发模式 (前端 + Rust 后端)
+# Development mode (frontend + Rust backend)
 pnpm tauri dev
 
-# 仅前端开发 (Vite, 端口 1420)
+# Frontend only (Vite, port 1420)
 pnpm dev
 ```
 
-## 构建
+## Build
 
 ```bash
-# 构建生产包 (Windows: .msi + .exe, Linux: .deb + .AppImage, macOS: .dmg + .app)
+# Production build (Windows: .msi + .exe, Linux: .deb + .AppImage, macOS: .dmg + .app)
 pnpm tauri build
 
-# 类型检查
+# Type check
 pnpm build && cargo check --manifest-path src-tauri/Cargo.toml
 ```
 
-## 下载
+## Download
 
-从 [GitHub Releases](https://github.com/shenjianZ/QuantaNote/releases) 下载对应平台的安装包。
+Download installers for your platform from [GitHub Releases](https://github.com/shenjianZ/QuantaNote/releases).
 
-## 许可证
+## License
 
-MIT
+[MIT](./LICENSE)
