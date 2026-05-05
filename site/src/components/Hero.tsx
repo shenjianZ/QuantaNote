@@ -10,7 +10,7 @@ function GithubIcon({ size = 16 }: { size?: number }) {
 }
 
 // Use Vite's import.meta.glob to reference screenshots
-const heroScreenshot = '/app-img/library.png'
+const heroScreenshot = `${import.meta.env.BASE_URL}app-img/library.png`
 
 const badges = [
   { icon: Shield, label: 'MIT License' },

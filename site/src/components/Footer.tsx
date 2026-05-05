@@ -23,7 +23,7 @@ export default function Footer() {
           {/* Brand */}
           <div>
             <div className="mb-3 flex items-center gap-2">
-              <img src="/icon.png" alt="QuantaNote" className="h-5 w-5 rounded" />
+              <img src={`${import.meta.env.BASE_URL}icon.png`} alt="QuantaNote" className="h-5 w-5 rounded" />
               <span className="text-[15px] font-semibold" style={{ color: 'var(--text)' }}>
                 QuantaNote
               </span>

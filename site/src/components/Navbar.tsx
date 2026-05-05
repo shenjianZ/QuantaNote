@@ -56,7 +56,7 @@ export default function Navbar() {
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-5">
         {/* Logo */}
         <a href="#" className="flex items-center gap-2 text-[var(--text)] no-underline">
-          <img src="/icon.png" alt="QuantaNote" className="h-6 w-6 rounded" />
+          <img src={`${import.meta.env.BASE_URL}icon.png`} alt="QuantaNote" className="h-6 w-6 rounded" />
           <span className="text-[15px] font-semibold tracking-tight">QuantaNote</span>
         </a>
 
