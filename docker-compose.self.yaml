@@ -8,9 +8,9 @@ services:
             - "${SERVER__PORT:-3000}:3000"
         restart: unless-stopped
         volumes:
-            - cloud-config:/app/config
-            - cloud-data:/app/data
-            - cloud-sync:/app/sync_data
+            - ./app/config:/app/config
+            - ./app/data:/app/data
+            - ./app/sync_data:/app/sync_data
         environment:
             ENV: ${ENV:-production}
 
