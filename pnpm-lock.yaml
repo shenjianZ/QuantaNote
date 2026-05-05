@@ -9,16 +9,16 @@ importers:
   .:
     dependencies:
       '@tauri-apps/api':
-        specifier: ^2.10
+        specifier: 2.11.0
         version: 2.11.0
       '@tauri-apps/plugin-dialog':
-        specifier: ^2.7.0
+        specifier: 2.7.1
         version: 2.7.1
       '@tauri-apps/plugin-opener':
-        specifier: ^2
+        specifier: 2.5.4
         version: 2.5.4
       '@tauri-apps/plugin-updater':
-        specifier: ^2.10.1
+        specifier: 2.10.1
         version: 2.10.1
       diff:
         specifier: ^9.0.0
@@ -49,7 +49,7 @@ importers:
         specifier: ^4.2.4
         version: 4.2.4(vite@7.3.2(@types/node@25.6.0)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0))
       '@tauri-apps/cli':
-        specifier: ^2
+        specifier: 2.11.0
         version: 2.11.0
       '@testing-library/jest-dom':
         specifier: ^6.9.1
