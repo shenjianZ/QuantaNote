@@ -78,7 +78,7 @@ const DEFAULTS: AppSettings = {
         pretty: false,
         maxLen: 4000,
     },
-    locale: "zh-CN",
+    locale: "en",
 };
 
 const AVAILABLE_FONT_FAMILIES = new Set(["Noto Sans SC", "system-ui"]);
@@ -89,7 +89,7 @@ const AVAILABLE_MONO_FAMILIES = new Set([
 ]);
 
 function normalizeSettings(settings: AppSettings): AppSettings {
-    const locale = settings.locale === "en" ? "en" : "zh-CN";
+    const locale = settings.locale === "zh-CN" ? "zh-CN" : "en";
     return {
         fontFamily: AVAILABLE_FONT_FAMILIES.has(settings.fontFamily)
             ? settings.fontFamily
@@ -229,6 +229,7 @@ function applySettings(settings: AppSettings) {
 
 interface SettingsState {
     settings: AppSettings;
+    hasSelectedLanguage: boolean;
     dbSize: string;
     dbPath: string;
     exportSizeEstimate: ExportSizeEstimate | null;
@@ -237,7 +238,8 @@ interface SettingsState {
     backupFiles: BackupFileInfo[];
     logDir: string;
     sqlLogPath: string;
-    init: () => void;
+    init: () => Promise<void>;
+    completeLanguageSetup: (locale: "zh-CN" | "en") => Promise<void>;
     updateSetting: <K extends keyof AppSettings>(
         key: K,
         value: AppSettings[K],
@@ -264,6 +266,7 @@ interface SettingsState {
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
     settings: loadSettings(),
+    hasSelectedLanguage: false,
     dbSize: i18n.t("common:status.calculating"),
     dbPath: "",
     exportSizeEstimate: null,
@@ -275,8 +278,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
     init: async () => {
         // 从 SQLite 加载设置
+        let hasSelectedLanguage = false;
         try {
             const saved = await loadAllSettings();
+            hasSelectedLanguage = saved["has-selected-language"] === "true";
             if (saved["quantanote-settings"]) {
                 const parsed = JSON.parse(saved["quantanote-settings"]);
                 const merged = normalizeSettings({ ...DEFAULTS, ...parsed });
@@ -288,6 +293,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         } catch {
             /* 首次启动，SQLite 为空 */
         }
+        set({ hasSelectedLanguage });
 
         const settings = get().settings;
         applySettings(settings);
@@ -320,6 +326,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         import("./updaterStore").then(({ useUpdaterStore }) => {
             useUpdaterStore.getState().startAutoUpdateCheck();
         }).catch(() => {});
+    },
+
+    completeLanguageSetup: async (locale) => {
+        const settings = { ...get().settings, locale };
+        persist(settings);
+        applySettings(settings);
+        i18n.changeLanguage(locale);
+        set({ settings, hasSelectedLanguage: true });
+        await saveSettings({ "has-selected-language": "true" });
     },
 
     updateSetting: async (key, value) => {

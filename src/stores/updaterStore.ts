@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { getVersion } from "@tauri-apps/api/app";
 import { checkForAppUpdate, downloadAppUpdate, installAppUpdate } from "../lib/updater";
 import type { UpdateState } from "../lib/update-types";
 import type { Update, DownloadEvent } from "@tauri-apps/plugin-updater";
@@ -39,7 +40,7 @@ type UpdaterState = {
 
 const INITIAL_STATE: UpdateState = {
     status: "idle",
-    currentVersion: "0.1.0",
+    currentVersion: "...",
     latestVersion: null,
     downloadedVersion: null,
     contentLength: null,
@@ -50,11 +51,20 @@ const INITIAL_STATE: UpdateState = {
 
 let hasRunStartupCheck = false;
 
+async function fetchAppVersion(): Promise<string> {
+    try {
+        return await getVersion();
+    } catch {
+        return "...";
+    }
+}
+
 export const useUpdaterStore = create<UpdaterState>((set, get) => ({
     updateState: { ...INITIAL_STATE },
     pendingUpdate: null,
 
     checkForUpdates: async () => {
+
         set({
             updateState: { ...get().updateState, status: "checking", error: null },
         });
@@ -76,6 +86,7 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
                 updateState: {
                     ...get().updateState,
                     status: "available",
+                    currentVersion: summary.currentVersion,
                     latestVersion: summary.version,
                     availableUpdate: summary,
                 },
@@ -184,3 +195,10 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
             .catch(() => {});
     },
 }));
+
+// 立即获取当前版本号，不依赖更新检查
+fetchAppVersion().then((ver) => {
+    useUpdaterStore.setState((s) => ({
+        updateState: { ...s.updateState, currentVersion: ver },
+    }));
+}).catch(() => {});

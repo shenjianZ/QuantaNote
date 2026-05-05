@@ -1,0 +1,9 @@
+{
+  "welcome": "Welcome to QuantaNote",
+  "subtitle": "Please select your language",
+  "continue": "Get Started",
+  "languages": {
+    "zh-CN": "简体中文",
+    "en": "English"
+  }
+}

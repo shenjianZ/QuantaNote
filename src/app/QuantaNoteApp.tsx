@@ -10,6 +10,7 @@ import { LibraryPage } from "../pages/LibraryPage";
 import { DocumentEditorPage } from "../pages/DocumentEditorPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import { ProfilePage } from "../pages/ProfilePage";
+import { LanguageSetupPage } from "../pages/LanguageSetupPage";
 import { useAppStore } from "../stores/appStore";
 import { useItemStore } from "../stores/itemStore";
 import { useSettingsStore } from "../stores/settingsStore";
@@ -69,6 +70,8 @@ export function QuantaNoteApp() {
         getItem,
         createItem,
     } = useItemStore();
+    const hasSelectedLanguage = useSettingsStore((s) => s.hasSelectedLanguage);
+    const [initDone, setInitDone] = useState(false);
     const [previewRequest, setPreviewRequest] = useState<{
         itemId: string;
         requestId: number;
@@ -77,7 +80,7 @@ export function QuantaNoteApp() {
     useEffect(() => {
         preloadVditorResources();
         useAppStore.getState().init();
-        useSettingsStore.getState().init();
+        useSettingsStore.getState().init().finally(() => setInitDone(true));
         useSyncStore.getState().init();
     }, []);
 
@@ -275,6 +278,17 @@ export function QuantaNoteApp() {
         document.addEventListener("contextmenu", handleContextMenu);
         return () => document.removeEventListener("contextmenu", handleContextMenu);
     }, []);
+
+    if (!initDone) return null;
+
+    if (!hasSelectedLanguage) {
+        return (
+            <ErrorBoundary>
+                <LanguageSetupPage onComplete={() => {}} />
+                <ToastContainer />
+            </ErrorBoundary>
+        );
+    }
 
     return (
         <ErrorBoundary>

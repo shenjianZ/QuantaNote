@@ -5,7 +5,8 @@ export type AppPage =
   | "library"
   | "document"
   | "settings"
-  | "profile";
+  | "profile"
+  | "language-setup";
 
 export type ItemType =
   | "note"

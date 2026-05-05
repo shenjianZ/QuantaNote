@@ -731,7 +731,7 @@ export function SettingsPage({
             <section>
                 <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
                     <span className="inline-block rounded-md bg-[var(--accent)] px-2.5 py-1 text-white">QuantaNote</span>
-                    <span data-testid="settings-about-version" className="inline-block rounded-md bg-[var(--accent-soft)] px-2.5 py-1 text-[var(--accent)]">v0.2.0</span>
+                    <span data-testid="settings-about-version" className="inline-block rounded-md bg-[var(--accent-soft)] px-2.5 py-1 text-[var(--accent)]">v{updateState.currentVersion}</span>
                 </h2>
                 <div className="mb-4 text-sm text-[var(--muted)]">
                     {t("settings:about.description")}
@@ -789,24 +789,21 @@ export function SettingsPage({
                             updateSetting("autoUpdateEnabled", v),
                         )}
                     </div>
-                    <div className={rowClass}>
-                        <span className="text-sm text-[var(--text)]">
-                            {t("settings:about.currentVersion")}
-                        </span>
-                        <span className="text-sm text-[var(--muted)]">
-                            v{updateState.currentVersion}
-                        </span>
-                    </div>
-                    {updateState.latestVersion && (
-                        <div className={rowClass}>
-                            <span className="text-sm text-[var(--text)]">
-                                {t("settings:about.updateLatestVersion")}
+                    <div className="py-2">
+                        <div className="flex items-center justify-between text-sm">
+                            <span className="text-[var(--text)]">
+                                {t("settings:about.currentVersion")}
                             </span>
-                            <span className="text-sm text-[var(--muted)]">
-                                v{updateState.latestVersion}
+                            <span className="text-[var(--muted)]">
+                                v{updateState.currentVersion}
                             </span>
                         </div>
-                    )}
+                        {updateState.latestVersion && (
+                            <div className="mt-0.5 text-xs text-[var(--muted)]">
+                                v{updateState.latestVersion}
+                            </div>
+                        )}
+                    </div>
                     <div className="py-2">
                         <span className="text-sm text-[var(--muted)]">
                             {(() => {
