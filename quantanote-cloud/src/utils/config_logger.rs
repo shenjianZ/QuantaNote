@@ -169,12 +169,27 @@ pub fn print_final_config(config: &AppConfig) {
     // ── Email ──
     tracing::info!("║ [email]                                         ║");
     tracing::info!("║   enabled       = {}", config.email.enabled);
-    tracing::info!("║   smtp_host     = {}", display_str(&config.email.smtp_host));
+    tracing::info!(
+        "║   smtp_host     = {}",
+        display_str(&config.email.smtp_host)
+    );
     tracing::info!("║   smtp_port     = {}", config.email.smtp_port);
-    tracing::info!("║   smtp_username = {}", display_str(&config.email.smtp_username));
-    tracing::info!("║   smtp_password = {}", mask_str(&config.email.smtp_password));
-    tracing::info!("║   from_name     = {}", display_str(&config.email.from_name));
-    tracing::info!("║   from_email    = {}", display_str(&config.email.from_email));
+    tracing::info!(
+        "║   smtp_username = {}",
+        display_str(&config.email.smtp_username)
+    );
+    tracing::info!(
+        "║   smtp_password = {}",
+        mask_str(&config.email.smtp_password)
+    );
+    tracing::info!(
+        "║   from_name     = {}",
+        display_str(&config.email.from_name)
+    );
+    tracing::info!(
+        "║   from_email    = {}",
+        display_str(&config.email.from_email)
+    );
 
     tracing::info!("╚══════════════════════════════════════════════════╝");
 }

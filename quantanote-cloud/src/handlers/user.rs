@@ -106,7 +106,11 @@ pub async fn upload_avatar(
     Query(query): Query<UploadAvatarQuery>,
     body: Bytes,
 ) -> Result<Json<ApiResponse<crate::domain::vo::user::ProfileResponse>>, ErrorResponse> {
-    log_info(&request_id, "上传头像", &format!("user_id={}, size={}", user_id, body.len()));
+    log_info(
+        &request_id,
+        "上传头像",
+        &format!("user_id={}, size={}", user_id, body.len()),
+    );
 
     // 验证 MIME 类型
     if !query.mime_type.starts_with("image/") {
@@ -146,16 +150,22 @@ pub async fn upload_avatar(
     // 更新数据库
     let user_repo = UserRepository::new(state.pool.clone());
     let service = UserService::new(user_repo);
-    service.update_avatar(&user_id, &storage_key).await
+    service
+        .update_avatar(&user_id, &storage_key)
+        .await
         .map_err(|e| ErrorResponse::new(e.to_string()))?;
 
     // 返回更新后的 profile
     let user_repo = UserRepository::new(state.pool.clone());
-    let profile = user_repo.find_by_id(&user_id).await
+    let profile = user_repo
+        .find_by_id(&user_id)
+        .await
         .map_err(|e| ErrorResponse::new(e.to_string()))?
         .ok_or_else(|| ErrorResponse::new("用户不存在".to_string()))?;
 
-    Ok(Json(ApiResponse::success(crate::domain::vo::user::ProfileResponse::from(profile))))
+    Ok(Json(ApiResponse::success(
+        crate::domain::vo::user::ProfileResponse::from(profile),
+    )))
 }
 
 /// 获取头像图片（公开端点）
@@ -165,17 +175,22 @@ pub async fn get_avatar(
 ) -> Result<axum::response::Response, ErrorResponse> {
     // 查询用户的 avatar_url
     let user_repo = UserRepository::new(state.pool.clone());
-    let user = user_repo.find_by_id(&user_id).await
+    let user = user_repo
+        .find_by_id(&user_id)
+        .await
         .map_err(|e| ErrorResponse::new(e.to_string()))?
         .ok_or_else(|| ErrorResponse::new("用户不存在".to_string()))?;
 
-    let avatar_key = user.avatar_url
+    let avatar_key = user
+        .avatar_url
         .ok_or_else(|| ErrorResponse::new("未设置头像".to_string()))?;
 
     // 从存储读取文件
     let storage = create_storage_backend(&state.config.storage)
         .map_err(|e| ErrorResponse::new(format!("存储初始化失败: {}", e)))?;
-    let obj = storage.get_object(&avatar_key).await
+    let obj = storage
+        .get_object(&avatar_key)
+        .await
         .map_err(|e| ErrorResponse::new(format!("读取头像失败: {}", e)))?;
 
     // 推断 content type
@@ -195,5 +210,6 @@ pub async fn get_avatar(
         StatusCode::OK,
         [(header::CONTENT_TYPE, content_type)],
         obj.data,
-    ).into_response())
+    )
+        .into_response())
 }

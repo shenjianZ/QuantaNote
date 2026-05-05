@@ -62,9 +62,7 @@ impl EmailService {
             .add_identifier(&Self::today_str());
 
         let daily_count: Option<String> = self.redis_client.get_key(&daily_key).await?;
-        let count = daily_count
-            .and_then(|v| v.parse::<u32>().ok())
-            .unwrap_or(0);
+        let count = daily_count.and_then(|v| v.parse::<u32>().ok()).unwrap_or(0);
 
         if count >= 10 {
             return Err(anyhow::anyhow!("今日发送次数已达上限"));
@@ -152,7 +150,9 @@ impl EmailService {
         let today = now.date_naive();
         let tomorrow = today.succ_opt().unwrap();
         let midnight = tomorrow.and_hms_opt(0, 0, 0).unwrap();
-        let now_dt = today.and_hms_opt(now.hour(), now.minute(), now.second()).unwrap();
+        let now_dt = today
+            .and_hms_opt(now.hour(), now.minute(), now.second())
+            .unwrap();
         let duration = midnight.signed_duration_since(now_dt);
         duration.num_seconds().max(1) as u64
     }

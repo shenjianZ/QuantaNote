@@ -29,6 +29,9 @@ pub struct ChangePasswordRequest {
 
 impl fmt::Debug for ChangePasswordRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "ChangePasswordRequest {{ old_password: ***, new_password: *** }}")
+        write!(
+            f,
+            "ChangePasswordRequest {{ old_password: ***, new_password: *** }}"
+        )
     }
 }

@@ -29,7 +29,7 @@
 
 ## 服务器配置
 
-### SERVER_HOST
+### SERVER__HOST
 
 服务器监听地址。
 
@@ -41,11 +41,11 @@
 
 **示例**：
 ```bash
-SERVER_HOST=127.0.0.1  # 仅本地访问
-SERVER_HOST=0.0.0.0     # 允许外部访问
+SERVER__HOST=127.0.0.1  # 仅本地访问
+SERVER__HOST=0.0.0.0     # 允许外部访问
 ```
 
-### SERVER_PORT
+### SERVER__PORT
 
 服务器监听端口。
 
@@ -57,9 +57,9 @@ SERVER_HOST=0.0.0.0     # 允许外部访问
 
 **示例**：
 ```bash
-SERVER_PORT=3000   # 开发环境
-SERVER_PORT=8080   # 生产环境
-SERVER_PORT=80     # HTTP 标准端口
+SERVER__PORT=3000   # 开发环境
+SERVER__PORT=8080   # 生产环境
+SERVER__PORT=80     # HTTP 标准端口
 ```
 
 ---
@@ -87,7 +87,7 @@ DATABASE_TYPE=postgresql  # PostgreSQL 数据库
 
 当 `DATABASE_TYPE=mysql` 时使用。
 
-#### DATABASE_HOST
+#### DATABASE__HOST
 
 MySQL 服务器地址。
 
@@ -98,12 +98,12 @@ MySQL 服务器地址。
 
 **示例**：
 ```bash
-DATABASE_HOST=localhost
-DATABASE_HOST=192.168.1.100
-DATABASE_HOST=mysql.example.com
+DATABASE__HOST=localhost
+DATABASE__HOST=192.168.1.100
+DATABASE__HOST=mysql.example.com
 ```
 
-#### DATABASE_PORT
+#### DATABASE__PORT
 
 MySQL 服务器端口。
 
@@ -114,10 +114,10 @@ MySQL 服务器端口。
 
 **示例**：
 ```bash
-DATABASE_PORT=3306
+DATABASE__PORT=3306
 ```
 
-#### DATABASE_USER
+#### DATABASE__USER
 
 MySQL 用户名。
 
@@ -129,11 +129,11 @@ MySQL 用户名。
 
 **示例**：
 ```bash
-DATABASE_USER=root
-DATABASE_USER=webapp
+DATABASE__USER=root
+DATABASE__USER=webapp
 ```
 
-#### DATABASE_PASSWORD
+#### DATABASE__PASSWORD
 
 MySQL 密码。
 
@@ -145,10 +145,10 @@ MySQL 密码。
 
 **示例**：
 ```bash
-DATABASE_PASSWORD=your-password
+DATABASE__PASSWORD=your-password
 ```
 
-#### DATABASE_DATABASE
+#### DATABASE__DATABASE
 
 MySQL 数据库名称。
 
@@ -160,7 +160,7 @@ MySQL 数据库名称。
 
 **示例**：
 ```bash
-DATABASE_DATABASE=web_template
+DATABASE__DATABASE=web_template
 ```
 
 ### PostgreSQL 配置
@@ -169,11 +169,11 @@ DATABASE_DATABASE=web_template
 
 | 环境变量 | 说明 | 默认值 |
 |---------|------|--------|
-| DATABASE_HOST | PostgreSQL 服务器地址 | localhost |
-| DATABASE_PORT | PostgreSQL 服务器端口 | 5432 |
-| DATABASE_USER | PostgreSQL 用户名 | - |
-| DATABASE_PASSWORD | PostgreSQL 密码 | - |
-| DATABASE_DATABASE | PostgreSQL 数据库名称 | - |
+| DATABASE__HOST | PostgreSQL 服务器地址 | localhost |
+| DATABASE__PORT | PostgreSQL 服务器端口 | 5432 |
+| DATABASE__USER | PostgreSQL 用户名 | - |
+| DATABASE__PASSWORD | PostgreSQL 密码 | - |
+| DATABASE__DATABASE | PostgreSQL 数据库名称 | - |
 
 ### SQLite 配置
 
@@ -199,7 +199,7 @@ DATABASE_PATH=/var/data/webapp.db
 - 目录必须存在，程序不会自动创建目录
 - 文件不存在时会自动创建
 
-### DATABASE_MAX_CONNECTIONS
+### DATABASE__MAX_CONNECTIONS
 
 数据库连接池最大连接数。
 
@@ -210,8 +210,8 @@ DATABASE_PATH=/var/data/webapp.db
 
 **示例**：
 ```bash
-DATABASE_MAX_CONNECTIONS=10    # 开发环境
-DATABASE_MAX_CONNECTIONS=100   # 生产环境
+DATABASE__MAX_CONNECTIONS=10    # 开发环境
+DATABASE__MAX_CONNECTIONS=100   # 生产环境
 ```
 
 **建议**：
@@ -222,7 +222,7 @@ DATABASE_MAX_CONNECTIONS=100   # 生产环境
 
 ## 认证配置
 
-### AUTH_JWT_SECRET
+### AUTH__JWT_SECRET
 
 JWT 签名密钥。
 
@@ -252,13 +252,13 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 **示例**：
 ```bash
 # 开发环境（不安全）
-AUTH_JWT_SECRET=dev-secret-key
+AUTH__JWT_SECRET=dev-secret-key
 
 # 生产环境（安全）
-AUTH_JWT_SECRET=Kx7Yn2Zp9qR8wF4tL6mN3vB5xC8zD1sE9aH2jK7
+AUTH__JWT_SECRET=Kx7Yn2Zp9qR8wF4tL6mN3vB5xC8zD1sE9aH2jK7
 ```
 
-### AUTH_ACCESS_TOKEN_EXPIRATION_MINUTES
+### AUTH__ACCESS_TOKEN_EXPIRATION_MINUTES
 
 Access Token 过期时间（分钟）。
 
@@ -269,9 +269,9 @@ Access Token 过期时间（分钟）。
 
 **示例**：
 ```bash
-AUTH_ACCESS_TOKEN_EXPIRATION_MINUTES=15   # 15 分钟（推荐）
-AUTH_ACCESS_TOKEN_EXPIRATION_MINUTES=30   # 30 分钟
-AUTH_ACCESS_TOKEN_EXPIRATION_MINUTES=60   # 1 小时
+AUTH__ACCESS_TOKEN_EXPIRATION_MINUTES=15   # 15 分钟（推荐）
+AUTH__ACCESS_TOKEN_EXPIRATION_MINUTES=30   # 30 分钟
+AUTH__ACCESS_TOKEN_EXPIRATION_MINUTES=60   # 1 小时
 ```
 
 **建议**：
@@ -279,7 +279,7 @@ AUTH_ACCESS_TOKEN_EXPIRATION_MINUTES=60   # 1 小时
 - 用户体验优先：30-60 分钟
 - 权衡安全性和用户体验
 
-### AUTH_REFRESH_TOKEN_EXPIRATION_DAYS
+### AUTH__REFRESH_TOKEN_EXPIRATION_DAYS
 
 Refresh Token 过期时间（天）。
 
@@ -290,9 +290,9 @@ Refresh Token 过期时间（天）。
 
 **示例**：
 ```bash
-AUTH_REFRESH_TOKEN_EXPIRATION_DAYS=7    # 7 天（推荐）
-AUTH_REFRESH_TOKEN_EXPIRATION_DAYS=30   # 30 天
-AUTH_REFRESH_TOKEN_EXPIRATION_DAYS=90   # 90 天
+AUTH__REFRESH_TOKEN_EXPIRATION_DAYS=7    # 7 天（推荐）
+AUTH__REFRESH_TOKEN_EXPIRATION_DAYS=30   # 30 天
+AUTH__REFRESH_TOKEN_EXPIRATION_DAYS=90   # 90 天
 ```
 
 **建议**：
@@ -304,7 +304,7 @@ AUTH_REFRESH_TOKEN_EXPIRATION_DAYS=90   # 90 天
 
 ## Redis 配置
 
-### REDIS_HOST
+### REDIS__HOST
 
 Redis 服务器地址。
 
@@ -315,12 +315,12 @@ Redis 服务器地址。
 
 **示例**：
 ```bash
-REDIS_HOST=localhost
-REDIS_HOST=192.168.1.100
-REDIS_HOST=redis.example.com
+REDIS__HOST=localhost
+REDIS__HOST=192.168.1.100
+REDIS__HOST=redis.example.com
 ```
 
-### REDIS_PORT
+### REDIS__PORT
 
 Redis 服务器端口。
 
@@ -331,10 +331,10 @@ Redis 服务器端口。
 
 **示例**：
 ```bash
-REDIS_PORT=6379
+REDIS__PORT=6379
 ```
 
-### REDIS_PASSWORD
+### REDIS__PASSWORD
 
 Redis 密码（如果设置了密码）。
 
@@ -346,10 +346,10 @@ Redis 密码（如果设置了密码）。
 
 **示例**：
 ```bash
-REDIS_PASSWORD=your-redis-password
+REDIS__PASSWORD=your-redis-password
 ```
 
-### REDIS_DB
+### REDIS__DB
 
 Redis 数据库编号。
 
@@ -361,8 +361,8 @@ Redis 数据库编号。
 
 **示例**：
 ```bash
-REDIS_DB=0    # 默认数据库
-REDIS_DB=1    # 数据库 1
+REDIS__DB=0    # 默认数据库
+REDIS__DB=1    # 数据库 1
 ```
 
 ---
@@ -416,11 +416,11 @@ cargo run
 
 ```bash
 DATABASE_TYPE=mysql \
-DATABASE_HOST=localhost \
-DATABASE_PORT=3306 \
-DATABASE_USER=root \
-DATABASE_PASSWORD=root \
-DATABASE_DATABASE=web_template_dev \
+DATABASE__HOST=localhost \
+DATABASE__PORT=3306 \
+DATABASE__USER=root \
+DATABASE__PASSWORD=root \
+DATABASE__DATABASE=web_template_dev \
 cargo run
 ```
 
@@ -444,17 +444,17 @@ cargo run -- -e production -c config/production.toml
 
 ```bash
 DATABASE_TYPE=mysql \
-DATABASE_HOST=mysql.production.example.com \
-DATABASE_PORT=3306 \
-DATABASE_USER=webapp \
-DATABASE_PASSWORD=strong-password-here \
-DATABASE_DATABASE=web_template_prod \
-DATABASE_MAX_CONNECTIONS=100 \
-AUTH_JWT_SECRET=Kx7Yn2Zp9qR8wF4tL6mN3vB5xC8zD1sE9aH2jK7 \
-REDIS_HOST=redis.production.example.com \
-REDIS_PORT=6379 \
-REDIS_PASSWORD=strong-redis-password \
-REDIS_DB=0 \
+DATABASE__HOST=mysql.production.example.com \
+DATABASE__PORT=3306 \
+DATABASE__USER=webapp \
+DATABASE__PASSWORD=strong-password-here \
+DATABASE__DATABASE=web_template_prod \
+DATABASE__MAX_CONNECTIONS=100 \
+AUTH__JWT_SECRET=Kx7Yn2Zp9qR8wF4tL6mN3vB5xC8zD1sE9aH2jK7 \
+REDIS__HOST=redis.production.example.com \
+REDIS__PORT=6379 \
+REDIS__PASSWORD=strong-redis-password \
+REDIS__DB=0 \
 cargo run -- -e production
 ```
 
@@ -470,21 +470,21 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - SERVER_HOST=0.0.0.0
-      - SERVER_PORT=3000
+      - SERVER__HOST=0.0.0.0
+      - SERVER__PORT=3000
       - DATABASE_TYPE=postgresql
-      - DATABASE_HOST=db
-      - DATABASE_PORT=5432
-      - DATABASE_USER=webapp
-      - DATABASE_PASSWORD=password
-      - DATABASE_DATABASE=web_template
-      - DATABASE_MAX_CONNECTIONS=10
-      - AUTH_JWT_SECRET=${JWT_SECRET}
-      - AUTH_ACCESS_TOKEN_EXPIRATION_MINUTES=15
-      - AUTH_REFRESH_TOKEN_EXPIRATION_DAYS=7
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_DB=0
+      - DATABASE__HOST=db
+      - DATABASE__PORT=5432
+      - DATABASE__USER=webapp
+      - DATABASE__PASSWORD=password
+      - DATABASE__DATABASE=web_template
+      - DATABASE__MAX_CONNECTIONS=10
+      - AUTH__JWT_SECRET=${JWT_SECRET}
+      - AUTH__ACCESS_TOKEN_EXPIRATION_MINUTES=15
+      - AUTH__REFRESH_TOKEN_EXPIRATION_DAYS=7
+      - REDIS__HOST=redis
+      - REDIS__PORT=6379
+      - REDIS__DB=0
     depends_on:
       - db
       - redis

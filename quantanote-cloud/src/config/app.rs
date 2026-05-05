@@ -92,8 +92,8 @@ impl AppConfig {
         // 安全警告：检查是否使用了默认的 JWT 密钥
         if config.auth.jwt_secret == "change-this-to-a-strong-secret-key-in-production" {
             tracing::warn!("⚠️  警告：正在使用不安全的默认 JWT 密钥！");
-            tracing::warn!("  请通过环境变量 AUTH_JWT_SECRET 或配置文件设置强密钥");
-            tracing::warn!("  示例：AUTH_JWT_SECRET=your-secure-random-string-here");
+            tracing::warn!("  请通过环境变量 AUTH__JWT_SECRET 或配置文件设置强密钥");
+            tracing::warn!("  示例：AUTH__JWT_SECRET=your-secure-random-string-here");
         }
 
         // 验证数据库配置
@@ -111,7 +111,7 @@ impl AppConfig {
 
         let settings = Config::builder()
             .add_source(File::from(PathBuf::from(path)))
-            .add_source(Environment::default().separator("_"))
+            .add_source(Environment::default().separator("__"))
             .build()?;
 
         let config: AppConfig = settings.try_deserialize()?;
@@ -119,8 +119,8 @@ impl AppConfig {
         // 安全警告：检查是否使用了默认的 JWT 密钥
         if config.auth.jwt_secret == "change-this-to-a-strong-secret-key-in-production" {
             tracing::warn!("⚠️  警告：正在使用不安全的默认 JWT 密钥！");
-            tracing::warn!("  请通过环境变量 AUTH_JWT_SECRET 或配置文件设置强密钥");
-            tracing::warn!("  示例：AUTH_JWT_SECRET=your-secure-random-string-here");
+            tracing::warn!("  请通过环境变量 AUTH__JWT_SECRET 或配置文件设置强密钥");
+            tracing::warn!("  示例：AUTH__JWT_SECRET=your-secure-random-string-here");
         }
 
         // 验证数据库配置

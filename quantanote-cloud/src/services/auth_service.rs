@@ -307,9 +307,13 @@ impl AuthService {
         if self.email_config.is_configured() {
             let email_service =
                 EmailService::new(self.redis_client.clone(), self.email_config.clone());
-            let (subject, html_body) =
-                crate::utils::mail_template::render_reset_password_mail(&reset_token, &request.lang);
-            email_service.send_email_direct(&user.email, &subject, &html_body).await?;
+            let (subject, html_body) = crate::utils::mail_template::render_reset_password_mail(
+                &reset_token,
+                &request.lang,
+            );
+            email_service
+                .send_email_direct(&user.email, &subject, &html_body)
+                .await?;
             tracing::info!("重置密码邮件已发送至: {}", user.email);
             Ok(None)
         } else {

@@ -14,9 +14,9 @@ use axum::{
     routing::{get, post, put},
     Router,
 };
-use handlers::user::{get_profile, update_profile, change_password, upload_avatar, get_avatar};
 use clap::Parser;
 use cli::CliArgs;
+use handlers::user::{change_password, get_avatar, get_profile, update_profile, upload_avatar};
 use services::sync_service::SyncService;
 use std::time::Duration;
 use tower_http::cors::{Any, CorsLayer};
@@ -130,8 +130,7 @@ async fn main() -> anyhow::Result<()> {
         )
         .route(
             "/sync/attachments/upload",
-            post(handlers::sync::upload_attachment)
-                .layer(DefaultBodyLimit::max(50 * 1024 * 1024)), // 附件上传限制 50MB
+            post(handlers::sync::upload_attachment).layer(DefaultBodyLimit::max(50 * 1024 * 1024)), // 附件上传限制 50MB
         )
         .route(
             "/sync/attachments/download/:attachment_id",
@@ -199,7 +198,10 @@ async fn pending_cleanup_task(state: AppState) {
     let age_hours: i64 = 24;
     let cleanup_timeout = Duration::from_secs(5 * 60);
 
-    tracing::info!("pending 清理任务: 等待 {}s 后首次执行", initial_delay.as_secs());
+    tracing::info!(
+        "pending 清理任务: 等待 {}s 后首次执行",
+        initial_delay.as_secs()
+    );
     tokio::time::sleep(initial_delay).await;
 
     let mut interval = tokio::time::interval(interval_duration);
@@ -229,13 +231,19 @@ async fn pending_cleanup_task(state: AppState) {
                 tracing::error!("pending 清理执行失败: {}", e);
             }
             Err(_) => {
-                tracing::error!("pending 清理超时 (>{:.0}s), 跳过本轮", cleanup_timeout.as_secs_f64());
+                tracing::error!(
+                    "pending 清理超时 (>{:.0}s), 跳过本轮",
+                    cleanup_timeout.as_secs_f64()
+                );
             }
         }
     }
 }
 
-async fn run_cleanup(state: &AppState, age_hours: i64) -> anyhow::Result<services::sync_service::CleanupStats> {
+async fn run_cleanup(
+    state: &AppState,
+    age_hours: i64,
+) -> anyhow::Result<services::sync_service::CleanupStats> {
     let repo = repositories::sync_repository::SyncRepository::new(state.pool.clone());
     let storage = infra::storage::create_storage_backend(&state.config.storage)?;
     let service = SyncService::new(repo, storage);

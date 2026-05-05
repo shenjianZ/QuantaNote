@@ -5,7 +5,7 @@ services:
             context: ./quantanote-cloud
             dockerfile: Dockerfile
         ports:
-            - "${SERVER_PORT:-3000}:3000"
+            - "${SERVER__PORT:-3000}:3000"
         restart: unless-stopped
         volumes:
             - cloud-config:/app/config
@@ -14,24 +14,24 @@ services:
         environment:
             ENV: ${ENV:-production}
 
-            SERVER_HOST: "0.0.0.0"
-            SERVER_PORT: ${SERVER_PORT:-3000}
+            SERVER__HOST: "0.0.0.0"
+            SERVER__PORT: ${SERVER__PORT:-3000}
 
-            DATABASE_DATABASE_TYPE: ${DATABASE_DATABASE_TYPE:-sqlite}
-            DATABASE_DATABASE: ${DATABASE_DATABASE:-/app/data/quantanote.db}
+            DATABASE__DATABASE_TYPE: ${DATABASE__DATABASE_TYPE:-sqlite}
+            DATABASE__PATH: ${DATABASE__PATH:-/app/data/quantanote.db}
 
-            AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?请设置 AUTH_JWT_SECRET}
+            AUTH__JWT_SECRET: ${AUTH__JWT_SECRET:?请设置 AUTH__JWT_SECRET}
 
-            STORAGE_BACKEND_TYPE: ${STORAGE_BACKEND_TYPE:-local}
-            STORAGE_BASE_PATH: ${STORAGE_BASE_PATH:-/app/sync_data}
+            STORAGE__BACKEND_TYPE: ${STORAGE__BACKEND_TYPE:-local}
+            STORAGE__BASE_PATH: ${STORAGE__BASE_PATH:-/app/sync_data}
 
-            EMAIL_ENABLED: ${EMAIL_ENABLED:-true}
-            EMAIL_SMTP_HOST: ${EMAIL_SMTP_HOST}
-            EMAIL_SMTP_PORT: ${EMAIL_SMTP_PORT:-465}
-            EMAIL_SMTP_USERNAME: ${EMAIL_SMTP_USERNAME}
-            EMAIL_SMTP_PASSWORD: ${EMAIL_SMTP_PASSWORD}
-            EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-QuantaNote}
-            EMAIL_FROM_EMAIL: ${EMAIL_FROM_EMAIL}
+            EMAIL__ENABLED: ${EMAIL__ENABLED:-true}
+            EMAIL__SMTP_HOST: ${EMAIL__SMTP_HOST}
+            EMAIL__SMTP_PORT: ${EMAIL__SMTP_PORT:-465}
+            EMAIL__SMTP_USERNAME: ${EMAIL__SMTP_USERNAME}
+            EMAIL__SMTP_PASSWORD: ${EMAIL__SMTP_PASSWORD}
+            EMAIL__FROM_NAME: ${EMAIL__FROM_NAME:-QuantaNote}
+            EMAIL__FROM_EMAIL: ${EMAIL__FROM_EMAIL}
 
 volumes:
     cloud-config:

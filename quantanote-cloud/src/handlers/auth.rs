@@ -145,10 +145,13 @@ pub async fn delete_account(
     };
 
     // 先验证用户存在且密码正确
-    service.validate_delete_user(&delete_request).await.map_err(|e| {
-        log_info(&request_id, "账号删除验证失败", &e.to_string());
-        ErrorResponse::new(e.to_string())
-    })?;
+    service
+        .validate_delete_user(&delete_request)
+        .await
+        .map_err(|e| {
+            log_info(&request_id, "账号删除验证失败", &e.to_string());
+            ErrorResponse::new(e.to_string())
+        })?;
 
     // 先清理关联的同步数据（必须在删除用户之前，因为有外键约束）
     if let Err(e) = sync_repo.delete_user_records(&user_id).await {
@@ -290,9 +293,16 @@ pub async fn send_verify_code(
 
     let email_service = EmailService::new(state.redis_client.clone(), state.config.email.clone());
 
-    match email_service.send_verification_code(&payload.email, &payload.lang).await {
+    match email_service
+        .send_verification_code(&payload.email, &payload.lang)
+        .await
+    {
         Ok(_) => {
-            log_info(&request_id, "验证码发送成功", &format!("email={}", payload.email));
+            log_info(
+                &request_id,
+                "验证码发送成功",
+                &format!("email={}", payload.email),
+            );
             let response = ApiResponse::success_with_message((), "验证码已发送");
             Ok(Json(response))
         }

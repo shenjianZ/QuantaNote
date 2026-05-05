@@ -53,15 +53,15 @@ pub struct CliArgs {
     /// 指定服务器监听端口
     ///
     /// 覆盖配置文件中的 port 设置
-    /// 可通过环境变量 SERVER_PORT 设置
-    #[arg(short, long, global = true, env = "SERVER_PORT")]
+    /// 可通过环境变量 SERVER__PORT 设置
+    #[arg(short, long, global = true, env = "SERVER__PORT")]
     pub port: Option<u16>,
 
     /// 指定服务器监听地址
     ///
     /// 覆盖配置文件中的 host 设置
-    /// 可通过环境变量 SERVER_HOST 设置
-    #[arg(long, global = true, env = "SERVER_HOST")]
+    /// 可通过环境变量 SERVER__HOST 设置
+    #[arg(long, global = true, env = "SERVER__HOST")]
     pub host: Option<String>,
 
     /// 启用调试日志

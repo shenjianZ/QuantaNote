@@ -51,18 +51,16 @@ impl Mailer {
             .body(html_body.to_string())
             .context("Failed to build email body")?;
 
-        mailer
-            .send(&email)
-            .map_err(|e| {
-                let error_msg = e.to_string();
-                if error_msg.contains("timeout") || error_msg.contains("timed out") {
-                    anyhow::anyhow!("Email sending timeout")
-                } else if error_msg.contains("connection") || error_msg.contains("connect") {
-                    anyhow::anyhow!("Cannot connect to email server")
-                } else {
-                    anyhow::anyhow!("Failed to send email via SMTP: {}", error_msg)
-                }
-            })?;
+        mailer.send(&email).map_err(|e| {
+            let error_msg = e.to_string();
+            if error_msg.contains("timeout") || error_msg.contains("timed out") {
+                anyhow::anyhow!("Email sending timeout")
+            } else if error_msg.contains("connection") || error_msg.contains("connect") {
+                anyhow::anyhow!("Cannot connect to email server")
+            } else {
+                anyhow::anyhow!("Failed to send email via SMTP: {}", error_msg)
+            }
+        })?;
 
         Ok(())
     }
