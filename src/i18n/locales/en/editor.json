@@ -40,5 +40,6 @@
     "title": "Version Comparison",
     "identical": "Both versions have identical content",
     "close": "Close"
-  }
+  },
+  "placeholder": "Start typing..."
 }

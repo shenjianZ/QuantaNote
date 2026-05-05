@@ -39,6 +39,26 @@ fn display_port(opt: &Option<u16>) -> String {
     }
 }
 
+/// 将 String 显示为值或 `<未设置>`（空字符串视为未设置）
+fn display_str(s: &str) -> String {
+    if s.is_empty() {
+        "<未设置>".to_string()
+    } else {
+        s.to_string()
+    }
+}
+
+/// 将 String 作为敏感字段掩码（空字符串视为未设置）
+fn mask_str(s: &str) -> String {
+    if s.is_empty() {
+        "<未设置>".to_string()
+    } else if s.len() <= 4 {
+        "****".to_string()
+    } else {
+        format!("{}****{}", &s[..2], &s[s.len() - 2..])
+    }
+}
+
 fn db_type_name(dt: &DatabaseType) -> &'static str {
     match dt {
         DatabaseType::MySQL => "mysql",
@@ -145,6 +165,16 @@ pub fn print_final_config(config: &AppConfig) {
         "║   webdav_password = {}",
         mask_secret(&config.storage.webdav_password)
     );
+
+    // ── Email ──
+    tracing::info!("║ [email]                                         ║");
+    tracing::info!("║   enabled       = {}", config.email.enabled);
+    tracing::info!("║   smtp_host     = {}", display_str(&config.email.smtp_host));
+    tracing::info!("║   smtp_port     = {}", config.email.smtp_port);
+    tracing::info!("║   smtp_username = {}", display_str(&config.email.smtp_username));
+    tracing::info!("║   smtp_password = {}", mask_str(&config.email.smtp_password));
+    tracing::info!("║   from_name     = {}", display_str(&config.email.from_name));
+    tracing::info!("║   from_email    = {}", display_str(&config.email.from_email));
 
     tracing::info!("╚══════════════════════════════════════════════════╝");
 }

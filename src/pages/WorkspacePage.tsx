@@ -3,6 +3,7 @@ import { CheckCircle2, Edit3, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../stores/appStore";
 import { useToastStore } from "../stores/toastStore";
+import { getVditorLang } from "../utils/vditorConfig";
 import type { VditorEditorHandle } from "../components/editor/VditorEditor";
 
 const VditorEditor = lazy(() => import("../components/editor/VditorEditor").then((m) => ({ default: m.VditorEditor })));
@@ -94,6 +95,7 @@ export function WorkspacePage({ onQuickCreate }: WorkspacePageProps) {
                   if (saved) setSaved(false);
                 }}
                 theme={theme === "light" ? "light" : "dark"}
+                lang={getVditorLang()}
                 toolbar={["table", "link", "code"]}
                 placeholder={t("workspace:placeholder")}
               />

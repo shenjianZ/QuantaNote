@@ -100,6 +100,72 @@ impl UserRepository {
         Ok(())
     }
 
+    /// 根据 ID 查询用户
+    pub async fn find_by_id(&self, id: &str) -> Result<Option<users::Model>> {
+        let user = users::Entity::find_by_id(id)
+            .one(&self.db)
+            .await
+            .map_err(|e| anyhow::anyhow!("查询失败: {}", e))?;
+
+        Ok(user)
+    }
+
+    /// 更新用户资料
+    pub async fn update_profile(
+        &self,
+        id: &str,
+        nickname: Option<String>,
+        bio: Option<String>,
+        phone: Option<String>,
+        address: Option<String>,
+    ) -> Result<users::Model> {
+        let user = users::Entity::find_by_id(id)
+            .one(&self.db)
+            .await
+            .map_err(|e| anyhow::anyhow!("查询失败: {}", e))?
+            .ok_or_else(|| anyhow::anyhow!("用户不存在"))?;
+
+        let mut active_model: users::ActiveModel = user.into();
+        if let Some(n) = nickname {
+            active_model.nickname = Set(Some(n));
+        }
+        if let Some(b) = bio {
+            active_model.bio = Set(Some(b));
+        }
+        if let Some(p) = phone {
+            active_model.phone = Set(Some(p));
+        }
+        if let Some(a) = address {
+            active_model.address = Set(Some(a));
+        }
+
+        let updated = active_model
+            .update(&self.db)
+            .await
+            .map_err(|e| anyhow::anyhow!("更新失败: {}", e))?;
+
+        Ok(updated)
+    }
+
+    /// 更新用户头像
+    #[allow(dead_code)]
+    pub async fn update_avatar(&self, id: &str, avatar_url: &str) -> Result<()> {
+        let user = users::Entity::find_by_id(id)
+            .one(&self.db)
+            .await
+            .map_err(|e| anyhow::anyhow!("查询失败: {}", e))?
+            .ok_or_else(|| anyhow::anyhow!("用户不存在"))?;
+
+        let mut active_model: users::ActiveModel = user.into();
+        active_model.avatar_url = Set(Some(avatar_url.to_string()));
+        active_model
+            .update(&self.db)
+            .await
+            .map_err(|e| anyhow::anyhow!("更新头像失败: {}", e))?;
+
+        Ok(())
+    }
+
     /// 根据 ID 删除用户
     pub async fn delete_by_id(&self, id: &str) -> Result<()> {
         users::Entity::delete_by_id(id)

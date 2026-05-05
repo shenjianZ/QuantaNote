@@ -75,7 +75,8 @@ pub struct RefreshResult {
 #[derive(Debug, Serialize)]
 pub struct ForgotPasswordResult {
     pub message: String,
-    pub reset_token: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reset_token: Option<String>,
 }
 
 /// 重置密码结果

@@ -28,5 +28,6 @@ public/llms.txt
 public/llms-full.txt
 public/doc-git-meta.json
 public/fonts/MiSans-*.woff2
+public/fonts/NotoSansSC*.woff2
 public/feed.xml
 public/sitemap.xml

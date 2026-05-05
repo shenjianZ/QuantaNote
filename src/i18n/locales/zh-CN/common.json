@@ -23,7 +23,9 @@
     "localMode": "本地模式",
     "copied": "已复制到剪贴板",
     "copyFailed": "复制失败",
-    "noMatch": "无匹配"
+    "noMatch": "无匹配",
+    "calculating": "计算中...",
+    "unknown": "未知"
   },
   "toast": {
     "saveSuccess": "记录已保存",
@@ -71,7 +73,19 @@
     "versionDeleted": "版本已删除",
     "versionDeleteFailed": "删除版本失败",
     "versionMetaFailed": "更新版本信息失败",
-    "favoriteFailed": "切换收藏失败"
+    "favoriteFailed": "切换收藏失败",
+    "alwaysOnTopMismatch": "窗口置顶状态与系统返回不一致",
+    "alwaysOnTopFailed": "设置窗口置顶失败",
+    "attachmentAdded": "附件已添加",
+    "attachmentDeleted": "附件已删除",
+    "itemCreateFailed": "创建记录失败",
+    "itemUpdateFailed": "更新记录失败",
+    "itemDeleteFailed": "删除记录失败",
+    "tagCreated": "标签已创建",
+    "tagDeleted": "标签已删除",
+    "tagUpdateFailed": "更新标签失败",
+    "tagRenameFailed": "重命名标签失败",
+    "tagColorFailed": "更新标签颜色失败"
   },
   "error": {
     "appError": "应用出现了问题",
@@ -81,6 +95,13 @@
   "emptyItem": {
     "title": "选择一条记录",
     "summary": "从左侧列表选择或创建新记录",
-    "untitled": "未命名笔记"
+    "untitled": "未命名笔记",
+    "noContent": "暂无内容"
+  },
+  "relativeTime": {
+    "justNow": "刚刚",
+    "minutesAgo": "{{count}} 分钟前",
+    "hoursAgo": "{{count}} 小时前",
+    "daysAgo": "{{count}} 天前"
   }
 }

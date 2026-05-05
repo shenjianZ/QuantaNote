@@ -11,5 +11,7 @@
   "restore": "Restore",
   "close": "Close",
   "openWorkspace": "Open Workspace",
-  "openLibrary": "Open Library"
+  "openLibrary": "Open Library",
+  "account": "Account",
+  "accountServerUrlRequired": "Please configure a sync server address in Settings first"
 }

@@ -43,6 +43,15 @@ base_path = "./sync_data"
 # webdav_username = "your-username"
 # webdav_password = "your-password"
 
+[email]
+enabled = false                      # 启用邮件服务（注册验证码、密码重置等）
+# smtp_host = "smtp.example.com"
+# smtp_port = 465
+# smtp_username = ""
+# smtp_password = ""
+# from_name = "QuantaNote"
+# from_email = ""
+
 # 安全检查清单：部署前请确认
 # ✅ 1. 已修改 jwt_secret 为强随机字符串
 # ✅ 2. 已修改数据库密码为强密码

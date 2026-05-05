@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import { getLibraryData, type ItemDto, type TagDto } from "../services/tauriCommands";
 import { useToastStore } from "./toastStore";
+import i18n from "../i18n";
 
 export type { ItemDto };
 
@@ -96,7 +97,7 @@ export const useItemStore = create<ItemState>((set) => ({
       return item;
     } catch (e) {
       set({ error: String(e) });
-      useToastStore.getState().addToast("error", "创建记录失败");
+      useToastStore.getState().addToast("error", i18n.t("common:toast.itemCreateFailed"));
       throw e;
     }
   },
@@ -111,7 +112,7 @@ export const useItemStore = create<ItemState>((set) => ({
       }));
     } catch (e) {
       set({ error: String(e) });
-      useToastStore.getState().addToast("error", "更新记录失败");
+      useToastStore.getState().addToast("error", i18n.t("common:toast.itemUpdateFailed"));
       throw e;
     }
   },
@@ -126,7 +127,7 @@ export const useItemStore = create<ItemState>((set) => ({
       }));
     } catch (e) {
       set({ error: String(e) });
-      useToastStore.getState().addToast("error", "删除记录失败");
+      useToastStore.getState().addToast("error", i18n.t("common:toast.itemDeleteFailed"));
       throw e;
     }
   },

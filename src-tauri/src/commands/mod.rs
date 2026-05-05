@@ -7,4 +7,5 @@ pub mod search;
 pub mod settings;
 pub mod sync;
 pub mod tag;
+pub mod user;
 pub mod version;

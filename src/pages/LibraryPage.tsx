@@ -26,6 +26,7 @@ import { useItemStore } from "../stores/itemStore";
 import { useSearchStore } from "../stores/searchStore";
 import { useTagStore } from "../stores/tagStore";
 import { useToastStore } from "../stores/toastStore";
+import { getVditorLang } from "../utils/vditorConfig";
 import type { Item } from "../types";
 
 type TabKey = "recent" | "pinned" | "favorite";
@@ -435,6 +436,7 @@ export function LibraryPage({
               <MarkdownRenderer
                 content={previewContent || selectedItem.summary || ""}
                 theme={theme === "light" ? "light" : "dark"}
+                lang={getVditorLang()}
               />
             </div>
 

@@ -2,6 +2,48 @@
 
 本文件记录 QuantaNote 的版本更新历史。格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [0.2.0] - 2026-05-05
+
+### Added
+
+#### 账号管理
+- 新增个人资料页面，支持查看和修改昵称
+- 修改密码功能，独立模态框输入旧密码和新密码
+- 删除账号功能，需输入邮箱二次确认，服务端自动清理关联数据
+- 未登录状态下账号入口引导用户配置服务器或登录
+
+#### 云同步增强
+- Token 刷新竞态条件修复，并发请求共享同一刷新 Promise
+- 同步状态指示器显示上次同步时间
+- Redis 键命名空间 `qn-cloud:` 前缀，支持多应用共享 Redis 实例
+- 环境变量分隔符统一为双下划线 `__`（如 `DATABASE__HOST`）
+- Rust HTTP 请求日志补全 URL 全路径输出
+
+#### 云服务端部署
+- Docker 多阶段构建镜像 (rust:1.85 + debian:bookworm-slim)
+- docker-compose 编排 (PostgreSQL 17 + Redis 7 + quantanote-cloud)
+- .env.example 全量环境变量模板
+- GitHub Actions CI 推送 Docker 镜像到阿里云 ACR
+- 启动配置日志新增 Email 模块打印
+
+#### 文档站
+- 文档站配置补齐缺失字段 (sidebar collapseControl、toc collapseControl、reading fullscreen、backend)
+- 新增 GitHub Actions 自动部署文档到 GitHub Pages
+- 设置页文档按钮链接到 GitHub Pages 文档站
+
+#### 其他
+- 设置页关于按钮添加图标 (GitHub / BookOpen / MessageSquare)
+- `pnpm bump` 脚本支持自动更新 SettingsPage.tsx 中的版本号
+- reqwest 连接日志级别调整为 Warn，减少噪音输出
+- 服务端邮件配置模块 (EmailConfig / EmailService)
+
+### Fixed
+
+- 修复修改密码接口返回空响应导致前端误判为失败
+- 修复删除账号 422 错误 (DeleteUserRequest 字段默认值)
+- 修复删除账号外键约束失败 (关联数据删除顺序调整)
+- 修复环境变量单下划线分隔符无法映射嵌套配置
+
 ## [0.1.0] - 2026-05-02
 
 ### Added

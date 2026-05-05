@@ -1,6 +1,6 @@
 [package]
 name = "quantanote-cloud"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 [dependencies]
@@ -30,6 +30,9 @@ jsonwebtoken = "9"
 argon2 = "0.5"
 sha2 = "0.10"
 base64 = "0.22"
+
+# ===== 邮件 =====
+lettre = { version = "0.11", default-features = false, features = ["tokio1", "tokio1-rustls", "builder", "smtp-transport", "webpki-roots", "ring"] }
 
 # ===== Redis =====
 redis = { version = "0.27", features = ["tokio-comp", "connection-manager"] }

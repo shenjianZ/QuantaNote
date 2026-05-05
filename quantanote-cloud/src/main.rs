@@ -11,9 +11,10 @@ mod utils;
 
 use axum::{
     extract::DefaultBodyLimit,
-    routing::{get, post},
+    routing::{get, post, put},
     Router,
 };
+use handlers::user::{get_profile, update_profile, change_password, upload_avatar, get_avatar};
 use clap::Parser;
 use cli::CliArgs;
 use services::sync_service::SyncService;
@@ -98,7 +99,12 @@ async fn main() -> anyhow::Result<()> {
             "/auth/forgot-password",
             post(handlers::auth::forgot_password),
         )
-        .route("/auth/reset-password", post(handlers::auth::reset_password));
+        .route("/auth/reset-password", post(handlers::auth::reset_password))
+        .route("/user/avatar/:user_id", get(get_avatar))
+        .route(
+            "/auth/send-verify-code",
+            post(handlers::auth::send_verify_code),
+        );
 
     // ========== 受保护路由 ==========
     let protected_routes = Router::new()
@@ -134,6 +140,13 @@ async fn main() -> anyhow::Result<()> {
         .route("/sync/commit", post(handlers::sync::commit_sync))
         .route("/sync/history", get(handlers::sync::sync_history))
         .route("/sync/reset", post(handlers::sync::reset_sync_data))
+        // 用户资料端点
+        .route("/user/profile", get(get_profile).post(update_profile))
+        .route("/user/password", post(change_password))
+        .route(
+            "/user/avatar",
+            put(upload_avatar).layer(DefaultBodyLimit::max(5 * 1024 * 1024)),
+        )
         // JWT 认证中间件（仅应用于受保护路由）
         .route_layer(axum::middleware::from_fn_with_state(
             app_state.clone(),

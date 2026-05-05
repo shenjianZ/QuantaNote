@@ -1,0 +1,64 @@
+{
+  "title": "个人资料",
+  "fields": {
+    "email": "邮箱",
+    "nickname": "昵称",
+    "phone": "手机号",
+    "address": "地址",
+    "bio": "个人简介",
+    "avatar": "头像",
+    "createdAt": "注册时间"
+  },
+  "placeholder": {
+    "nickname": "输入昵称",
+    "phone": "输入手机号",
+    "address": "输入地址",
+    "bio": "介绍一下自己..."
+  },
+  "password": {
+    "title": "修改密码",
+    "oldPassword": "当前密码",
+    "newPassword": "新密码",
+    "confirmPassword": "确认新密码",
+    "placeholder": {
+      "old": "输入当前密码",
+      "new": "输入新密码",
+      "confirm": "再次输入新密码"
+    },
+    "mismatch": "两次输入的新密码不一致",
+    "success": "密码修改成功",
+    "failed": "密码修改失败",
+    "submitBtn": "确认修改"
+  },
+  "danger": {
+    "title": "危险区域",
+    "deleteAccount": "删除账号",
+    "deleteConfirm": "确认删除账号？此操作不可撤销，所有数据将被永久删除。",
+    "confirmTitle": "确认删除账号",
+    "confirmDesc": "请输入你的邮箱地址以确认删除",
+    "confirmPlaceholder": "输入邮箱地址",
+    "confirmBtn": "确认删除",
+    "deleting": "删除中...",
+    "emailMismatch": "邮箱地址不匹配",
+    "deleteSuccess": "账号已删除"
+  },
+  "save": "保存",
+  "saving": "保存中...",
+  "saveSuccess": "资料已更新",
+  "saveFailed": "更新失败",
+  "notLoggedIn": "请先登录",
+  "uploadAvatar": "点击上传头像",
+  "avatar": {
+    "success": "头像已更新",
+    "failed": "头像上传失败"
+  },
+  "account": {
+    "serverUrlRequired": "请先配置同步服务器地址",
+    "goToSettings": "前往设置",
+    "pleaseLogin": "登录后即可管理账号信息和同步设置",
+    "login": "登录",
+    "register": "注册",
+    "logout": "退出登录",
+    "logoutSuccess": "已退出登录"
+  }
+}

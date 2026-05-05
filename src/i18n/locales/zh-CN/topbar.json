@@ -11,5 +11,7 @@
   "restore": "恢复",
   "close": "关闭",
   "openWorkspace": "打开工作台",
-  "openLibrary": "打开记录库"
+  "openLibrary": "打开记录库",
+  "account": "账号",
+  "accountServerUrlRequired": "请先在设置中配置同步服务器地址"
 }

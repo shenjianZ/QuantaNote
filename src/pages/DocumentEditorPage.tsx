@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { ArrowLeft, Clock, Loader2, Save, Star } from "lucide-react";
 import { useAppStore } from "../stores/appStore";
 import { useItemStore } from "../stores/itemStore";
+import { getVditorLang } from "../utils/vditorConfig";
 import { useToastStore } from "../stores/toastStore";
 import { VersionPanel, type VersionDto } from "../components/editor/VersionPanel";
 import { getVersions, createVersion, updateVersion, restoreVersion, deleteVersion } from "../services/tauriCommands";
@@ -89,7 +90,7 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
       });
       setSaved(true);
     } catch (e) {
-      console.error("保存失败:", e);
+      console.error("Save failed:", e);
       useToastStore.getState().addToast("error", t("common:toast.saveFailed"));
     }
   }, [selectedItemId, updateItem]);
@@ -124,7 +125,7 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
     } catch (e) {
       // 回滚乐观更新
       setIsFavorite(!next);
-      console.error("切换收藏失败:", e);
+      console.error("Toggle favorite failed:", e);
       useToastStore.getState().addToast("error", t("common:toast.favoriteFailed"));
     }
   }
@@ -141,7 +142,7 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
       setVersions((current) => [version as VersionDto, ...current].slice(0, 50));
       useToastStore.getState().addToast("success", t("common:toast.versionSaved"));
     } catch (e) {
-      console.error("创建版本失败:", e);
+      console.error("Create version failed:", e);
       useToastStore.getState().addToast("error", t("common:toast.versionSaveFailed"));
     }
   }
@@ -151,7 +152,7 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
       const updated = await updateVersion(versionId, name, description);
       setVersions((current) => current.map((v) => (v.id === versionId ? (updated as VersionDto) : v)));
     } catch (e) {
-      console.error("更新版本信息失败:", e);
+      console.error("Update version meta failed:", e);
       useToastStore.getState().addToast("error", t("common:toast.versionMetaFailed"));
     }
   }
@@ -163,7 +164,7 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
       setTitle(updatedItem.title);
       useToastStore.getState().addToast("success", t("common:toast.versionRestored"));
     } catch (e) {
-      console.error("恢复版本失败:", e);
+      console.error("Restore version failed:", e);
       useToastStore.getState().addToast("error", t("common:toast.versionRestoreFailed"));
     }
   }
@@ -174,7 +175,7 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
       setVersions((current) => current.filter((v) => v.id !== versionId));
       useToastStore.getState().addToast("success", t("common:toast.versionDeleted"));
     } catch (e) {
-      console.error("删除版本失败:", e);
+      console.error("Delete version failed:", e);
       useToastStore.getState().addToast("error", t("common:toast.versionDeleteFailed"));
     }
   }
@@ -232,7 +233,7 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
         />
         <div className="min-h-0 flex-1 overflow-hidden">
           <Suspense fallback={<div className="flex h-full items-center justify-center text-[var(--muted)]"><Loader2 className="mr-2 h-4 w-4 animate-spin" />{t("document:loadingEditor")}</div>}>
-            <VditorEditor initialValue={content} onChange={handleContentChange} theme={resolveTheme(theme)} />
+            <VditorEditor initialValue={content} onChange={handleContentChange} theme={resolveTheme(theme)} lang={getVditorLang()} />
           </Suspense>
         </div>
       </article>

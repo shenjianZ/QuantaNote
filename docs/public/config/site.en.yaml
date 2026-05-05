@@ -44,6 +44,9 @@ changelog:
 # Sidebar Navigation Configuration
 sidebar:
     enabled: true
+    collapseControl:
+        enabled: true
+        defaultCollapsed: false
     collections:
         docs:
             sections:
@@ -148,6 +151,9 @@ theme:
 toc:
     maxLevel: 4
     enabled: true
+    collapseControl:
+        enabled: true
+        defaultCollapsed: false
     title: "On This Page"
 
 # Image viewer configuration
@@ -175,7 +181,7 @@ footer:
         url: "https://github.com/shenjianZ/QuantaNote"
         branch: "master"
     lastUpdated: "2026-05-03"
-    version: "v0.1.0"
+    version: "v0.2.0"
     groups:
         - title: "Community"
           items:
@@ -271,9 +277,21 @@ feedback:
 ai:
     enabled: false
 
+backend:
+    enabled: false
+    baseUrl: "/api"
+    features:
+        auth: false
+        comments: false
+        bookmarks: false
+        analytics: false
+        feedback: true
+        notifications: false
+        admin: false
+
 # Fonts Configuration
 fonts:
-    fontFamilyZhCn: "MiSans, PingFang SC, Noto Sans SC, Microsoft YaHei, sans-serif"
+    fontFamilyZhCn: " PingFang SC, Noto Sans SC, Microsoft YaHei, sans-serif"
     fontFamilyEn: "Fragment Mono, system-ui, sans-serif"
     downloadFonts:
         - "FragmentMono-Italic.woff2"
@@ -322,6 +340,8 @@ breadcrumb:
 reading:
     showTime: true
     showProgress: true
+    fullscreen:
+        enabled: true
 
 # Sitemap Configuration
 sitemap:

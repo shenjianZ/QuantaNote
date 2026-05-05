@@ -1,0 +1,12 @@
+target/
+data/
+sync_data/
+config/development.toml
+config/production.toml
+.env
+.idea/
+.vscode/
+*.md
+*.rs.bk
+.DS_Store
+Thumbs.db

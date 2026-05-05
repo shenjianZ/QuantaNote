@@ -1,0 +1,64 @@
+{
+  "title": "Profile",
+  "fields": {
+    "email": "Email",
+    "nickname": "Nickname",
+    "phone": "Phone",
+    "address": "Address",
+    "bio": "Bio",
+    "avatar": "Avatar",
+    "createdAt": "Joined"
+  },
+  "placeholder": {
+    "nickname": "Enter nickname",
+    "phone": "Enter phone number",
+    "address": "Enter address",
+    "bio": "Tell us about yourself..."
+  },
+  "password": {
+    "title": "Change Password",
+    "oldPassword": "Current Password",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm New Password",
+    "placeholder": {
+      "old": "Enter current password",
+      "new": "Enter new password",
+      "confirm": "Re-enter new password"
+    },
+    "mismatch": "New passwords do not match",
+    "success": "Password changed successfully",
+    "failed": "Failed to change password",
+    "submitBtn": "Confirm"
+  },
+  "danger": {
+    "title": "Danger Zone",
+    "deleteAccount": "Delete Account",
+    "deleteConfirm": "Are you sure? This action cannot be undone. All data will be permanently deleted.",
+    "confirmTitle": "Confirm Account Deletion",
+    "confirmDesc": "Please enter your email address to confirm deletion",
+    "confirmPlaceholder": "Enter your email address",
+    "confirmBtn": "Delete Account",
+    "deleting": "Deleting...",
+    "emailMismatch": "Email address does not match",
+    "deleteSuccess": "Account deleted"
+  },
+  "save": "Save",
+  "saving": "Saving...",
+  "saveSuccess": "Profile updated",
+  "saveFailed": "Update failed",
+  "notLoggedIn": "Please log in first",
+  "uploadAvatar": "Click to upload avatar",
+  "avatar": {
+    "success": "Avatar updated",
+    "failed": "Failed to upload avatar"
+  },
+  "account": {
+    "serverUrlRequired": "Please configure a sync server address first",
+    "goToSettings": "Go to Settings",
+    "pleaseLogin": "Log in to manage your account and sync settings",
+    "login": "Login",
+    "register": "Register",
+    "logout": "Logout",
+    "logoutSuccess": "Logged out successfully"
+  }
+}

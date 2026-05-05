@@ -23,7 +23,9 @@
     "localMode": "Local Mode",
     "copied": "Copied to clipboard",
     "copyFailed": "Copy failed",
-    "noMatch": "No match"
+    "noMatch": "No match",
+    "calculating": "Calculating...",
+    "unknown": "Unknown"
   },
   "toast": {
     "saveSuccess": "Note saved",
@@ -71,7 +73,19 @@
     "versionDeleted": "Version deleted",
     "versionDeleteFailed": "Failed to delete version",
     "versionMetaFailed": "Failed to update version info",
-    "favoriteFailed": "Failed to toggle favorite"
+    "favoriteFailed": "Failed to toggle favorite",
+    "alwaysOnTopMismatch": "Always-on-top state mismatch",
+    "alwaysOnTopFailed": "Failed to set always-on-top",
+    "attachmentAdded": "Attachment added",
+    "attachmentDeleted": "Attachment deleted",
+    "itemCreateFailed": "Failed to create record",
+    "itemUpdateFailed": "Failed to update record",
+    "itemDeleteFailed": "Failed to delete record",
+    "tagCreated": "Tag created",
+    "tagDeleted": "Tag deleted",
+    "tagUpdateFailed": "Failed to update tag",
+    "tagRenameFailed": "Failed to rename tag",
+    "tagColorFailed": "Failed to update tag color"
   },
   "error": {
     "appError": "Something went wrong",
@@ -81,6 +95,13 @@
   "emptyItem": {
     "title": "Select a record",
     "summary": "Select from the list or create a new one",
-    "untitled": "Untitled Note"
+    "untitled": "Untitled Note",
+    "noContent": "No content"
+  },
+  "relativeTime": {
+    "justNow": "Just now",
+    "minutesAgo": "{{count}} min ago",
+    "hoursAgo": "{{count}} hours ago",
+    "daysAgo": "{{count}} days ago"
   }
 }

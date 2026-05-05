@@ -40,5 +40,6 @@
     "title": "版本对比",
     "identical": "两个版本内容相同",
     "close": "关闭"
-  }
+  },
+  "placeholder": "开始输入..."
 }

@@ -9,6 +9,7 @@ import { WorkspacePage } from "../pages/WorkspacePage";
 import { LibraryPage } from "../pages/LibraryPage";
 import { DocumentEditorPage } from "../pages/DocumentEditorPage";
 import { SettingsPage } from "../pages/SettingsPage";
+import { ProfilePage } from "../pages/ProfilePage";
 import { useAppStore } from "../stores/appStore";
 import { useItemStore } from "../stores/itemStore";
 import { useSettingsStore } from "../stores/settingsStore";
@@ -303,6 +304,9 @@ export function QuantaNoteApp() {
             )}
             {currentPage === "settings" && (
                 <SettingsPage theme={theme} onThemeChange={setTheme} />
+            )}
+            {currentPage === "profile" && (
+                <ProfilePage onNavigate={navigate} />
             )}
 
             <CommandPalette

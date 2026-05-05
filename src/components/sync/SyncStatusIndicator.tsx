@@ -1,4 +1,4 @@
-import { Cloud, CloudOff, Loader2, CloudCog } from "lucide-react";
+import { Cloud, CloudOff, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSyncStore } from "../../stores/syncStore";
 
@@ -23,7 +23,7 @@ export function SyncStatusIndicator({ onClick }: SyncStatusIndicatorProps) {
     const statusIcon = isSyncing ? (
         <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
     ) : state.status === "completed" ? (
-        <CloudCog className="h-4 w-4 text-green-400" />
+        <Cloud className="h-4 w-4 text-green-400" />
     ) : state.status === "error" ? (
         <CloudOff className="h-4 w-4 text-red-400" />
     ) : (

@@ -2,7 +2,8 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import Vditor from "vditor";
 import "vditor/dist/index.css";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { VDITOR_CDN, VDITOR_LANG } from "../../utils/vditorConfig";
+import { useTranslation } from "react-i18next";
+import { VDITOR_CDN, getVditorLang } from "../../utils/vditorConfig";
 import { SearchReplaceBar } from "./SearchReplaceBar";
 
 type VditorToolbarItem = string | {
@@ -16,6 +17,7 @@ interface VditorEditorProps {
   initialValue: string;
   onChange: (value: string) => void;
   theme?: "dark" | "light";
+  lang?: "zh_CN" | "en_US";
   toolbar?: string[];
   placeholder?: string;
 }
@@ -52,10 +54,16 @@ function clampTableSize(value: number) {
   return Math.max(1, Math.min(200, Math.floor(value)));
 }
 
-function buildTableMarkdown(rowsInput: number, colsInput: number) {
+const TABLE_I18N = {
+  zh_CN: { title: "插入表格", row: "行", col: "列", cancel: "取消", insert: "插入", colName: "列" },
+  en_US: { title: "Insert Table", row: "Rows", col: "Cols", cancel: "Cancel", insert: "Insert", colName: "Col" },
+} as const;
+
+function buildTableMarkdown(rowsInput: number, colsInput: number, lang: "zh_CN" | "en_US" = "zh_CN") {
   const rows = clampTableSize(rowsInput);
   const cols = clampTableSize(colsInput);
-  const headers = Array.from({ length: cols }, (_, index) => `列 ${index + 1}`);
+  const t = TABLE_I18N[lang];
+  const headers = Array.from({ length: cols }, (_, index) => `${t.colName} ${index + 1}`);
   const separators = Array.from({ length: cols }, () => "---");
   const bodyRows = Array.from({ length: Math.max(rows - 1, 0) }, () => {
     return `| ${Array.from({ length: cols }, () => " ").join(" | ")} |`;
@@ -70,10 +78,12 @@ function buildTableMarkdown(rowsInput: number, colsInput: number) {
   ].join("\n");
 }
 
-function showTableSizePanel(event: Event, onInsert: (rows: number, cols: number) => void) {
+function showTableSizePanel(event: Event, onInsert: (rows: number, cols: number) => void, lang: "zh_CN" | "en_US" = "zh_CN") {
   event.preventDefault();
   event.stopPropagation();
   closeActiveTablePanel?.();
+
+  const t = TABLE_I18N[lang];
 
   const trigger = event.currentTarget instanceof HTMLElement
     ? event.currentTarget
@@ -85,13 +95,13 @@ function showTableSizePanel(event: Event, onInsert: (rows: number, cols: number)
 
   const title = document.createElement("div");
   title.className = "quantanote-vditor-table-panel__title";
-  title.textContent = "插入表格";
+  title.textContent = t.title;
 
   const form = document.createElement("form");
   form.className = "quantanote-vditor-table-panel__form";
 
   const rowLabel = document.createElement("label");
-  rowLabel.textContent = "行";
+  rowLabel.textContent = t.row;
   const rowInput = document.createElement("input");
   rowInput.type = "number";
   rowInput.min = "1";
@@ -100,7 +110,7 @@ function showTableSizePanel(event: Event, onInsert: (rows: number, cols: number)
   rowLabel.appendChild(rowInput);
 
   const colLabel = document.createElement("label");
-  colLabel.textContent = "列";
+  colLabel.textContent = t.col;
   const colInput = document.createElement("input");
   colInput.type = "number";
   colInput.min = "1";
@@ -113,11 +123,11 @@ function showTableSizePanel(event: Event, onInsert: (rows: number, cols: number)
 
   const cancelButton = document.createElement("button");
   cancelButton.type = "button";
-  cancelButton.textContent = "取消";
+  cancelButton.textContent = t.cancel;
 
   const insertButton = document.createElement("button");
   insertButton.type = "submit";
-  insertButton.textContent = "插入";
+  insertButton.textContent = t.insert;
   insertButton.className = "primary";
 
   actions.append(cancelButton, insertButton);
@@ -174,12 +184,12 @@ function showTableSizePanel(event: Event, onInsert: (rows: number, cols: number)
   closeActiveTablePanel = closePanel;
 }
 
-function createTableToolbarItem(insertTable: (rows: number, cols: number) => void): VditorToolbarItem {
+function createTableToolbarItem(insertTable: (rows: number, cols: number) => void, lang: "zh_CN" | "en_US" = "zh_CN"): VditorToolbarItem {
   return {
     name: "quantanote-table",
     icon: TABLE_ICON,
-    tip: "插入表格",
-    click: (event) => showTableSizePanel(event, insertTable),
+    tip: TABLE_I18N[lang].title,
+    click: (event) => showTableSizePanel(event, insertTable, lang),
   };
 }
 
@@ -191,9 +201,12 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
   initialValue,
   onChange,
   theme = "dark",
+  lang,
   toolbar,
-  placeholder = "开始输入...",
+  placeholder,
 }, ref) {
+  const { t } = useTranslation();
+  const resolvedPlaceholder = placeholder ?? t("editor:placeholder");
   const containerRef = useRef<HTMLDivElement>(null);
   const vditorRef = useRef<Vditor | null>(null);
   const onChangeRef = useRef(onChange);
@@ -473,6 +486,16 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
 
   useEffect(() => {
     if (!containerRef.current) return;
+
+    // 语言切换前保存当前内容，重建后恢复
+    const currentVditor = vditorRef.current;
+    if (currentVditor && readyRef.current) {
+      const currentContent = currentVditor.getValue();
+      if (currentContent) {
+        initialValueRef.current = currentContent;
+      }
+    }
+
     readyRef.current = false;
     containerRef.current.dataset.vditorReady = "false";
 
@@ -500,9 +523,10 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
     window.addEventListener("keyup", onKeyUp);
     containerRef.current.addEventListener("paste", onPaste, true);
 
+    const resolvedLang = lang ?? getVditorLang();
     const vditor = new Vditor(containerRef.current, {
       cdn: VDITOR_CDN,
-      lang: VDITOR_LANG,
+      lang: resolvedLang,
       mode: "ir",
       height: "100%",
       theme: theme === "dark" ? "dark" : "classic",
@@ -519,13 +543,13 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
         }
         onChangeRef.current(value);
       },
-      placeholder,
+      placeholder: resolvedPlaceholder,
       toolbar: normalizeToolbar(
         toolbar ?? DEFAULT_TOOLBAR,
         createTableToolbarItem((rows, cols) => {
-          vditorRef.current?.insertValue(buildTableMarkdown(rows, cols), true);
+          vditorRef.current?.insertValue(buildTableMarkdown(rows, cols, resolvedLang), true);
           vditorRef.current?.focus();
-        }),
+        }, resolvedLang),
       ) as never,
       preview: {
         theme: { current: theme === "dark" ? "dark" : "light" },
@@ -574,7 +598,7 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
       vditorRef.current = null;
       readyRef.current = false;
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [lang]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync external content changes
   useEffect(() => {

@@ -1,0 +1,39 @@
+services:
+    quantanote-cloud:
+        image: ${QT_REGISTRY:-quantanote-cloud}
+        build:
+            context: ./quantanote-cloud
+            dockerfile: Dockerfile
+        ports:
+            - "${SERVER_PORT:-3000}:3000"
+        restart: unless-stopped
+        volumes:
+            - cloud-config:/app/config
+            - cloud-data:/app/data
+            - cloud-sync:/app/sync_data
+        environment:
+            ENV: ${ENV:-production}
+
+            SERVER_HOST: "0.0.0.0"
+            SERVER_PORT: ${SERVER_PORT:-3000}
+
+            DATABASE_DATABASE_TYPE: ${DATABASE_DATABASE_TYPE:-sqlite}
+            DATABASE_DATABASE: ${DATABASE_DATABASE:-/app/data/quantanote.db}
+
+            AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?请设置 AUTH_JWT_SECRET}
+
+            STORAGE_BACKEND_TYPE: ${STORAGE_BACKEND_TYPE:-local}
+            STORAGE_BASE_PATH: ${STORAGE_BASE_PATH:-/app/sync_data}
+
+            EMAIL_ENABLED: ${EMAIL_ENABLED:-true}
+            EMAIL_SMTP_HOST: ${EMAIL_SMTP_HOST}
+            EMAIL_SMTP_PORT: ${EMAIL_SMTP_PORT:-465}
+            EMAIL_SMTP_USERNAME: ${EMAIL_SMTP_USERNAME}
+            EMAIL_SMTP_PASSWORD: ${EMAIL_SMTP_PASSWORD}
+            EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-QuantaNote}
+            EMAIL_FROM_EMAIL: ${EMAIL_FROM_EMAIL}
+
+volumes:
+    cloud-config:
+    cloud-data:
+    cloud-sync:

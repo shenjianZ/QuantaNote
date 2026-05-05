@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import {
+    BookOpen,
     Cloud,
     Database,
     Download,
     FileText,
+    Github,
     Globe2,
     Laptop,
+    MessageSquare,
     Moon,
     Palette,
     RefreshCw,
@@ -25,6 +28,7 @@ import { ImportModal } from "../components/common/ImportModal";
 import { Select } from "../components/common/Select";
 import { SyncSettingsPanel } from "../components/sync/SyncSettingsPanel";
 import { useSettingsStore } from "../stores/settingsStore";
+import { useAppStore } from "../stores/appStore";
 import { useToastStore } from "../stores/toastStore";
 import { useUpdaterStore } from "../stores/updaterStore";
 
@@ -68,7 +72,9 @@ export function SettingsPage({
     onThemeChange,
 }: SettingsPageProps) {
     const { t } = useTranslation(["settings", "common"]);
-    const [activeSection, setActiveSection] = useState(0);
+    const settingsSection = useAppStore((s) => s.settingsSection);
+    const setSettingsSection = useAppStore((s) => s.setSettingsSection);
+    const [activeSection, setActiveSection] = useState(settingsSection ?? 0);
     const [colorPickerOpen, setColorPickerOpen] = useState(false);
     const [exportModalOpen, setExportModalOpen] = useState(false);
     const [importModalOpen, setImportModalOpen] = useState(false);
@@ -109,6 +115,13 @@ export function SettingsPage({
         fetchBackups();
         fetchDiagnosticsPaths();
     }, [init, refreshDbSize, fetchDbPath, fetchAutoBackupConfig, fetchBackupDirPath, fetchBackups, fetchDiagnosticsPaths]);
+
+    useEffect(() => {
+        if (settingsSection != null) {
+            setActiveSection(settingsSection);
+            setSettingsSection(null);
+        }
+    }, [settingsSection, setSettingsSection]);
 
     function renderToggle(value: boolean, onChange: (v: boolean) => void) {
         return (
@@ -709,7 +722,7 @@ export function SettingsPage({
                     <h2 className="mb-3 text-sm font-semibold text-[var(--text)]">
                         {t("settings:data.syncTitle")}
                     </h2>
-                    <SyncSettingsPanel />
+                    <SyncSettingsPanel showAccount={false} />
                 </section>
             );
         }
@@ -718,7 +731,7 @@ export function SettingsPage({
             <section>
                 <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
                     <span className="inline-block rounded-md bg-[var(--accent)] px-2.5 py-1 text-white">QuantaNote</span>
-                    <span data-testid="settings-about-version" className="inline-block rounded-md bg-[var(--accent-soft)] px-2.5 py-1 text-[var(--accent)]">v0.1.0</span>
+                    <span data-testid="settings-about-version" className="inline-block rounded-md bg-[var(--accent-soft)] px-2.5 py-1 text-[var(--accent)]">v0.2.0</span>
                 </h2>
                 <div className="mb-4 text-sm text-[var(--muted)]">
                     {t("settings:about.description")}
@@ -735,14 +748,16 @@ export function SettingsPage({
                         target="_blank"
                         rel="noopener noreferrer"
                     >
+                        <span className="translate-y-[1px]"><Github size={14} /></span>
                         {t("settings:about.github")}
                     </a>
                     <a
                         className="inline-flex items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--field)] px-3 py-1.5 text-sm text-[var(--text)] hover:bg-[var(--hover)]"
-                        href="https://github.com/shenjianZ/QuantaNote#readme"
+                        href="https://shenjianz.github.io/QuantaNote"
                         target="_blank"
                         rel="noopener noreferrer"
                     >
+                        <span className="translate-y-[1px]"><BookOpen size={14} /></span>
                         {t("settings:about.docs")}
                     </a>
                     <a
@@ -751,6 +766,7 @@ export function SettingsPage({
                         target="_blank"
                         rel="noopener noreferrer"
                     >
+                        <span className="translate-y-[1px]"><MessageSquare size={14} /></span>
                         {t("settings:about.feedback")}
                     </a>
                 </div>

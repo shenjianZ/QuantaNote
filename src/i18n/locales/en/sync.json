@@ -56,5 +56,6 @@
     "item_tags": "Tag Associations",
     "versions": "Versions",
     "attachments": "Attachments"
-  }
+  },
+  "sessionExpired": "Session expired, please log in again"
 }

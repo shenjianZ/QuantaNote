@@ -226,6 +226,7 @@ impl SyncTransport {
     async fn do_refresh(&self) -> Result<(), AppError> {
         let rt = self.refresh_token.lock().await.clone();
         let url = format!("{}/auth/refresh", self.server_url);
+        log::debug!("POST {}", url);
         let resp = self
             .client
             .post(&url)
@@ -316,6 +317,8 @@ impl SyncTransport {
         const MAX_RETRIES: u32 = 3;
         const INITIAL_BACKOFF_MS: u64 = 500;
 
+        log::debug!("{} {}", req.method(), req.url());
+
         let mut last_err: Option<String> = None;
 
         for attempt in 0..MAX_RETRIES {
@@ -399,6 +402,7 @@ impl SyncTransport {
     /// 登录
     pub async fn login(&self, email: &str, password: &str) -> Result<SyncLoginResult, AppError> {
         let url = format!("{}/auth/login", self.server_url);
+        log::debug!("POST {}", url);
         let resp = self
             .client
             .post(&url)
@@ -425,16 +429,21 @@ impl SyncTransport {
     }
 
     /// 注册
-    pub async fn register(&self, email: &str, password: &str) -> Result<SyncLoginResult, AppError> {
+    pub async fn register(&self, email: &str, password: &str, verify_code: Option<&str>) -> Result<SyncLoginResult, AppError> {
         let url = format!("{}/auth/register", self.server_url);
+        log::debug!("POST {}", url);
+        let mut body = serde_json::json!({
+            "email": email,
+            "password": password,
+            "device_id": self.device_id
+        });
+        if let Some(code) = verify_code {
+            body["verify_code"] = serde_json::Value::String(code.to_string());
+        }
         let resp = self
             .client
             .post(&url)
-            .json(&serde_json::json!({
-                "email": email,
-                "password": password,
-                "device_id": self.device_id
-            }))
+            .json(&body)
             .send()
             .await
             .map_err(|e| AppError::SyncError(format!("请求失败: {}", e)))?;
@@ -452,13 +461,41 @@ impl SyncTransport {
         }
     }
 
-    /// 忘记密码
-    pub async fn forgot_password(&self, email: &str) -> Result<String, AppError> {
-        let url = format!("{}/auth/forgot-password", self.server_url);
+    /// 发送验证码
+    pub async fn send_verify_code(&self, email: &str, lang: &str) -> Result<(), AppError> {
+        let url = format!("{}/auth/send-verify-code", self.server_url);
+        log::debug!("POST {}", url);
         let resp = self
             .client
             .post(&url)
-            .json(&serde_json::json!({ "email": email }))
+            .json(&serde_json::json!({
+                "email": email,
+                "lang": lang
+            }))
+            .send()
+            .await
+            .map_err(|e| AppError::SyncError(format!("请求失败: {}", e)))?;
+
+        let body: ApiResponse<serde_json::Value> = resp
+            .json()
+            .await
+            .map_err(|e| AppError::SyncError(format!("解析响应失败: {}", e)))?;
+
+        if body.code == 200 {
+            Ok(())
+        } else {
+            Err(AppError::SyncError(format!("发送验证码失败: {}", body.message)))
+        }
+    }
+
+    /// 忘记密码
+    pub async fn forgot_password(&self, email: &str, lang: &str) -> Result<Option<String>, AppError> {
+        let url = format!("{}/auth/forgot-password", self.server_url);
+        log::debug!("POST {}", url);
+        let resp = self
+            .client
+            .post(&url)
+            .json(&serde_json::json!({ "email": email, "lang": lang }))
             .send()
             .await
             .map_err(|e| AppError::SyncError(format!("请求失败: {}", e)))?;
@@ -472,10 +509,9 @@ impl SyncTransport {
             let data = body
                 .data
                 .ok_or_else(|| AppError::SyncError("响应数据为空".to_string()))?;
-            data["reset_token"]
-                .as_str()
-                .map(|s| s.to_string())
-                .ok_or_else(|| AppError::SyncError("未返回重置令牌".to_string()))
+            // reset_token 可能为 null（邮件模式）或有值（开发模式）
+            let token = data["reset_token"].as_str().map(|s| s.to_string());
+            Ok(token)
         } else {
             Err(AppError::SyncError(format!("请求失败: {}", body.message)))
         }
@@ -489,6 +525,7 @@ impl SyncTransport {
         new_password: &str,
     ) -> Result<(), AppError> {
         let url = format!("{}/auth/reset-password", self.server_url);
+        log::debug!("POST {}", url);
         let resp = self
             .client
             .post(&url)
@@ -519,6 +556,7 @@ impl SyncTransport {
     /// 测试连接
     pub async fn test_connection(&self) -> Result<bool, AppError> {
         let url = format!("{}/health", self.server_url);
+        log::debug!("GET {}", url);
         let resp = self
             .client
             .get(&url)
@@ -689,6 +727,70 @@ impl SyncTransport {
             "attachments_complete": attachments_complete,
             "attachments": attachments
         }));
+        let resp = self.send_auth_with_refresh(builder).await?;
+        self.handle_response(resp).await
+    }
+
+    pub async fn get_profile(&self) -> Result<crate::models::user::UserProfile, AppError> {
+        let url = format!("{}/user/profile", self.server_url);
+        let builder = self.client.get(&url);
+        let resp = self.send_auth_with_refresh(builder).await?;
+        self.handle_response(resp).await
+    }
+
+    pub async fn update_profile(
+        &self,
+        updates: &crate::models::user::UpdateProfilePayload,
+    ) -> Result<crate::models::user::UserProfile, AppError> {
+        let url = format!("{}/user/profile", self.server_url);
+        let builder = self.client.post(&url).json(updates);
+        let resp = self.send_auth_with_refresh(builder).await?;
+        self.handle_response(resp).await
+    }
+
+    pub async fn change_password(&self, old_password: &str, new_password: &str) -> Result<(), AppError> {
+        let url = format!("{}/user/password", self.server_url);
+        let builder = self.client.post(&url).json(&serde_json::json!({
+            "old_password": old_password,
+            "new_password": new_password
+        }));
+        let resp = self.send_auth_with_refresh(builder).await?;
+        let status = resp.status();
+        if !status.is_success() {
+            let body_text = resp.text().await.unwrap_or_default();
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body_text) {
+                let msg = json["message"].as_str().unwrap_or(&body_text);
+                return Err(AppError::SyncError(msg.to_string()));
+            }
+            return Err(AppError::SyncError(body_text));
+        }
+        Ok(())
+    }
+
+    /// 删除账号
+    pub async fn delete_account(&self) -> Result<(), AppError> {
+        let url = format!("{}/auth/delete", self.server_url);
+        let builder = self.client.post(&url).json(&serde_json::json!({}));
+        let resp = self.send_auth_with_refresh(builder).await?;
+        let status = resp.status();
+        if !status.is_success() {
+            let body_text = resp.text().await.unwrap_or_default();
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body_text) {
+                let msg = json["message"].as_str().unwrap_or(&body_text);
+                return Err(AppError::SyncError(msg.to_string()));
+            }
+            return Err(AppError::SyncError(body_text));
+        }
+        Ok(())
+    }
+
+    /// 上传头像
+    pub async fn upload_avatar(&self, mime_type: &str, data: Vec<u8>) -> Result<crate::models::user::UserProfile, AppError> {
+        let mut url = reqwest::Url::parse(&format!("{}/user/avatar", self.server_url))
+            .map_err(|e| AppError::SyncError(format!("URL 解析失败: {}", e)))?;
+        url.query_pairs_mut()
+            .append_pair("mime_type", mime_type);
+        let builder = self.client.put(url).body(data);
         let resp = self.send_auth_with_refresh(builder).await?;
         self.handle_response(resp).await
     }

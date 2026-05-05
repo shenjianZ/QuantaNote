@@ -6,6 +6,7 @@ use argon2::{
 use rand::Rng;
 
 use crate::config::auth::AuthConfig;
+use crate::config::email::EmailConfig;
 use crate::domain::dto::auth::{
     DeleteUserRequest, ForgotPasswordRequest, LoginRequest, RegisterRequest, ResetPasswordRequest,
 };
@@ -15,12 +16,14 @@ use crate::infra::redis::{
     redis_key::{BusinessType, RedisKey},
 };
 use crate::repositories::user_repository::UserRepository;
+use crate::services::email_service::EmailService;
 use crate::utils::jwt::TokenService;
 
 pub struct AuthService {
     user_repo: UserRepository,
     redis_client: RedisClient,
     auth_config: AuthConfig,
+    email_config: EmailConfig,
 }
 
 impl AuthService {
@@ -28,11 +31,13 @@ impl AuthService {
         user_repo: UserRepository,
         redis_client: RedisClient,
         auth_config: AuthConfig,
+        email_config: EmailConfig,
     ) -> Self {
         Self {
             user_repo,
             redis_client,
             auth_config,
+            email_config,
         }
     }
 
@@ -147,19 +152,31 @@ impl AuthService {
             return Err(anyhow::anyhow!("邮箱已注册"));
         }
 
-        // 2. 哈希密码
+        // 2. 如果邮件服务启用，校验验证码
+        if self.email_config.is_configured() {
+            let code = request
+                .verify_code
+                .as_deref()
+                .ok_or_else(|| anyhow::anyhow!("请提供邮箱验证码"))?;
+
+            let email_service =
+                EmailService::new(self.redis_client.clone(), self.email_config.clone());
+            email_service.verify_code(&request.email, code).await?;
+        }
+
+        // 3. 哈希密码
         let password_hash = self.hash_password(&request.password)?;
 
-        // 3. 生成用户 ID
+        // 4. 生成用户 ID
         let user_id = self.generate_unique_user_id().await?;
 
-        // 4. 插入数据库并获取包含真实 created_at 的用户对象
+        // 5. 插入数据库并获取包含真实 created_at 的用户对象
         let user = self
             .user_repo
             .insert(user_id.clone(), request.email, password_hash)
             .await?;
 
-        // 5. 生成 token（绑定设备）
+        // 6. 生成 token（绑定设备）
         let (access_token, refresh_token) = TokenService::generate_token_pair(
             &user_id,
             &request.device_id,
@@ -168,7 +185,7 @@ impl AuthService {
             &self.auth_config.jwt_secret,
         )?;
 
-        // 6. 保存 refresh_token（按设备隔离）
+        // 7. 保存 refresh_token（按设备隔离）
         self.save_refresh_token(
             &user_id,
             &request.device_id,
@@ -264,7 +281,8 @@ impl AuthService {
     }
 
     /// 忘记密码 - 生成重置令牌
-    pub async fn forgot_password(&self, request: ForgotPasswordRequest) -> Result<String> {
+    /// 邮件启用时发送邮件，否则直接返回 token（开发调试用）
+    pub async fn forgot_password(&self, request: ForgotPasswordRequest) -> Result<Option<String>> {
         // 1. 查找用户
         let user = self
             .user_repo
@@ -285,7 +303,18 @@ impl AuthService {
             .await
             .map_err(|e| anyhow::anyhow!("Redis 保存失败: {}", e))?;
 
-        Ok(reset_token)
+        // 4. 邮件启用时发送重置码邮件
+        if self.email_config.is_configured() {
+            let email_service =
+                EmailService::new(self.redis_client.clone(), self.email_config.clone());
+            let (subject, html_body) =
+                crate::utils::mail_template::render_reset_password_mail(&reset_token, &request.lang);
+            email_service.send_email_direct(&user.email, &subject, &html_body).await?;
+            tracing::info!("重置密码邮件已发送至: {}", user.email);
+            Ok(None)
+        } else {
+            Ok(Some(reset_token))
+        }
     }
 
     /// 重置密码
@@ -329,24 +358,36 @@ impl AuthService {
         Ok(())
     }
 
-    /// 删除用户
-    pub async fn delete_user(&self, request: DeleteUserRequest) -> Result<()> {
-        let password_hash = self
+    /// 验证删除用户请求（检查用户存在、可选密码验证）
+    pub async fn validate_delete_user(&self, request: &DeleteUserRequest) -> Result<()> {
+        let _user = self
             .user_repo
-            .get_password_hash(&request.user_id)
+            .find_by_id(&request.user_id)
             .await?
             .ok_or_else(|| anyhow::anyhow!("用户不存在"))?;
 
-        let parsed_hash = PasswordHash::new(&password_hash)
-            .map_err(|e| anyhow::anyhow!("解析密码哈希失败: {}", e))?;
-        let argon2 = Argon2::default();
+        if let Some(password) = &request.password {
+            let password_hash = self
+                .user_repo
+                .get_password_hash(&request.user_id)
+                .await?
+                .ok_or_else(|| anyhow::anyhow!("用户不存在"))?;
 
-        argon2
-            .verify_password(request.password.as_bytes(), &parsed_hash)
-            .map_err(|_| anyhow::anyhow!("密码错误"))?;
+            let parsed_hash = PasswordHash::new(&password_hash)
+                .map_err(|e| anyhow::anyhow!("解析密码哈希失败: {}", e))?;
+            let argon2 = Argon2::default();
 
-        self.user_repo.delete_by_id(&request.user_id).await?;
+            argon2
+                .verify_password(password.as_bytes(), &parsed_hash)
+                .map_err(|_| anyhow::anyhow!("密码错误"))?;
+        }
 
+        Ok(())
+    }
+
+    /// 删除用户（仅执行删除，不验证）
+    pub async fn delete_user(&self, user_id: &str) -> Result<()> {
+        self.user_repo.delete_by_id(user_id).await?;
         Ok(())
     }
 }

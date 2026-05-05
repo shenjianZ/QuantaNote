@@ -25,6 +25,8 @@ const VDITOR_BUILD_ASSETS = [
   "js/icons/ant.js",
   "js/katex",
   "js/lute/lute.min.js",
+  "js/mermaid",
+  "js/i18n/en_US.js",
 ];
 
 function getContentType(filePath: string) {

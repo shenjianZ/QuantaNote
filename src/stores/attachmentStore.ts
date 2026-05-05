@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { addAttachment, deleteAttachment, getAttachments } from "../services/tauriCommands";
 import { useToastStore } from "./toastStore";
+import i18n from "../i18n";
 
 interface AttachmentDto {
   id: string;
@@ -40,11 +41,11 @@ export const useAttachmentStore = create<AttachmentState>((set, get) => ({
     try {
       const newAtt = await addAttachment(itemId, path) as AttachmentDto;
       set({ attachments: [...get().attachments, newAtt] });
-      useToastStore.getState().addToast("success", "附件已添加");
+      useToastStore.getState().addToast("success", i18n.t("common:toast.attachmentAdded"));
     } catch (e) {
       set({ error: String(e) });
       const reason = typeof e === "string" ? e : (e instanceof Error ? e.message : String(e));
-      useToastStore.getState().addToast("error", `添加附件失败: ${reason}`);
+      useToastStore.getState().addToast("error", `${i18n.t("common:toast.attachmentAddFailed")}: ${reason}`);
     }
   },
 
@@ -52,11 +53,11 @@ export const useAttachmentStore = create<AttachmentState>((set, get) => ({
     try {
       await deleteAttachment(id);
       set({ attachments: get().attachments.filter((a) => a.id !== id) });
-      useToastStore.getState().addToast("success", "附件已删除");
+      useToastStore.getState().addToast("success", i18n.t("common:toast.attachmentDeleted"));
     } catch (e) {
       set({ error: String(e) });
       const reason = typeof e === "string" ? e : (e instanceof Error ? e.message : String(e));
-      useToastStore.getState().addToast("error", `删除附件失败: ${reason}`);
+      useToastStore.getState().addToast("error", `${i18n.t("common:toast.attachmentDeleteFailed")}: ${reason}`);
     }
   },
 }));

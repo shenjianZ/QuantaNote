@@ -463,6 +463,32 @@ kbd {
     padding-left: 0.9em !important;
 }
 
+/* Restore ordered-list numbering overridden by Tailwind preflight */
+.markdown-preview ol,
+.vditor-reset ol {
+    list-style-type: decimal !important;
+}
+
+.markdown-preview ol ol,
+.vditor-reset ol ol {
+    list-style-type: lower-alpha !important;
+}
+
+.markdown-preview ol ol ol,
+.vditor-reset ol ol ol {
+    list-style-type: lower-roman !important;
+}
+
+.markdown-preview ul,
+.vditor-reset ul {
+    list-style-type: disc !important;
+}
+
+.markdown-preview ul ul,
+.vditor-reset ul ul {
+    list-style-type: circle !important;
+}
+
 .markdown-preview li,
 .vditor-reset li {
     margin: 0.2em 0 !important;

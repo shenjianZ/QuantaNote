@@ -4,7 +4,8 @@ export type AppPage =
   | "workspace"
   | "library"
   | "document"
-  | "settings";
+  | "settings"
+  | "profile";
 
 export type ItemType =
   | "note"

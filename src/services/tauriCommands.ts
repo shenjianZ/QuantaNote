@@ -417,8 +417,9 @@ export async function syncRegister(
     serverUrl: string,
     email: string,
     password: string,
+    verifyCode?: string,
 ) {
-    return invoke<SyncLoginResult>("sync_register", { serverUrl, email, password });
+    return invoke<SyncLoginResult>("sync_register", { serverUrl, email, password, verifyCode: verifyCode ?? null });
 }
 
 export async function syncLogout() {
@@ -428,8 +429,9 @@ export async function syncLogout() {
 export async function syncForgotPassword(
     serverUrl: string,
     email: string,
-) {
-    return invoke<string>("sync_forgot_password", { serverUrl, email });
+    lang: string = "zh-CN",
+): Promise<string | null> {
+    return invoke<string | null>("sync_forgot_password", { serverUrl, email, lang });
 }
 
 export async function syncResetPassword(
@@ -466,4 +468,46 @@ export async function resolveSyncConflicts(
 
 export async function cancelSyncConflicts() {
     return invoke("cancel_sync_conflicts");
+}
+
+// ── User Profile ──────────────────────────────────────────────
+
+export interface UserProfile {
+    id: string;
+    email: string;
+    nickname: string | null;
+    avatar_url: string | null;
+    bio: string | null;
+    phone: string | null;
+    address: string | null;
+    created_at: string | null;
+}
+
+export async function getUserProfile(): Promise<UserProfile> {
+    return invoke<UserProfile>("get_user_profile");
+}
+
+export async function updateUserProfile(updates: {
+    nickname?: string;
+    bio?: string;
+    phone?: string;
+    address?: string;
+}): Promise<UserProfile> {
+    return invoke<UserProfile>("update_user_profile", { updates });
+}
+
+export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
+    return invoke("change_password", { payload: { old_password: oldPassword, new_password: newPassword } });
+}
+
+export async function uploadAvatar(filePath: string): Promise<UserProfile> {
+    return invoke<UserProfile>("upload_avatar", { filePath });
+}
+
+export async function deleteAccount(): Promise<void> {
+    return invoke("delete_account");
+}
+
+export async function sendVerifyCode(serverUrl: string, email: string, lang: string = "zh-CN"): Promise<void> {
+    return invoke("send_verify_code", { serverUrl, email, lang });
 }

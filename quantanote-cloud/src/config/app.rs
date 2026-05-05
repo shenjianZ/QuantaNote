@@ -1,6 +1,6 @@
 use super::{
-    auth::AuthConfig, database::DatabaseConfig, redis::RedisConfig, server::ServerConfig,
-    storage::StorageConfig,
+    auth::AuthConfig, database::DatabaseConfig, email::EmailConfig, redis::RedisConfig,
+    server::ServerConfig, storage::StorageConfig,
 };
 use config::{Config, ConfigError, Environment, File};
 use serde::Deserialize;
@@ -17,6 +17,8 @@ pub struct AppConfig {
     pub redis: RedisConfig,
     #[serde(default)]
     pub storage: StorageConfig,
+    #[serde(default)]
+    pub email: EmailConfig,
 }
 
 impl AppConfig {
@@ -74,7 +76,7 @@ impl AppConfig {
         }
 
         // 添加环境变量源（会覆盖配置文件的值）
-        builder = builder.add_source(Environment::default().separator("_"));
+        builder = builder.add_source(Environment::default().separator("__"));
 
         // 应用 CLI 覆盖（仅 Web 服务器参数）
         if let Some(host) = overrides.host {

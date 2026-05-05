@@ -129,7 +129,7 @@ if computed_hash != record.content_hash {
 
 ### 4. 拉取记录 — `POST /sync/records/pull`
 
-**作用**：向客户端提供最新的完整记录数据。
+**作用**：向客户端提供最新的完整记录数据。 
 
 **流程**：
 ```

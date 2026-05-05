@@ -49,7 +49,7 @@ impl RedisKey {
     }
 
     pub fn build(&self) -> String {
-        format!("{}:{}", self.business.prefix(), self.identifiers.join(":"))
+        format!("qn-cloud:{}:{}", self.business.prefix(), self.identifiers.join(":"))
     }
 }
 

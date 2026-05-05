@@ -56,5 +56,6 @@
     "item_tags": "标签关联",
     "versions": "版本",
     "attachments": "附件"
-  }
+  },
+  "sessionExpired": "登录已过期，请重新登录"
 }

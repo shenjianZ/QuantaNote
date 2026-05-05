@@ -24,7 +24,11 @@ import { Select } from "../common/Select";
 
 type AuthModal = "login" | "register" | "forgot" | "reset" | null;
 
-export function SyncSettingsPanel() {
+interface SyncSettingsPanelProps {
+    showAccount?: boolean;
+}
+
+export function SyncSettingsPanel({ showAccount = true }: SyncSettingsPanelProps) {
     const { t } = useTranslation(["sync", "common"]);
     const {
         config,
@@ -46,7 +50,6 @@ export function SyncSettingsPanel() {
 
     const [authModal, setAuthModal] = useState<AuthModal>(null);
     const [resetEmail, setResetEmail] = useState("");
-    const [resetToken, setResetToken] = useState("");
     const [serverUrlInput, setServerUrlInput] = useState(config.server_url);
     const [testResult, setTestResult] = useState<boolean | null>(null);
     const [isTesting, setIsTesting] = useState(false);
@@ -168,48 +171,50 @@ export function SyncSettingsPanel() {
             </div>
 
             {/* 账号状态 */}
-            <div className="space-y-2">
-                <label className="text-sm font-medium text-[var(--text)]">
-                    {t("account")}
-                </label>
-                {isLoggedIn ? (
-                    <div className="flex items-center justify-between rounded-xl bg-[var(--field)] px-4 py-3">
-                        <div className="flex items-center gap-2">
-                            <Cloud className="h-4 w-4 text-[var(--accent)]" />
-                            <span className="text-sm text-[var(--text)]">
-                                {t("loggedIn")}
-                            </span>
+            {showAccount && (
+                <div className="space-y-2">
+                    <label className="text-sm font-medium text-[var(--text)]">
+                        {t("account")}
+                    </label>
+                    {isLoggedIn ? (
+                        <div className="flex items-center justify-between rounded-xl bg-[var(--field)] px-4 py-3">
+                            <div className="flex items-center gap-2">
+                                <Cloud className="h-4 w-4 text-[var(--accent)]" />
+                                <span className="text-sm text-[var(--text)]">
+                                    {t("loggedIn")}
+                                </span>
+                            </div>
+                            <button
+                                data-testid="sync-logout-btn"
+                                onClick={logout}
+                                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-500/10"
+                            >
+                                <LogOut className="h-3.5 w-3.5" />
+                                {t("logout")}
+                            </button>
                         </div>
-                        <button
-                            data-testid="sync-logout-btn"
-                            onClick={logout}
-                            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-500/10"
-                        >
-                            <LogOut className="h-3.5 w-3.5" />
-                            {t("logout")}
-                        </button>
-                    </div>
-                ) : (
-                    <div className="flex gap-2">
-                        <button
-                            data-testid="sync-login-btn"
-                            onClick={() => setAuthModal("login")}
-                            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white hover:opacity-90"
-                        >
-                            <LogIn className="h-4 w-4" />
-                            {t("login")}
-                        </button>
-                        <button
-                            data-testid="sync-register-btn"
-                            onClick={() => setAuthModal("register")}
-                            className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-[var(--line)] px-4 py-2.5 text-sm text-[var(--text)] hover:bg-[var(--hover)]"
-                        >
-                            <UserPlus className="h-4 w-4" />
-                            {t("register")}
-                        </button>
-                    </div>
-                )}
-            </div>
+                    ) : (
+                        <div className="flex gap-2">
+                            <button
+                                data-testid="sync-login-btn"
+                                onClick={() => setAuthModal("login")}
+                                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white hover:opacity-90"
+                            >
+                                <LogIn className="h-4 w-4" />
+                                {t("login")}
+                            </button>
+                            <button
+                                data-testid="sync-register-btn"
+                                onClick={() => setAuthModal("register")}
+                                className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-[var(--line)] px-4 py-2.5 text-sm text-[var(--text)] hover:bg-[var(--hover)]"
+                            >
+                                <UserPlus className="h-4 w-4" />
+                                {t("register")}
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* 同步策略 */}
             {isLoggedIn && (
@@ -459,9 +464,8 @@ export function SyncSettingsPanel() {
                 open={authModal === "forgot"}
                 onClose={() => setAuthModal(null)}
                 onSwitchToLogin={() => setAuthModal("login")}
-                onSwitchToResetPassword={(email, token) => {
+                onSwitchToResetPassword={(email) => {
                     setResetEmail(email);
-                    setResetToken(token);
                     setAuthModal("reset");
                 }}
             />
@@ -469,7 +473,6 @@ export function SyncSettingsPanel() {
                 open={authModal === "reset"}
                 onClose={() => setAuthModal(null)}
                 email={resetEmail}
-                resetToken={resetToken}
                 onSwitchToLogin={() => setAuthModal("login")}
             />
 

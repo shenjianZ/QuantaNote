@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Mail, Loader2 } from "lucide-react";
+import { Mail, Loader2, KeyRound } from "lucide-react";
 import { Modal } from "../common/Modal";
 import { useSyncStore } from "../../stores/syncStore";
+import { useToastStore } from "../../stores/toastStore";
 
 interface ForgotPasswordModalProps {
     open: boolean;
     onClose: () => void;
     onSwitchToLogin: () => void;
-    onSwitchToResetPassword: (email: string, resetToken: string) => void;
+    onSwitchToResetPassword: (email: string) => void;
 }
 
 export function ForgotPasswordModal({
@@ -18,7 +19,7 @@ export function ForgotPasswordModal({
     onSwitchToResetPassword,
 }: ForgotPasswordModalProps) {
     const { t } = useTranslation(["auth"]);
-    const { config, forgotPassword, isLoading, error, clearError } = useSyncStore();
+    const { config, forgotPassword, isLoading, clearError } = useSyncStore();
     const [email, setEmail] = useState("");
     const [serverUrl, setServerUrl] = useState(config.server_url || "");
     const [sent, setSent] = useState(false);
@@ -28,14 +29,11 @@ export function ForgotPasswordModal({
         if (!email.trim()) return;
 
         try {
-            const resetToken = await forgotPassword(config.server_url || serverUrl, email);
+            await forgotPassword(config.server_url || serverUrl, email);
             setSent(true);
-            // 自动跳转到重置密码页面
-            setTimeout(() => {
-                onSwitchToResetPassword(email, resetToken);
-            }, 1500);
-        } catch {
-            // error is set in store
+            useToastStore.getState().addToast("success", t("forgotPassword.sent"));
+        } catch (err) {
+            useToastStore.getState().addToast("error", String(err));
         }
     }
 
@@ -48,7 +46,7 @@ export function ForgotPasswordModal({
 
     return (
         <Modal open={open} onClose={handleClose} title={t("forgotPassword.title")}>
-            <form onSubmit={handleSubmit} className="space-y-4" data-testid="forgot-password-modal">
+            <form onSubmit={handleSubmit} noValidate className="space-y-4" data-testid="forgot-password-modal">
                 {!config.server_url && (
                     <div>
                         <label className="mb-1 block text-xs text-[var(--muted)]">
@@ -59,7 +57,7 @@ export function ForgotPasswordModal({
                             type="url"
                             value={serverUrl}
                             onChange={(e) => setServerUrl(e.target.value)}
-                            placeholder="https://your-server.com"
+                            placeholder={t("forgotPassword.serverUrlPlaceholder")}
                             className="w-full rounded-xl border border-[var(--line)] bg-[var(--field)] px-4 py-2.5 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
                             required
                         />
@@ -67,11 +65,21 @@ export function ForgotPasswordModal({
                 )}
 
                 {sent ? (
-                    <div data-testid="forgot-success" className="rounded-lg bg-green-500/10 px-4 py-6 text-center">
-                        <Mail className="mx-auto mb-2 h-8 w-8 text-green-400" />
-                        <p className="text-sm text-[var(--text)]">
-                            {t("forgotPassword.sent")}
-                        </p>
+                    <div data-testid="forgot-success" className="space-y-4">
+                        <div className="rounded-lg bg-green-500/10 px-4 py-6 text-center">
+                            <Mail className="mx-auto mb-2 h-8 w-8 text-green-400" />
+                            <p className="text-sm text-[var(--text)]">
+                                {t("forgotPassword.sent")}
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => onSwitchToResetPassword(email)}
+                            className="flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--field)] px-4 py-2.5 text-sm font-medium text-[var(--text)] hover:bg-[var(--hover)]"
+                        >
+                            <KeyRound className="h-4 w-4" />
+                            {t("forgotPassword.enterCode")}
+                        </button>
                     </div>
                 ) : (
                     <>
@@ -87,17 +95,11 @@ export function ForgotPasswordModal({
                                 type="email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                placeholder="your@email.com"
+                                placeholder={t("forgotPassword.emailPlaceholder")}
                                 className="w-full rounded-xl border border-[var(--line)] bg-[var(--field)] px-4 py-2.5 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
                                 required
                             />
                         </div>
-
-                        {error && (
-                            <div data-testid="forgot-error" className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">
-                                {error}
-                            </div>
-                        )}
 
                         <button
                             data-testid="forgot-submit-btn"

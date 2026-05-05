@@ -1,21 +1,24 @@
-import { VDITOR_CDN, VDITOR_LANG } from "./vditorConfig";
+import { VDITOR_CDN, getVditorLang } from "./vditorConfig";
 
 let preloadPromise: Promise<void> | null = null;
 
-const SCRIPT_ASSETS = [
-  {
-    id: `vditorI18nScript${VDITOR_LANG}`,
-    path: `${VDITOR_CDN}/dist/js/i18n/${VDITOR_LANG}.js`,
-  },
-  {
-    id: "vditorLuteScript",
-    path: `${VDITOR_CDN}/dist/js/lute/lute.min.js`,
-  },
-  {
-    id: "vditorIconScript",
-    path: `${VDITOR_CDN}/dist/js/icons/ant.js`,
-  },
-];
+function getScriptAssets() {
+  const lang = getVditorLang();
+  return [
+    {
+      id: `vditorI18nScript${lang}`,
+      path: `${VDITOR_CDN}/dist/js/i18n/${lang}.js`,
+    },
+    {
+      id: "vditorLuteScript",
+      path: `${VDITOR_CDN}/dist/js/lute/lute.min.js`,
+    },
+    {
+      id: "vditorIconScript",
+      path: `${VDITOR_CDN}/dist/js/icons/ant.js`,
+    },
+  ];
+}
 
 const HINT_ASSETS = [
   `${VDITOR_CDN}/dist/css/content-theme/dark.css`,
@@ -68,9 +71,11 @@ export function preloadVditorResources() {
     });
   };
 
+  const scriptAssets = getScriptAssets();
+
   preloadPromise = Promise.all([
     import("../components/editor/VditorEditor"),
-    ...SCRIPT_ASSETS.map((asset) => loadScript(asset.path, asset.id)),
+    ...scriptAssets.map((asset) => loadScript(asset.path, asset.id)),
   ])
     .then(() => {
       if ("requestIdleCallback" in window) {

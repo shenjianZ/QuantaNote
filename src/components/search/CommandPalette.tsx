@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { FileText, Loader2, Search } from "lucide-react";
 import { Kbd } from "../common/Kbd";
 import { useSearchStore } from "../../stores/searchStore";
@@ -29,6 +30,7 @@ export function CommandPalette({
   onSelectItem,
   items,
 }: CommandPaletteProps) {
+  const { t } = useTranslation(["command-palette"]);
   const query = useSearchStore((s) => s.query);
   const results = useSearchStore((s) => s.results);
   const searching = useSearchStore((s) => s.searching);
@@ -118,7 +120,7 @@ export function CommandPalette({
         role="combobox"
         aria-expanded={true}
         aria-haspopup="listbox"
-        aria-label="搜索笔记"
+        aria-label={t("command-palette:searchLabel")}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--line)] px-4">
@@ -130,7 +132,7 @@ export function CommandPalette({
           <input
             ref={inputRef}
             className="min-w-0 flex-1 bg-transparent text-base text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
-            placeholder="搜索笔记"
+            placeholder={t("command-palette:searchPlaceholder")}
             data-testid="palette-search-input"
             role="combobox"
             aria-autocomplete="list"
@@ -147,7 +149,7 @@ export function CommandPalette({
         <div className="min-h-0 overflow-auto p-2" id="palette-results" role="listbox">
           {effectiveResults.length === 0 ? (
             <div className="px-4 py-10 text-center text-sm text-[var(--muted)]">
-              {query.trim() ? "没有匹配的笔记" : "输入关键词搜索笔记"}
+              {query.trim() ? t("command-palette:noResults") : t("command-palette:hint")}
             </div>
           ) : (
             effectiveResults.map((item, index) => (

@@ -1,7 +1,8 @@
 import { memo, useEffect, useState } from "react";
-import { CheckCircle2, Database, Wifi, WifiOff } from "lucide-react";
+import { CheckCircle2, CloudOff, Database, Loader2, Wifi, WifiOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { AppPage } from "../../types";
+import { useSyncStore } from "../../stores/syncStore";
 
 interface StatusBarProps {
   currentPage: AppPage;
@@ -9,9 +10,17 @@ interface StatusBarProps {
 }
 
 export const StatusBar = memo(function StatusBar({ currentPage, itemCount }: StatusBarProps) {
-  const { t } = useTranslation(["statusbar", "common"]);
+  const { t } = useTranslation(["statusbar", "common", "sync"]);
   const [time, setTime] = useState(() => formatTime());
   const [online, setOnline] = useState(() => navigator.onLine);
+  const { config, state } = useSyncStore();
+
+  const syncActive = config.enabled && Boolean(config.access_token);
+  const isSyncing =
+    state.status === "preparing" ||
+    state.status === "pushing" ||
+    state.status === "pulling" ||
+    state.status === "syncing_attachments";
 
   const PAGE_NAMES: Record<string, string> = {
     workspace: t("statusbar:workspace"),
@@ -61,7 +70,30 @@ export const StatusBar = memo(function StatusBar({ currentPage, itemCount }: Sta
           )}
         </span>
         <span>·</span>
-        <span>{t("common:status.localMode")}</span>
+        <span className="inline-flex items-center gap-1">
+          {syncActive ? (
+            isSyncing ? (
+              <>
+                <Loader2 className="h-3 w-3 animate-spin text-blue-400" />
+                {t("sync:syncing")}
+              </>
+            ) : state.status === "error" ? (
+              <>
+                <CloudOff className="h-3 w-3 text-red-400" />
+                {t("sync:syncError")}
+              </>
+            ) : state.last_sync_at ? (
+              <>
+                <CheckCircle2 className="h-3 w-3 text-green-500" />
+                {t("sync:lastSync", { time: new Date(state.last_sync_at).toLocaleTimeString() })}
+              </>
+            ) : (
+              t("sync:idle")
+            )
+          ) : (
+            t("common:status.localMode")
+          )}
+        </span>
       </div>
     </footer>
   );

@@ -8,7 +8,7 @@ mod sync;
 mod utils;
 
 use commands::{
-    attachment, auto_backup, data_io, diagnostics, item, search, settings, tag, version,
+    attachment, auto_backup, data_io, diagnostics, item, search, settings, tag, user, version,
 };
 use db::DbState;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -271,6 +271,12 @@ pub fn run() {
             commands::sync::get_pending_conflicts,
             commands::sync::resolve_sync_conflicts,
             commands::sync::cancel_sync_conflicts,
+            commands::sync::send_verify_code,
+            user::get_user_profile,
+            user::update_user_profile,
+            user::change_password,
+            user::upload_avatar,
+            user::delete_account,
             update_window_behavior,
         ])
         .run(tauri::generate_context!())

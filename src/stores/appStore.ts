@@ -4,6 +4,7 @@ import type { AppPage } from "../types";
 import type { ThemeMode } from "../hooks/useTheme";
 import { loadAllSettings, saveSettings } from "../services/tauriCommands";
 import { useToastStore } from "./toastStore";
+import i18n from "../i18n";
 
 function getAppWindow() {
   try {
@@ -19,6 +20,7 @@ interface AppState {
   selectedItemId: string | null;
   theme: ThemeMode;
   alwaysOnTop: boolean;
+  settingsSection: number | null;
   init: () => Promise<void>;
   navigate: (page: AppPage) => void;
   openPalette: () => void;
@@ -26,6 +28,7 @@ interface AppState {
   selectItem: (id: string) => void;
   setTheme: (theme: ThemeMode) => void;
   setAlwaysOnTop: (value: boolean) => Promise<void>;
+  setSettingsSection: (section: number | null) => void;
 }
 
 function applyThemeAttr(theme: ThemeMode) {
@@ -41,6 +44,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedItemId: null,
   theme: "system",
   alwaysOnTop: false,
+  settingsSection: null,
 
   init: async () => {
     try {
@@ -90,7 +94,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   navigate: (page) => {
-    set({ currentPage: page });
+    const patch: Partial<AppState> = { currentPage: page };
+    if (page !== "settings") {
+      patch.settingsSection = null;
+    }
+    set(patch);
     saveSettings({ currentPage: page }).catch(() => {});
   },
   openPalette: () => set({ paletteOpen: true }),
@@ -115,7 +123,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ alwaysOnTop: actual });
       saveSettings({ alwaysOnTop: String(actual) }).catch(() => {});
       if (actual !== value) {
-        useToastStore.getState().addToast("error", "窗口置顶状态与系统返回不一致");
+        useToastStore.getState().addToast("error", i18n.t("common:toast.alwaysOnTopMismatch"));
       }
     } catch {
       let actual = previous;
@@ -126,7 +134,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       set({ alwaysOnTop: actual });
       saveSettings({ alwaysOnTop: String(actual) }).catch(() => {});
-      useToastStore.getState().addToast("error", "设置窗口置顶失败");
+      useToastStore.getState().addToast("error", i18n.t("common:toast.alwaysOnTopFailed"));
     }
   },
+  setSettingsSection: (section) => set({ settingsSection: section }),
 }));

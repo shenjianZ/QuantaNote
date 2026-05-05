@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Modal } from "./Modal";
 import { MarkdownRenderer } from "./MarkdownRenderer";
+import { getVditorLang } from "../../utils/vditorConfig";
 import type { VersionDto } from "../../types";
 
 interface VersionPreviewModalProps {
@@ -42,7 +43,7 @@ export function VersionPreviewModal({ open, version, onClose, onRestore, theme }
         <p className="mb-3 text-sm text-[var(--muted)]">{version.description}</p>
       )}
       <div className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4">
-        <MarkdownRenderer content={version.content} theme={theme} />
+        <MarkdownRenderer content={version.content} theme={theme} lang={getVditorLang()} />
       </div>
       <div className="mt-4 flex justify-end gap-2">
         <button

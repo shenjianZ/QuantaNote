@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { LogIn, Loader2 } from "lucide-react";
 import { Modal } from "../common/Modal";
 import { useSyncStore } from "../../stores/syncStore";
+import { useToastStore } from "../../stores/toastStore";
 
 interface LoginModalProps {
     open: boolean;
@@ -18,7 +19,7 @@ export function LoginModal({
     onSwitchToForgotPassword,
 }: LoginModalProps) {
     const { t } = useTranslation(["auth"]);
-    const { config, login, isLoading, error, clearError } = useSyncStore();
+    const { config, login, isLoading, clearError } = useSyncStore();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
 
@@ -27,9 +28,10 @@ export function LoginModal({
         if (!email.trim() || !password.trim()) return;
         try {
             await login(config.server_url || serverUrl, email, password);
+            useToastStore.getState().addToast("success", t("login.success"));
             onClose();
-        } catch {
-            // error is set in store
+        } catch (err) {
+            useToastStore.getState().addToast("error", String(err));
         }
     }
 
@@ -44,7 +46,7 @@ export function LoginModal({
 
     return (
         <Modal open={open} onClose={handleClose} title={t("login.title")}>
-            <form onSubmit={handleSubmit} className="space-y-4" data-testid="login-modal">
+            <form onSubmit={handleSubmit} noValidate className="space-y-4" data-testid="login-modal">
                 {!config.server_url && (
                     <div>
                         <label className="mb-1 block text-xs text-[var(--muted)]">
@@ -55,7 +57,7 @@ export function LoginModal({
                             type="url"
                             value={serverUrl}
                             onChange={(e) => setServerUrl(e.target.value)}
-                            placeholder="https://your-server.com"
+                            placeholder={t("login.serverUrlPlaceholder")}
                             className="w-full rounded-xl border border-[var(--line)] bg-[var(--field)] px-4 py-2.5 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
                             required
                         />
@@ -70,7 +72,7 @@ export function LoginModal({
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        placeholder="your@email.com"
+                        placeholder={t("login.emailPlaceholder")}
                         className="w-full rounded-xl border border-[var(--line)] bg-[var(--field)] px-4 py-2.5 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
                         required
                     />
@@ -89,12 +91,6 @@ export function LoginModal({
                         required
                     />
                 </div>
-
-                {error && (
-                    <div data-testid="login-error" className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">
-                        {error}
-                    </div>
-                )}
 
                 <button
                     data-testid="login-submit-btn"

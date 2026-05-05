@@ -1,6 +1,8 @@
+import i18n from "../i18n";
+
 export function deriveRecordTitle(content: string): string {
     const text = content.trim();
-    if (!text) return "未命名笔记";
+    if (!text) return i18n.t("common:emptyItem.untitled");
 
     const headings = new Map<number, string>();
     for (const line of text.split(/\r?\n/)) {

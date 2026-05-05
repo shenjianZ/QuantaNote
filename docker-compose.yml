@@ -1,0 +1,110 @@
+services:
+  # ===== QuantaNote Cloud Server =====
+  quantanote-cloud:
+    image: ${QT_REGISTRY:-quantanote-cloud}
+    build:
+      context: ./quantanote-cloud
+      dockerfile: Dockerfile
+    ports:
+      - "${SERVER__PORT:-3000}:3000"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - cloud-data:/app/data
+      - cloud-sync:/app/sync_data
+    environment:
+      # ── 运行环境 ──
+      ENV: ${ENV:-production}
+
+      # ── 服务器 ──
+      SERVER__HOST: "0.0.0.0"
+      SERVER__PORT: ${SERVER__PORT:-3000}
+
+      # ── 数据库（PostgreSQL）──
+      DATABASE__DATABASE_TYPE: ${DATABASE__DATABASE_TYPE:-postgresql}
+      DATABASE__HOST: ${DATABASE__HOST:-postgres}
+      DATABASE__PORT: ${DATABASE__PORT:-5432}
+      DATABASE__USER: ${DATABASE__USER:-quantanote}
+      DATABASE__PASSWORD: ${DATABASE__PASSWORD:?请设置 DATABASE__PASSWORD}
+      DATABASE__DATABASE: ${DATABASE__DATABASE:-quantanote}
+      DATABASE__MAX_CONNECTIONS: ${DATABASE__MAX_CONNECTIONS:-20}
+
+      # ── 认证 ──
+      AUTH__JWT_SECRET: ${AUTH__JWT_SECRET:?请设置 AUTH__JWT_SECRET}
+      AUTH__ACCESS_TOKEN_EXPIRATION_MINUTES: ${AUTH__ACCESS_TOKEN_EXPIRATION_MINUTES:-15}
+      AUTH__REFRESH_TOKEN_EXPIRATION_DAYS: ${AUTH__REFRESH_TOKEN_EXPIRATION_DAYS:-7}
+
+      # ── Redis ──
+      REDIS__HOST: ${REDIS__HOST:-redis}
+      REDIS__PORT: ${REDIS__PORT:-6379}
+      REDIS__PASSWORD: ${REDIS__PASSWORD:-}
+      REDIS__DB: ${REDIS__DB:-0}
+
+      # ── 存储 ──
+      STORAGE__BACKEND_TYPE: ${STORAGE__BACKEND_TYPE:-local}
+      STORAGE__BASE_PATH: ${STORAGE__BASE_PATH:-/app/sync_data}
+      # S3 / MinIO（取消注释以启用）
+      # STORAGE__BUCKET: quantanote-sync
+      # STORAGE__ENDPOINT: http://minio:9000
+      # STORAGE__REGION: us-east-1
+      # STORAGE__ACCESS_KEY: minioadmin
+      # STORAGE__SECRET_KEY: minioadmin
+      # WebDAV（取消注释以启用）
+      # STORAGE__WEBDAV_URL: https://your-webdav.example.com/dav/QuantaNote
+      # STORAGE__WEBDAV_USERNAME: username
+      # STORAGE__WEBDAV_PASSWORD: password
+
+      # ── 邮件 ──
+      EMAIL__ENABLED: ${EMAIL__ENABLED:-false}
+      # EMAIL__SMTP_HOST: smtp.example.com
+      # EMAIL__SMTP_PORT: 465
+      # EMAIL__SMTP_USERNAME: ""
+      # EMAIL__SMTP_PASSWORD: ""
+      # EMAIL__FROM_NAME: QuantaNote
+      # EMAIL__FROM_EMAIL: noreply@example.com
+
+  # ===== PostgreSQL =====
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DATABASE__USER:-quantanote}
+      POSTGRES_PASSWORD: ${DATABASE__PASSWORD:?请设置 DATABASE__PASSWORD}
+      POSTGRES_DB: ${DATABASE__DATABASE:-quantanote}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE__USER:-quantanote}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    ports:
+      - "${DATABASE_EXPOSE_PORT:-5432}:5432"
+
+  # ===== Redis =====
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: >
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    ports:
+      - "${REDIS_EXPOSE_PORT:-6379}:6379"
+
+volumes:
+  postgres-data:
+  redis-data:
+  cloud-data:
+  cloud-sync:

@@ -23,6 +23,7 @@ import {
     type ConflictResolutionChoice,
 } from "../services/tauriCommands";
 import { useItemStore } from "./itemStore";
+import i18n from "../i18n";
 import { useTagStore } from "./tagStore";
 
 let _autoSyncTimer: ReturnType<typeof setInterval> | null = null;
@@ -59,9 +60,9 @@ interface SyncStore {
 
     // 认证
     login: (serverUrl: string, email: string, password: string) => Promise<void>;
-    register: (serverUrl: string, email: string, password: string) => Promise<void>;
+    register: (serverUrl: string, email: string, password: string, verifyCode?: string) => Promise<void>;
     logout: () => Promise<void>;
-    forgotPassword: (serverUrl: string, email: string) => Promise<string>;
+    forgotPassword: (serverUrl: string, email: string) => Promise<string | null>;
     resetPassword: (serverUrl: string, email: string, resetToken: string, newPassword: string) => Promise<void>;
 
     // 同步操作
@@ -136,12 +137,12 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
                     try {
                         await get().triggerSync();
                     } catch (e) {
-                        console.warn("自动同步失败:", e);
+                        console.warn("Auto sync failed:", e);
                     }
                 });
             }
         } catch (e) {
-            console.error("初始化同步配置失败:", e);
+            console.error("Init sync config failed:", e);
         }
     },
 
@@ -157,10 +158,10 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
         }
     },
 
-    register: async (serverUrl, email, password) => {
+    register: async (serverUrl, email, password, verifyCode) => {
         set({ isLoading: true, error: null });
         try {
-            await syncRegister(serverUrl, email, password);
+            await syncRegister(serverUrl, email, password, verifyCode);
             const config = await getSyncConfig();
             set({ config, isLoading: false });
         } catch (e) {
@@ -185,7 +186,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     forgotPassword: async (serverUrl, email) => {
         set({ isLoading: true, error: null });
         try {
-            const resetToken = await syncForgotPassword(serverUrl, email);
+            const resetToken = await syncForgotPassword(serverUrl, email, i18n.language);
             set({ isLoading: false });
             return resetToken;
         } catch (e) {
@@ -235,7 +236,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
             if (msg.includes("TokenExpired") || msg.includes("登录已过期")) {
                 stopAutoSync();
                 await get().logout();
-                set({ isLoading: false, error: "登录已过期，请重新登录" });
+                set({ isLoading: false, error: i18n.t("sync:sessionExpired") });
                 return {} as SyncResult;
             }
             set({ isLoading: false, error: msg });
@@ -263,7 +264,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
                 historyPageSize: result.page_size,
             });
         } catch (e) {
-            console.error("获取同步历史失败:", e);
+            console.error("Fetch sync history failed:", e);
         }
     },
 
@@ -314,7 +315,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
                 try {
                     await get().triggerSync();
                 } catch (e) {
-                    console.warn("自动同步失败:", e);
+                    console.warn("Auto sync failed:", e);
                 }
             });
         } else {

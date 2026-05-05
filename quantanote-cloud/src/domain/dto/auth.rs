@@ -1,6 +1,24 @@
 use serde::Deserialize;
 use std::fmt;
 
+/// 发送验证码请求
+#[derive(Deserialize)]
+pub struct SendVerifyCodeRequest {
+    pub email: String,
+    #[serde(default = "default_lang")]
+    pub lang: String,
+}
+
+impl fmt::Debug for SendVerifyCodeRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SendVerifyCodeRequest {{ email: {} }}", self.email)
+    }
+}
+
+fn default_lang() -> String {
+    "zh-CN".to_string()
+}
+
 /// 注册请求
 #[derive(Deserialize)]
 pub struct RegisterRequest {
@@ -8,6 +26,8 @@ pub struct RegisterRequest {
     pub password: String,
     #[serde(default = "default_device_id")]
     pub device_id: String,
+    /// 邮件验证码（当邮件服务启用时必填）
+    pub verify_code: Option<String>,
 }
 
 // 实现 Debug trait，对密码进行脱敏
@@ -48,8 +68,9 @@ fn default_device_id() -> String {
 /// 删除用户请求
 #[derive(Deserialize)]
 pub struct DeleteUserRequest {
+    #[serde(default)]
     pub user_id: String,
-    pub password: String,
+    pub password: Option<String>,
 }
 
 // 实现 Debug trait
@@ -80,6 +101,8 @@ impl fmt::Debug for RefreshRequest {
 #[derive(Deserialize)]
 pub struct ForgotPasswordRequest {
     pub email: String,
+    #[serde(default = "default_lang")]
+    pub lang: String,
 }
 
 impl fmt::Debug for ForgotPasswordRequest {

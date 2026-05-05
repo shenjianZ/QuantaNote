@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { getAllTags, createTag as createTagCmd, deleteTag as deleteTagCmd, getItemTags, setItemTags, renameTag as renameTagCmd, updateTagColor as updateTagColorCmd } from "../services/tauriCommands";
 import { useToastStore } from "./toastStore";
+import i18n from "../i18n";
 
 export interface TagDto {
   name: string;
@@ -43,10 +44,10 @@ export const useTagStore = create<TagState>((set, get) => ({
     try {
       const newTag = await createTagCmd(name, color);
       set({ tags: [...get().tags, newTag] });
-      useToastStore.getState().addToast("success", "标签已创建");
+      useToastStore.getState().addToast("success", i18n.t("common:toast.tagCreated"));
     } catch (e) {
       set({ error: String(e) });
-      useToastStore.getState().addToast("error", "创建标签失败");
+      useToastStore.getState().addToast("error", i18n.t("common:toast.tagCreateFailed"));
     }
   },
 
@@ -57,10 +58,10 @@ export const useTagStore = create<TagState>((set, get) => ({
         tags: get().tags.filter((t) => t.name !== name),
         itemTags: get().itemTags.filter((t) => t.name !== name),
       });
-      useToastStore.getState().addToast("success", "标签已删除");
+      useToastStore.getState().addToast("success", i18n.t("common:toast.tagDeleted"));
     } catch (e) {
       set({ error: String(e) });
-      useToastStore.getState().addToast("error", "删除标签失败");
+      useToastStore.getState().addToast("error", i18n.t("common:toast.tagDeleteFailed"));
     }
   },
 
@@ -81,7 +82,7 @@ export const useTagStore = create<TagState>((set, get) => ({
       set({ itemTags });
     } catch (e) {
       set({ error: String(e) });
-      useToastStore.getState().addToast("error", "更新标签失败");
+      useToastStore.getState().addToast("error", i18n.t("common:toast.tagUpdateFailed"));
     }
   },
 
@@ -94,7 +95,7 @@ export const useTagStore = create<TagState>((set, get) => ({
       });
     } catch (e) {
       set({ error: String(e) });
-      useToastStore.getState().addToast("error", "重命名标签失败");
+      useToastStore.getState().addToast("error", i18n.t("common:toast.tagRenameFailed"));
     }
   },
 
@@ -107,7 +108,7 @@ export const useTagStore = create<TagState>((set, get) => ({
       });
     } catch (e) {
       set({ error: String(e) });
-      useToastStore.getState().addToast("error", "更新标签颜色失败");
+      useToastStore.getState().addToast("error", i18n.t("common:toast.tagColorFailed"));
     }
   },
 }));

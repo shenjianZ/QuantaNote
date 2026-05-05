@@ -13,6 +13,7 @@ import zhModals from "./locales/zh-CN/modals.json";
 import zhSync from "./locales/zh-CN/sync.json";
 import zhAuth from "./locales/zh-CN/auth.json";
 import zhEditor from "./locales/zh-CN/editor.json";
+import zhProfile from "./locales/zh-CN/profile.json";
 
 import enCommon from "./locales/en/common.json";
 import enWorkspace from "./locales/en/workspace.json";
@@ -26,6 +27,7 @@ import enModals from "./locales/en/modals.json";
 import enSync from "./locales/en/sync.json";
 import enAuth from "./locales/en/auth.json";
 import enEditor from "./locales/en/editor.json";
+import enProfile from "./locales/en/profile.json";
 
 const resources = {
   "zh-CN": {
@@ -41,6 +43,7 @@ const resources = {
     sync: zhSync,
     auth: zhAuth,
     editor: zhEditor,
+    profile: zhProfile,
   },
   en: {
     common: enCommon,
@@ -55,6 +58,7 @@ const resources = {
     sync: enSync,
     auth: enAuth,
     editor: enEditor,
+    profile: enProfile,
   },
 };
 
@@ -75,6 +79,7 @@ i18n.use(initReactI18next).init({
     "sync",
     "auth",
     "editor",
+    "profile",
   ],
   defaultNS: "common",
   interpolation: {

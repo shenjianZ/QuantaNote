@@ -264,7 +264,7 @@ interface SettingsState {
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
     settings: loadSettings(),
-    dbSize: "计算中...",
+    dbSize: i18n.t("common:status.calculating"),
     dbPath: "",
     exportSizeEstimate: null,
     autoBackupConfig: null,
@@ -424,7 +424,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             const size = await invoke<string>("get_db_size");
             set({ dbSize: size });
         } catch {
-            set({ dbSize: "未知" });
+            set({ dbSize: i18n.t("common:status.unknown") });
         }
     },
 
@@ -433,7 +433,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             const path = await getDbPath();
             set({ dbPath: path });
         } catch {
-            set({ dbPath: "未知" });
+            set({ dbPath: i18n.t("common:status.unknown") });
         }
     },
 

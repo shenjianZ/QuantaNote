@@ -1,6 +1,6 @@
 use crate::domain::dto::auth::{
     DeleteUserRequest, ForgotPasswordRequest, LoginRequest, RefreshRequest, RegisterRequest,
-    ResetPasswordRequest,
+    ResetPasswordRequest, SendVerifyCodeRequest,
 };
 use crate::domain::vo::auth::{
     ForgotPasswordResult, LoginResult, RefreshResult, RegisterResult, ResetPasswordResult,
@@ -10,6 +10,7 @@ use crate::error::ErrorResponse;
 use crate::infra::middleware::logging::{log_info, RequestId};
 use crate::repositories::user_repository::UserRepository;
 use crate::services::auth_service::AuthService;
+use crate::services::email_service::EmailService;
 use crate::utils::jwt::TokenService;
 use crate::AppState;
 use axum::{
@@ -31,6 +32,7 @@ pub async fn register(
         user_repo,
         state.redis_client.clone(),
         state.config.auth.clone(),
+        state.config.email.clone(),
     );
 
     match service.register(payload).await {
@@ -60,6 +62,7 @@ pub async fn login(
         user_repo,
         state.redis_client.clone(),
         state.config.auth.clone(),
+        state.config.email.clone(),
     );
 
     match service.login(payload).await {
@@ -97,6 +100,7 @@ pub async fn refresh(
         user_repo,
         state.redis_client.clone(),
         state.config.auth.clone(),
+        state.config.email.clone(),
     );
 
     match service.refresh_access_token(&payload.refresh_token).await {
@@ -127,10 +131,12 @@ pub async fn delete_account(
     log_info(&request_id, "删除账号请求", &format!("user_id={}", user_id));
 
     let user_repo = UserRepository::new(state.pool.clone());
+    let sync_repo = crate::repositories::sync_repository::SyncRepository::new(state.pool.clone());
     let service = AuthService::new(
         user_repo,
         state.redis_client.clone(),
         state.config.auth.clone(),
+        state.config.email.clone(),
     );
 
     let delete_request = DeleteUserRequest {
@@ -138,7 +144,25 @@ pub async fn delete_account(
         password: payload.password,
     };
 
-    match service.delete_user(delete_request).await {
+    // 先验证用户存在且密码正确
+    service.validate_delete_user(&delete_request).await.map_err(|e| {
+        log_info(&request_id, "账号删除验证失败", &e.to_string());
+        ErrorResponse::new(e.to_string())
+    })?;
+
+    // 先清理关联的同步数据（必须在删除用户之前，因为有外键约束）
+    if let Err(e) = sync_repo.delete_user_records(&user_id).await {
+        log_info(&request_id, "清理同步记录失败", &e.to_string());
+    }
+    if let Err(e) = sync_repo.delete_user_attachments(&user_id).await {
+        log_info(&request_id, "清理同步附件失败", &e.to_string());
+    }
+    if let Err(e) = sync_repo.delete_all_snapshots(&user_id).await {
+        log_info(&request_id, "清理同步快照失败", &e.to_string());
+    }
+
+    // 最后删除用户
+    match service.delete_user(&user_id).await {
         Ok(_) => {
             log_info(&request_id, "账号删除成功", &format!("user_id={}", user_id));
             let response = ApiResponse::success_with_message((), "账号删除成功");
@@ -173,6 +197,7 @@ pub async fn delete_refresh_token(
         user_repo,
         state.redis_client.clone(),
         state.config.auth.clone(),
+        state.config.email.clone(),
     );
 
     match service.delete_refresh_token(&user_id, &device_id).await {
@@ -205,13 +230,14 @@ pub async fn forgot_password(
         user_repo,
         state.redis_client.clone(),
         state.config.auth.clone(),
+        state.config.email.clone(),
     );
 
     match service.forgot_password(payload).await {
         Ok(reset_token) => {
             log_info(&request_id, "重置令牌生成成功", &"");
             let response = ApiResponse::success(ForgotPasswordResult {
-                message: "重置令牌已生成".to_string(),
+                message: "重置码已发送".to_string(),
                 reset_token,
             });
             Ok(Json(response))
@@ -236,6 +262,7 @@ pub async fn reset_password(
         user_repo,
         state.redis_client.clone(),
         state.config.auth.clone(),
+        state.config.email.clone(),
     );
 
     match service.reset_password(payload).await {
@@ -248,6 +275,29 @@ pub async fn reset_password(
         }
         Err(e) => {
             log_info(&request_id, "密码重置失败", &e.to_string());
+            Err(ErrorResponse::new(e.to_string()))
+        }
+    }
+}
+
+/// 发送注册验证码
+pub async fn send_verify_code(
+    Extension(request_id): Extension<RequestId>,
+    State(state): State<AppState>,
+    Json(payload): Json<SendVerifyCodeRequest>,
+) -> Result<Json<ApiResponse<()>>, ErrorResponse> {
+    log_info(&request_id, "发送验证码请求", &payload);
+
+    let email_service = EmailService::new(state.redis_client.clone(), state.config.email.clone());
+
+    match email_service.send_verification_code(&payload.email, &payload.lang).await {
+        Ok(_) => {
+            log_info(&request_id, "验证码发送成功", &format!("email={}", payload.email));
+            let response = ApiResponse::success_with_message((), "验证码已发送");
+            Ok(Json(response))
+        }
+        Err(e) => {
+            log_info(&request_id, "验证码发送失败", &e.to_string());
             Err(ErrorResponse::new(e.to_string()))
         }
     }

@@ -3,12 +3,12 @@ import { useTranslation } from "react-i18next";
 import { KeyRound, Loader2, CheckCircle } from "lucide-react";
 import { Modal } from "../common/Modal";
 import { useSyncStore } from "../../stores/syncStore";
+import { useToastStore } from "../../stores/toastStore";
 
 interface ResetPasswordModalProps {
     open: boolean;
     onClose: () => void;
     email: string;
-    resetToken: string;
     onSwitchToLogin: () => void;
 }
 
@@ -16,28 +16,25 @@ export function ResetPasswordModal({
     open,
     onClose,
     email,
-    resetToken: initialToken,
     onSwitchToLogin,
 }: ResetPasswordModalProps) {
     const { t } = useTranslation(["auth"]);
-    const { config, resetPassword, isLoading, error, clearError } = useSyncStore();
-    const [resetToken, setResetToken] = useState(initialToken);
+    const { config, resetPassword, isLoading, clearError } = useSyncStore();
+    const [resetToken, setResetToken] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
-    const [localError, setLocalError] = useState("");
     const [success, setSuccess] = useState(false);
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
-        setLocalError("");
 
         if (!resetToken.trim() || !newPassword.trim()) return;
         if (newPassword !== confirmPassword) {
-            setLocalError(t("resetPassword.passwordMismatch"));
+            useToastStore.getState().addToast("error", t("resetPassword.passwordMismatch"));
             return;
         }
         if (newPassword.length < 6) {
-            setLocalError(t("resetPassword.passwordTooShort"));
+            useToastStore.getState().addToast("error", t("resetPassword.passwordTooShort"));
             return;
         }
 
@@ -49,17 +46,17 @@ export function ResetPasswordModal({
                 newPassword,
             );
             setSuccess(true);
+            useToastStore.getState().addToast("success", t("resetPassword.success"));
             setTimeout(() => {
                 onSwitchToLogin();
             }, 1500);
-        } catch {
-            // error is set in store
+        } catch (err) {
+            useToastStore.getState().addToast("error", String(err));
         }
     }
 
     function handleClose() {
         clearError();
-        setLocalError("");
         setResetToken("");
         setNewPassword("");
         setConfirmPassword("");
@@ -67,11 +64,9 @@ export function ResetPasswordModal({
         onClose();
     }
 
-    const displayError = localError || error;
-
     return (
         <Modal open={open} onClose={handleClose} title={t("resetPassword.title")}>
-            <form onSubmit={handleSubmit} className="space-y-4" data-testid="reset-password-modal">
+            <form onSubmit={handleSubmit} noValidate className="space-y-4" data-testid="reset-password-modal">
                 {success ? (
                     <div data-testid="reset-success" className="rounded-lg bg-green-500/10 px-4 py-6 text-center">
                         <CheckCircle className="mx-auto mb-2 h-8 w-8 text-green-400" />
@@ -133,12 +128,6 @@ export function ResetPasswordModal({
                                 required
                             />
                         </div>
-
-                        {displayError && (
-                            <div data-testid="reset-error" className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">
-                                {displayError}
-                            </div>
-                        )}
 
                         <button
                             data-testid="reset-submit-btn"

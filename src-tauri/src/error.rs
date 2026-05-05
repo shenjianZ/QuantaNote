@@ -10,7 +10,7 @@ pub enum AppError {
     Validation(String),
     #[error("IO 错误: {0}")]
     Io(String),
-    #[error("同步错误: {0}")]
+    #[error("{0}")]
     SyncError(String),
     #[error("登录已过期，请重新登录")]
     TokenExpired,

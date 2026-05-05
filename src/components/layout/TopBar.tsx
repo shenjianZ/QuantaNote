@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { Archive, Copy, Home, Minus, MoreHorizontal, Pin, Search, Settings, Square, X } from "lucide-react";
+import { Archive, Copy, Home, Minus, MoreHorizontal, Pin, Search, Settings, Square, User, X } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useTranslation } from "react-i18next";
 import type { AppPage } from "../../types";
 import { Kbd } from "../common/Kbd";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useAppStore } from "../../stores/appStore";
+import { useSyncStore } from "../../stores/syncStore";
+import { useToastStore } from "../../stores/toastStore";
+import i18n from "../../i18n";
 import { SyncStatusIndicator } from "../sync/SyncStatusIndicator";
 
 const appWindow = getCurrentWindow();
@@ -21,6 +24,9 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
   const settings = useSettingsStore((s) => s.settings);
   const alwaysOnTop = useAppStore((s) => s.alwaysOnTop);
   const setAlwaysOnTop = useAppStore((s) => s.setAlwaysOnTop);
+  const setSettingsSection = useAppStore((s) => s.setSettingsSection);
+  const syncConfig = useSyncStore((s) => s.config);
+  const isLoggedIn = Boolean(syncConfig.access_token && syncConfig.user_id);
   const [menuOpen, setMenuOpen] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -77,6 +83,19 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
   function navigateAndClose(page: AppPage) {
     setMenuOpen(false);
     onNavigate(page);
+  }
+
+  function handleAccountClick() {
+    setMenuOpen(false);
+    if (isLoggedIn) {
+      onNavigate("profile");
+    } else if (!syncConfig.server_url) {
+      setSettingsSection(3);
+      useToastStore.getState().addToast("info", i18n.t("topbar:accountServerUrlRequired"));
+      onNavigate("settings");
+    } else {
+      onNavigate("profile");
+    }
   }
 
   return (
@@ -159,6 +178,16 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
             >
               <Settings className="h-4 w-4" />
               {t("topbar:settings")}
+            </button>
+            <div className="my-1 h-px bg-[var(--line)]" />
+            <button
+              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-[var(--text)] hover:bg-[var(--hover)]"
+              type="button"
+              role="menuitem"
+              onClick={handleAccountClick}
+            >
+              <User className="h-4 w-4" />
+              {t("topbar:account")}
             </button>
           </div>
         )}

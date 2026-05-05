@@ -6,6 +6,7 @@ import {
   Image,
   Link,
 } from "lucide-react";
+import i18n from "../i18n";
 import type { Item, ItemType, Tag } from "../types";
 import type { ItemDto } from "../stores/itemStore";
 
@@ -34,13 +35,16 @@ function formatRelativeTime(isoDate: string): string {
     const diffMs = now.getTime() - date.getTime();
     const diffMin = Math.floor(diffMs / 60000);
 
-    if (diffMin < 1) return "刚刚";
-    if (diffMin < 60) return `${diffMin} 分钟前`;
+    if (diffMin < 1) return i18n.t("common:relativeTime.justNow");
+    if (diffMin < 60)
+      return i18n.t("common:relativeTime.minutesAgo", { count: diffMin });
     const diffHour = Math.floor(diffMin / 60);
-    if (diffHour < 24) return `${diffHour} 小时前`;
+    if (diffHour < 24)
+      return i18n.t("common:relativeTime.hoursAgo", { count: diffHour });
     const diffDay = Math.floor(diffHour / 24);
-    if (diffDay < 30) return `${diffDay} 天前`;
-    return date.toLocaleDateString("zh-CN");
+    if (diffDay < 30)
+      return i18n.t("common:relativeTime.daysAgo", { count: diffDay });
+    return date.toLocaleDateString(i18n.language);
   } catch {
     return isoDate;
   }

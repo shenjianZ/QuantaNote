@@ -92,4 +92,15 @@ replaceInFile(
 );
 console.log(`  ✓ quantanote-cloud/src/handlers/health.rs → ${newVersion}`);
 
+// --- Frontend source files ---
+console.log("\n🌐 前端源文件:");
+const settingsPageOk = replaceInFile(
+  "src/pages/SettingsPage.tsx",
+  /v\d+\.\d+\.\d+(-[\w.]+)?/,
+  `v${newVersion}`
+);
+if (settingsPageOk) {
+  console.log(`  ✓ src/pages/SettingsPage.tsx → ${newVersion}`);
+}
+
 console.log(`\n✅ 全部版本号已统一为 ${newVersion}\n`);
