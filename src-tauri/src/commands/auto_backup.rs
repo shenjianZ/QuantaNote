@@ -2,9 +2,7 @@ use tauri::State;
 
 use crate::db::DbState;
 use crate::error::AppError;
-use crate::services::backup_service::{
-    self, AutoBackupConfig, BackupFileInfo,
-};
+use crate::services::backup_service::{self, AutoBackupConfig, BackupFileInfo};
 
 #[tauri::command]
 pub fn get_auto_backup_config() -> Result<AutoBackupConfig, AppError> {

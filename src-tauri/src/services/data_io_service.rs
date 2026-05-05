@@ -76,7 +76,8 @@ pub fn export_data(db: &DbState) -> Result<String, AppError> {
         meta_rows
             .into_iter()
             .map(|row| {
-                let relative_path: String = row["file_path"].as_str().unwrap_or_default().to_string();
+                let relative_path: String =
+                    row["file_path"].as_str().unwrap_or_default().to_string();
                 let full_path = paths::quantanote_dir().join(&relative_path);
                 let file_data = std::fs::read(&full_path).ok().map(|bytes| {
                     use base64::engine::general_purpose::STANDARD as BASE64;
@@ -123,8 +124,14 @@ pub fn import_data(db: &DbState, json: String) -> Result<(), AppError> {
     for attachment in &data.attachments {
         let id = attachment["id"].as_str().unwrap_or_default().to_string();
         let item_id = sanitize_path_component(attachment["item_id"].as_str().unwrap_or_default());
-        let filename = attachment["filename"].as_str().unwrap_or_default().to_string();
-        let mut file_path = attachment["file_path"].as_str().unwrap_or_default().to_string();
+        let filename = attachment["filename"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
+        let mut file_path = attachment["file_path"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
 
         if !file_path.is_empty() && (file_path.contains("..") || file_path.contains('\0')) {
             file_path = String::new();
@@ -138,13 +145,14 @@ pub fn import_data(db: &DbState, json: String) -> Result<(), AppError> {
                 let bytes = BASE64
                     .decode(file_data)
                     .map_err(|e| AppError::Validation(format!("附件数据无效: {}", e)))?;
-                let relative_path = std::path::PathBuf::from("attachments")
-                    .join(&item_id)
-                    .join(format!(
-                        "{}-{}",
-                        &id.chars().take(8).collect::<String>(),
-                        filename
-                    ));
+                let relative_path =
+                    std::path::PathBuf::from("attachments")
+                        .join(&item_id)
+                        .join(format!(
+                            "{}-{}",
+                            &id.chars().take(8).collect::<String>(),
+                            filename
+                        ));
                 let dest_path = data_dir.join(&relative_path);
                 std::fs::create_dir_all(
                     dest_path
@@ -236,11 +244,7 @@ pub fn get_export_size_estimate(db: &DbState) -> Result<ExportSizeEstimate, AppE
     })
 }
 
-pub fn export_data_zip(
-    db: &DbState,
-    path: &str,
-    options: &ExportOptions,
-) -> Result<(), AppError> {
+pub fn export_data_zip(db: &DbState, path: &str, options: &ExportOptions) -> Result<(), AppError> {
     let dest = resolve_user_path(path)?;
     let conn = db
         .conn
@@ -302,11 +306,7 @@ pub fn export_data_zip(
     Ok(())
 }
 
-pub fn import_data_zip(
-    db: &DbState,
-    path: &str,
-    options: &ImportOptions,
-) -> Result<(), AppError> {
+pub fn import_data_zip(db: &DbState, path: &str, options: &ImportOptions) -> Result<(), AppError> {
     let src = resolve_user_path(path)?;
     let file = std::fs::File::open(&src).map_err(|e| AppError::Io(e.to_string()))?;
     let mut archive =
@@ -373,10 +373,11 @@ pub fn import_data_zip(
         let data_dir = paths::quantanote_dir();
         // 重新打开 archive（之前的已消耗）
         let file = std::fs::File::open(&src).map_err(|e| AppError::Io(e.to_string()))?;
-        let mut archive2 =
-            zip::ZipArchive::new(file).map_err(|e| AppError::Io(e.to_string()))?;
+        let mut archive2 = zip::ZipArchive::new(file).map_err(|e| AppError::Io(e.to_string()))?;
         for i in 0..archive_count {
-            let mut f = archive2.by_index(i).map_err(|e| AppError::Io(e.to_string()))?;
+            let mut f = archive2
+                .by_index(i)
+                .map_err(|e| AppError::Io(e.to_string()))?;
             let name = f.name().to_string();
             if !name.starts_with("attachments/") || name.ends_with('/') {
                 continue;

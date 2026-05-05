@@ -238,7 +238,9 @@ pub async fn sync_register(
     ensure_device_id(&mut config);
 
     let transport = SyncTransport::new(&server_url, "", "", &config.device_id);
-    let register_result = transport.register(&email, &password, verify_code.as_deref()).await?;
+    let register_result = transport
+        .register(&email, &password, verify_code.as_deref())
+        .await?;
 
     config.enabled = true;
     config.server_url = server_url;
@@ -275,7 +277,11 @@ pub fn sync_logout(
 }
 
 #[tauri::command]
-pub async fn sync_forgot_password(server_url: String, email: String, lang: String) -> Result<Option<String>, AppError> {
+pub async fn sync_forgot_password(
+    server_url: String,
+    email: String,
+    lang: String,
+) -> Result<Option<String>, AppError> {
     let transport = SyncTransport::new(&server_url, "", "", "");
     transport.forgot_password(&email, &lang).await
 }
@@ -574,7 +580,11 @@ pub fn cancel_sync_conflicts(sync_state: State<'_, SyncEngineState>) -> Result<(
 }
 
 #[tauri::command]
-pub async fn send_verify_code(server_url: String, email: String, lang: String) -> Result<(), AppError> {
+pub async fn send_verify_code(
+    server_url: String,
+    email: String,
+    lang: String,
+) -> Result<(), AppError> {
     let transport = SyncTransport::new(&server_url, "", "", "default");
     transport.send_verify_code(&email, &lang).await
 }

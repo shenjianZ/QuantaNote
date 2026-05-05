@@ -429,7 +429,12 @@ impl SyncTransport {
     }
 
     /// 注册
-    pub async fn register(&self, email: &str, password: &str, verify_code: Option<&str>) -> Result<SyncLoginResult, AppError> {
+    pub async fn register(
+        &self,
+        email: &str,
+        password: &str,
+        verify_code: Option<&str>,
+    ) -> Result<SyncLoginResult, AppError> {
         let url = format!("{}/auth/register", self.server_url);
         log::debug!("POST {}", url);
         let mut body = serde_json::json!({
@@ -484,12 +489,19 @@ impl SyncTransport {
         if body.code == 200 {
             Ok(())
         } else {
-            Err(AppError::SyncError(format!("发送验证码失败: {}", body.message)))
+            Err(AppError::SyncError(format!(
+                "发送验证码失败: {}",
+                body.message
+            )))
         }
     }
 
     /// 忘记密码
-    pub async fn forgot_password(&self, email: &str, lang: &str) -> Result<Option<String>, AppError> {
+    pub async fn forgot_password(
+        &self,
+        email: &str,
+        lang: &str,
+    ) -> Result<Option<String>, AppError> {
         let url = format!("{}/auth/forgot-password", self.server_url);
         log::debug!("POST {}", url);
         let resp = self
@@ -748,7 +760,11 @@ impl SyncTransport {
         self.handle_response(resp).await
     }
 
-    pub async fn change_password(&self, old_password: &str, new_password: &str) -> Result<(), AppError> {
+    pub async fn change_password(
+        &self,
+        old_password: &str,
+        new_password: &str,
+    ) -> Result<(), AppError> {
         let url = format!("{}/user/password", self.server_url);
         let builder = self.client.post(&url).json(&serde_json::json!({
             "old_password": old_password,
@@ -785,11 +801,14 @@ impl SyncTransport {
     }
 
     /// 上传头像
-    pub async fn upload_avatar(&self, mime_type: &str, data: Vec<u8>) -> Result<crate::models::user::UserProfile, AppError> {
+    pub async fn upload_avatar(
+        &self,
+        mime_type: &str,
+        data: Vec<u8>,
+    ) -> Result<crate::models::user::UserProfile, AppError> {
         let mut url = reqwest::Url::parse(&format!("{}/user/avatar", self.server_url))
             .map_err(|e| AppError::SyncError(format!("URL 解析失败: {}", e)))?;
-        url.query_pairs_mut()
-            .append_pair("mime_type", mime_type);
+        url.query_pairs_mut().append_pair("mime_type", mime_type);
         let builder = self.client.put(url).body(data);
         let resp = self.send_auth_with_refresh(builder).await?;
         self.handle_response(resp).await

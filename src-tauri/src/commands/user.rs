@@ -7,9 +7,7 @@ use crate::services::sync_service;
 use crate::sync::transport::SyncTransport;
 
 #[tauri::command]
-pub async fn get_user_profile(
-    db: State<'_, DbState>,
-) -> Result<UserProfile, AppError> {
+pub async fn get_user_profile(db: State<'_, DbState>) -> Result<UserProfile, AppError> {
     let config = sync_service::load_sync_config(&db);
 
     if !config.enabled || config.access_token.is_empty() {
@@ -25,7 +23,10 @@ pub async fn get_user_profile(
 
     let profile = transport.get_profile().await?;
 
-    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
     conn.execute(
         "INSERT OR REPLACE INTO user_profile (id, email, nickname, avatar_url, bio, phone, address, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, datetime('now'))",
@@ -63,7 +64,10 @@ pub async fn update_user_profile(
 
     let profile = transport.update_profile(&updates).await?;
 
-    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
     conn.execute(
         "INSERT OR REPLACE INTO user_profile (id, email, nickname, avatar_url, bio, phone, address, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, datetime('now'))",
@@ -116,8 +120,7 @@ pub async fn upload_avatar(
     }
 
     // 读取文件
-    let data = std::fs::read(&file_path)
-        .map_err(|e| AppError::Io(e.to_string()))?;
+    let data = std::fs::read(&file_path).map_err(|e| AppError::Io(e.to_string()))?;
 
     // 推断 MIME 类型
     let mime_type = match std::path::Path::new(&file_path)
@@ -144,7 +147,10 @@ pub async fn upload_avatar(
     let profile = transport.upload_avatar(mime_type, data).await?;
 
     // 更新本地缓存
-    let conn = db.conn.lock().map_err(|e| AppError::Database(e.to_string()))?;
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
     conn.execute(
         "INSERT OR REPLACE INTO user_profile (id, email, nickname, avatar_url, bio, phone, address, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, datetime('now'))",

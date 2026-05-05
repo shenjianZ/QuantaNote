@@ -162,12 +162,10 @@ pub fn run_auto_backup(db: &DbState) {
 pub fn start_backup_scheduler(app: &AppHandle) {
     let app_handle = app.clone();
 
-    std::thread::spawn(move || {
-        loop {
-            std::thread::sleep(Duration::from_secs(3600));
-            if let Some(db) = app_handle.try_state::<DbState>() {
-                run_auto_backup(&db);
-            }
+    std::thread::spawn(move || loop {
+        std::thread::sleep(Duration::from_secs(3600));
+        if let Some(db) = app_handle.try_state::<DbState>() {
+            run_auto_backup(&db);
         }
     });
 }

@@ -315,7 +315,9 @@ pub async fn sync_attachments_download(
     Ok(())
 }
 
-pub fn collect_attachment_metas_for_commit(db: &DbState) -> Result<Vec<serde_json::Value>, AppError> {
+pub fn collect_attachment_metas_for_commit(
+    db: &DbState,
+) -> Result<Vec<serde_json::Value>, AppError> {
     use crate::sync::diff::compute_file_hash;
     use crate::utils::paths;
 
