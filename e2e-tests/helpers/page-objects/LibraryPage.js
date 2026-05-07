@@ -59,8 +59,12 @@ class LibraryPage {
   }
 
   async selectTab(tabName) {
-    // "全部" / "置顶" / "收藏"
-    const btn = await $(`//*[@data-testid='library-filter-panel']//button[contains(., '${tabName}')]`);
+    const tabIds = {
+      "全部": "library-tab-recent",
+      "置顶": "library-tab-pinned",
+      "收藏": "library-tab-favorite",
+    };
+    const btn = await $(tabIds[tabName] ? `[data-testid='${tabIds[tabName]}']` : `//button[contains(., '${tabName}')]`);
     await btn.click();
     await observePause();
   }
@@ -161,7 +165,16 @@ class LibraryPage {
 
   async clickDelete() {
     await this.openReaderMenu();
-    const btn = await $("//button[contains(@class, 'menu-item')][contains(., '删除')]");
+    const btn = await $("[data-testid='reader-delete-btn']");
+    await btn.click();
+    await btn.waitForDisplayed({ timeout: 3000 });
+    await expect(btn).toHaveText(expect.stringContaining("确认删除"));
+    await btn.click();
+  }
+
+  async clickDeleteOnce() {
+    await this.openReaderMenu();
+    const btn = await $("[data-testid='reader-delete-btn']");
     await btn.click();
   }
 

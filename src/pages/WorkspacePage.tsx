@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { CheckCircle2, Edit3, Loader2 } from "lucide-react";
+import { ArrowRight, CheckCircle2, Edit3, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../stores/appStore";
 import { useToastStore } from "../stores/toastStore";
@@ -10,17 +10,20 @@ const VditorEditor = lazy(() => import("../components/editor/VditorEditor").then
 
 interface WorkspacePageProps {
   onQuickCreate: (content: string) => Promise<void>;
+  onViewSaved?: () => void;
 }
 
-export function WorkspacePage({ onQuickCreate }: WorkspacePageProps) {
+export function WorkspacePage({ onQuickCreate, onViewSaved }: WorkspacePageProps) {
   const { t } = useTranslation(["workspace", "common"]);
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [shortcutModifier] = useState(() => navigator.platform.toLowerCase().includes("mac") ? "Cmd" : "Ctrl");
   const editorRef = useRef<VditorEditorHandle>(null);
   const theme = useAppStore((s) => s.theme);
   const savingRef = useRef(saving);
   const onQuickCreateRef = useRef(onQuickCreate);
+  const canSave = Boolean(draft.trim()) && !saving;
 
   useEffect(() => { savingRef.current = saving; }, [saving]);
   useEffect(() => { onQuickCreateRef.current = onQuickCreate; }, [onQuickCreate]);
@@ -73,10 +76,11 @@ export function WorkspacePage({ onQuickCreate }: WorkspacePageProps) {
             <p className="mt-1 text-sm text-[var(--muted)]">{t("workspace:subtitle")}</p>
           </div>
           <button
-            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full bg-[var(--accent)] px-3 text-sm font-medium text-white hover:opacity-90"
+            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full bg-[var(--accent)] px-3 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
             type="button"
             data-testid="workspace-save-btn"
-            aria-disabled={!draft.trim() || saving}
+            disabled={!canSave}
+            aria-disabled={!canSave}
             onClick={() => handleQuickSave().catch(() => {})}
           >
             <Edit3 className="h-4 w-4" />
@@ -104,12 +108,25 @@ export function WorkspacePage({ onQuickCreate }: WorkspacePageProps) {
           <footer className="mt-3 flex shrink-0 items-center justify-between">
             <div className="min-w-0 text-xs text-[var(--muted)]" data-testid="workspace-status">
               {saved ? (
-                <span className="inline-flex items-center gap-1 text-[var(--accent)]">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  {t("workspace:savedStatus")}
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1 text-[var(--accent)]">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    {t("workspace:savedStatus")}
+                  </span>
+                  {onViewSaved && (
+                    <button
+                      className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
+                      type="button"
+                      data-testid="workspace-view-saved-btn"
+                      onClick={onViewSaved}
+                    >
+                      {t("workspace:viewSaved")}
+                      <ArrowRight className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
               ) : (
-                t("workspace:shortcutHint")
+                t("workspace:shortcutHint", { mod: shortcutModifier })
               )}
             </div>
           </footer>

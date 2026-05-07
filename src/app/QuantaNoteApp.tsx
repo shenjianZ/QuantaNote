@@ -167,6 +167,16 @@ export function QuantaNoteApp() {
         navigate("library");
     }, [navigate, selectedItemId]);
 
+    const handleViewLastQuickCreated = useCallback(() => {
+        if (selectedItemId) {
+            setPreviewRequest((current) => ({
+                itemId: selectedItemId,
+                requestId: (current?.requestId ?? 0) + 1,
+            }));
+        }
+        navigate("library");
+    }, [navigate, selectedItemId]);
+
     const handleCreateNote = useCallback(async () => {
         const item = await createItem(i18n.t("common:emptyItem.untitled"), "note", "");
         selectItem(item.id);
@@ -299,7 +309,10 @@ export function QuantaNoteApp() {
             itemCount={dbItems.length}
         >
             {currentPage === "workspace" && (
-                <WorkspacePage onQuickCreate={handleQuickCreate} />
+                <WorkspacePage
+                    onQuickCreate={handleQuickCreate}
+                    onViewSaved={handleViewLastQuickCreated}
+                />
             )}
             {currentPage === "library" && (
                 <LibraryPage

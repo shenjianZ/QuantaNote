@@ -75,7 +75,7 @@ describe("LibraryPage", () => {
     const props = makeProps({ items: [pinnedItem, normalItem] });
     const { user } = setup(<LibraryPage {...props} />);
 
-    await user.click(screen.getByText("置顶"));
+    await user.click(screen.getByTestId("library-tab-pinned"));
     expect(screen.getByText("Pinned Note")).toBeInTheDocument();
     expect(screen.queryByText("Normal Note")).not.toBeInTheDocument();
   });
@@ -86,7 +86,7 @@ describe("LibraryPage", () => {
     const props = makeProps({ items: [favItem, normalItem] });
     const { user } = setup(<LibraryPage {...props} />);
 
-    await user.click(screen.getByText("收藏"));
+    await user.click(screen.getByTestId("library-tab-favorite"));
     expect(screen.getByText("Fav Note")).toBeInTheDocument();
     expect(screen.queryByText("Normal Note")).not.toBeInTheDocument();
   });
@@ -111,5 +111,32 @@ describe("LibraryPage", () => {
     const props = makeProps({ items: [] });
     setup(<LibraryPage {...props} />);
     expect(screen.getByText("还没有可显示的记录")).toBeInTheDocument();
+  });
+
+  it("requires confirmation before deleting a reader item", async () => {
+    const deleteItem = vi.fn(async () => {});
+    useItemStore.setState({
+      selectedItem: {
+        ...defaultSelectedItem,
+        id: "item-1",
+        title: "Note A",
+        content: "Body",
+      },
+      deleteItem,
+    });
+    const props = makeProps({
+      selectedItem: createMockItem({ id: "item-1", title: "Note A" }),
+    });
+    const { user } = setup(<LibraryPage {...props} />);
+
+    await user.click(screen.getByText("Note A"));
+    await user.click(screen.getByTestId("reader-menu-btn"));
+    await user.click(screen.getByTestId("reader-delete-btn"));
+
+    expect(deleteItem).not.toHaveBeenCalled();
+    expect(screen.getByTestId("reader-delete-btn")).toHaveTextContent("确认删除");
+
+    await user.click(screen.getByTestId("reader-delete-btn"));
+    await waitFor(() => expect(deleteItem).toHaveBeenCalledWith("item-1"));
   });
 });

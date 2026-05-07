@@ -72,6 +72,7 @@ export function LibraryPage({
   const [tagModalOpen, setTagModalOpen] = useState(false);
   const [tagManagerOpen, setTagManagerOpen] = useState(false);
   const [attachmentModalOpen, setAttachmentModalOpen] = useState(false);
+  const [deleteConfirming, setDeleteConfirming] = useState(false);
   const filterDetailsRef = useRef<HTMLDetailsElement>(null);
   const menuDetailsRef = useRef<HTMLDetailsElement>(null);
 
@@ -115,6 +116,7 @@ export function LibraryPage({
       const menu = menuDetailsRef.current;
       if (menu && menu.open && !menu.contains(e.target as Node)) {
         menu.open = false;
+        setDeleteConfirming(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -138,6 +140,7 @@ export function LibraryPage({
     if (!selectedItem.id) return;
     fetchAttachments(selectedItem.id);
     fetchItemTags(selectedItem.id);
+    setDeleteConfirming(false);
   }, [selectedItem.id, fetchAttachments, fetchItemTags]);
 
   useEffect(() => {
@@ -247,6 +250,7 @@ export function LibraryPage({
 
   function handleCloseReader() {
     setReaderOpen(false);
+    setDeleteConfirming(false);
     onPreviewRequestClear?.();
   }
 
@@ -272,7 +276,21 @@ export function LibraryPage({
               {t("library:newBtn")}
             </button>
           </div>
-          <div className="mb-3 flex items-center gap-2">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <div className="grid grid-cols-3 gap-1 rounded-full border border-[var(--line)] bg-[var(--field)] p-1" aria-label={t("library:filter.title")}>
+              {FILTERS.map((filter) => (
+                <button
+                  key={filter.key}
+                  type="button"
+                  data-testid={`library-tab-${filter.key}`}
+                  className={`h-8 rounded-full px-3 text-sm font-medium transition-colors ${activeTab === filter.key ? "bg-[var(--paper)] text-[var(--accent)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--text)]"}`}
+                  aria-pressed={activeTab === filter.key}
+                  onClick={() => setActiveTab(filter.key)}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
             <div className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--field)] px-3 text-[var(--muted)]">
               <Search className="h-4 w-4 shrink-0" />
               <input
@@ -291,18 +309,6 @@ export function LibraryPage({
               </summary>
               <div className="absolute right-0 top-12 z-20 w-64 rounded-2xl border border-[var(--line)] bg-[var(--popover)] p-4 shadow-2xl" data-testid="library-filter-panel">
                 <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">{t("library:filter.title")}</div>
-                <div className="mb-4 grid grid-cols-3 gap-1 rounded-xl bg-[var(--field)] p-1">
-                  {FILTERS.map((filter) => (
-                    <button
-                      key={filter.key}
-                      type="button"
-                      className={`rounded-lg px-2 py-1.5 text-sm font-medium transition-colors ${activeTab === filter.key ? "bg-[var(--paper)] text-[var(--accent)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--text)]"}`}
-                      onClick={() => setActiveTab(filter.key)}
-                    >
-                      {filter.label}
-                    </button>
-                  ))}
-                </div>
                 <label className="mb-4 block">
                   <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.sort")}</span>
                   <Select
@@ -421,7 +427,24 @@ export function LibraryPage({
                   <button className="menu-item" type="button" onClick={() => { handleCopy(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Copy className="h-4 w-4" />{t("library:reader.copy")}</button>
                   <button className="menu-item" type="button" onClick={() => { handleAddAttachment(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Paperclip className="h-4 w-4" />{t("library:reader.addAttachment")}</button>
                   <button className="menu-item" type="button" onClick={() => { onOpenDocument(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Edit3 className="h-4 w-4" />{t("library:reader.fullEdit")}</button>
-                  <button className="menu-item text-red-400" type="button" onClick={() => { handleDelete(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Trash2 className="h-4 w-4" />{t("library:reader.delete")}</button>
+                  <button
+                    className={`menu-item ${deleteConfirming ? "bg-red-500/10 text-red-500 hover:bg-red-500/15" : "text-red-400"}`}
+                    type="button"
+                    data-testid="reader-delete-btn"
+                    onClick={() => {
+                      if (!deleteConfirming) {
+                        setDeleteConfirming(true);
+                        return;
+                      }
+                      handleDelete().then(() => {
+                        setDeleteConfirming(false);
+                        if (menuDetailsRef.current) menuDetailsRef.current.open = false;
+                      });
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    {deleteConfirming ? t("library:reader.confirmDelete") : t("library:reader.delete")}
+                  </button>
                 </div>
               </details>
               <button className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="reader-edit-btn" aria-label={t("library:reader.editCurrent")} onClick={onOpenDocument} title={t("library:reader.editCurrent")}>

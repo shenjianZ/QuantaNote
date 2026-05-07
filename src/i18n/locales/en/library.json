@@ -32,6 +32,7 @@
     "addAttachment": "Add Attachment",
     "fullEdit": "Full Edit",
     "delete": "Delete",
+    "confirmDelete": "Confirm delete",
     "tags": "Tags",
     "attachments": "Attachments",
     "editCurrent": "Edit Current Note",

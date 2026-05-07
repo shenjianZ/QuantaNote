@@ -1,8 +1,9 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { clearMocks } from "@tauri-apps/api/mocks";
-import { afterEach, beforeAll, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, vi } from "vitest";
 import { randomFillSync } from "node:crypto";
+import i18n from "../i18n";
 
 beforeAll(() => {
   Object.defineProperty(window, "crypto", {
@@ -28,6 +29,10 @@ beforeAll(() => {
     })),
     configurable: true,
   });
+});
+
+beforeEach(async () => {
+  await i18n.changeLanguage("zh-CN");
 });
 
 afterEach(() => {
