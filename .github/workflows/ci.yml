@@ -29,6 +29,11 @@ jobs:
           if [ -z "$BODY" ]; then
             BODY="Release ${TAG}"
           fi
+          # 读取安装指南文件并替换版本号
+          if [ -f "RELEASE_GUIDE.md" ]; then
+            GUIDE=$(cat RELEASE_GUIDE.md | sed "s/\*/${TAG}/g")
+            BODY="${BODY}${GUIDE}"
+          fi
           # 多行内容需要特殊处理
           echo "body<<EOF" >> $GITHUB_OUTPUT
           echo "$BODY" >> $GITHUB_OUTPUT
