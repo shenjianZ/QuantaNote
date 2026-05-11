@@ -90,6 +90,9 @@ pub async fn change_password(
     db: State<'_, DbState>,
     payload: ChangePasswordPayload,
 ) -> Result<(), AppError> {
+    if payload.new_password.len() < 8 {
+        return Err(AppError::Validation("新密码长度不能少于8位".to_string()));
+    }
     let config = sync_service::load_sync_config(&db);
 
     if !config.enabled || config.access_token.is_empty() {

@@ -127,6 +127,8 @@ export function SettingsPage({
         return (
             <button
                 type="button"
+                role="switch"
+                aria-checked={value}
                 className={`relative h-6 w-11 rounded-full border border-[var(--line)] transition ${value ? "bg-[var(--accent)]" : "bg-[var(--field)]"}`}
                 onClick={() => onChange(!value)}
             >

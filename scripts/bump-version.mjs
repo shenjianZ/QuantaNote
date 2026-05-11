@@ -63,7 +63,6 @@ console.log(`\n🔧 统一修改版本号 → ${newVersion}\n`);
 console.log("📦 package.json:");
 replaceJsonVersion("package.json");
 replaceJsonVersion("docs/package.json");
-replaceJsonVersion("slides/package.json");
 
 // --- Cargo.toml files ---
 console.log("\n🦀 Cargo.toml:");

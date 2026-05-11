@@ -192,7 +192,9 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
                     return get().downloadUpdate();
                 }
             })
-            .catch(() => {});
+            .catch((e) => {
+                console.warn("Auto update check/download failed:", e);
+            });
     },
 }));
 

@@ -418,3 +418,185 @@ pub fn compute_diff(
         unchanged,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_local(id: &str, table: &str, hash: &str, updated_at: &str) -> SyncRecordPayload {
+        SyncRecordPayload {
+            table_name: table.to_string(),
+            record_id: id.to_string(),
+            content_hash: hash.to_string(),
+            updated_at: updated_at.to_string(),
+            data: serde_json::json!({"id": id}),
+        }
+    }
+
+    fn make_remote(id: &str, table: &str, hash: &str, updated_at: &str) -> RecordMetaInfo {
+        RecordMetaInfo {
+            table_name: table.to_string(),
+            record_id: id.to_string(),
+            content_hash: hash.to_string(),
+            updated_at: updated_at.to_string(),
+        }
+    }
+
+    #[test]
+    fn local_only_records_are_pushed() {
+        let local = vec![make_local("1", "items", "hash_a", "2024-01-01T00:00:00Z")];
+        let remote = vec![];
+        let baseline = HashMap::new();
+        let result = compute_diff(&local, &remote, &baseline, "auto");
+        assert_eq!(result.to_push.len(), 1);
+        assert_eq!(result.to_pull.len(), 0);
+        assert_eq!(result.conflicts.len(), 0);
+        assert_eq!(result.unchanged, 0);
+    }
+
+    #[test]
+    fn remote_only_records_are_pulled() {
+        let local = vec![];
+        let remote = vec![make_remote("1", "items", "hash_a", "2024-01-01T00:00:00Z")];
+        let baseline = HashMap::new();
+        let result = compute_diff(&local, &remote, &baseline, "auto");
+        assert_eq!(result.to_push.len(), 0);
+        assert_eq!(result.to_pull.len(), 1);
+        assert_eq!(result.conflicts.len(), 0);
+    }
+
+    #[test]
+    fn unchanged_records_counted() {
+        let local = vec![make_local("1", "items", "hash_a", "2024-01-01T00:00:00Z")];
+        let remote = vec![make_remote("1", "items", "hash_a", "2024-01-01T00:00:00Z")];
+        let mut baseline = HashMap::new();
+        baseline.insert("items:1".to_string(), "hash_a".to_string());
+        let result = compute_diff(&local, &remote, &baseline, "auto");
+        assert_eq!(result.to_push.len(), 0);
+        assert_eq!(result.to_pull.len(), 0);
+        assert_eq!(result.conflicts.len(), 0);
+        assert_eq!(result.unchanged, 1);
+    }
+
+    #[test]
+    fn local_only_change_is_pushed() {
+        let local = vec![make_local("1", "items", "hash_b", "2024-01-02T00:00:00Z")];
+        let remote = vec![make_remote("1", "items", "hash_a", "2024-01-01T00:00:00Z")];
+        let mut baseline = HashMap::new();
+        baseline.insert("items:1".to_string(), "hash_a".to_string());
+        let result = compute_diff(&local, &remote, &baseline, "auto");
+        assert_eq!(result.to_push.len(), 1);
+        assert_eq!(result.to_pull.len(), 0);
+        assert_eq!(result.conflicts.len(), 0);
+    }
+
+    #[test]
+    fn remote_only_change_is_pulled() {
+        let local = vec![make_local("1", "items", "hash_a", "2024-01-01T00:00:00Z")];
+        let remote = vec![make_remote("1", "items", "hash_b", "2024-01-02T00:00:00Z")];
+        let mut baseline = HashMap::new();
+        baseline.insert("items:1".to_string(), "hash_a".to_string());
+        let result = compute_diff(&local, &remote, &baseline, "auto");
+        assert_eq!(result.to_push.len(), 0);
+        assert_eq!(result.to_pull.len(), 1);
+        assert_eq!(result.conflicts.len(), 0);
+    }
+
+    #[test]
+    fn both_changed_same_content_is_unchanged() {
+        let local = vec![make_local("1", "items", "hash_b", "2024-01-02T00:00:00Z")];
+        let remote = vec![make_remote("1", "items", "hash_b", "2024-01-02T00:00:00Z")];
+        let mut baseline = HashMap::new();
+        baseline.insert("items:1".to_string(), "hash_a".to_string());
+        let result = compute_diff(&local, &remote, &baseline, "auto");
+        assert_eq!(result.conflicts.len(), 0);
+        assert_eq!(result.unchanged, 1);
+    }
+
+    #[test]
+    fn both_changed_different_content_is_conflict() {
+        let local = vec![make_local("1", "items", "hash_b", "2024-01-02T00:00:00Z")];
+        let remote = vec![make_remote("1", "items", "hash_c", "2024-01-02T00:00:00Z")];
+        let mut baseline = HashMap::new();
+        baseline.insert("items:1".to_string(), "hash_a".to_string());
+        let result = compute_diff(&local, &remote, &baseline, "auto");
+        assert_eq!(result.conflicts.len(), 1);
+    }
+
+    #[test]
+    fn local_wins_strategy_pushes_conflict() {
+        let local = vec![make_local("1", "items", "hash_b", "2024-01-02T00:00:00Z")];
+        let remote = vec![make_remote("1", "items", "hash_c", "2024-01-02T00:00:00Z")];
+        let mut baseline = HashMap::new();
+        baseline.insert("items:1".to_string(), "hash_a".to_string());
+        let result = compute_diff(&local, &remote, &baseline, "local-wins");
+        assert_eq!(result.conflicts.len(), 1);
+        assert_eq!(result.to_push.len(), 1);
+        assert_eq!(result.to_pull.len(), 0);
+    }
+
+    #[test]
+    fn remote_wins_strategy_pulls_conflict() {
+        let local = vec![make_local("1", "items", "hash_b", "2024-01-02T00:00:00Z")];
+        let remote = vec![make_remote("1", "items", "hash_c", "2024-01-02T00:00:00Z")];
+        let mut baseline = HashMap::new();
+        baseline.insert("items:1".to_string(), "hash_a".to_string());
+        let result = compute_diff(&local, &remote, &baseline, "remote-wins");
+        assert_eq!(result.conflicts.len(), 1);
+        assert_eq!(result.to_push.len(), 0);
+        assert_eq!(result.to_pull.len(), 1);
+    }
+
+    #[test]
+    fn auto_strategy_picks_newer_on_conflict() {
+        let local = vec![make_local("1", "items", "hash_b", "2024-01-03T00:00:00Z")];
+        let remote = vec![make_remote("1", "items", "hash_c", "2024-01-02T00:00:00Z")];
+        let mut baseline = HashMap::new();
+        baseline.insert("items:1".to_string(), "hash_a".to_string());
+        let result = compute_diff(&local, &remote, &baseline, "auto");
+        assert_eq!(result.conflicts.len(), 1);
+        // local is newer → should push
+        assert_eq!(result.to_push.len(), 1);
+        assert_eq!(result.to_pull.len(), 0);
+    }
+
+    #[test]
+    fn no_baseline_treats_as_new() {
+        let local = vec![make_local("1", "items", "hash_a", "2024-01-01T00:00:00Z")];
+        let remote = vec![make_remote("1", "items", "hash_a", "2024-01-01T00:00:00Z")];
+        let baseline = HashMap::new();
+        let result = compute_diff(&local, &remote, &baseline, "auto");
+        // Same hash → unchanged even without baseline
+        assert_eq!(result.unchanged, 1);
+        assert_eq!(result.conflicts.len(), 0);
+    }
+
+    #[test]
+    fn cross_table_ids_do_not_collide() {
+        let local = vec![make_local("1", "items", "hash_a", "2024-01-01T00:00:00Z")];
+        let remote = vec![make_remote("1", "tags", "hash_b", "2024-01-01T00:00:00Z")];
+        let baseline = HashMap::new();
+        let result = compute_diff(&local, &remote, &baseline, "auto");
+        assert_eq!(result.to_push.len(), 1);
+        assert_eq!(result.to_pull.len(), 1);
+        assert_eq!(result.conflicts.len(), 0);
+    }
+
+    #[test]
+    fn compute_record_hash_is_deterministic() {
+        let data = serde_json::json!({"id": "1", "title": "test"});
+        let h1 = compute_record_hash(&data);
+        let h2 = compute_record_hash(&data);
+        assert_eq!(h1, h2);
+        assert!(!h1.is_empty());
+    }
+
+    #[test]
+    fn compute_file_hash_is_deterministic() {
+        let data = b"hello world";
+        let h1 = compute_file_hash(data);
+        let h2 = compute_file_hash(data);
+        assert_eq!(h1, h2);
+        assert!(!h1.is_empty());
+    }
+}

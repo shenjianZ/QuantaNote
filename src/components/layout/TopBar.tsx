@@ -11,7 +11,12 @@ import { useToastStore } from "../../stores/toastStore";
 import i18n from "../../i18n";
 import { SyncStatusIndicator } from "../sync/SyncStatusIndicator";
 
-const appWindow = getCurrentWindow();
+let appWindow: ReturnType<typeof getCurrentWindow> | null = null;
+try {
+  appWindow = getCurrentWindow();
+} catch {
+  // non-Tauri environment
+}
 
 interface TopBarProps {
   currentPage: AppPage;
@@ -32,9 +37,10 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!appWindow) return;
     appWindow.isMaximized().then(setIsMaximized);
     const unlisten = appWindow.onResized(() => {
-      appWindow.isMaximized().then(setIsMaximized);
+      appWindow?.isMaximized().then(setIsMaximized);
     });
     return () => { unlisten.then((fn) => fn()); };
   }, []);
@@ -61,6 +67,7 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
   }, [menuOpen]);
 
   function handleMinimize() {
+    if (!appWindow) return;
     if (settings.minimizeToTray) {
       appWindow.hide();
       return;
@@ -69,6 +76,7 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
   }
 
   function handleClose() {
+    if (!appWindow) return;
     if (settings.closeKeepRunning) {
       appWindow.hide();
       return;
@@ -99,7 +107,7 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
   }
 
   return (
-    <header className="relative z-50 flex h-12 shrink-0 items-center gap-2 border-b border-[var(--line)] bg-[var(--chrome)] px-3 [-webkit-app-region:drag]">
+    <header data-tauri-drag-region className="relative z-50 flex h-12 shrink-0 items-center gap-2 border-b border-[var(--line)] bg-[var(--chrome)] px-3 [-webkit-app-region:drag]">
       <div className="shrink-0 px-1 text-left text-sm font-semibold text-[var(--text)]">QuantaNote</div>
 
       <button
@@ -207,7 +215,7 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
         <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="window-minimize" aria-label={t("topbar:minimize")} title={t("topbar:minimize")} onClick={handleMinimize}>
           <Minus className="h-4 w-4" />
         </button>
-        <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="window-maximize" aria-label={isMaximized ? t("topbar:restore") : t("topbar:maximize")} title={isMaximized ? t("topbar:restore") : t("topbar:maximize")} onClick={() => appWindow.toggleMaximize()}>
+        <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="window-maximize" aria-label={isMaximized ? t("topbar:restore") : t("topbar:maximize")} title={isMaximized ? t("topbar:restore") : t("topbar:maximize")} onClick={() => appWindow?.toggleMaximize()}>
           {isMaximized ? <Copy className="h-4 w-4" /> : <Square className="h-4 w-4" />}
         </button>
         <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] hover:bg-red-500/12 hover:text-red-400" type="button" data-testid="window-close" aria-label={t("common:buttons.close")} title={t("common:buttons.close")} onClick={handleClose}>

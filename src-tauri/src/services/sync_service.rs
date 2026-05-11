@@ -12,7 +12,10 @@ pub struct SyncOutput {
 pub fn load_sync_config(db: &DbState) -> SyncConfig {
     let conn = match db.conn.lock() {
         Ok(c) => c,
-        Err(_) => return SyncConfig::default(),
+        Err(e) => {
+            log::warn!("Failed to acquire DB lock for sync config: {}", e);
+            return SyncConfig::default();
+        }
     };
     let result = conn.query_row(
         "SELECT value FROM settings WHERE key = 'quantanote-sync-config'",
@@ -20,8 +23,15 @@ pub fn load_sync_config(db: &DbState) -> SyncConfig {
         |row| row.get::<_, String>(0),
     );
     match result {
-        Ok(json_str) => serde_json::from_str(&json_str).unwrap_or_default(),
-        Err(_) => SyncConfig::default(),
+        Ok(json_str) => serde_json::from_str(&json_str).unwrap_or_else(|e| {
+            log::warn!("Failed to parse sync config JSON: {}", e);
+            SyncConfig::default()
+        }),
+        Err(rusqlite::Error::QueryReturnedNoRows) => SyncConfig::default(),
+        Err(e) => {
+            log::warn!("Failed to load sync config from DB: {}", e);
+            SyncConfig::default()
+        }
     }
 }
 
@@ -48,11 +58,11 @@ pub async fn run_sync_with_transport(
     use crate::sync::diff::{collect_local_records, compute_diff};
     use crate::sync::{load_baseline_map, save_baseline_map};
 
-    state_manager.set_status(SyncStatus::Preparing);
+    let _ = state_manager.set_status(SyncStatus::Preparing);
 
     let remote_snapshot = transport.get_latest_snapshot().await?;
 
-    state_manager.set_progress("计算本地数据", 0, 1);
+    let _ = state_manager.set_progress("计算本地数据", 0, 1);
     let local_records = collect_local_records(db)?;
 
     let remote_metas = if let Some(ref snapshot) = remote_snapshot {
@@ -65,7 +75,7 @@ pub async fn run_sync_with_transport(
 
     let baseline_map = load_baseline_map(db)?;
 
-    state_manager.set_progress("比对差异", 0, 1);
+    let _ = state_manager.set_progress("比对差异", 0, 1);
     let diff_result = compute_diff(
         &local_records,
         &remote_metas,
@@ -74,14 +84,14 @@ pub async fn run_sync_with_transport(
     );
 
     if !diff_result.conflicts.is_empty() {
-        eprintln!(
-            "[WARN] 检测到 {} 条冲突记录，策略: {}",
+        log::warn!(
+            "检测到 {} 条冲突记录，策略: {}",
             diff_result.conflicts.len(),
             config.conflict_resolution
         );
         for conflict in &diff_result.conflicts {
-            eprintln!(
-                "[INFO] 冲突: {} (表: {}) → {:?}",
+            log::info!(
+                "冲突: {} (表: {}) → {:?}",
                 conflict.record_id, conflict.table_name, conflict.resolution
             );
         }
@@ -114,7 +124,7 @@ pub async fn run_sync_with_transport(
 
         result.pending_conflicts = Some(conflict_infos.clone());
         result.skipped = diff_result.unchanged;
-        state_manager.set_completed();
+        let _ = state_manager.set_completed();
         return Ok(SyncOutput {
             result,
             pending_state: Some(PendingSyncState {
@@ -128,9 +138,9 @@ pub async fn run_sync_with_transport(
 
     let mut pushed_records: Vec<PushedRecord> = Vec::new();
     if !diff_result.to_push.is_empty() {
-        state_manager.set_status(SyncStatus::Pushing);
+        let _ = state_manager.set_status(SyncStatus::Pushing);
         let total = diff_result.to_push.len() as u32;
-        state_manager.set_progress("推送记录", 0, total);
+        let _ = state_manager.set_progress("推送记录", 0, total);
 
         pushed_records = diff_result
             .to_push
@@ -145,9 +155,9 @@ pub async fn run_sync_with_transport(
     }
 
     if !diff_result.to_pull.is_empty() {
-        state_manager.set_status(SyncStatus::Pulling);
+        let _ = state_manager.set_status(SyncStatus::Pulling);
         let total = diff_result.to_pull.len() as u32;
-        state_manager.set_progress("拉取记录", 0, total);
+        let _ = state_manager.set_progress("拉取记录", 0, total);
 
         let pull_result = transport
             .pull_records(config.last_snapshot_id.as_deref())
@@ -158,7 +168,7 @@ pub async fn run_sync_with_transport(
     }
 
     if config.sync_attachments {
-        state_manager.set_status(SyncStatus::SyncingAttachments);
+        let _ = state_manager.set_status(SyncStatus::SyncingAttachments);
         sync_attachments_upload(transport, state_manager, &mut result, db).await?;
     }
 
@@ -168,7 +178,7 @@ pub async fn run_sync_with_transport(
         vec![]
     };
 
-    state_manager.set_progress("提交同步", 0, 1);
+    let _ = state_manager.set_progress("提交同步", 0, 1);
     let commit_result = transport
         .commit_sync(pushed_records, attachment_metas, config.sync_attachments)
         .await?;
@@ -182,7 +192,7 @@ pub async fn run_sync_with_transport(
     let final_records = collect_local_records(db)?;
     save_baseline_map(db, &final_records, &result.snapshot_id)?;
 
-    state_manager.set_completed();
+    let _ = state_manager.set_completed();
     Ok(SyncOutput {
         result,
         pending_state: None,

@@ -128,6 +128,7 @@ impl DbState {
     pub fn open(db_path: &str) -> Result<Self, AppError> {
         let mut conn = Connection::open(db_path).map_err(|e| AppError::Database(e.to_string()))?;
 
+        #[allow(deprecated)]
         conn.trace(Some(logging::log_sql));
 
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")

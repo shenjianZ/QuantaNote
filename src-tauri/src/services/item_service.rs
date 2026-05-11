@@ -5,6 +5,8 @@ use crate::repositories::item_repository;
 use crate::repositories::version_repository;
 use crate::utils::paths;
 
+const VALID_ITEM_TYPES: &[&str] = &["note"];
+
 pub fn create_item(
     db: &DbState,
     title: String,
@@ -13,6 +15,12 @@ pub fn create_item(
 ) -> Result<ItemDto, AppError> {
     if title.trim().is_empty() {
         return Err(AppError::Validation("标题不能为空".to_string()));
+    }
+    if !VALID_ITEM_TYPES.contains(&item_type.as_str()) {
+        return Err(AppError::Validation(format!(
+            "无效的记录类型: {}",
+            item_type
+        )));
     }
     let content_val = content.unwrap_or_default();
     let summary = if content_val.is_empty() {
@@ -31,8 +39,9 @@ pub fn create_item(
         },
     )?;
     if !content_val.is_empty() {
-        let _ =
-            version_repository::create_version(db, &item.id, &content_val, "创建", "初始版本", "");
+        if let Err(e) = version_repository::create_version(db, &item.id, &content_val, "创建", "初始版本", "") {
+            log::warn!("Failed to create initial version for item {}: {}", item.id, e);
+        }
     }
     Ok(item)
 }

@@ -247,8 +247,8 @@ pub fn get_pinned(db: &DbState) -> Result<Vec<ItemDto>, AppError> {
     let items: Vec<ItemDto> = stmt
         .query_map([], row_to_item)
         .map_err(|e| AppError::Database(e.to_string()))?
-        .filter_map(|r| r.ok())
-        .collect();
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| AppError::Database(e.to_string()))?;
 
     Ok(items)
 }
@@ -266,8 +266,8 @@ pub fn get_recent(db: &DbState, limit: i64) -> Result<Vec<ItemDto>, AppError> {
     let items: Vec<ItemDto> = stmt
         .query_map(params![limit], row_to_item)
         .map_err(|e| AppError::Database(e.to_string()))?
-        .filter_map(|r| r.ok())
-        .collect();
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| AppError::Database(e.to_string()))?;
 
     Ok(items)
 }

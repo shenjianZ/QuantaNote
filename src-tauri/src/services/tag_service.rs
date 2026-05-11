@@ -3,6 +3,18 @@ use crate::error::AppError;
 use crate::models::item::TagDto;
 use crate::repositories::tag_repository;
 
+const VALID_TAG_COLORS: &[&str] = &["cyan", "purple", "yellow", "blue", "green", "red"];
+
+fn validate_tag_color(color: &str) -> Result<(), AppError> {
+    if !VALID_TAG_COLORS.contains(&color) {
+        return Err(AppError::Validation(format!(
+            "无效的标签颜色: {}，有效值: {:?}",
+            color, VALID_TAG_COLORS
+        )));
+    }
+    Ok(())
+}
+
 pub fn get_all_tags(db: &DbState) -> Result<Vec<TagDto>, AppError> {
     tag_repository::get_all_tags(db)
 }
@@ -12,6 +24,7 @@ pub fn get_all_item_tag_mappings(db: &DbState) -> Result<Vec<(String, String)>, 
 }
 
 pub fn create_tag(db: &DbState, name: &str, color: &str) -> Result<TagDto, AppError> {
+    validate_tag_color(color)?;
     tag_repository::create_tag(db, name, color)
 }
 
@@ -48,6 +61,7 @@ pub fn rename_tag(db: &DbState, old_name: &str, new_name: &str) -> Result<TagDto
 }
 
 pub fn update_tag_color(db: &DbState, name: &str, color: &str) -> Result<TagDto, AppError> {
+    validate_tag_color(color)?;
     tag_repository::update_tag_color(db, name, color)
 }
 

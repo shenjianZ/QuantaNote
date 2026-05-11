@@ -41,7 +41,7 @@ export const useItemStore = create<ItemState>((set) => ({
   error: null,
 
   fetchItems: async (itemType) => {
-    set({ loading: true });
+    set({ loading: true, error: null });
     try {
       const items = await invoke<ItemDto[]>("get_items", {
         itemType: itemType ?? null,

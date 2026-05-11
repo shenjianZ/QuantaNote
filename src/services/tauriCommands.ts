@@ -344,7 +344,7 @@ export interface SyncState {
 export interface ConflictInfo {
     record_id: string;
     table_name: string;
-    local_data: any;
+    local_data: Record<string, unknown>;
     local_updated_at: string;
     remote_updated_at: string;
     content_hash: string;

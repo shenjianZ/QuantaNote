@@ -8,7 +8,7 @@
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=000000)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=FFFFFF)
 ![Rust](https://img.shields.io/badge/Rust-1.70+-000000?logo=rust&logoColor=FFFFFF)
-![Vite](https://img.shields.io/badge/Vite-6.0-646CFF?logo=vite&logoColor=FFFFFF)
+![Vite](https://img.shields.io/badge/Vite-7.0-646CFF?logo=vite&logoColor=FFFFFF)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind-4.0-06B6D4?logo=tailwindcss&logoColor=FFFFFF)
 ![Zustand](https://img.shields.io/badge/Zustand-5.0-FFB84D?logoColor=FFFFFF)
 ![SQLite](https://img.shields.io/badge/SQLite-0.31-003B57?logo=sqlite&logoColor=FFFFFF)
@@ -63,7 +63,7 @@ A local-first desktop note management app with Markdown editing, full-text searc
 | Frontend | React 19, TypeScript, Zustand 5, TailwindCSS 4, Vditor 3 |
 | Backend | Tauri 2, Rust, rusqlite 0.31 |
 | Database | SQLite (WAL mode, FTS5 full-text search) |
-| Testing | Vitest, Playwright, cargo test |
+| Testing | Vitest, WebDriverIO, cargo test |
 
 ## Quick Start
 

@@ -237,7 +237,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
                 stopAutoSync();
                 await get().logout();
                 set({ isLoading: false, error: i18n.t("sync:sessionExpired") });
-                return {} as SyncResult;
+                throw new Error(i18n.t("sync:sessionExpired"));
             }
             set({ isLoading: false, error: msg });
             throw e;

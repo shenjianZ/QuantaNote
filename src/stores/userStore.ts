@@ -66,7 +66,12 @@ export const useUserStore = create<UserState>((set) => ({
     },
 
     deleteAccount: async () => {
-        await deleteAccountCmd();
-        set({ profile: null });
+        try {
+            await deleteAccountCmd();
+            set({ profile: null });
+        } catch {
+            useToastStore.getState().addToast("error", i18n.t("profile:saveFailed"));
+            throw new Error("deleteAccount failed");
+        }
     },
 }));

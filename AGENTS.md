@@ -1,4 +1,4 @@
-# AGENTS.md instructions for D:\rustproject\QuantaNote
+# AGENTS.md instructions for QuantaNote
 
 1. 对于前端项目（react、vue、ts），我习惯使用 pnpm，而不是 npm
 2. 始终使用中文回复

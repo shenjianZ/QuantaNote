@@ -7,7 +7,7 @@ import {
   Link,
 } from "lucide-react";
 import i18n from "../i18n";
-import type { Item, ItemType, Tag } from "../types";
+import type { Item, ItemType } from "../types";
 import type { ItemDto } from "../stores/itemStore";
 
 const TYPE_TO_ICON: Record<string, typeof FileText> = {
@@ -57,7 +57,7 @@ export function adaptItem(dto: ItemDto): Item {
     type: itemType,
     title: dto.title,
     summary: dto.summary || dto.content?.slice(0, 60) || "",
-    tags: [] as Tag[],
+    tags: [],
     time: formatRelativeTime(dto.updated_at || dto.created_at),
     icon: TYPE_TO_ICON[dto.item_type] ?? FileText,
     accent: TYPE_TO_ACCENT[dto.item_type] ?? "cyan",

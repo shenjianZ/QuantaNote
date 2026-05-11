@@ -8,7 +8,6 @@ import { cp, mkdir, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import type { Plugin, ResolvedConfig } from "vite";
 
-// @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
 const VDITOR_ASSET_PREFIX = "/vditor/dist";

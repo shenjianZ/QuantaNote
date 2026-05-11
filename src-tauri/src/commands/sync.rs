@@ -79,7 +79,7 @@ pub fn get_sync_state(sync_state: State<'_, SyncEngineState>) -> Result<SyncStat
         .engine
         .lock()
         .map_err(|e| AppError::Database(e.to_string()))?;
-    Ok(engine.state_manager().get_state())
+    Ok(engine.state_manager().get_state()?)
 }
 
 #[tauri::command]
@@ -148,14 +148,14 @@ pub async fn trigger_sync(
         (transport, sm, shared_config)
     };
 
-    state_manager.clear_progress();
+    let _ = state_manager.clear_progress();
 
     let sync_output =
         match sync_service::run_sync_with_transport(&transport, &state_manager, &config, &db).await
         {
             Ok(r) => r,
             Err(e) => {
-                state_manager.set_error(e.to_string());
+                let _ = state_manager.set_error(e.to_string());
                 let (new_access, new_refresh) = transport.get_tokens().await;
                 let mut updated_config = config;
                 updated_config.access_token = new_access;
@@ -205,6 +205,9 @@ pub async fn sync_login(
     email: String,
     password: String,
 ) -> Result<SyncLoginResult, AppError> {
+    if password.len() < 8 {
+        return Err(AppError::Validation("密码长度不能少于8位".to_string()));
+    }
     let mut config = sync_service::load_sync_config(&db);
     ensure_device_id(&mut config);
 
@@ -234,6 +237,9 @@ pub async fn sync_register(
     password: String,
     verify_code: Option<String>,
 ) -> Result<SyncLoginResult, AppError> {
+    if password.len() < 8 {
+        return Err(AppError::Validation("密码长度不能少于8位".to_string()));
+    }
     let mut config = sync_service::load_sync_config(&db);
     ensure_device_id(&mut config);
 

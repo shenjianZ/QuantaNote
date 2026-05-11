@@ -32,11 +32,12 @@ export const useTagStore = create<TagState>((set, get) => ({
   setTags: (tags) => set({ tags }),
 
   fetchTags: async () => {
+    set({ loading: true, error: null });
     try {
       const tags = await getAllTags();
-      set({ tags });
+      set({ tags, loading: false });
     } catch (e) {
-      set({ error: String(e) });
+      set({ error: String(e), loading: false });
     }
   },
 

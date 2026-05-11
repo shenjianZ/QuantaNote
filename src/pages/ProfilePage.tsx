@@ -219,7 +219,7 @@ export function ProfilePage({ onNavigate }: { onNavigate: (page: AppPage) => voi
                 {profile?.avatar_url && config.server_url ? (
                   <img
                     src={`${config.server_url}/user/avatar/${profile.id}`}
-                    alt=""
+                    alt={profile?.nickname || profile?.email || "User avatar"}
                     className="h-16 w-16 rounded-full object-cover"
                   />
                 ) : (

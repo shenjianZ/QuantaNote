@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use crate::models::sync::{SyncProgress, SyncState, SyncStatus};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
@@ -22,22 +23,32 @@ impl SyncStateManager {
         self.app_handle = Some(handle);
     }
 
-    pub fn get_state(&self) -> SyncState {
-        self.state.lock().unwrap().clone()
+    pub fn get_state(&self) -> Result<SyncState, AppError> {
+        self.state
+            .lock()
+            .map(|s| s.clone())
+            .map_err(|e| AppError::Database(e.to_string()))
     }
 
-    pub fn set_status(&self, status: SyncStatus) {
+    pub fn set_status(&self, status: SyncStatus) -> Result<(), AppError> {
         let snapshot = {
-            let mut state = self.state.lock().unwrap();
+            let mut state = self
+                .state
+                .lock()
+                .map_err(|e| AppError::Database(e.to_string()))?;
             state.status = status;
             state.clone()
         };
         self.emit_state(&snapshot);
+        Ok(())
     }
 
-    pub fn set_progress(&self, phase: &str, current: u32, total: u32) {
+    pub fn set_progress(&self, phase: &str, current: u32, total: u32) -> Result<(), AppError> {
         let snapshot = {
-            let mut state = self.state.lock().unwrap();
+            let mut state = self
+                .state
+                .lock()
+                .map_err(|e| AppError::Database(e.to_string()))?;
             state.progress = Some(SyncProgress {
                 phase: phase.to_string(),
                 current,
@@ -46,21 +57,29 @@ impl SyncStateManager {
             state.clone()
         };
         self.emit_state(&snapshot);
+        Ok(())
     }
 
-    pub fn set_error(&self, error: String) {
+    pub fn set_error(&self, error: String) -> Result<(), AppError> {
         let snapshot = {
-            let mut state = self.state.lock().unwrap();
+            let mut state = self
+                .state
+                .lock()
+                .map_err(|e| AppError::Database(e.to_string()))?;
             state.status = SyncStatus::Error;
             state.last_error = Some(error);
             state.clone()
         };
         self.emit_state(&snapshot);
+        Ok(())
     }
 
-    pub fn set_completed(&self) {
+    pub fn set_completed(&self) -> Result<(), AppError> {
         let snapshot = {
-            let mut state = self.state.lock().unwrap();
+            let mut state = self
+                .state
+                .lock()
+                .map_err(|e| AppError::Database(e.to_string()))?;
             state.status = SyncStatus::Completed;
             state.progress = None;
             state.last_error = None;
@@ -68,15 +87,20 @@ impl SyncStateManager {
             state.clone()
         };
         self.emit_state(&snapshot);
+        Ok(())
     }
 
-    pub fn clear_progress(&self) {
+    pub fn clear_progress(&self) -> Result<(), AppError> {
         let snapshot = {
-            let mut state = self.state.lock().unwrap();
+            let mut state = self
+                .state
+                .lock()
+                .map_err(|e| AppError::Database(e.to_string()))?;
             state.progress = None;
             state.clone()
         };
         self.emit_state(&snapshot);
+        Ok(())
     }
 
     fn emit_state(&self, state: &SyncState) {

@@ -249,7 +249,7 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
     }
   }, [getContentElement]);
 
-  // 高亮所有匹配项 - 使用 innerHTML 替换方式
+  // 高亮所有匹配项 - 使用 DOM API 安全替换
   const highlightAll = useCallback((query: string, caseSensitive: boolean) => {
     clearHighlights();
     const container = containerRef.current;
