@@ -36,13 +36,9 @@ xattr -dr com.apple.quarantine /Applications/QuantaNote.app
 2. 选择 **"打开"**
 3. 在弹窗中点击 **"打开"**
 
-### 问题 3：使用 Homebrew 安装（推荐）
+### 问题 3：Homebrew 安装
 
-```bash
-brew install --cask quantanote
-```
-
-Homebrew 会自动处理安全问题。
+QuantaNote 暂未发布 Homebrew Cask。请先从上方下载 `.dmg` 安装包。
 
 ---
 
