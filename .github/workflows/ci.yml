@@ -31,8 +31,8 @@ jobs:
           fi
           # 读取安装指南文件并替换版本号
           if [ -f "RELEASE_GUIDE.md" ]; then
-            GUIDE=$(cat RELEASE_GUIDE.md | sed "s/\*/${TAG}/g")
-            BODY="${BODY}${GUIDE}"
+            GUIDE=$(sed "s/__TAG__/${TAG}/g" RELEASE_GUIDE.md)
+            BODY="${BODY}"$'\n\n'"${GUIDE}"
           fi
           # 多行内容需要特殊处理
           echo "body<<EOF" >> $GITHUB_OUTPUT
@@ -85,9 +85,13 @@ jobs:
         run: |
           $tagVersion = $env:GITHUB_REF_NAME.TrimStart("v")
           $packageVersion = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $siteVersion = (Get-Content site/package.json -Raw | ConvertFrom-Json).version
+          $docsVersion = (Get-Content docs/package.json -Raw | ConvertFrom-Json).version
           $tauriVersion = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
           $cargoVersion = (Select-String -Path src-tauri/Cargo.toml -Pattern '^version = "([^"]+)"$').Matches[0].Groups[1].Value
           if ($packageVersion -ne $tagVersion) { throw "package.json version $packageVersion != tag $tagVersion" }
+          if ($siteVersion -ne $tagVersion) { throw "site/package.json version $siteVersion != tag $tagVersion" }
+          if ($docsVersion -ne $tagVersion) { throw "docs/package.json version $docsVersion != tag $tagVersion" }
           if ($tauriVersion -ne $tagVersion) { throw "tauri.conf.json version $tauriVersion != tag $tagVersion" }
           if ($cargoVersion -ne $tagVersion) { throw "Cargo.toml version $cargoVersion != tag $tagVersion" }
 

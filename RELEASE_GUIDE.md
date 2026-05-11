@@ -4,13 +4,13 @@
 
 | Platform | Architecture | File | Size |
 |----------|--------------|------|------|
-| **Windows** | x64 | [QuantaNote-*-windows-x64.exe](https://github.com/shenjianZ/QuantaNote/releases/latest/download/QuantaNote-*-windows-x64.exe) | ~10 MB |
-| **Windows** | x64 | [QuantaNote-*-windows-x64.msi](https://github.com/shenjianZ/QuantaNote/releases/latest/download/QuantaNote-*-windows-x64.msi) | ~12 MB |
-| **macOS** | Apple Silicon (M1/M2/M3/M4) | [QuantaNote-*-macos-aarch64.dmg](https://github.com/shenjianZ/QuantaNote/releases/latest/download/QuantaNote-*-macos-aarch64.dmg) | ~15 MB |
-| **macOS** | Intel | [QuantaNote-*-macos-x64.dmg](https://github.com/shenjianZ/QuantaNote/releases/latest/download/QuantaNote-*-macos-x64.dmg) | ~15 MB |
-| **Linux** | x64 | [QuantaNote-*-linux-x64.AppImage](https://github.com/shenjianZ/QuantaNote/releases/latest/download/QuantaNote-*-linux-x64.AppImage) | ~85 MB |
-| **Linux** | x64 | [QuantaNote-*-linux-x64.deb](https://github.com/shenjianZ/QuantaNote/releases/latest/download/QuantaNote-*-linux-x64.deb) | ~14 MB |
-| **Linux** | x64 | [QuantaNote-*-linux-x64.rpm](https://github.com/shenjianZ/QuantaNote/releases/latest/download/QuantaNote-*-linux-x64.rpm) | ~14 MB |
+| **Windows** | x64 | [QuantaNote-__TAG__-windows-x64.exe](https://github.com/shenjianZ/QuantaNote/releases/latest/download/QuantaNote-__TAG__-windows-x64.exe) | ~10 MB |
+| **Windows** | x64 | [QuantaNote-__TAG__-windows-x64.msi](https://github.com/shenjianZ/QuantaNote/releases/latest/download/QuantaNote-__TAG__-windows-x64.msi) | ~12 MB |
+| **macOS** | Apple Silicon (M1/M2/M3/M4) | [QuantaNote-__TAG__-macos-aarch64.dmg](https://github.com/shenjianZ/QuantaNote/releases/latest/download/QuantaNote-__TAG__-macos-aarch64.dmg) | ~15 MB |
+| **macOS** | Intel | [QuantaNote-__TAG__-macos-x64.dmg](https://github.com/shenjianZ/QuantaNote/releases/latest/download/QuantaNote-__TAG__-macos-x64.dmg) | ~15 MB |
+| **Linux** | x64 | [QuantaNote-__TAG__-linux-x64.AppImage](https://github.com/shenjianZ/QuantaNote/releases/latest/download/QuantaNote-__TAG__-linux-x64.AppImage) | ~85 MB |
+| **Linux** | x64 | [QuantaNote-__TAG__-linux-x64.deb](https://github.com/shenjianZ/QuantaNote/releases/latest/download/QuantaNote-__TAG__-linux-x64.deb) | ~14 MB |
+| **Linux** | x64 | [QuantaNote-__TAG__-linux-x64.rpm](https://github.com/shenjianZ/QuantaNote/releases/latest/download/QuantaNote-__TAG__-linux-x64.rpm) | ~14 MB |
 
 ---
 
@@ -58,7 +58,7 @@ Homebrew 会自动处理安全问题。
 ### 问题 2：静默安装（高级用户/批量部署）
 
 ```powershell
-QuantaNote-*-windows-x64.exe /S
+QuantaNote-__TAG__-windows-x64.exe /S
 ```
 
 ---
@@ -69,16 +69,16 @@ QuantaNote-*-windows-x64.exe /S
 
 ```bash
 # 1. 添加执行权限
-chmod +x QuantaNote-*-linux-x64.AppImage
+chmod +x QuantaNote-__TAG__-linux-x64.AppImage
 
 # 2. 运行
-./QuantaNote-*-linux-x64.AppImage
+./QuantaNote-__TAG__-linux-x64.AppImage
 ```
 
 ### Debian/Ubuntu (.deb)
 
 ```bash
-sudo dpkg -i QuantaNote-*-linux-x64.deb
+sudo dpkg -i QuantaNote-__TAG__-linux-x64.deb
 
 # 如果遇到依赖问题
 sudo apt-get install -f
@@ -87,16 +87,16 @@ sudo apt-get install -f
 ### Fedora/RHEL (.rpm)
 
 ```bash
-sudo rpm -i QuantaNote-*-linux-x64.rpm
+sudo rpm -i QuantaNote-__TAG__-linux-x64.rpm
 
 # 或使用 dnf 自动处理依赖
-sudo dnf localinstall QuantaNote-*-linux-x64.rpm
+sudo dnf localinstall QuantaNote-__TAG__-linux-x64.rpm
 ```
 
 ### Archive (.tar.gz)
 
 ```bash
-tar -xzf QuantaNote-*-linux-x64.tar.gz
+tar -xzf QuantaNote-__TAG__-linux-x64.tar.gz
 cd QuantaNote
 ./quanta-note
 ```

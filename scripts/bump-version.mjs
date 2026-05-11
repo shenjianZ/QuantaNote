@@ -8,8 +8,11 @@
  *
  * 修改范围:
  *   - package.json (root)
+ *   - site/package.json
  *   - docs/package.json
  *   - slides/package.json
+ *   - site/src/components/*
+ *   - docs/public/config/site*.yaml
  *   - src-tauri/Cargo.toml
  *   - src-tauri/tauri.conf.json
  *   - quantanote-cloud/Cargo.toml
@@ -39,12 +42,15 @@ function replaceInFile(rel, search, replace) {
   const abs = filePath(rel);
   let content = readFileSync(abs, "utf-8");
   const before = content;
-  content = content.replace(search, replace);
-  if (content === before) {
+  const matched = typeof search === "string" ? content.includes(search) : search.test(content);
+  if (!matched) {
     console.warn(`  ⚠ 未匹配: ${rel}`);
     return false;
   }
-  writeFileSync(abs, content, "utf-8");
+  content = content.replace(search, replace);
+  if (content !== before) {
+    writeFileSync(abs, content, "utf-8");
+  }
   return true;
 }
 
@@ -62,6 +68,7 @@ console.log(`\n🔧 统一修改版本号 → ${newVersion}\n`);
 // --- package.json files ---
 console.log("📦 package.json:");
 replaceJsonVersion("package.json");
+replaceJsonVersion("site/package.json");
 replaceJsonVersion("docs/package.json");
 
 // --- Cargo.toml files ---
@@ -93,13 +100,36 @@ console.log(`  ✓ quantanote-cloud/src/handlers/health.rs → ${newVersion}`);
 
 // --- Frontend source files ---
 console.log("\n🌐 前端源文件:");
-const settingsPageOk = replaceInFile(
-  "src/pages/SettingsPage.tsx",
-  /v\d+\.\d+\.\d+(-[\w.]+)?/,
-  `v${newVersion}`
+const siteHeroOk = replaceInFile(
+  "site/src/components/Hero.tsx",
+  /Download v\d+\.\d+\.\d+(-[\w.]+)?/,
+  `Download v${newVersion}`
 );
-if (settingsPageOk) {
-  console.log(`  ✓ src/pages/SettingsPage.tsx → ${newVersion}`);
+if (siteHeroOk) {
+  console.log(`  ✓ site/src/components/Hero.tsx → ${newVersion}`);
 }
+
+const siteDownloadOk = replaceInFile(
+  "site/src/components/DownloadCTA.tsx",
+  /v\d+\.\d+\.\d+(-[\w.]+)?\s+—\s+MIT License/,
+  `v${newVersion} — MIT License`
+);
+if (siteDownloadOk) {
+  console.log(`  ✓ site/src/components/DownloadCTA.tsx → ${newVersion}`);
+}
+
+console.log("\n📎 Docs site config:");
+replaceInFile(
+  "docs/public/config/site.yaml",
+  /version: "v\d+\.\d+\.\d+(-[\w.]+)?"/,
+  `version: "v${newVersion}"`
+);
+console.log(`  ✓ docs/public/config/site.yaml → ${newVersion}`);
+replaceInFile(
+  "docs/public/config/site.en.yaml",
+  /version: "v\d+\.\d+\.\d+(-[\w.]+)?"/,
+  `version: "v${newVersion}"`
+);
+console.log(`  ✓ docs/public/config/site.en.yaml → ${newVersion}`);
 
 console.log(`\n✅ 全部版本号已统一为 ${newVersion}\n`);
