@@ -1,6 +1,6 @@
 [package]
 name = "quanta-note"
-version = "0.2.0"
+version = "0.2.1"
 description = "Local-first desktop information hub"
 authors = ["QuantaNote"]
 edition = "2021"

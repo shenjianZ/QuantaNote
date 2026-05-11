@@ -2,6 +2,28 @@
 
 本文件记录 QuantaNote 的版本更新历史。格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [0.2.1] - 2026-05-11
+
+### Changed
+
+- 升级 rusqlite 0.31→0.35、thiserror 1→2、hashlink 0.9→0.10
+- 同步状态管理改用 `Result` 替代 `unwrap`，改善错误传播
+- CI concurrency 分组独立命名，避免 docs/site 部署互相取消
+
+### Added
+
+- 密码长度（≥8位）、标签颜色、记录类型等输入验证
+- 同步 diff 模块单元测试（冲突策略、跨表 ID、哈希确定性等）
+- PR Check workflow（仅手动触发）
+
+### Fixed
+
+- 前端 TopBar 兼容非 Tauri 环境（浏览器预览不再报错）
+- 标签加载状态管理，fetchTags 正确设置 loading/error
+- 删除账号异常时显示错误提示而非静默失败
+- 编辑器搜索高亮改用 DOM API，移除 innerHTML 替换
+- SettingsPage 开关组件添加 role="switch" 和 aria-checked 无障碍属性
+
 ## [0.2.0] - 2026-05-05
 
 ### Added
