@@ -92,7 +92,9 @@ pub async fn run_sync_with_transport(
         for conflict in &diff_result.conflicts {
             log::info!(
                 "冲突: {} (表: {}) → {:?}",
-                conflict.record_id, conflict.table_name, conflict.resolution
+                conflict.record_id,
+                conflict.table_name,
+                conflict.resolution
             );
         }
     }

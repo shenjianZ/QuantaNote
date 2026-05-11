@@ -39,8 +39,14 @@ pub fn create_item(
         },
     )?;
     if !content_val.is_empty() {
-        if let Err(e) = version_repository::create_version(db, &item.id, &content_val, "创建", "初始版本", "") {
-            log::warn!("Failed to create initial version for item {}: {}", item.id, e);
+        if let Err(e) =
+            version_repository::create_version(db, &item.id, &content_val, "创建", "初始版本", "")
+        {
+            log::warn!(
+                "Failed to create initial version for item {}: {}",
+                item.id,
+                e
+            );
         }
     }
     Ok(item)

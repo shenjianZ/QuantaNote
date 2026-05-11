@@ -116,6 +116,7 @@
     "updateErrorNetwork": "No network connection",
     "updateErrorUnreachable": "Update server unreachable",
     "updateErrorNoRelease": "No update available",
+    "updateErrorSignature": "Update package signature verification failed. Please wait for a fixed installer.",
     "updateErrorUnknown": "Update check failed"
   },
   "localeOptions": {

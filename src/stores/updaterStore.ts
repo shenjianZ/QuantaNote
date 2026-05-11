@@ -26,6 +26,15 @@ function classifyUpdateError(err: unknown): string {
     if (lower.includes("cert") || lower.includes("tls") || lower.includes("ssl")) {
         return i18n.t("settings:updateErrorNetwork");
     }
+    if (
+        lower.includes("signature") ||
+        lower.includes("verify") ||
+        lower.includes("verification") ||
+        lower.includes("pubkey") ||
+        lower.includes("public key")
+    ) {
+        return i18n.t("settings:updateErrorSignature");
+    }
     return i18n.t("settings:updateErrorUnknown");
 }
 
