@@ -120,7 +120,7 @@ export default function DownloadCTA() {
             className="rounded-full px-3 py-1 text-[12px]"
             style={{ border: '1px solid var(--line)', color: 'var(--muted)' }}
           >
-            v0.2.0 — MIT License
+            v0.2.1 — MIT License
           </span>
         </motion.div>
       </div>
