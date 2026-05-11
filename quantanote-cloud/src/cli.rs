@@ -27,7 +27,7 @@ impl Environment {
 #[command(name = "quantanote-cloud")]
 #[command(about = "QuantaNote Cloud Server", long_about = None)]
 #[command(author = "shenjianZ")]
-#[command(version = "0.2.1")]
+#[command(version = "0.2.2")]
 #[command(propagate_version = true)]
 pub struct CliArgs {
     /// 指定配置文件路径

@@ -76,7 +76,7 @@ export default function Hero() {
             onMouseLeave={e => (e.currentTarget.style.background = '#386c5f')}
           >
             <Download size={16} />
-            Download v0.2.1
+            Download v0.2.2
           </a>
           <a
             href="https://github.com/shenjianZ/QuantaNote"
