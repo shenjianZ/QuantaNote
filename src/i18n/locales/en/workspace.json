@@ -5,6 +5,7 @@
   "savingBtn": "Saving",
   "placeholder": "What do you want to note today?",
   "savedStatus": "Saved",
-  "shortcutHint": "Ctrl/⌘ + Enter to save",
+  "shortcutHint": "{{mod}} + Enter to save",
+  "viewSaved": "View note",
   "loadingEditor": "Loading editor..."
 }
