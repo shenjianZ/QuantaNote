@@ -5,17 +5,20 @@
   "windows": ["floating-ball", "quick-note"],
   "permissions": [
     "core:default",
+    "core:event:allow-emit",
     "core:window:allow-close",
     "core:window:allow-hide",
     "core:window:allow-show",
     "core:window:allow-set-focus",
     "core:window:allow-start-dragging",
     "core:window:allow-set-always-on-top",
+    "core:window:allow-set-background-color",
     "core:window:allow-set-size",
     "core:window:allow-set-position",
     "core:window:allow-center",
     "core:window:allow-set-decorations",
     "core:window:allow-set-resizable",
+    "core:webview:allow-set-webview-background-color",
     "core:webview:allow-create-webview-window"
   ]
 }

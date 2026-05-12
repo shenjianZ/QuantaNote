@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { emit, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { LogicalSize, LogicalPosition } from "@tauri-apps/api/dpi";
@@ -11,6 +12,7 @@ import {
     Sparkles,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { loadAllSettings } from "../../services/tauriCommands";
 
 interface MenuItem {
     icon: React.ReactNode;
@@ -19,28 +21,152 @@ interface MenuItem {
     gradient: string;
 }
 
-const COLLAPSED_SIZE = { width: 64, height: 64 };
+const COLLAPSED_SIZE = { width: 56, height: 56 };
 const EXPANDED_SIZE = { width: 300, height: 300 };
-const BALL_OFFSET_COLLAPSED = { x: 32, y: 32 };
+const BALL_OFFSET_COLLAPSED = { x: 28, y: 28 };
 const BALL_OFFSET_EXPANDED = { x: 150, y: 150 };
-const MENU_RADIUS = 80;
+const MENU_RADIUS = 96;
+const SETTINGS_CHANGED_EVENT = "quantanote-settings-changed";
+
+interface SettingsChangedPayload {
+    key: string;
+    value: unknown;
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+    const normalized = hex.replace("#", "");
+    if (!/^[0-9a-fA-F]{6}$/.test(normalized)) return null;
+    return {
+        r: parseInt(normalized.slice(0, 2), 16),
+        g: parseInt(normalized.slice(2, 4), 16),
+        b: parseInt(normalized.slice(4, 6), 16),
+    };
+}
+
+function applyAccentColor(accentColor: unknown) {
+    if (typeof accentColor !== "string") return;
+    const rgb = hexToRgb(accentColor);
+    if (!rgb) return;
+    const root = document.documentElement;
+    root.style.setProperty("--accent", accentColor);
+    root.style.setProperty("--accent-rgb", `${rgb.r}, ${rgb.g}, ${rgb.b}`);
+    root.style.setProperty("--accent-soft", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.14)`);
+}
+
+async function syncAccentColorFromSettings() {
+    try {
+        const saved = await loadAllSettings();
+        const rawSettings = saved["quantanote-settings"];
+        if (!rawSettings) return;
+        const parsed = JSON.parse(rawSettings) as { accentColor?: unknown };
+        applyAccentColor(parsed.accentColor);
+    } catch {
+        /* use stylesheet defaults */
+    }
+}
 
 export function FloatingBall() {
     const { t } = useTranslation("floating-ball");
     const [menuOpen, setMenuOpen] = useState(false);
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
     const dragStartPos = useRef({ x: 0, y: 0 });
+    const pointerDown = useRef(false);
     const hasMoved = useRef(false);
     const isDragging = useRef(false);
+    const acceptUserMoveEvents = useRef(false);
+    const moveTimer = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+    const moveIdleTimer = useRef<ReturnType<typeof window.setTimeout> | null>(null);
 
     useEffect(() => {
         document.documentElement.classList.add("floating-ball-mode");
         document.body.style.background = "transparent";
         document.body.style.backgroundColor = "transparent";
+        getCurrentWindow().setBackgroundColor([0, 0, 0, 0]).catch(() => {});
+        syncAccentColorFromSettings();
         return () => {
             document.documentElement.classList.remove("floating-ball-mode");
             document.body.style.background = "";
             document.body.style.backgroundColor = "";
+        };
+    }, []);
+
+    useEffect(() => {
+        let active = true;
+        let unlisten: (() => void) | undefined;
+
+        listen<SettingsChangedPayload>(SETTINGS_CHANGED_EVENT, (event) => {
+            if (event.payload.key === "accentColor") {
+                applyAccentColor(event.payload.value);
+            }
+        })
+            .then((cleanup) => {
+                if (active) {
+                    unlisten = cleanup;
+                } else {
+                    cleanup();
+                }
+            })
+            .catch(() => {});
+
+        return () => {
+            active = false;
+            unlisten?.();
+        };
+    }, []);
+
+    useEffect(() => {
+        const clearPointerState = () => {
+            pointerDown.current = false;
+        };
+        window.addEventListener("mouseup", clearPointerState);
+        return () => window.removeEventListener("mouseup", clearPointerState);
+    }, []);
+
+    useEffect(() => {
+        const win = getCurrentWindow();
+        let active = true;
+        let unlisten: (() => void) | undefined;
+
+        win.onMoved((position) => {
+            if (!acceptUserMoveEvents.current) return;
+            if (moveTimer.current) {
+                window.clearTimeout(moveTimer.current);
+            }
+            if (moveIdleTimer.current) {
+                window.clearTimeout(moveIdleTimer.current);
+            }
+            moveTimer.current = window.setTimeout(async () => {
+                try {
+                    await emit("quantanote-floating-ball-position-changed", {
+                        x: Math.round(position.payload.x),
+                        y: Math.round(position.payload.y),
+                    });
+                } catch {
+                    /* ignore */
+                }
+            }, 200);
+            moveIdleTimer.current = window.setTimeout(() => {
+                acceptUserMoveEvents.current = false;
+            }, 800);
+        })
+            .then((cleanup) => {
+                if (active) {
+                    unlisten = cleanup;
+                } else {
+                    cleanup();
+                }
+            })
+            .catch(() => {});
+
+        return () => {
+            active = false;
+            unlisten?.();
+            if (moveTimer.current) {
+                window.clearTimeout(moveTimer.current);
+            }
+            if (moveIdleTimer.current) {
+                window.clearTimeout(moveIdleTimer.current);
+            }
         };
     }, []);
 
@@ -88,39 +214,74 @@ export function FloatingBall() {
 
     // 拖拽处理
     const handleMouseDown = useCallback(
-        async (e: React.MouseEvent) => {
+        (e: React.MouseEvent) => {
             e.preventDefault();
             if (menuOpen) return;
 
+            pointerDown.current = true;
+            acceptUserMoveEvents.current = false;
             hasMoved.current = false;
-            isDragging.current = true;
-            dragStartPos.current = { x: e.clientX, y: e.clientY };
-
-            try {
-                const win = getCurrentWindow();
-                await win.startDragging();
-            } catch {
-                /* ignore */
-            }
-
             isDragging.current = false;
+            dragStartPos.current = { x: e.screenX, y: e.screenY };
+        },
+        [menuOpen],
+    );
+
+    const handleMouseMove = useCallback(
+        async (e: React.MouseEvent) => {
+            if (!pointerDown.current || menuOpen || isDragging.current) return;
+
+            const dx = Math.abs(e.screenX - dragStartPos.current.x);
+            const dy = Math.abs(e.screenY - dragStartPos.current.y);
+            if (dx < 5 && dy < 5) return;
+
+            hasMoved.current = true;
+            isDragging.current = true;
+            acceptUserMoveEvents.current = true;
+            try {
+                await getCurrentWindow().startDragging();
+            } catch {
+                acceptUserMoveEvents.current = false;
+                /* ignore */
+            } finally {
+                pointerDown.current = false;
+                window.setTimeout(() => {
+                    isDragging.current = false;
+                }, 0);
+            }
         },
         [menuOpen],
     );
 
     const handleMouseUp = useCallback((e: React.MouseEvent) => {
-        const dx = Math.abs(e.clientX - dragStartPos.current.x);
-        const dy = Math.abs(e.clientY - dragStartPos.current.y);
+        if (menuOpen && !pointerDown.current) {
+            hasMoved.current = false;
+            return;
+        }
+
+        pointerDown.current = false;
+        const dx = Math.abs(e.screenX - dragStartPos.current.x);
+        const dy = Math.abs(e.screenY - dragStartPos.current.y);
         if (dx >= 5 || dy >= 5) {
             hasMoved.current = true;
         }
-    }, []);
+    }, [menuOpen]);
 
     const handleClick = useCallback(() => {
+        if (menuOpen) {
+            setMenuOpen(false);
+            hasMoved.current = false;
+            return;
+        }
+
         if (!hasMoved.current && !isDragging.current) {
             setMenuOpen((prev) => !prev);
         }
         hasMoved.current = false;
+    }, [menuOpen]);
+
+    const emitCommand = useCallback((command: string) => {
+        emit("quantanote-floating-ball-command", command).catch(() => {});
     }, []);
 
     // 打开快速笔记窗口
@@ -128,6 +289,7 @@ export function FloatingBall() {
         const existing = await WebviewWindow.getByLabel("quick-note");
         if (existing) {
             try {
+                await existing.show();
                 await existing.setFocus();
                 return;
             } catch {
@@ -154,11 +316,11 @@ export function FloatingBall() {
     }, []);
 
     const handleCloseBall = useCallback(() => {
-        try {
-            getCurrentWindow().close();
-        } catch {
-            /* ignore */
-        }
+        emit("quantanote-floating-ball-command", "hide")
+            .catch(() => {})
+            .finally(() => {
+                getCurrentWindow().close().catch(() => {});
+            });
     }, []);
 
     // 菜单项
@@ -172,22 +334,19 @@ export function FloatingBall() {
         {
             icon: <Search className="h-4 w-4" />,
             label: t("search"),
-            action: () =>
-                window.dispatchEvent(new CustomEvent("quantanote:open-search")),
+            action: () => emitCommand("open-search"),
             gradient: "from-sky-400 to-blue-500",
         },
         {
             icon: <Clock className="h-4 w-4" />,
             label: t("recentNotes"),
-            action: () =>
-                window.dispatchEvent(new CustomEvent("quantanote:open-recent")),
+            action: () => emitCommand("open-recent"),
             gradient: "from-amber-400 to-orange-500",
         },
         {
             icon: <FileText className="h-4 w-4" />,
             label: t("newFullNote"),
-            action: () =>
-                window.dispatchEvent(new CustomEvent("quantanote:new-note")),
+            action: () => emitCommand("new-note"),
             gradient: "from-violet-400 to-purple-500",
         },
         {
@@ -229,7 +388,7 @@ export function FloatingBall() {
                         className="absolute inset-0 animate-[fadeIn_0.2s_ease-out]"
                         style={{
                             background:
-                                "radial-gradient(circle at 50% 50%, rgba(0,0,0,0.15) 0%, transparent 50%)",
+                                "radial-gradient(circle at 50% 50%, rgba(var(--accent-rgb), 0.14) 0%, transparent 52%)",
                             pointerEvents: "none",
                         }}
                     />
@@ -246,17 +405,20 @@ export function FloatingBall() {
                                     ...getItemStyle(index),
                                     pointerEvents: "auto",
                                     animation: `menuItemIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) ${delay}ms both`,
+                                    zIndex: isHovered ? 30 : 1,
                                 }}
                                 onMouseEnter={() => setHoveredIndex(index)}
                                 onMouseLeave={() => setHoveredIndex(null)}
                             >
                                 <button
                                     type="button"
-                                    className={`group relative flex items-center gap-2 rounded-full border border-white/20 bg-white/90 px-3 py-2 text-sm font-medium shadow-lg backdrop-blur-md transition-all duration-200 dark:border-white/10 dark:bg-gray-900/90 ${
+                                    className={`group relative flex h-11 w-11 items-center justify-center rounded-full text-sm font-medium transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40 ${
                                         isHovered
-                                            ? "scale-110 shadow-xl"
-                                            : "scale-100 shadow-md"
+                                            ? "scale-110"
+                                            : "scale-100"
                                     }`}
+                                    aria-label={item.label}
+                                    title={item.label}
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         item.action();
@@ -264,11 +426,13 @@ export function FloatingBall() {
                                     }}
                                 >
                                     <span
-                                        className={`flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br ${item.gradient} text-white shadow-sm`}
+                                        className={`flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br ${item.gradient} text-white shadow-sm`}
                                     >
                                         {item.icon}
                                     </span>
-                                    <span className="text-[var(--text)] whitespace-nowrap pr-1">
+                                    <span
+                                        className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-[var(--paper)] px-2 py-1 text-xs font-medium text-[var(--text)] opacity-0 shadow-[0_8px_20px_rgba(var(--accent-rgb),0.18)] backdrop-blur-sm transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
+                                    >
                                         {item.label}
                                     </span>
                                 </button>
@@ -284,12 +448,13 @@ export function FloatingBall() {
                     data-floating-ball
                     type="button"
                     style={{ pointerEvents: "auto" }}
-                    className={`group relative flex h-14 w-14 cursor-grab items-center justify-center rounded-full transition-all duration-300 active:cursor-grabbing ${
+                    className={`group relative flex h-12 w-12 cursor-grab items-center justify-center rounded-full transition-all duration-300 active:cursor-grabbing ${
                         menuOpen
                             ? "scale-90 rotate-45 shadow-2xl"
                             : "hover:scale-110 hover:shadow-2xl"
                     }`}
                     onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
                     onClick={handleClick}
                     aria-label="Floating Ball Menu"
@@ -312,19 +477,13 @@ export function FloatingBall() {
                         }`}
                     >
                         <Sparkles
-                            className={`h-5 w-5 transition-transform duration-300 ${
+                            className={`h-4 w-4 transition-transform duration-300 ${
                                 menuOpen ? "rotate-90" : ""
                             }`}
                         />
                     </span>
 
                     {/* 脉冲指示器 */}
-                    {!menuOpen && (
-                        <span className="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5">
-                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
-                            <span className="relative inline-flex h-3.5 w-3.5 rounded-full border-2 border-white bg-red-500 dark:border-gray-900" />
-                        </span>
-                    )}
                 </button>
             </div>
         </div>

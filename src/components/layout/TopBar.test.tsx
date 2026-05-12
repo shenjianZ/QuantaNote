@@ -35,6 +35,9 @@ function setWindowSettings(settings: {
       closeKeepRunning: settings.closeKeepRunning,
       autoBackup: true,
       autostart: false,
+      autoUpdateEnabled: false,
+      floatingBall: false,
+      floatingBallPosition: null,
       sqlLogging: {
         enabled: false,
         toConsole: false,

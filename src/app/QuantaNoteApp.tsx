@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { availableMonitors, primaryMonitor } from "@tauri-apps/api/window";
+import { PhysicalPosition } from "@tauri-apps/api/dpi";
 import { FileText } from "lucide-react";
 import { AppShell } from "../components/layout/AppShell";
 import { CommandPalette } from "../components/search/CommandPalette";
@@ -16,6 +18,7 @@ import { useAppStore } from "../stores/appStore";
 import { useItemStore } from "../stores/itemStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useSyncStore } from "../stores/syncStore";
+import type { FloatingBallPosition } from "../stores/settingsStore";
 import { adaptItem } from "../adapters/itemAdapter";
 import { deriveRecordTitle } from "../utils/recordTitle";
 import { preloadVditorResources } from "../utils/vditorPreload";
@@ -43,7 +46,113 @@ type TrayCommand =
     | "new-note"
     | "open-workspace"
     | "open-library"
-    | "open-settings";
+    | "open-settings"
+    | "show-floating-ball"
+    | "hide-floating-ball";
+
+type FloatingBallCommand =
+    | "open-search"
+    | "open-recent"
+    | "new-note"
+    | "hide";
+
+const FLOATING_BALL_SIZE = 56;
+const FLOATING_BALL_MARGIN = 24;
+const FLOATING_BALL_RIGHT_MARGIN = 96;
+const SHOW_FLOATING_BALL_EVENT = "quantanote:show-floating-ball-window";
+const HIDE_FLOATING_BALL_EVENT = "quantanote:hide-floating-ball-window";
+
+interface PhysicalWorkArea {
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+    ballSize: number;
+    margin: number;
+    rightMargin: number;
+}
+
+function isValidFloatingBallPosition(position: FloatingBallPosition | null | undefined): position is FloatingBallPosition {
+    return Boolean(
+        position &&
+        Number.isFinite(position.x) &&
+        Number.isFinite(position.y),
+    );
+}
+
+async function getInitialFloatingBallPosition(): Promise<FloatingBallPosition> {
+    const saved = useSettingsStore.getState().settings.floatingBallPosition;
+
+    try {
+        const [monitors, primary] = await Promise.all([
+            availableMonitors(),
+            primaryMonitor(),
+        ]);
+        const workAreas = (monitors.length > 0 ? monitors : primary ? [primary] : [])
+            .map((monitor) => {
+                const { position, size } = monitor.workArea;
+                const scale = monitor.scaleFactor || 1;
+                const ballSize = FLOATING_BALL_SIZE * scale;
+                const margin = FLOATING_BALL_MARGIN * scale;
+                const rightMargin = FLOATING_BALL_RIGHT_MARGIN * scale;
+                return {
+                    left: position.x,
+                    top: position.y,
+                    right: position.x + size.width,
+                    bottom: position.y + size.height,
+                    ballSize,
+                    margin,
+                    rightMargin,
+                };
+            });
+        if (workAreas.length > 0) {
+            const primaryWorkArea = primary
+                ? workAreas.find((area) => {
+                    return area.left === primary.workArea.position.x &&
+                        area.top === primary.workArea.position.y;
+                }) ?? workAreas[0]
+                : workAreas[0];
+            const targetArea = isValidFloatingBallPosition(saved)
+                ? workAreas.find((area) => isPositionInWorkArea(saved, area)) ?? primaryWorkArea
+                : primaryWorkArea;
+            const targetPosition = isValidFloatingBallPosition(saved)
+                ? saved
+                : {
+                    x: targetArea.right - targetArea.ballSize - targetArea.rightMargin,
+                    y: targetArea.bottom - targetArea.ballSize - targetArea.margin,
+                };
+            return clampFloatingBallPosition(targetPosition, targetArea);
+        }
+    } catch {
+        /* fallback to browser screen metrics */
+    }
+
+    const scale = window.devicePixelRatio || 1;
+    return {
+        x: Math.round(Math.max(FLOATING_BALL_MARGIN * scale, (window.screen.availWidth - FLOATING_BALL_SIZE - FLOATING_BALL_RIGHT_MARGIN) * scale)),
+        y: Math.round(Math.max(FLOATING_BALL_MARGIN * scale, (window.screen.availHeight - FLOATING_BALL_SIZE - FLOATING_BALL_MARGIN) * scale)),
+    };
+}
+
+function isPositionInWorkArea(position: FloatingBallPosition, area: PhysicalWorkArea) {
+    return (
+        position.x >= area.left &&
+        position.y >= area.top &&
+        position.x + area.ballSize <= area.right &&
+        position.y + area.ballSize <= area.bottom
+    );
+}
+
+function clampFloatingBallPosition(position: FloatingBallPosition, area: PhysicalWorkArea): FloatingBallPosition {
+    const minX = area.left + area.margin;
+    const minY = area.top + area.margin;
+    const maxX = Math.max(minX, area.right - area.ballSize - area.rightMargin);
+    const maxY = Math.max(minY, area.bottom - area.ballSize - area.margin);
+    return {
+        x: Math.round(Math.min(Math.max(position.x, minX), maxX)),
+        y: Math.round(Math.min(Math.max(position.y, minY), maxY)),
+    };
+}
 
 function isEditableShortcutTarget(target: EventTarget | null) {
     if (!(target instanceof HTMLElement)) return false;
@@ -264,6 +373,12 @@ export function QuantaNoteApp() {
                 case "open-settings":
                     navigate("settings");
                     break;
+                case "show-floating-ball":
+                    window.dispatchEvent(new Event(SHOW_FLOATING_BALL_EVENT));
+                    break;
+                case "hide-floating-ball":
+                    window.dispatchEvent(new Event(HIDE_FLOATING_BALL_EVENT));
+                    break;
             }
         })
             .then((cleanup) => {
@@ -292,10 +407,20 @@ export function QuantaNoteApp() {
         }
     }, []);
 
+    const hideFloatingBallWindow = useCallback(async () => {
+        const win = floatingBallRef.current;
+        if (win) {
+            try { await win.hide(); } catch { /* already hidden or closed */ }
+        }
+    }, []);
+
     const openFloatingBallWindow = useCallback(async () => {
         const existing = floatingBallRef.current;
         if (existing) {
             try {
+                const position = await getInitialFloatingBallPosition();
+                await existing.setPosition(new PhysicalPosition(position.x, position.y));
+                await existing.show();
                 await existing.setFocus();
                 return;
             } catch { /* window may have been closed */ }
@@ -303,11 +428,12 @@ export function QuantaNoteApp() {
 
         try {
             const baseUrl = window.location.href.split("?")[0];
+            const position = await getInitialFloatingBallPosition();
             const win = new WebviewWindow("floating-ball", {
                 url: `${baseUrl}?mode=floating-ball`,
                 title: "QuantaNote Floating Ball",
-                width: 64,
-                height: 64,
+                width: FLOATING_BALL_SIZE,
+                height: FLOATING_BALL_SIZE,
                 decorations: false,
                 transparent: true,
                 shadow: false,
@@ -315,17 +441,44 @@ export function QuantaNoteApp() {
                 alwaysOnTop: true,
                 resizable: false,
                 skipTaskbar: true,
-                center: true,
+                visible: false,
+                focus: false,
             });
             floatingBallRef.current = win;
+            win.once("tauri://created", () => {
+                win.setBackgroundColor([0, 0, 0, 0]).catch(() => {});
+                win.setPosition(new PhysicalPosition(position.x, position.y)).catch(() => {});
+                win.show().catch(() => {});
+            }).catch(() => {});
             win.once("tauri://error", () => {
                 floatingBallRef.current = null;
             });
+            win.once("tauri://destroyed", () => {
+                floatingBallRef.current = null;
+            }).catch(() => {});
         } catch { /* ignore */ }
     }, []);
 
+    useEffect(() => {
+        const showFloatingBall = () => {
+            useSettingsStore.getState().updateSetting("floatingBall", true);
+            openFloatingBallWindow();
+        };
+        const hideFloatingBall = () => {
+            hideFloatingBallWindow();
+        };
+
+        window.addEventListener(SHOW_FLOATING_BALL_EVENT, showFloatingBall);
+        window.addEventListener(HIDE_FLOATING_BALL_EVENT, hideFloatingBall);
+        return () => {
+            window.removeEventListener(SHOW_FLOATING_BALL_EVENT, showFloatingBall);
+            window.removeEventListener(HIDE_FLOATING_BALL_EVENT, hideFloatingBall);
+        };
+    }, [openFloatingBallWindow, hideFloatingBallWindow]);
+
     // 监听悬浮球设置变化
     const floatingBallEnabled = useSettingsStore((s) => s.settings.floatingBall);
+    const floatingBallPosition = useSettingsStore((s) => s.settings.floatingBallPosition);
     const prevFloatingBallRef = useRef(floatingBallEnabled);
 
     useEffect(() => {
@@ -340,6 +493,13 @@ export function QuantaNoteApp() {
         prevFloatingBallRef.current = current;
     }, [floatingBallEnabled, openFloatingBallWindow, closeFloatingBallWindow]);
 
+    useEffect(() => {
+        if (!floatingBallEnabled || !isValidFloatingBallPosition(floatingBallPosition)) return;
+        floatingBallRef.current
+            ?.setPosition(new PhysicalPosition(floatingBallPosition.x, floatingBallPosition.y))
+            .catch(() => {});
+    }, [floatingBallEnabled, floatingBallPosition]);
+
     // 首次加载时检查
     useEffect(() => {
         if (floatingBallEnabled) {
@@ -352,22 +512,54 @@ export function QuantaNoteApp() {
 
     // 监听悬浮球发出的事件
     useEffect(() => {
-        const handleOpenSearch = () => openPalette();
-        const handleOpenRecent = () => {
-            navigate("library");
-        };
-        const handleNewNote = () => {
-            handleCreateNote().catch(() => {});
-        };
+        let active = true;
+        let unlistenCommand: (() => void) | undefined;
+        let unlistenPosition: (() => void) | undefined;
 
-        window.addEventListener("quantanote:open-search", handleOpenSearch);
-        window.addEventListener("quantanote:open-recent", handleOpenRecent);
-        window.addEventListener("quantanote:new-note", handleNewNote);
+        listen<FloatingBallCommand>("quantanote-floating-ball-command", (event) => {
+            switch (event.payload) {
+                case "open-search":
+                    openPalette();
+                    break;
+                case "open-recent":
+                    navigate("library");
+                    break;
+                case "new-note":
+                    handleCreateNote().catch(() => {});
+                    break;
+                case "hide":
+                    useSettingsStore.getState().updateSetting("floatingBall", false);
+                    break;
+            }
+        })
+            .then((cleanup) => {
+                if (active) {
+                    unlistenCommand = cleanup;
+                } else {
+                    cleanup();
+                }
+            })
+            .catch(() => {});
+
+        listen<FloatingBallPosition>("quantanote-floating-ball-position-changed", (event) => {
+            if (!isValidFloatingBallPosition(event.payload)) return;
+            const current = useSettingsStore.getState().settings.floatingBallPosition;
+            if (current?.x === event.payload.x && current?.y === event.payload.y) return;
+            useSettingsStore.getState().updateSetting("floatingBallPosition", event.payload);
+        })
+            .then((cleanup) => {
+                if (active) {
+                    unlistenPosition = cleanup;
+                } else {
+                    cleanup();
+                }
+            })
+            .catch(() => {});
 
         return () => {
-            window.removeEventListener("quantanote:open-search", handleOpenSearch);
-            window.removeEventListener("quantanote:open-recent", handleOpenRecent);
-            window.removeEventListener("quantanote:new-note", handleNewNote);
+            active = false;
+            unlistenCommand?.();
+            unlistenPosition?.();
         };
     }, [openPalette, navigate, handleCreateNote]);
 

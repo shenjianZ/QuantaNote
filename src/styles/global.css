@@ -1009,6 +1009,9 @@ html.floating-ball-mode body {
 html.floating-ball-mode #root {
     background: transparent !important;
     background-color: transparent !important;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
 }
 
 /* 菜单项弹入动画 */

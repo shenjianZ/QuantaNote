@@ -139,6 +139,16 @@ export function SettingsPage({
         );
     }
 
+    function updateFloatingBallPosition(axis: "x" | "y", value: string) {
+        const numericValue = Number(value);
+        if (!Number.isFinite(numericValue)) return;
+        const current = settings.floatingBallPosition ?? { x: 0, y: 0 };
+        updateSetting("floatingBallPosition", {
+            ...current,
+            [axis]: Math.round(numericValue),
+        });
+    }
+
     const settingsMenu = [
         { label: t("settings:menu.appearance"), icon: Palette },
         { label: t("settings:menu.font"), icon: Globe2 },
@@ -313,6 +323,49 @@ export function SettingsPage({
                                 )}
                             </div>
                         ))}
+                        <div className={rowClass}>
+                            <div>
+                                <span className="text-sm text-[var(--text)]">
+                                    {t("settings:appearance.floatingBallPosition")}
+                                </span>
+                                <div className="mt-0.5 text-xs text-[var(--muted)]">
+                                    {t("settings:appearance.floatingBallPositionDesc")}
+                                </div>
+                            </div>
+                            <div className="flex flex-wrap justify-end gap-2">
+                                <label className="flex items-center gap-1.5 text-xs text-[var(--muted)]">
+                                    <span>X</span>
+                                    <input
+                                        data-testid="floating-ball-x-input"
+                                        className="h-8 w-20 rounded-full border border-[var(--line)] bg-[var(--field)] px-3 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                                        inputMode="numeric"
+                                        type="number"
+                                        value={settings.floatingBallPosition?.x ?? ""}
+                                        placeholder={t("settings:appearance.floatingBallDefault")}
+                                        onChange={(e) => updateFloatingBallPosition("x", e.currentTarget.value)}
+                                    />
+                                </label>
+                                <label className="flex items-center gap-1.5 text-xs text-[var(--muted)]">
+                                    <span>Y</span>
+                                    <input
+                                        data-testid="floating-ball-y-input"
+                                        className="h-8 w-20 rounded-full border border-[var(--line)] bg-[var(--field)] px-3 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                                        inputMode="numeric"
+                                        type="number"
+                                        value={settings.floatingBallPosition?.y ?? ""}
+                                        placeholder={t("settings:appearance.floatingBallDefault")}
+                                        onChange={(e) => updateFloatingBallPosition("y", e.currentTarget.value)}
+                                    />
+                                </label>
+                                <button
+                                    type="button"
+                                    className="h-8 rounded-full bg-[var(--field)] px-3 text-sm text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
+                                    onClick={() => updateSetting("floatingBallPosition", null)}
+                                >
+                                    {t("settings:appearance.floatingBallReset")}
+                                </button>
+                            </div>
+                        </div>
                     </section>
                     <section>
                         <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">

@@ -114,7 +114,12 @@ pub fn run() {
                 MenuItem::with_id(app, "workspace", "打开工作台", true, None::<&str>)?;
             let library_item = MenuItem::with_id(app, "library", "打开记录库", true, None::<&str>)?;
             let settings_item = MenuItem::with_id(app, "settings", "打开设置", true, None::<&str>)?;
+            let show_floating_ball_item =
+                MenuItem::with_id(app, "show_floating_ball", "显示悬浮球", true, None::<&str>)?;
+            let hide_floating_ball_item =
+                MenuItem::with_id(app, "hide_floating_ball", "隐藏悬浮球", true, None::<&str>)?;
             let separator = PredefinedMenuItem::separator(app)?;
+            let floating_separator = PredefinedMenuItem::separator(app)?;
             let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
             let menu = Menu::with_items(
                 app,
@@ -124,6 +129,9 @@ pub fn run() {
                     &workspace_item,
                     &library_item,
                     &settings_item,
+                    &floating_separator,
+                    &show_floating_ball_item,
+                    &hide_floating_ball_item,
                     &separator,
                     &quit_item,
                 ],
@@ -156,6 +164,8 @@ pub fn run() {
                     "workspace" => emit_tray_command(app, "open-workspace"),
                     "library" => emit_tray_command(app, "open-library"),
                     "settings" => emit_tray_command(app, "open-settings"),
+                    "show_floating_ball" => emit_tray_command(app, "show-floating-ball"),
+                    "hide_floating_ball" => emit_tray_command(app, "hide-floating-ball"),
                     "quit" => {
                         if let Some(db_state) = app.try_state::<DbState>() {
                             match db_state.checkpoint_wal() {
@@ -184,7 +194,7 @@ pub fn run() {
                 let behavior = window.state::<WindowBehavior>();
                 let keep_running = behavior.close_keep_running.load(Ordering::Relaxed);
 
-                if keep_running {
+                if keep_running && window.label() == "main" {
                     api.prevent_close();
                     let _ = window.hide();
                 } else {

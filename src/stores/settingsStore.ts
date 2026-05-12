@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { emit as emitTauriEvent } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import i18n from "../i18n";
@@ -37,6 +38,11 @@ export interface CustomColor {
     name: string;
 }
 
+export interface FloatingBallPosition {
+    x: number;
+    y: number;
+}
+
 export interface AppSettings {
     fontFamily: string;
     fontMono: string;
@@ -49,6 +55,7 @@ export interface AppSettings {
     autostart: boolean;
     autoUpdateEnabled: boolean;
     floatingBall: boolean;
+    floatingBallPosition: FloatingBallPosition | null;
     sqlLogging: SqlLogSettings;
     locale: "zh-CN" | "en";
 }
@@ -73,6 +80,7 @@ const DEFAULTS: AppSettings = {
     autostart: false,
     autoUpdateEnabled: false,
     floatingBall: false,
+    floatingBallPosition: null,
     sqlLogging: {
         enabled: false,
         toConsole: false,
@@ -110,8 +118,20 @@ function normalizeSettings(settings: AppSettings): AppSettings {
         autostart: Boolean(settings.autostart),
         autoUpdateEnabled: Boolean(settings.autoUpdateEnabled),
         floatingBall: Boolean(settings.floatingBall),
+        floatingBallPosition: normalizeFloatingBallPosition(settings.floatingBallPosition),
         sqlLogging: normalizeSqlLogSettings(settings.sqlLogging),
         locale,
+    };
+}
+
+function normalizeFloatingBallPosition(position?: Partial<FloatingBallPosition> | null): FloatingBallPosition | null {
+    if (!position) return null;
+    const x = Number(position.x);
+    const y = Number(position.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    return {
+        x: Math.round(x),
+        y: Math.round(y),
     };
 }
 
@@ -222,6 +242,10 @@ function applySettings(settings: AppSettings) {
     root.style.setProperty("--accent", settings.accentColor);
     const rgb = hexToRgb(settings.accentColor);
     if (rgb) {
+        root.style.setProperty(
+            "--accent-rgb",
+            `${rgb.r}, ${rgb.g}, ${rgb.b}`,
+        );
         root.style.setProperty(
             "--accent-soft",
             `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.14)`,
@@ -345,6 +369,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         persist(settings);
         applySettings(settings);
         set({ settings });
+        emitTauriEvent("quantanote-settings-changed", { key, value }).catch(() => {});
 
         if (key === "locale") {
             i18n.changeLanguage(value as string);

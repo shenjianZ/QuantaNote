@@ -34,6 +34,12 @@
     "minimizeToTrayDesc": "点击最小化按钮时，将窗口隐藏到托盘",
     "closeKeepRunning": "关闭窗口时隐藏到托盘",
     "closeKeepRunningDesc": "点击关闭按钮时，不退出应用，而是隐藏到托盘",
+    "floatingBall": "悬浮球",
+    "floatingBallDesc": "在其他窗口上方显示快速操作悬浮按钮",
+    "floatingBallPosition": "悬浮球位置",
+    "floatingBallPositionDesc": "设置屏幕物理 X/Y 坐标；留空或重置时根据实际屏幕尺寸显示在右下角",
+    "floatingBallDefault": "自动",
+    "floatingBallReset": "重置",
     "systemSection": "系统",
     "autostart": "开机自动启动"
   },

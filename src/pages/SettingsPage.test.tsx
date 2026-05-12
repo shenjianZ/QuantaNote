@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { setup } from "../test/test-utils";
 import { SettingsPage } from "./SettingsPage";
 import { useSettingsStore } from "../stores/settingsStore";
@@ -24,6 +24,9 @@ describe("SettingsPage", () => {
                 closeKeepRunning: false,
                 autoBackup: false,
                 autostart: false,
+                autoUpdateEnabled: false,
+                floatingBall: false,
+                floatingBallPosition: null,
                 customAccentColors: [],
                 sqlLogging: {
                     enabled: false,
@@ -98,6 +101,17 @@ describe("SettingsPage", () => {
             await user.click(toggles[0]);
             expect(updateSettingMock).toHaveBeenCalled();
         }
+    });
+
+    it("updates floating ball coordinates", async () => {
+        setup(<SettingsPage />);
+        fireEvent.change(screen.getByTestId("floating-ball-x-input"), {
+            target: { value: "120" },
+        });
+        expect(updateSettingMock).toHaveBeenCalledWith(
+            "floatingBallPosition",
+            { x: 120, y: 0 },
+        );
     });
 
     it("switches to data section and shows export", async () => {

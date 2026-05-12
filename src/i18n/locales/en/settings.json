@@ -34,6 +34,12 @@
     "minimizeToTrayDesc": "Hide window to tray when clicking the minimize button",
     "closeKeepRunning": "Hide to Tray on Close",
     "closeKeepRunningDesc": "Hide to tray instead of quitting when clicking the close button",
+    "floatingBall": "Floating Ball",
+    "floatingBallDesc": "Show a floating quick action button above other windows",
+    "floatingBallPosition": "Floating Ball Position",
+    "floatingBallPositionDesc": "Set physical screen X/Y coordinates. Leave empty or reset to use the bottom-right position from the actual screen size.",
+    "floatingBallDefault": "Auto",
+    "floatingBallReset": "Reset",
     "systemSection": "System",
     "autostart": "Auto Start on Boot"
   },
