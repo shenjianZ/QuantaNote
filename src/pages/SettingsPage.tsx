@@ -293,6 +293,11 @@ export function SettingsPage({
                                 label: t("settings:appearance.closeKeepRunning"),
                                 desc: t("settings:appearance.closeKeepRunningDesc"),
                             },
+                            {
+                                key: "floatingBall" as const,
+                                label: t("settings:appearance.floatingBall"),
+                                desc: t("settings:appearance.floatingBallDesc"),
+                            },
                         ].map((item) => (
                             <div className={rowClass} key={item.key}>
                                 <div>

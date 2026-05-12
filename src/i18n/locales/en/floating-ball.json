@@ -1,0 +1,14 @@
+{
+  "quickNote": "Quick Note",
+  "quickNoteTitle": "Quick Note",
+  "search": "Search",
+  "recentNotes": "Recent Notes",
+  "newFullNote": "New Full Note",
+  "togglePin": "Toggle Pin",
+  "saveBtn": "Save",
+  "cancelBtn": "Cancel",
+  "savingBtn": "Saving...",
+  "closeFloatingBall": "Close Floating Ball",
+  "shortcutHint": "{{mod}} + Enter to save",
+  "placeholder": "Write your note..."
+}

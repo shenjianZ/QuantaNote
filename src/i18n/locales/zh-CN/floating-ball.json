@@ -1,0 +1,14 @@
+{
+  "quickNote": "快速笔记",
+  "quickNoteTitle": "快速笔记",
+  "search": "搜索",
+  "recentNotes": "最近笔记",
+  "newFullNote": "新建完整笔记",
+  "togglePin": "切换置顶",
+  "saveBtn": "保存",
+  "cancelBtn": "取消",
+  "savingBtn": "保存中...",
+  "closeFloatingBall": "关闭悬浮球",
+  "shortcutHint": "{{mod}} + Enter 保存",
+  "placeholder": "输入笔记内容..."
+}

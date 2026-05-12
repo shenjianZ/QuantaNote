@@ -48,6 +48,7 @@ export interface AppSettings {
     autoBackup: boolean;
     autostart: boolean;
     autoUpdateEnabled: boolean;
+    floatingBall: boolean;
     sqlLogging: SqlLogSettings;
     locale: "zh-CN" | "en";
 }
@@ -71,6 +72,7 @@ const DEFAULTS: AppSettings = {
     autoBackup: true,
     autostart: false,
     autoUpdateEnabled: false,
+    floatingBall: false,
     sqlLogging: {
         enabled: false,
         toConsole: false,
@@ -107,6 +109,7 @@ function normalizeSettings(settings: AppSettings): AppSettings {
         autoBackup: Boolean(settings.autoBackup),
         autostart: Boolean(settings.autostart),
         autoUpdateEnabled: Boolean(settings.autoUpdateEnabled),
+        floatingBall: Boolean(settings.floatingBall),
         sqlLogging: normalizeSqlLogSettings(settings.sqlLogging),
         locale,
     };
@@ -400,6 +403,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
                     .getState()
                     .addToast("error", i18n.t("common:toast.windowBehaviorFailed"));
             }
+        } else if (key === "floatingBall") {
+            window.dispatchEvent(
+                new CustomEvent("quantanote:floating-ball-toggle", {
+                    detail: { enabled: value },
+                }),
+            );
         }
     },
 

@@ -15,6 +15,7 @@ import zhAuth from "./locales/zh-CN/auth.json";
 import zhEditor from "./locales/zh-CN/editor.json";
 import zhProfile from "./locales/zh-CN/profile.json";
 import zhLanguageSetup from "./locales/zh-CN/language-setup.json";
+import zhFloatingBall from "./locales/zh-CN/floating-ball.json";
 
 import enCommon from "./locales/en/common.json";
 import enWorkspace from "./locales/en/workspace.json";
@@ -30,6 +31,7 @@ import enAuth from "./locales/en/auth.json";
 import enEditor from "./locales/en/editor.json";
 import enProfile from "./locales/en/profile.json";
 import enLanguageSetup from "./locales/en/language-setup.json";
+import enFloatingBall from "./locales/en/floating-ball.json";
 
 const resources = {
   "zh-CN": {
@@ -47,6 +49,7 @@ const resources = {
     editor: zhEditor,
     profile: zhProfile,
     "language-setup": zhLanguageSetup,
+    "floating-ball": zhFloatingBall,
   },
   en: {
     common: enCommon,
@@ -63,6 +66,7 @@ const resources = {
     editor: enEditor,
     profile: enProfile,
     "language-setup": enLanguageSetup,
+    "floating-ball": enFloatingBall,
   },
 };
 
@@ -85,6 +89,7 @@ i18n.use(initReactI18next).init({
     "editor",
     "profile",
     "language-setup",
+    "floating-ball",
   ],
   defaultNS: "common",
   interpolation: {

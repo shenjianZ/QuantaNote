@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { FileText } from "lucide-react";
 import { AppShell } from "../components/layout/AppShell";
 import { CommandPalette } from "../components/search/CommandPalette";
@@ -279,6 +280,96 @@ export function QuantaNoteApp() {
             unlisten?.();
         };
     }, [handleCreateNote, navigate]);
+
+    // Floating ball window lifecycle
+    const floatingBallRef = useRef<WebviewWindow | null>(null);
+
+    const closeFloatingBallWindow = useCallback(async () => {
+        const win = floatingBallRef.current;
+        if (win) {
+            try { await win.close(); } catch { /* already closed */ }
+            floatingBallRef.current = null;
+        }
+    }, []);
+
+    const openFloatingBallWindow = useCallback(async () => {
+        const existing = floatingBallRef.current;
+        if (existing) {
+            try {
+                await existing.setFocus();
+                return;
+            } catch { /* window may have been closed */ }
+        }
+
+        try {
+            const baseUrl = window.location.href.split("?")[0];
+            const win = new WebviewWindow("floating-ball", {
+                url: `${baseUrl}?mode=floating-ball`,
+                title: "QuantaNote Floating Ball",
+                width: 64,
+                height: 64,
+                decorations: false,
+                transparent: true,
+                shadow: false,
+                backgroundColor: [0, 0, 0, 0],
+                alwaysOnTop: true,
+                resizable: false,
+                skipTaskbar: true,
+                center: true,
+            });
+            floatingBallRef.current = win;
+            win.once("tauri://error", () => {
+                floatingBallRef.current = null;
+            });
+        } catch { /* ignore */ }
+    }, []);
+
+    // 监听悬浮球设置变化
+    const floatingBallEnabled = useSettingsStore((s) => s.settings.floatingBall);
+    const prevFloatingBallRef = useRef(floatingBallEnabled);
+
+    useEffect(() => {
+        const prev = prevFloatingBallRef.current;
+        const current = floatingBallEnabled;
+
+        if (current && !prev) {
+            openFloatingBallWindow();
+        } else if (!current && prev) {
+            closeFloatingBallWindow();
+        }
+        prevFloatingBallRef.current = current;
+    }, [floatingBallEnabled, openFloatingBallWindow, closeFloatingBallWindow]);
+
+    // 首次加载时检查
+    useEffect(() => {
+        if (floatingBallEnabled) {
+            openFloatingBallWindow();
+        }
+        return () => {
+            closeFloatingBallWindow();
+        };
+    }, []);
+
+    // 监听悬浮球发出的事件
+    useEffect(() => {
+        const handleOpenSearch = () => openPalette();
+        const handleOpenRecent = () => {
+            navigate("library");
+        };
+        const handleNewNote = () => {
+            handleCreateNote().catch(() => {});
+        };
+
+        window.addEventListener("quantanote:open-search", handleOpenSearch);
+        window.addEventListener("quantanote:open-recent", handleOpenRecent);
+        window.addEventListener("quantanote:new-note", handleNewNote);
+
+        return () => {
+            window.removeEventListener("quantanote:open-search", handleOpenSearch);
+            window.removeEventListener("quantanote:open-recent", handleOpenRecent);
+            window.removeEventListener("quantanote:new-note", handleNewNote);
+        };
+    }, [openPalette, navigate, handleCreateNote]);
 
     // 禁用右键菜单（作为 Tauri 配置的补充）
     useEffect(() => {

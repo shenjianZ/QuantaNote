@@ -5,6 +5,15 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>QuantaNote</title>
+    <script>
+      (function() {
+        var p = new URLSearchParams(window.location.search);
+        var m = p.get('mode');
+        if (m === 'floating-ball' || m === 'quick-note') {
+          document.documentElement.classList.add(m === 'floating-ball' ? 'floating-ball-mode' : 'quick-note-mode');
+        }
+      })();
+    </script>
   </head>
 
   <body>

@@ -990,3 +990,74 @@ kbd {
         transform: translateY(0);
     }
 }
+
+/* Floating ball window: fully transparent */
+html.floating-ball-mode {
+    --app-bg: transparent;
+}
+
+html.floating-ball-mode,
+html.floating-ball-mode body {
+    background: transparent !important;
+    background-color: transparent !important;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+    -webkit-app-region: no-drag;
+}
+
+html.floating-ball-mode #root {
+    background: transparent !important;
+    background-color: transparent !important;
+}
+
+/* 菜单项弹入动画 */
+@keyframes menuItemIn {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.3);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+/* 淡入动画 */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* 添加 --accent-rgb 变量供悬浮球使用 */
+:root {
+    --accent-rgb: 56, 108, 95;
+}
+[data-theme="dark"] {
+    --accent-rgb: 124, 183, 166;
+}
+
+/* Quick note window: minimal chrome */
+html.quick-note-mode {
+    overflow: hidden;
+}
+html.quick-note-mode body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+html.quick-note-mode .workspace-editor-panel {
+    border: none;
+    border-radius: 0;
+}
+html.quick-note-mode .vditor {
+    border: none !important;
+    border-radius: 0 !important;
+}
+html.quick-note-mode .vditor-toolbar {
+    border-top: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--line) !important;
+    padding: 4px 8px !important;
+}
