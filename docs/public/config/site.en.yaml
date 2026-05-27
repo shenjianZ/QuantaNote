@@ -70,6 +70,8 @@ sidebar:
                         path: "/docs/features/document-editor"
                       - title: "Markdown Editor"
                         path: "/docs/features/markdown-editor"
+                      - title: "Floating Ball"
+                        path: "/docs/features/floating-ball"
                       - title: "Tags"
                         path: "/docs/features/tags"
                       - title: "Attachments"

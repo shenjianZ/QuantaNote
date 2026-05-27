@@ -70,6 +70,8 @@ sidebar:
                         path: "/docs/features/document-editor"
                       - title: "Markdown 编辑器"
                         path: "/docs/features/markdown-editor"
+                      - title: "悬浮球"
+                        path: "/docs/features/floating-ball"
                       - title: "标签"
                         path: "/docs/features/tags"
                       - title: "附件"

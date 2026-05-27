@@ -94,3 +94,15 @@ Right-clicking the tray icon opens a context menu with the following options:
 | **Quit** | Fully exits the QuantaNote application |
 
 > **Tip**: If you frequently need to capture quick notes, set QuantaNote to autostart and minimize to tray. Use the tray right-click menu's "New Note" option for instant note capture.
+
+## Floating Ball
+
+The floating ball is a separate desktop shortcut window that can stay above other windows. It is useful when the main window is hidden or minimized but you still want a lightweight entry point.
+
+| Setting | Description |
+|---------|-------------|
+| **Floating Ball** | Enables or disables the floating ball window |
+| **Floating Ball Position** | Sets physical screen X/Y coordinates; when empty, the ball is placed near the bottom-right of the primary screen |
+| **Reset** | Clears the manual position and lets the app calculate the default position again |
+
+The floating ball menu includes quick note, search, recent notes, new full note, and close actions. See [Floating Ball](../features/floating-ball.md) for the full guide.

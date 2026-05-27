@@ -36,6 +36,10 @@ Below is an overview of every major feature. Click each link to learn more.
 
 - **[Command Palette](./command-palette.md)** — Press `Ctrl+K` to instantly search and navigate across all items. A global quick-access tool for power users.
 
+## Desktop Quick Access
+
+- **[Floating Ball](./floating-ball.md)** — A small always-on-top shortcut window for capturing notes or opening search without switching back to the main app first.
+
 ## Design Principles
 
 - **Local-first** — All data lives on your machine. No cloud dependency, no accounts required for core functionality.
