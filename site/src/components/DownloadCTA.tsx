@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Download, Apple, Monitor, Laptop, ExternalLink } from 'lucide-react'
+import { Download, Apple, Monitor, Laptop, Smartphone, ExternalLink } from 'lucide-react'
 
 const platforms = [
   {
@@ -18,6 +18,12 @@ const platforms = [
     icon: Laptop,
     name: 'Linux',
     formats: '.deb / .AppImage',
+    href: 'https://github.com/shenjianZ/QuantaNote/releases/latest',
+  },
+  {
+    icon: Smartphone,
+    name: 'Android',
+    formats: '.apk',
     href: 'https://github.com/shenjianZ/QuantaNote/releases/latest',
   },
 ]
@@ -53,7 +59,7 @@ export default function DownloadCTA() {
           className="mb-10 text-[15px]"
           style={{ color: 'var(--muted)' }}
         >
-          Available for Windows, macOS, and Linux. Free and open source.
+          Available for Windows, macOS, Linux, and Android. Free and open source.
         </motion.p>
 
         <motion.div
