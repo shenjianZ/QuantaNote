@@ -7,6 +7,7 @@ import { useItemStore } from "../stores/itemStore";
 import { useAttachmentStore } from "../stores/attachmentStore";
 import { useTagStore } from "../stores/tagStore";
 import { useSearchStore } from "../stores/searchStore";
+import { MOBILE_BACK_EVENT } from "../utils/platform";
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({
   open: vi.fn(),
@@ -97,6 +98,34 @@ describe("LibraryPage", () => {
 
     await user.click(screen.getByText("Note A"));
     expect(props.onSelectItem).toHaveBeenCalledWith("item-1");
+  });
+
+  it("closes the reader drawer on mobile back", async () => {
+    useItemStore.setState({
+      selectedItem: {
+        ...defaultSelectedItem,
+        id: "item-1",
+        title: "Note A",
+        content: "Body",
+      },
+    });
+    const props = makeProps({
+      selectedItem: createMockItem({ id: "item-1", title: "Note A" }),
+      onPreviewRequestClear: vi.fn(),
+    });
+    const { user } = setup(<LibraryPage {...props} />);
+
+    await user.click(screen.getByText("Note A"));
+    expect(screen.getByTestId("reader-drawer")).toBeInTheDocument();
+
+    const event = new Event(MOBILE_BACK_EVENT, { cancelable: true });
+    window.dispatchEvent(event);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("reader-drawer")).not.toBeInTheDocument();
+    });
+    expect(event.defaultPrevented).toBe(true);
+    expect(props.onPreviewRequestClear).toHaveBeenCalled();
   });
 
   it("calls onCreateItem when new button clicked", async () => {

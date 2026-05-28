@@ -1,0 +1,25 @@
+{
+    "$schema": "../gen/schemas/desktop-schema.json",
+    "identifier": "mobile",
+    "description": "Capability for the main window on mobile platforms",
+    "windows": ["main"],
+    "platforms": ["android", "iOS"],
+    "permissions": [
+        "core:default",
+        "core:window:allow-close",
+        "core:event:allow-listen",
+        "core:event:allow-unlisten",
+        "opener:default",
+        {
+            "identifier": "opener:allow-open-path",
+            "allow": [
+                { "path": "/sdcard/Android/data/com.quantanote.desktop/files/quantanote" },
+                { "path": "/sdcard/Android/data/com.quantanote.desktop/files/quantanote/**" },
+                { "path": "/storage/emulated/0/Android/data/com.quantanote.desktop/files/quantanote" },
+                { "path": "/storage/emulated/0/Android/data/com.quantanote.desktop/files/quantanote/**" }
+            ]
+        },
+        "dialog:default",
+        "log:default"
+    ]
+}

@@ -21,8 +21,10 @@ interface AppState {
   theme: ThemeMode;
   alwaysOnTop: boolean;
   settingsSection: number | null;
+  navigationHistory: AppPage[];
   init: () => Promise<void>;
   navigate: (page: AppPage) => void;
+  goBack: () => boolean;
   openPalette: () => void;
   closePalette: () => void;
   selectItem: (id: string) => void;
@@ -45,6 +47,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   theme: "system",
   alwaysOnTop: false,
   settingsSection: null,
+  navigationHistory: [],
 
   init: async () => {
     try {
@@ -94,12 +97,42 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   navigate: (page) => {
-    const patch: Partial<AppState> = { currentPage: page };
-    if (page !== "settings") {
-      patch.settingsSection = null;
+    const current = get().currentPage;
+    const history = get().navigationHistory;
+
+    // 如果导航到新页面，将当前页面加入历史
+    if (page !== current) {
+      const newHistory = [...history, current];
+      set({
+        currentPage: page,
+        navigationHistory: newHistory,
+        settingsSection: page !== "settings" ? null : get().settingsSection
+      });
+    } else {
+      set({
+        currentPage: page,
+        settingsSection: page !== "settings" ? null : get().settingsSection
+      });
     }
-    set(patch);
+
     saveSettings({ currentPage: page }).catch(() => {});
+  },
+
+  goBack: () => {
+    const history = get().navigationHistory;
+    if (history.length === 0) return false;
+
+    const previousPage = history[history.length - 1];
+    const newHistory = history.slice(0, -1);
+
+    set({
+      currentPage: previousPage,
+      navigationHistory: newHistory,
+      settingsSection: previousPage !== "settings" ? null : get().settingsSection
+    });
+
+    saveSettings({ currentPage: previousPage }).catch(() => {});
+    return true;
   },
   openPalette: () => set({ paletteOpen: true }),
   closePalette: () => set({ paletteOpen: false }),

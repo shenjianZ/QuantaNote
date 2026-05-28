@@ -31,6 +31,7 @@ import { useSettingsStore } from "../stores/settingsStore";
 import { useAppStore } from "../stores/appStore";
 import { useToastStore } from "../stores/toastStore";
 import { useUpdaterStore } from "../stores/updaterStore";
+import { isMobile } from "../utils/platform";
 
 const FONT_OPTIONS_KEYS = [
     { value: "Noto Sans SC", label: "Noto Sans SC" },
@@ -80,6 +81,7 @@ export function SettingsPage({
     const [importModalOpen, setImportModalOpen] = useState(false);
     const [backupManagerOpen, setBackupManagerOpen] = useState(false);
     const settings = useSettingsStore((s) => s.settings);
+    const isMobilePlatform = isMobile();
     const dbSize = useSettingsStore((s) => s.dbSize);
     const dbPath = useSettingsStore((s) => s.dbPath);
     const autoBackupConfig = useSettingsStore((s) => s.autoBackupConfig);
@@ -129,11 +131,11 @@ export function SettingsPage({
                 type="button"
                 role="switch"
                 aria-checked={value}
-                className={`relative h-6 w-11 rounded-full border border-[var(--line)] transition ${value ? "bg-[var(--accent)]" : "bg-[var(--field)]"}`}
+                className={`settings-switch relative shrink-0 rounded-full border border-[var(--line)] transition ${value ? "bg-[var(--accent)]" : "bg-[var(--field)]"}`}
                 onClick={() => onChange(!value)}
             >
                 <span
-                    className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${value ? "left-6" : "left-1"}`}
+                    className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition ${value ? "left-6" : "left-1"}`}
                 />
             </button>
         );
@@ -147,6 +149,24 @@ export function SettingsPage({
             ...current,
             [axis]: Math.round(numericValue),
         });
+    }
+
+    async function handleOpenLogDir() {
+        if (!logDir) return;
+        try {
+            await openPath(logDir);
+        } catch {
+            try {
+                await navigator.clipboard.writeText(logDir);
+                useToastStore
+                    .getState()
+                    .addToast("info", t("common:toast.pathCopied"));
+            } catch {
+                useToastStore
+                    .getState()
+                    .addToast("error", t("common:toast.copyFailed"));
+            }
+        }
     }
 
     const settingsMenu = [
@@ -231,7 +251,7 @@ export function SettingsPage({
                         <div className="mb-4 flex flex-wrap gap-2.5">
                             {ACCENT_COLOR_KEYS.map((c) => (
                                 <button
-                                    className={`h-7 w-7 rounded-full border border-[var(--line)] transition-transform hover:scale-110 ${c.value === settings.accentColor ? "outline outline-2 outline-offset-2 outline-[var(--accent)]" : ""}`}
+                                    className={`settings-color-swatch rounded-full border border-[var(--line)] transition-transform hover:scale-110 ${c.value === settings.accentColor ? "outline outline-2 outline-offset-2 outline-[var(--accent)]" : ""}`}
                                     key={c.value}
                                     data-testid="accent-color"
                                     style={{ background: c.value }}
@@ -248,7 +268,7 @@ export function SettingsPage({
                             {settings.customAccentColors.map((c) => (
                                 <div className="group relative" key={c.hex}>
                                     <button
-                                        className={`h-7 w-7 rounded-full border border-[var(--line)] transition-transform hover:scale-110 ${c.hex === settings.accentColor ? "outline outline-2 outline-offset-2 outline-[var(--accent)]" : ""}`}
+                                        className={`settings-color-swatch rounded-full border border-[var(--line)] transition-transform hover:scale-110 ${c.hex === settings.accentColor ? "outline outline-2 outline-offset-2 outline-[var(--accent)]" : ""}`}
                                         style={{ background: c.hex }}
                                         title={`${c.name} (${c.hex.toUpperCase()})`}
                                         type="button"
@@ -271,7 +291,7 @@ export function SettingsPage({
                             <button
                                 type="button"
                                 data-testid="settings-add-custom-color-btn"
-                                className="flex h-7 w-7 items-center justify-center rounded-full border border-dashed border-[var(--line)] text-[var(--muted)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                                className="settings-color-swatch flex items-center justify-center rounded-full border border-dashed border-[var(--line)] text-[var(--muted)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
                                 title={t("settings:appearance.addCustomColor")}
                                 onClick={() => setColorPickerOpen(true)}
                             >
@@ -288,6 +308,7 @@ export function SettingsPage({
                             onCancel={() => setColorPickerOpen(false)}
                         />
                     </section>
+                    {!isMobilePlatform && (
                     <section>
                         <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">
                             {t("settings:appearance.windowBehavior")}
@@ -367,6 +388,8 @@ export function SettingsPage({
                             </div>
                         </div>
                     </section>
+                    )}
+                    {!isMobilePlatform && (
                     <section>
                         <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">
                             {t("settings:appearance.systemSection")}
@@ -380,6 +403,7 @@ export function SettingsPage({
                             )}
                         </div>
                     </section>
+                    )}
                 </>
             );
         }
@@ -756,7 +780,7 @@ export function SettingsPage({
                             <button
                                 className="inline-flex items-center gap-2 rounded-full bg-[var(--field)] px-4 py-2 text-sm hover:bg-[var(--hover)]"
                                 type="button"
-                                onClick={() => logDir && openPath(logDir)}
+                                onClick={handleOpenLogDir}
                             >
                                 <FileText className="h-4 w-4" />
                                 {t("settings:data.openLogDir")}
@@ -832,6 +856,7 @@ export function SettingsPage({
                 </div>
 
                 {/* 更新检查 */}
+                {!isMobilePlatform && (
                 <section className="mt-6">
                     <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">
                         {t("settings:about.updateSection")}
@@ -930,18 +955,19 @@ export function SettingsPage({
                         </button>
                     </div>
                 </section>
+                )}
             </section>
         );
     }
 
     return (
-        <div className="flex h-full min-h-0 gap-3 bg-[var(--app-bg)] p-4">
-            <nav className="w-36 shrink-0 space-y-1">
+        <div className="flex h-full min-h-0 flex-col gap-2 bg-[var(--app-bg)] p-2 sm:flex-row sm:gap-3 sm:p-4">
+            <nav className="flex shrink-0 gap-1 overflow-x-auto px-1 sm:w-36 sm:flex-col sm:space-y-1 sm:overflow-x-visible sm:px-0">
                 {settingsMenu.map((item, index) => {
                     const Icon = item.icon;
                     return (
                         <button
-                            className={`flex h-10 w-full items-center gap-2 rounded-full px-3 text-sm ${index === activeSection ? "bg-[var(--nav-active)] text-[var(--text)] font-medium" : "text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"}`}
+                            className={`flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3 text-sm ${index === activeSection ? "bg-[var(--nav-active)] text-[var(--text)] font-medium" : "text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"}`}
                             key={item.label}
                             onClick={() => setActiveSection(index)}
                             type="button"
@@ -953,7 +979,7 @@ export function SettingsPage({
                 })}
             </nav>
 
-            <main className="min-h-0 flex-1 overflow-auto rounded-3xl border border-[var(--line)] bg-[var(--paper)] p-5">
+            <main className="min-h-0 flex-1 overflow-auto rounded-3xl border border-[var(--line)] bg-[var(--paper)] p-3 sm:p-5">
                 {renderSection()}
             </main>
         </div>

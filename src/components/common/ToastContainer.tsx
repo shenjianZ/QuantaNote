@@ -32,12 +32,12 @@ function ToastItem({ toast }: { toast: Toast }) {
 
     return (
         <div
-            className={`flex items-center gap-3 rounded-2xl border ${colors.border} bg-[var(--popover)] px-4 py-3 text-sm text-[var(--text)] shadow-lg backdrop-blur-sm animate-[toast-in_0.25s_ease-out]`}
+            className={`flex w-full items-center gap-3 rounded-2xl border ${colors.border} bg-[var(--popover)] px-4 py-3 text-sm text-[var(--text)] shadow-lg backdrop-blur-sm animate-[toast-in_0.25s_ease-out]`}
             role="alert"
             data-testid={`toast-${toast.type}`}
         >
             <Icon className={`h-4 w-4 shrink-0 ${colors.icon}`} />
-            <span>{toast.message}</span>
+            <span className="min-w-0 flex-1 break-words">{toast.message}</span>
         </div>
     );
 }
@@ -48,9 +48,12 @@ export function ToastContainer() {
     if (toasts.length === 0) return null;
 
     return (
-        <div className="pointer-events-none fixed top-4 left-1/2 z-[100] flex -translate-x-1/2 flex-col items-center gap-2">
+        <div className="pointer-events-none fixed left-0 right-0 top-[calc(env(safe-area-inset-top,0px)+1rem)] z-[100] flex flex-col items-center gap-2 px-4">
             {toasts.map((toast) => (
-                <div key={toast.id} className="pointer-events-auto">
+                <div
+                    key={toast.id}
+                    className="pointer-events-auto w-full max-w-md sm:w-auto sm:min-w-80"
+                >
                     <ToastItem toast={toast} />
                 </div>
             ))}

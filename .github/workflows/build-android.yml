@@ -1,0 +1,122 @@
+name: Build Android
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate release version
+        shell: pwsh
+        run: |
+          $tagVersion = $env:GITHUB_REF_NAME.TrimStart("v")
+          $packageVersion = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $tauriVersion = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          $cargoVersion = (Select-String -Path src-tauri/Cargo.toml -Pattern '^version = "([^"]+)"$').Matches[0].Groups[1].Value
+          if ($packageVersion -ne $tagVersion) { throw "package.json version $packageVersion != tag $tagVersion" }
+          if ($tauriVersion -ne $tagVersion) { throw "tauri.conf.json version $tauriVersion != tag $tagVersion" }
+          if ($cargoVersion -ne $tagVersion) { throw "Cargo.toml version $cargoVersion != tag $tagVersion" }
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Android NDK
+        run: sdkmanager "ndk;27.0.12077973"
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Android signing
+        shell: pwsh
+        run: |
+          $androidDir = "src-tauri/gen/android"
+          $keystorePath = Join-Path $env:RUNNER_TEMP "keystore.jks"
+
+          [IO.File]::WriteAllBytes(
+            $keystorePath,
+            [Convert]::FromBase64String("${{ secrets.ANDROID_KEYSTORE_BASE64 }}")
+          )
+
+          @"
+          storeFile=$keystorePath
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          "@ | Set-Content -Path "$androidDir/keystore.properties" -Encoding UTF8
+
+      - name: Build APK
+        run: pnpm tauri android build --apk --target aarch64 --split-per-abi --ci
+        env:
+          ANDROID_NDK_HOME: /usr/local/lib/android/sdk/ndk/27.0.12077973
+          NDK_HOME: /usr/local/lib/android/sdk/ndk/27.0.12077973
+
+      - name: Prepare release assets
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $tag = "${{ github.ref_name }}"
+          $outDir = Join-Path $PWD "release-assets"
+          New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+
+          $androidRoot = Join-Path $PWD "src-tauri/gen/android"
+
+          $apks = Get-ChildItem -Path $androidRoot -Recurse -Filter "*.apk" |
+            Where-Object { $_.FullName -match "release" -and $_.FullName -notmatch "unaligned" }
+          if (!$apks) { throw "No release APK found in $androidRoot" }
+
+          foreach ($apk in $apks) {
+            $arch = if ($apk.Name -match "arm64") { "arm64-v8a" }
+                    elseif ($apk.Name -match "universal") { "universal" }
+                    else { "unknown" }
+            $dest = Join-Path $outDir "QuantaNote-$tag-android-$arch.apk"
+            Copy-Item -LiteralPath $apk.FullName -Destination $dest -Force
+          }
+
+          Get-ChildItem -Path $outDir -File | ForEach-Object {
+            Write-Host "Prepared release asset: $($_.Name)"
+          }
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuantaNote-${{ github.ref_name }}-android
+          path: release-assets/*
+          if-no-files-found: error
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload ${{ github.ref_name }} release-assets/* --clobber

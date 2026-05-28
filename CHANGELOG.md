@@ -2,6 +2,29 @@
 
 本文件记录 QuantaNote 的版本更新历史。格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [0.3.0] - 2026-05-28
+
+### Added
+
+- Android 移动端适配：底部导航栏、移动端平台检测、返回键处理
+- Android CI 构建工作流（GitHub Actions），自动构建签名 APK 并上传至 Release
+- Android capabilities 配置（mobile.json）
+- 移动端 UI 组件：BottomTabBar、移动端专属布局适配
+- Toast 通知组件（ToastContainer）
+- 数据导入导出功能增强
+- 日志系统优化（native log 支持）
+- Modal 组件单元测试
+- 退出确认与自动更新逻辑优化
+
+### Changed
+
+- 升级 Tauri 2.11、Vite 7、Vitest 4、React 19.1 等核心依赖
+- 命令面板（CommandPalette）交互优化
+- 文档编辑器页面（DocumentEditorPage）性能改进
+- 库页面（LibraryPage）筛选和布局优化
+- 设置页面（SettingsPage）新增移动端相关配置
+- 全局样式和主题系统调整
+
 ## [0.2.3] - 2026-05-12
 
 ### Added

@@ -85,7 +85,8 @@
     "tagDeleted": "标签已删除",
     "tagUpdateFailed": "更新标签失败",
     "tagRenameFailed": "重命名标签失败",
-    "tagColorFailed": "更新标签颜色失败"
+    "tagColorFailed": "更新标签颜色失败",
+    "pressBackAgainToExit": "再按一次返回退出应用"
   },
   "error": {
     "appError": "应用出现了问题",

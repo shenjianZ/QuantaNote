@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { FileText, Loader2, Search } from "lucide-react";
+import { ArrowLeft, FileText, Loader2, Search } from "lucide-react";
 import { Kbd } from "../common/Kbd";
 import { useSearchStore } from "../../stores/searchStore";
 import type { SearchResultDto } from "../../stores/searchStore";
@@ -112,22 +112,32 @@ export function CommandPalette({
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-start bg-black/20 px-4 pt-16 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex flex-col bg-[var(--popover)] pt-[env(safe-area-inset-top)] sm:grid sm:place-items-start sm:bg-black/20 sm:px-4 sm:pt-16 sm:backdrop-blur-sm"
+      data-testid="command-palette-overlay"
       onClick={onClose}
     >
       <section
-        className="mx-auto flex max-h-[72vh] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-[var(--line)] bg-[var(--popover)] shadow-2xl"
+        className="flex h-full w-full flex-col overflow-hidden sm:mx-auto sm:max-h-[72vh] sm:max-w-xl sm:rounded-3xl sm:border sm:border-[var(--line)] sm:shadow-2xl"
         role="combobox"
         aria-expanded={true}
         aria-haspopup="listbox"
         aria-label={t("command-palette:searchLabel")}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--line)] px-4">
+        {/* 移动端返回按钮 + 搜索框 */}
+        <div className="flex h-14 shrink-0 items-center gap-2 border-b border-[var(--line)] px-3 sm:gap-3 sm:px-4">
+          <button
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[var(--muted)] sm:hidden"
+            type="button"
+            onClick={onClose}
+            aria-label={t("command-palette:back", "返回")}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
           {searching ? (
-            <Loader2 className="h-5 w-5 animate-spin text-[var(--muted)]" />
+            <Loader2 className="hidden h-5 w-5 animate-spin text-[var(--muted)] sm:block" />
           ) : (
-            <Search className="h-5 w-5 text-[var(--muted)]" />
+            <Search className="hidden h-5 w-5 text-[var(--muted)] sm:block" />
           )}
           <input
             ref={inputRef}
@@ -143,10 +153,10 @@ export function CommandPalette({
             onKeyDown={handleKeyDown}
             autoFocus
           />
-          <Kbd>Esc</Kbd>
+          <span className="hidden sm:inline-flex"><Kbd>Esc</Kbd></span>
         </div>
 
-        <div className="min-h-0 overflow-auto p-2" id="palette-results" role="listbox">
+        <div className="min-h-0 flex-1 overflow-auto p-2" id="palette-results" role="listbox">
           {effectiveResults.length === 0 ? (
             <div className="px-4 py-10 text-center text-sm text-[var(--muted)]">
               {query.trim() ? t("command-palette:noResults") : t("command-palette:hint")}

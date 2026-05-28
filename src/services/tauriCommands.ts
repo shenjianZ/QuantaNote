@@ -261,8 +261,25 @@ export async function exportDataZip(path: string, options: ExportOptions) {
     }});
 }
 
+export async function exportDataZipToDefault(options: ExportOptions) {
+    return invoke<string>("export_data_zip_to_default", { options: {
+        include_tags: options.includeTags,
+        include_attachments: options.includeAttachments,
+        include_versions: options.includeVersions,
+    }});
+}
+
 export async function importDataZip(path: string, options: ImportOptions) {
     return invoke("import_data_zip", { path, options: {
+        include_tags: options.includeTags,
+        include_attachments: options.includeAttachments,
+        include_versions: options.includeVersions,
+        overwrite: options.overwrite,
+    }});
+}
+
+export async function importDataZipBytes(data: number[], options: ImportOptions) {
+    return invoke("import_data_zip_bytes", { data, options: {
         include_tags: options.includeTags,
         include_attachments: options.includeAttachments,
         include_versions: options.includeVersions,

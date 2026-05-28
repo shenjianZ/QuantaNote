@@ -107,11 +107,12 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
   }
 
   return (
-    <header data-tauri-drag-region className="relative z-50 flex h-12 shrink-0 items-center gap-2 border-b border-[var(--line)] bg-[var(--chrome)] px-3 [-webkit-app-region:drag]">
+    <header className="relative z-50 flex h-11 shrink-0 items-center gap-2 border-b border-[var(--line)] bg-[var(--chrome)] px-2 sm:h-12 sm:px-3 sm:[-webkit-app-region:drag]">
       <div className="shrink-0 px-1 text-left text-sm font-semibold text-[var(--text)]">QuantaNote</div>
 
+      {/* 桌面端导航 pill — 移动端隐藏 */}
       <button
-        className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm transition [-webkit-app-region:no-drag] ${currentPage === "workspace" ? "bg-[var(--field)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"}`}
+        className={`hidden h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm transition sm:inline-flex sm:[-webkit-app-region:no-drag] ${currentPage === "workspace" ? "bg-[var(--field)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"}`}
         type="button"
         data-testid="nav-workspace"
         onClick={() => onNavigate("workspace")}
@@ -122,7 +123,7 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
       </button>
 
       <button
-        className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm transition [-webkit-app-region:no-drag] ${currentPage === "library" ? "bg-[var(--field)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"}`}
+        className={`hidden h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm transition sm:inline-flex sm:[-webkit-app-region:no-drag] ${currentPage === "library" ? "bg-[var(--field)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"}`}
         type="button"
         data-testid="nav-library"
         onClick={() => onNavigate("library")}
@@ -132,22 +133,28 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
         {t("topbar:library")}
       </button>
 
-      <SyncStatusIndicator />
+      {/* 桌面端显示同步状态 — 移动端隐藏 */}
+      <div className="hidden sm:block">
+        <SyncStatusIndicator />
+      </div>
 
+      {/* 搜索按钮 — 移动端只显示图标，无底色 */}
       <button
-        className="ml-auto flex h-8 w-44 max-w-[36vw] items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--field)] px-3 text-sm text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--text)] [-webkit-app-region:no-drag]"
+        className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--muted)] transition hover:text-[var(--text)] sm:w-44 sm:max-w-none sm:flex-1 sm:justify-start sm:gap-2 sm:border sm:border-[var(--line)] sm:bg-[var(--field)] sm:px-3 sm:[-webkit-app-region:no-drag] sm:hover:border-[var(--accent)]"
         onClick={onOpenSearch}
         type="button"
+        aria-label={t("topbar:search")}
       >
         <Search className="h-4 w-4 shrink-0" />
-        <span className="min-w-0 flex-1 truncate text-left">{t("topbar:search")}</span>
+        <span className="hidden min-w-0 flex-1 truncate text-left sm:block">{t("topbar:search")}</span>
         <span className="hidden items-center gap-1 sm:flex">
           <Kbd>⌘</Kbd>
           <Kbd>K</Kbd>
         </span>
       </button>
 
-      <div className="relative [-webkit-app-region:no-drag]" ref={menuRef}>
+      {/* 溢出菜单 — 始终显示 */}
+      <div className="relative sm:[-webkit-app-region:no-drag]" ref={menuRef}>
         <button
           className={`flex h-8 w-8 items-center justify-center rounded-lg ${menuOpen ? "bg-[var(--field)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"}`}
           type="button"
@@ -201,7 +208,8 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
         )}
       </div>
 
-      <div className="flex items-center gap-1 [-webkit-app-region:no-drag]">
+      {/* 桌面端窗口控制按钮 — 移动端隐藏 */}
+      <div className="hidden items-center gap-1 sm:flex sm:[-webkit-app-region:no-drag]">
         <button
           className={`grid h-8 w-8 place-items-center rounded-lg ${alwaysOnTop ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"}`}
           type="button"

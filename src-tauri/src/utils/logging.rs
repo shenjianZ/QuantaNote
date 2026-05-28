@@ -152,13 +152,22 @@ pub fn clear_sql_log_file() -> std::io::Result<()> {
 }
 
 pub fn tauri_log_plugin<R: Runtime>() -> TauriPlugin<R> {
-    tauri_plugin_log::Builder::new()
+    let builder = tauri_plugin_log::Builder::new()
         .clear_targets()
-        .target(Target::new(TargetKind::Stdout))
-        .target(Target::new(TargetKind::Folder {
-            path: paths::quantanote_dir(),
-            file_name: Some("quanta-note".to_string()),
-        }))
+        .target(Target::new(TargetKind::Stdout));
+
+    #[cfg(target_os = "android")]
+    let builder = builder.target(Target::new(TargetKind::LogDir {
+        file_name: Some("quanta-note".to_string()),
+    }));
+
+    #[cfg(not(target_os = "android"))]
+    let builder = builder.target(Target::new(TargetKind::Folder {
+        path: paths::quantanote_dir(),
+        file_name: Some("quanta-note".to_string()),
+    }));
+
+    builder
         .level(LevelFilter::Debug)
         .level_for("reqwest", LevelFilter::Warn)
         .rotation_strategy(RotationStrategy::KeepSome(10))

@@ -85,7 +85,8 @@
     "tagDeleted": "Tag deleted",
     "tagUpdateFailed": "Failed to update tag",
     "tagRenameFailed": "Failed to rename tag",
-    "tagColorFailed": "Failed to update tag color"
+    "tagColorFailed": "Failed to update tag color",
+    "pressBackAgainToExit": "Press Back again to exit"
   },
   "error": {
     "appError": "Something went wrong",

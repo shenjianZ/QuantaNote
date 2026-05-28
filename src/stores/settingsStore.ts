@@ -5,6 +5,7 @@ import { save, open } from "@tauri-apps/plugin-dialog";
 import i18n from "../i18n";
 import { useItemStore } from "./itemStore";
 import { useToastStore } from "./toastStore";
+import { isMobile } from "../utils/platform";
 import {
     getDbPath,
     setAutostart,
@@ -12,7 +13,9 @@ import {
     updateWindowBehavior,
     getExportSizeEstimate,
     exportDataZip,
+    exportDataZipToDefault,
     importDataZip,
+    importDataZipBytes,
     getAutoBackupConfig,
     updateAutoBackupConfig as updateAutoBackupConfigCmd,
     triggerBackupNow as triggerBackupNowCmd,
@@ -71,7 +74,7 @@ export interface SqlLogSettings {
 const DEFAULTS: AppSettings = {
     fontFamily: "Noto Sans SC",
     fontMono: "JetBrains Mono",
-    fontSize: 15,
+    fontSize: isMobile() ? 14 : 15,
     accentColor: "#386c5f",
     customAccentColors: [],
     minimizeToTray: true,
@@ -168,6 +171,50 @@ function fromBackendSqlLogConfig(config: SqlLogConfig): SqlLogSettings {
         toFile: config.to_file,
         pretty: config.pretty,
         maxLen: config.max_len,
+    });
+}
+
+function selectZipFileBytes(): Promise<number[] | null> {
+    return new Promise((resolve) => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".zip,application/zip,application/x-zip-compressed";
+        input.style.display = "none";
+
+        let settled = false;
+        const cleanup = () => {
+            input.remove();
+            window.removeEventListener("focus", handleFocus);
+        };
+        const finish = (value: number[] | null) => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            resolve(value);
+        };
+        const handleFocus = () => {
+            window.setTimeout(() => {
+                if (!input.files?.length) finish(null);
+            }, 400);
+        };
+
+        input.addEventListener(
+            "change",
+            async () => {
+                const file = input.files?.[0];
+                if (!file) {
+                    finish(null);
+                    return;
+                }
+                const buffer = await file.arrayBuffer();
+                finish(Array.from(new Uint8Array(buffer)));
+            },
+            { once: true },
+        );
+
+        window.addEventListener("focus", handleFocus);
+        document.body.appendChild(input);
+        input.click();
     });
 }
 
@@ -547,6 +594,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
     exportDataWithOptions: async (options: ExportOptions) => {
         try {
+            if (isMobile()) {
+                const path = await exportDataZipToDefault(options);
+                useToastStore
+                    .getState()
+                    .addToast("success", i18n.t("common:toast.exportSuccess"));
+                useToastStore.getState().addToast("info", path);
+                return;
+            }
+
             const path = await save({
                 defaultPath: "quantanote-backup.zip",
                 filters: [{ name: "ZIP", extensions: ["zip"] }],
@@ -564,6 +620,18 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
     importDataWithOptions: async (options: ImportOptions) => {
         try {
+            if (isMobile()) {
+                const data = await selectZipFileBytes();
+                if (!data) return;
+                await importDataZipBytes(data, options);
+                await useItemStore.getState().fetchItems();
+                await get().refreshDbSize();
+                useToastStore
+                    .getState()
+                    .addToast("success", i18n.t("common:toast.importSuccess"));
+                return;
+            }
+
             const path = await open({
                 multiple: false,
                 filters: [{ name: "ZIP", extensions: ["zip"] }],

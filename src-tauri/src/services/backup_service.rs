@@ -162,8 +162,14 @@ pub fn run_auto_backup(db: &DbState) {
 pub fn start_backup_scheduler(app: &AppHandle) {
     let app_handle = app.clone();
 
+    // 移动端使用较短的检查间隔，避免被系统杀死
+    #[cfg(mobile)]
+    let check_interval = Duration::from_secs(900); // 15 分钟
+    #[cfg(not(mobile))]
+    let check_interval = Duration::from_secs(3600); // 1 小时
+
     std::thread::spawn(move || loop {
-        std::thread::sleep(Duration::from_secs(3600));
+        std::thread::sleep(check_interval);
         if let Some(db) = app_handle.try_state::<DbState>() {
             run_auto_backup(&db);
         }

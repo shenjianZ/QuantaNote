@@ -979,6 +979,32 @@ kbd {
     outline-offset: 2px;
 }
 
+.settings-switch {
+    width: 2.75rem;
+    height: 1.5rem;
+    min-width: 2.75rem;
+    min-height: 1.5rem;
+    padding: 0;
+}
+
+.settings-color-swatch {
+    width: 1.75rem;
+    height: 1.75rem;
+    min-width: 1.75rem;
+    min-height: 1.75rem;
+    padding: 0;
+}
+
+@media (pointer: coarse) {
+    .settings-switch {
+        min-height: 1.5rem;
+    }
+
+    .settings-color-swatch {
+        min-height: 1.75rem;
+    }
+}
+
 /* Toast slide-in animation */
 @keyframes toast-in {
     from {
@@ -1063,4 +1089,36 @@ html.quick-note-mode .vditor-toolbar {
     border-right: none !important;
     border-bottom: 1px solid var(--line) !important;
     padding: 4px 8px !important;
+}
+
+/* ── Mobile touch targets ── */
+@media (pointer: coarse) {
+    button,
+    [role="button"],
+    summary {
+        min-height: 44px;
+    }
+}
+
+/* ── Safe area inset for mobile bottom bar ── */
+.safe-area-inset-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ── Safe area inset for mobile top status bar ── */
+.safe-area-inset-top {
+    padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* ── Mobile full-height safe area ── */
+.safe-area-top-inset {
+    margin-top: env(safe-area-inset-top, 0px);
+}
+
+/* ── Mobile scrollbar: thinner ── */
+@media (pointer: coarse) {
+    ::-webkit-scrollbar {
+        width: 3px;
+        height: 3px;
+    }
 }

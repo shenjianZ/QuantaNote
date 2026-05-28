@@ -27,9 +27,10 @@ function normalizeForVersionCompare(value: string | undefined) {
 
 interface DocumentEditorPageProps {
   onBackToPreview: () => void;
+  onModalStateChange?: (modalOpen: boolean) => void;
 }
 
-export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps) {
+export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: DocumentEditorPageProps) {
   const { t } = useTranslation(["document", "common"]);
   const selectedItemId = useAppStore((s) => s.selectedItemId);
   const theme = useAppStore((s) => s.theme);
@@ -53,6 +54,12 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
   useEffect(() => { latestTitle.current = title; }, [title]);
   useEffect(() => { latestSummary.current = summary; }, [summary]);
   useEffect(() => { latestContent.current = content; }, [content]);
+
+  // 通知父组件版本面板状态变化
+  useEffect(() => {
+    onModalStateChange?.(versionPanelOpen);
+    return () => { onModalStateChange?.(false); };
+  }, [versionPanelOpen, onModalStateChange]);
 
   // 组件卸载时清理防抖定时器
   useEffect(() => {
@@ -187,9 +194,9 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
       || normalizeForVersionCompare(content) !== normalizeForVersionCompare(latestVersionContent));
 
   return (
-    <div className="mx-auto flex h-full min-h-0 w-full max-w-4xl flex-col bg-[var(--app-bg)] p-4">
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-4xl flex-col bg-[var(--app-bg)] p-2 sm:p-4">
       {/* Top toolbar: back + favorite */}
-      <div className="mb-3 flex shrink-0 items-center gap-2">
+      <div className="mb-2 flex shrink-0 items-center gap-2 sm:mb-3">
         <button
           className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--field)] px-3 text-sm text-[var(--text)] hover:bg-[var(--hover)]"
           type="button"
@@ -214,7 +221,7 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
       </div>
 
       {/* Editor */}
-      <article className="flex min-h-0 flex-1 flex-col rounded-3xl border border-[var(--line)] bg-[var(--paper)] p-4">
+      <article className="flex min-h-0 flex-1 flex-col rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3 sm:rounded-3xl sm:p-4">
         <input
           className="app-editor-title mb-2 w-full bg-transparent text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
           type="text"
@@ -239,7 +246,7 @@ export function DocumentEditorPage({ onBackToPreview }: DocumentEditorPageProps)
       </article>
 
       {/* Bottom status bar */}
-      <div className="mt-2 flex shrink-0 items-center justify-between px-1 text-xs text-[var(--muted)]">
+      <div className="mt-2 flex shrink-0 flex-wrap items-center justify-between gap-2 px-1 text-xs text-[var(--muted)] safe-area-inset-bottom">
         <div className="flex items-center gap-3">
           <span data-testid="doc-save-status">{saved ? t("document:saved") : t("document:saving")}</span>
           <span>{t("document:charCount", { count: charCount })}</span>

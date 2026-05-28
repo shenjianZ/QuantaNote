@@ -183,7 +183,7 @@ footer:
         url: "https://github.com/shenjianZ/QuantaNote"
         branch: "master"
     lastUpdated: "2026-05-03"
-    version: "v0.2.3"
+    version: "v0.3.0"
     groups:
         - title: "社区"
           items:

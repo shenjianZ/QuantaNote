@@ -32,3 +32,11 @@ updater.info
 
 .env
 .gitnexus/
+release.keystore
+
+# Android build outputs
+src-tauri/gen/android/app/build
+src-tauri/gen/android/build
+
+# TUI project (separate)
+quantanote-tui/

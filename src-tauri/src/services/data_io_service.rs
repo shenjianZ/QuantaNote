@@ -306,6 +306,41 @@ pub fn export_data_zip(db: &DbState, path: &str, options: &ExportOptions) -> Res
     Ok(())
 }
 
+pub fn export_data_zip_to_default(
+    db: &DbState,
+    options: &ExportOptions,
+) -> Result<String, AppError> {
+    let exports_dir = paths::quantanote_dir().join("exports");
+    std::fs::create_dir_all(&exports_dir).map_err(|e| AppError::Io(e.to_string()))?;
+    let path = exports_dir.join(format!(
+        "quantanote-backup-{}.zip",
+        chrono::Local::now().format("%Y%m%d-%H%M%S")
+    ));
+
+    export_data_zip(db, &path.to_string_lossy(), options)?;
+    Ok(path.to_string_lossy().to_string())
+}
+
+pub fn import_data_zip_bytes(
+    db: &DbState,
+    data: Vec<u8>,
+    options: &ImportOptions,
+) -> Result<(), AppError> {
+    if data.is_empty() {
+        return Err(AppError::Validation("ZIP 数据为空".to_string()));
+    }
+
+    let imports_dir = paths::quantanote_dir().join("imports");
+    std::fs::create_dir_all(&imports_dir).map_err(|e| AppError::Io(e.to_string()))?;
+    let path = imports_dir.join(format!(
+        "quantanote-import-{}.zip",
+        chrono::Local::now().format("%Y%m%d-%H%M%S")
+    ));
+    std::fs::write(&path, data).map_err(|e| AppError::Io(e.to_string()))?;
+
+    import_data_zip(db, &path.to_string_lossy(), options)
+}
+
 pub fn import_data_zip(db: &DbState, path: &str, options: &ImportOptions) -> Result<(), AppError> {
     let src = resolve_user_path(path)?;
     let file = std::fs::File::open(&src).map_err(|e| AppError::Io(e.to_string()))?;

@@ -11,6 +11,7 @@
 | **Linux** | x64 | [QuantaNote-__TAG__-linux-x64.AppImage](https://github.com/shenjianZ/QuantaNote/releases/latest/download/QuantaNote-__TAG__-linux-x64.AppImage) | ~85 MB |
 | **Linux** | x64 | [QuantaNote-__TAG__-linux-x64.deb](https://github.com/shenjianZ/QuantaNote/releases/latest/download/QuantaNote-__TAG__-linux-x64.deb) | ~14 MB |
 | **Linux** | x64 | [QuantaNote-__TAG__-linux-x64.rpm](https://github.com/shenjianZ/QuantaNote/releases/latest/download/QuantaNote-__TAG__-linux-x64.rpm) | ~14 MB |
+| **Android** | ARM64 | [QuantaNote-__TAG__-android-arm64-v8a.apk](https://github.com/shenjianZ/QuantaNote/releases/latest/download/QuantaNote-__TAG__-android-arm64-v8a.apk) | ~20 MB |
 
 ---
 
@@ -96,6 +97,29 @@ tar -xzf QuantaNote-__TAG__-linux-x64.tar.gz
 cd QuantaNote
 ./quanta-note
 ```
+
+---
+
+## 🤖 Android 安装指南
+
+### 方法 1：直接安装 APK（推荐）
+
+1. 下载 `QuantaNote-__TAG__-android-arm64-v8a.apk`
+2. 在手机上打开下载的 APK 文件
+3. 如果提示"未知来源"，请在设置中允许安装未知来源应用
+4. 按照安装向导完成安装
+
+### 方法 2：通过 ADB 安装
+
+```bash
+adb install QuantaNote-__TAG__-android-arm64-v8a.apk
+```
+
+### 注意事项
+
+- **系统要求**：Android 7.0（API 24）及以上
+- **首次安装**：Android 可能会要求授予文件访问权限，请允许以确保笔记数据正常存储
+- **签名变更**：如果之前安装了不同签名的版本，需要先卸载旧版本
 
 ---
 

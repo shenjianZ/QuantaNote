@@ -39,10 +39,27 @@ pub fn export_data_zip(
 }
 
 #[tauri::command]
+pub fn export_data_zip_to_default(
+    options: ExportOptions,
+    db: State<'_, DbState>,
+) -> Result<String, AppError> {
+    data_io_service::export_data_zip_to_default(&db, &options)
+}
+
+#[tauri::command]
 pub fn import_data_zip(
     path: String,
     options: ImportOptions,
     db: State<'_, DbState>,
 ) -> Result<(), AppError> {
     data_io_service::import_data_zip(&db, &path, &options)
+}
+
+#[tauri::command]
+pub fn import_data_zip_bytes(
+    data: Vec<u8>,
+    options: ImportOptions,
+    db: State<'_, DbState>,
+) -> Result<(), AppError> {
+    data_io_service::import_data_zip_bytes(&db, data, &options)
 }

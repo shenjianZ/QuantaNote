@@ -26,6 +26,8 @@ import { useItemStore } from "../stores/itemStore";
 import { useSearchStore } from "../stores/searchStore";
 import { useTagStore } from "../stores/tagStore";
 import { useToastStore } from "../stores/toastStore";
+import { MOBILE_BACK_EVENT } from "../utils/platform";
+import { nativeLog } from "../utils/nativeLog";
 import { getVditorLang } from "../utils/vditorConfig";
 import type { Item } from "../types";
 
@@ -44,6 +46,8 @@ interface LibraryPageProps {
   } | null;
   onPreviewItemOpen?: (id: string) => void;
   onPreviewRequestClear?: () => void;
+  onReaderOpenChange?: (isOpen: boolean) => void;
+  onModalStateChange?: (modalOpen: boolean) => void;
 }
 
 export function LibraryPage({
@@ -55,6 +59,8 @@ export function LibraryPage({
   previewRequest,
   onPreviewItemOpen,
   onPreviewRequestClear,
+  onReaderOpenChange,
+  onModalStateChange,
 }: LibraryPageProps) {
   const { t } = useTranslation(["library", "common"]);
 
@@ -148,6 +154,43 @@ export function LibraryPage({
     onSelectItem(previewRequest.itemId);
     setReaderOpen(true);
   }, [previewRequest, onSelectItem]);
+
+  // 通知父组件 readerOpen 状态变化
+  useEffect(() => {
+    onReaderOpenChange?.(readerOpen);
+    return () => { onReaderOpenChange?.(false); };
+  }, [readerOpen, onReaderOpenChange]);
+
+  // 通知父组件模态框状态变化
+  useEffect(() => {
+    const anyOpen = tagModalOpen || tagManagerOpen || attachmentModalOpen;
+    onModalStateChange?.(anyOpen);
+    return () => { onModalStateChange?.(false); };
+  }, [tagModalOpen, tagManagerOpen, attachmentModalOpen, onModalStateChange]);
+
+  useEffect(() => {
+    if (!readerOpen) return;
+
+    function handleMobileBack(e: Event) {
+      if (document.querySelector('[role="dialog"][aria-modal="true"]')) {
+        nativeLog("info", "[QuantaNote][mobile-back] reader ignored because dialog is open");
+        return;
+      }
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (menuDetailsRef.current?.open) {
+        nativeLog("info", "[QuantaNote][mobile-back] close reader overflow menu");
+        menuDetailsRef.current.open = false;
+        setDeleteConfirming(false);
+        return;
+      }
+      nativeLog("info", "[QuantaNote][mobile-back] close reader drawer");
+      handleCloseReader();
+    }
+
+    window.addEventListener(MOBILE_BACK_EVENT, handleMobileBack);
+    return () => window.removeEventListener(MOBILE_BACK_EVENT, handleMobileBack);
+  }, [readerOpen]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -259,12 +302,12 @@ export function LibraryPage({
     selectedItemDto?.id === selectedItem.id ? selectedItemDto.content : "";
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[var(--app-bg)] px-[clamp(1rem,4vw,4rem)] py-4">
+    <div className="flex h-full min-h-0 flex-col bg-[var(--app-bg)] px-3 py-3 sm:px-[clamp(1rem,4vw,4rem)] sm:py-4">
       <section className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col">
-          <div className="mb-4 flex shrink-0 items-center justify-between gap-4">
-            <div>
+          <div className="mb-4 flex shrink-0 items-center justify-between gap-3">
+            <div className="min-w-0">
               <h1 className="app-hero-title text-[var(--text)]">{t("library:title")}</h1>
-              <p className="mt-1 text-sm text-[var(--muted)]">{t("library:subtitle")}</p>
+              <p className="mt-1 hidden text-sm text-[var(--muted)] sm:block">{t("library:subtitle")}</p>
             </div>
             <button
               className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full bg-[var(--accent)] px-3 text-sm font-medium text-white hover:opacity-90"
@@ -354,7 +397,7 @@ export function LibraryPage({
                 {visibleItems.map((item) => (
                   <button
                     key={item.id}
-                    className="group flex w-full items-start gap-3 px-4 py-3 text-left transition hover:bg-[var(--hover)]"
+                    className="group flex w-full items-start gap-3 px-3 py-3.5 text-left transition hover:bg-[var(--hover)] sm:px-4 sm:py-3"
                     type="button"
                     data-testid="library-item"
                     onClick={() => handleOpenItem(item.id)}
@@ -397,9 +440,9 @@ export function LibraryPage({
       </section>
 
       {hasSelection && (
-        <section className="fixed inset-x-3 bottom-8 top-14 z-30 mx-auto overflow-hidden rounded-3xl border border-[var(--line)] bg-[var(--paper)] shadow-2xl" style={{ maxWidth: "42rem" }} data-testid="reader-drawer">
+        <section className="fixed inset-0 z-[60] overflow-hidden bg-[var(--paper)] sm:inset-x-3 sm:bottom-8 sm:top-14 sm:mx-auto sm:rounded-3xl sm:border sm:border-[var(--line)] sm:shadow-2xl" style={{ maxWidth: "min(42rem, 100%)" }} data-testid="reader-drawer">
           <div className="flex h-full min-h-0 flex-col">
-            <header className="flex shrink-0 items-start gap-3 border-b border-[var(--line)] px-4 py-3">
+            <header className="flex shrink-0 items-start gap-2 border-b border-[var(--line)] px-3 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:gap-3 sm:px-4 sm:py-3 sm:pt-3">
               <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--field)] text-[var(--muted)]">
                 {(() => {
                   const SelectedIcon = selectedItem.icon;
@@ -455,7 +498,7 @@ export function LibraryPage({
               </button>
             </header>
 
-            <div className="min-h-0 flex-1 overflow-auto px-4 py-4" onCopy={() => useToastStore.getState().addToast("success", t("common:toast.copySuccess"))}>
+            <div className="min-h-0 flex-1 overflow-auto px-4 py-4 sm:px-6" onCopy={() => useToastStore.getState().addToast("success", t("common:toast.copySuccess"))}>
               <MarkdownRenderer
                 content={previewContent || selectedItem.summary || ""}
                 theme={theme === "light" ? "light" : "dark"}
@@ -463,7 +506,7 @@ export function LibraryPage({
               />
             </div>
 
-            <footer className="shrink-0 border-t border-[var(--line)] px-4 py-3">
+            <footer className="shrink-0 border-t border-[var(--line)] bg-[var(--paper)] px-3 py-3 safe-area-inset-bottom sm:px-4">
               <div className="flex flex-wrap items-center gap-2">
                 {itemTags.map((tag) => (
                   <span key={tag.name} className="rounded-full bg-[var(--field)] px-2 py-0.5 text-xs text-[var(--muted)]">

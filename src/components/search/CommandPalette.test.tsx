@@ -91,4 +91,17 @@ describe("CommandPalette", () => {
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it("keeps the mobile search surface below the status bar safe area", () => {
+    setup(
+      <CommandPalette
+        open
+        onClose={vi.fn()}
+        onSelectItem={vi.fn()}
+        items={items}
+      />,
+    );
+
+    expect(screen.getByTestId("command-palette-overlay")).toHaveClass("pt-[env(safe-area-inset-top)]");
+  });
 });

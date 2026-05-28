@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { isMobile, MOBILE_BACK_EVENT } from "../../utils/platform";
+import { nativeLog } from "../../utils/nativeLog";
 
 interface ModalProps {
   open: boolean;
@@ -31,11 +33,30 @@ export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg" }:
     return () => clearTimeout(timer);
   }, [open]);
 
-  // 键盘事件：Escape 关闭 + Tab 焦点陷阱
+  // 键盘事件：Escape 关闭 + 移动端返回键关闭 + Tab 焦点陷阱
   useEffect(() => {
     if (!open) return;
+    const mobile = isMobile();
+
+    function handleMobileBack(e: Event) {
+      const dialogs = Array.from(
+        document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]')
+      );
+      if (dialogs[dialogs.length - 1] !== dialogRef.current) return;
+      nativeLog("info", "[QuantaNote][mobile-back] close top modal", { title });
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      onCloseRef.current();
+    }
+
     function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onCloseRef.current();
+      // Escape 或移动端 Backspace（物理返回键映射）关闭
+      if (e.key === "Escape" || (mobile && e.key === "Backspace")) {
+        e.preventDefault();
+        e.stopPropagation();
+        onCloseRef.current();
+        return;
+      }
       if (e.key === "Tab" && dialogRef.current) {
         const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
           'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
@@ -52,8 +73,12 @@ export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg" }:
         }
       }
     }
+    window.addEventListener(MOBILE_BACK_EVENT, handleMobileBack);
     document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
+    return () => {
+      window.removeEventListener(MOBILE_BACK_EVENT, handleMobileBack);
+      document.removeEventListener("keydown", handleKey);
+    };
   }, [open]);
 
   if (!open) return null;
@@ -61,7 +86,7 @@ export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg" }:
   return (
     <div
       ref={backdropRef}
-      className="fixed inset-0 z-50 grid place-items-center bg-black/20 px-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 grid place-items-end bg-black/20 backdrop-blur-sm sm:place-items-center sm:px-4"
       onClick={(e) => {
         if (e.target === backdropRef.current) onClose();
       }}
@@ -71,7 +96,7 @@ export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg" }:
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`flex max-h-[85vh] w-full ${maxWidth} flex-col rounded-3xl border border-[var(--line)] bg-[var(--popover)] shadow-2xl`}
+        className={`flex max-h-[90vh] w-full flex-col rounded-t-3xl border border-[var(--line)] bg-[var(--popover)] shadow-2xl sm:max-h-[85vh] sm:${maxWidth} sm:rounded-3xl`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-[var(--line)] px-5 py-3">
@@ -87,6 +112,8 @@ export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg" }:
           </button>
         </div>
         <div className="min-h-0 flex-1 overflow-auto px-5 py-4">{children}</div>
+        {/* 移动端底部安全区域 */}
+        <div className="safe-area-inset-bottom sm:hidden" />
       </div>
     </div>
   );

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { onBackButtonPress } from "@tauri-apps/api/app";
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { availableMonitors, primaryMonitor } from "@tauri-apps/api/window";
+import { availableMonitors, getCurrentWindow, primaryMonitor } from "@tauri-apps/api/window";
 import { PhysicalPosition } from "@tauri-apps/api/dpi";
 import { FileText } from "lucide-react";
 import { AppShell } from "../components/layout/AppShell";
@@ -18,10 +20,13 @@ import { useAppStore } from "../stores/appStore";
 import { useItemStore } from "../stores/itemStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useSyncStore } from "../stores/syncStore";
+import { useToastStore } from "../stores/toastStore";
 import type { FloatingBallPosition } from "../stores/settingsStore";
 import { adaptItem } from "../adapters/itemAdapter";
 import { deriveRecordTitle } from "../utils/recordTitle";
 import { preloadVditorResources } from "../utils/vditorPreload";
+import { isMobile, MOBILE_BACK_EVENT } from "../utils/platform";
+import { nativeLog } from "../utils/nativeLog";
 import type { AppPage, Item } from "../types";
 import i18n from "../i18n";
 import "../styles/themes.css";
@@ -61,6 +66,8 @@ const FLOATING_BALL_MARGIN = 24;
 const FLOATING_BALL_RIGHT_MARGIN = 96;
 const SHOW_FLOATING_BALL_EVENT = "quantanote:show-floating-ball-window";
 const HIDE_FLOATING_BALL_EVENT = "quantanote:hide-floating-ball-window";
+const EXIT_BACK_WINDOW_MS = 2000;
+const TOP_LEVEL_PAGES: AppPage[] = ["workspace", "library", "settings"];
 
 interface PhysicalWorkArea {
     left: number;
@@ -161,14 +168,36 @@ function isEditableShortcutTarget(target: EventTarget | null) {
     return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement;
 }
 
+async function requestAppExitFromBackButton() {
+    nativeLog("info", "[QuantaNote][mobile-back] exit requested");
+
+    try {
+        await invoke("request_app_exit");
+        nativeLog("info", "[QuantaNote][mobile-back] request_app_exit resolved");
+        return;
+    } catch (error) {
+        nativeLog("warn", "[QuantaNote][mobile-back] request_app_exit failed", error);
+    }
+
+    try {
+        await getCurrentWindow().close();
+        nativeLog("info", "[QuantaNote][mobile-back] current window close requested");
+    } catch (error) {
+        nativeLog("warn", "[QuantaNote][mobile-back] current window close failed", error);
+    }
+}
+
 export function QuantaNoteApp() {
     const {
         currentPage,
         paletteOpen,
         selectedItemId,
+        settingsSection,
         navigate,
+        goBack,
         openPalette,
         closePalette,
+        setSettingsSection,
         theme,
         setTheme,
         selectItem,
@@ -186,6 +215,9 @@ export function QuantaNoteApp() {
         itemId: string;
         requestId: number;
     } | null>(null);
+    const [readerOpen, setReaderOpen] = useState(false);
+    const [anyModalOpen, setAnyModalOpen] = useState(false);
+    const lastExitBackAtRef = useRef(0);
 
     useEffect(() => {
         preloadVditorResources();
@@ -356,6 +388,7 @@ export function QuantaNoteApp() {
     }, [paletteOpen, openPalette, closePalette, handleCreateNote]);
 
     useEffect(() => {
+        if (isMobile()) return;
         let active = true;
         let unlisten: (() => void) | undefined;
 
@@ -395,6 +428,126 @@ export function QuantaNoteApp() {
             unlisten?.();
         };
     }, [handleCreateNote, navigate]);
+
+    // Mobile back button handling
+    useEffect(() => {
+        if (!isMobile()) return;
+
+        let active = true;
+        let unregisterBackButton: (() => void) | undefined;
+
+        function dispatchMobileBackEvent() {
+            const event = new Event(MOBILE_BACK_EVENT, { cancelable: true });
+            window.dispatchEvent(event);
+            return event.defaultPrevented;
+        }
+
+        function handleBackButton() {
+            nativeLog("info", "[QuantaNote][mobile-back] pressed", {
+                currentPage,
+                paletteOpen,
+                anyModalOpen,
+                readerOpen,
+                settingsSection,
+                topLevel: TOP_LEVEL_PAGES.includes(currentPage as AppPage),
+            });
+
+            // P0: CommandPalette 打开 → 关闭
+            if (paletteOpen) {
+                nativeLog("info", "[QuantaNote][mobile-back] close command palette");
+                lastExitBackAtRef.current = 0;
+                closePalette();
+                return;
+            }
+
+            // P1: 任何 Modal 打开 → 交给 Modal.tsx 关闭
+            if (dispatchMobileBackEvent()) {
+                nativeLog("info", "[QuantaNote][mobile-back] consumed by overlay/modal listener");
+                lastExitBackAtRef.current = 0;
+                return;
+            }
+            if (anyModalOpen) {
+                nativeLog("warn", "[QuantaNote][mobile-back] modal state is open but no listener consumed event");
+                lastExitBackAtRef.current = 0;
+                return;
+            }
+
+            // P2: 预览抽屉打开 → 关闭
+            if (readerOpen) {
+                nativeLog("info", "[QuantaNote][mobile-back] close reader fallback from app");
+                lastExitBackAtRef.current = 0;
+                setReaderOpen(false);
+                setPreviewRequest(null);
+                return;
+            }
+
+            // P3: Settings 分区非默认 → 回到第一个分区
+            if (currentPage === "settings" && settingsSection != null && settingsSection !== 0) {
+                nativeLog("info", "[QuantaNote][mobile-back] reset settings section", { settingsSection });
+                lastExitBackAtRef.current = 0;
+                setSettingsSection(0);
+                return;
+            }
+
+            // P4: 顶级页面 → 两次返回退出应用
+            if (TOP_LEVEL_PAGES.includes(currentPage as AppPage)) {
+                const now = Date.now();
+                const delta = now - lastExitBackAtRef.current;
+                nativeLog("info", "[QuantaNote][mobile-back] top-level exit check", {
+                    delta,
+                    exitWindowMs: EXIT_BACK_WINDOW_MS,
+                });
+                if (now - lastExitBackAtRef.current <= EXIT_BACK_WINDOW_MS) {
+                    requestAppExitFromBackButton();
+                    return;
+                }
+                lastExitBackAtRef.current = now;
+                nativeLog("info", "[QuantaNote][mobile-back] first back on top-level page, showing exit hint");
+                useToastStore.getState().addToast("info", i18n.t("common:toast.pressBackAgainToExit"));
+                return;
+            }
+
+            // P5: 有导航历史 → 返回上一页
+            nativeLog("info", "[QuantaNote][mobile-back] go back in app history");
+            lastExitBackAtRef.current = 0;
+            goBack();
+        }
+
+        onBackButtonPress(() => {
+            nativeLog("info", "[QuantaNote][mobile-back] Tauri onBackButtonPress event");
+            handleBackButton();
+        })
+            .then((listener) => {
+                if (active) {
+                    unregisterBackButton = () => {
+                        listener.unregister().catch(() => {});
+                    };
+                } else {
+                    listener.unregister().catch(() => {});
+                }
+            })
+            .catch(() => {});
+
+        // 键盘 fallback：方便 Android 外接键盘/调试环境触发同一套逻辑
+        function handleKeyDown(e: KeyboardEvent) {
+            if (e.key === "Backspace") {
+                // 只在移动端且非输入框时处理
+                if (!isEditableShortcutTarget(e.target)) {
+                    nativeLog("info", "[QuantaNote][mobile-back] Backspace fallback event");
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleBackButton();
+                }
+            }
+        }
+
+        document.addEventListener("keydown", handleKeyDown, true);
+        return () => {
+            active = false;
+            unregisterBackButton?.();
+            document.removeEventListener("keydown", handleKeyDown, true);
+        };
+    }, [paletteOpen, closePalette, anyModalOpen, readerOpen, currentPage, settingsSection, setSettingsSection, goBack]);
 
     // Floating ball window lifecycle
     const floatingBallRef = useRef<WebviewWindow | null>(null);
@@ -460,6 +613,7 @@ export function QuantaNoteApp() {
     }, []);
 
     useEffect(() => {
+        if (isMobile()) return;
         const showFloatingBall = () => {
             useSettingsStore.getState().updateSetting("floatingBall", true);
             openFloatingBallWindow();
@@ -482,6 +636,7 @@ export function QuantaNoteApp() {
     const prevFloatingBallRef = useRef(floatingBallEnabled);
 
     useEffect(() => {
+        if (isMobile()) return;
         const prev = prevFloatingBallRef.current;
         const current = floatingBallEnabled;
 
@@ -494,6 +649,7 @@ export function QuantaNoteApp() {
     }, [floatingBallEnabled, openFloatingBallWindow, closeFloatingBallWindow]);
 
     useEffect(() => {
+        if (isMobile()) return;
         if (!floatingBallEnabled || !isValidFloatingBallPosition(floatingBallPosition)) return;
         floatingBallRef.current
             ?.setPosition(new PhysicalPosition(floatingBallPosition.x, floatingBallPosition.y))
@@ -502,6 +658,7 @@ export function QuantaNoteApp() {
 
     // 首次加载时检查
     useEffect(() => {
+        if (isMobile()) return;
         if (floatingBallEnabled) {
             openFloatingBallWindow();
         }
@@ -512,6 +669,7 @@ export function QuantaNoteApp() {
 
     // 监听悬浮球发出的事件
     useEffect(() => {
+        if (isMobile()) return;
         let active = true;
         let unlistenCommand: (() => void) | undefined;
         let unlistenPosition: (() => void) | undefined;
@@ -589,6 +747,7 @@ export function QuantaNoteApp() {
             currentPage={currentPage as AppPage}
             onNavigate={navigate}
             onOpenSearch={openPalette}
+            onNewNote={handleCreateNote}
             itemCount={dbItems.length}
         >
             {currentPage === "workspace" && (
@@ -607,10 +766,15 @@ export function QuantaNoteApp() {
                     previewRequest={previewRequest}
                     onPreviewItemOpen={handlePreviewItemOpen}
                     onPreviewRequestClear={handlePreviewRequestClear}
+                    onReaderOpenChange={setReaderOpen}
+                    onModalStateChange={setAnyModalOpen}
                 />
             )}
             {currentPage === "document" && (
-                <DocumentEditorPage onBackToPreview={handleBackToPreview} />
+                <DocumentEditorPage
+                    onBackToPreview={handleBackToPreview}
+                    onModalStateChange={setAnyModalOpen}
+                />
             )}
             {currentPage === "settings" && (
                 <SettingsPage theme={theme} onThemeChange={setTheme} />

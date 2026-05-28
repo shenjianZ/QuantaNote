@@ -68,12 +68,12 @@ export function WorkspacePage({ onQuickCreate, onViewSaved }: WorkspacePageProps
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[var(--app-bg)] px-[clamp(1rem,4vw,4rem)] py-4">
+    <div className="flex h-full min-h-0 flex-col bg-[var(--app-bg)] px-3 py-3 sm:px-[clamp(1rem,4vw,4rem)] sm:py-4">
       <section className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col">
-        <div className="mb-4 flex shrink-0 items-center justify-between gap-4">
-          <div>
+        <div className="mb-3 flex shrink-0 items-center justify-between gap-3 sm:mb-4">
+          <div className="min-w-0">
             <h1 className="app-hero-title text-[var(--text)]">{t("workspace:title")}</h1>
-            <p className="mt-1 text-sm text-[var(--muted)]">{t("workspace:subtitle")}</p>
+            <p className="mt-1 hidden text-sm text-[var(--muted)] sm:block">{t("workspace:subtitle")}</p>
           </div>
           <button
             className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full bg-[var(--accent)] px-3 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
@@ -126,7 +126,7 @@ export function WorkspacePage({ onQuickCreate, onViewSaved }: WorkspacePageProps
                   )}
                 </div>
               ) : (
-                t("workspace:shortcutHint", { mod: shortcutModifier })
+                  <span className="hidden sm:inline">{t("workspace:shortcutHint", { mod: shortcutModifier })}</span>
               )}
             </div>
           </footer>
