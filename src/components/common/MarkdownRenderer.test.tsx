@@ -66,4 +66,28 @@ const answer: number = 42;
     expect(document.querySelector("script")).not.toBeInTheDocument();
     expect(screen.queryByText("unsafe")).not.toBeInTheDocument();
   });
+
+  it("keeps native disclosure, footnotes, media and preformatted HTML readable", () => {
+    setup(
+      <MarkdownRenderer
+        content={`说明[^1]
+
+[^1]: 这是脚注内容。
+
+<details>
+<summary>展开补充说明</summary>
+<p>补充内容</p>
+</details>
+
+<audio src="/sample.mp3"></audio>
+
+<pre>preserved text</pre>`}
+      />,
+    );
+
+    expect(document.querySelector("[data-footnotes]")).toBeInTheDocument();
+    expect(screen.getByText("展开补充说明")).toBeInTheDocument();
+    expect(document.querySelector(".markdown-audio-frame audio")).toHaveAttribute("controls");
+    expect(document.querySelector("pre")?.textContent).toContain("preserved text");
+  });
 });

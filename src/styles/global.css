@@ -1346,11 +1346,21 @@ html.quick-note-mode .vditor-toolbar {
 }
 
 .markdown-preview .markdown-callout-label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
     margin-bottom: 0.32rem;
     color: var(--callout-color);
     font-size: var(--font-size-xs);
     font-weight: 700;
     letter-spacing: 0.03em;
+}
+
+.markdown-preview .markdown-callout-icon {
+    width: 0.95rem;
+    height: 0.95rem;
+    flex: 0 0 auto;
+    stroke-width: 2.1;
 }
 
 .markdown-preview .markdown-callout-content > :first-child {
@@ -1376,6 +1386,84 @@ html.quick-note-mode .vditor-toolbar {
 .markdown-preview .markdown-task-box.is-checked {
     border-color: var(--accent);
     background: var(--accent);
+}
+
+.markdown-preview li:has(> .markdown-task-box),
+.markdown-preview li:has(> p > .markdown-task-box) {
+    margin-left: -1.35em !important;
+    padding-left: 0 !important;
+    list-style: none !important;
+}
+
+.markdown-preview .markdown-media-frame {
+    width: 100%;
+    margin: 1.35rem 0;
+    padding: 0.75rem;
+    border: 1px solid var(--line);
+    border-radius: 0.95rem;
+    background: var(--field);
+}
+
+.markdown-preview .markdown-media-frame audio,
+.markdown-preview .markdown-media-frame video {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 0.58rem;
+}
+
+.markdown-preview .markdown-video-frame video {
+    max-height: min(38rem, 70vh);
+    background: var(--code-block-bg);
+    object-fit: contain;
+}
+
+.markdown-preview [data-footnotes] {
+    margin-top: 2.8rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 0.88em;
+}
+
+.markdown-preview [data-footnotes] h2 {
+    margin: 0 0 0.65rem !important;
+    padding: 0 !important;
+    border: 0 !important;
+    color: var(--md-heading) !important;
+    font-size: 0.86rem !important;
+    letter-spacing: 0.04em !important;
+    text-transform: uppercase;
+}
+
+.markdown-preview [data-footnotes] ol {
+    margin: 0 !important;
+    padding-left: 1.25rem !important;
+}
+
+.markdown-preview [data-footnotes] li {
+    margin: 0.35rem 0 !important;
+    padding-left: 0.2rem !important;
+}
+
+.markdown-preview .data-footnote-ref,
+.markdown-preview .data-footnote-backref {
+    border-radius: 0.3rem;
+    color: var(--accent) !important;
+    text-decoration: none !important;
+}
+
+.markdown-preview .data-footnote-ref {
+    padding: 0 0.18rem;
+    background: var(--accent-soft);
+    font-size: 0.78em;
+    font-weight: 700;
+    vertical-align: super;
+}
+
+.markdown-preview .data-footnote-backref:hover,
+.markdown-preview .data-footnote-ref:hover {
+    background: var(--hover);
 }
 
 .markdown-preview .katex-display {

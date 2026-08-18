@@ -1,9 +1,9 @@
 import { Children, cloneElement, isValidElement, useCallback, useState, type ReactElement, type ReactNode } from "react";
-import { Check, Copy } from "lucide-react";
+import { Check, CircleAlert, Copy, Info, Lightbulb, OctagonAlert, TriangleAlert } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import rehypeRaw from "rehype-raw";
-import rehypeSanitize from "rehype-sanitize";
+import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -33,6 +33,17 @@ hljs.registerLanguage("rust", rust);
 hljs.registerLanguage("sql", sql);
 hljs.registerLanguage("typescript", typescript);
 hljs.registerLanguage("xml", xml);
+
+const markdownSanitizeSchema = {
+  ...defaultSchema,
+  attributes: {
+    ...defaultSchema.attributes,
+    audio: ["controls", "preload", "src"],
+    source: [...(defaultSchema.attributes?.source ?? []), "src"],
+    video: ["controls", "preload", "poster", "src"],
+  },
+  tagNames: [...(defaultSchema.tagNames ?? []), "audio", "video"],
+};
 
 interface MarkdownRendererProps {
   content: string;
@@ -180,6 +191,17 @@ function calloutLabel(kind: CalloutKind, lang?: "zh_CN" | "en_US"): string {
   }[kind];
 }
 
+function CalloutIcon({ kind }: { kind: CalloutKind }) {
+  const Icon = {
+    note: Info,
+    tip: Lightbulb,
+    important: CircleAlert,
+    warning: TriangleAlert,
+    caution: OctagonAlert,
+  }[kind];
+  return <Icon className="markdown-callout-icon" aria-hidden="true" />;
+}
+
 export function MarkdownRenderer({ content, theme = "dark", lang, emptyText }: MarkdownRendererProps) {
   const { t } = useTranslation();
   const resolvedEmptyText = emptyText ?? t("common:emptyItem.noContent");
@@ -249,7 +271,10 @@ export function MarkdownRenderer({ content, theme = "dark", lang, emptyText }: M
 
       return (
         <aside className={`markdown-callout markdown-callout--${callout.kind}`} data-callout={callout.kind}>
-          <div className="markdown-callout-label">{calloutLabel(callout.kind, lang)}</div>
+          <div className="markdown-callout-label">
+            <CalloutIcon kind={callout.kind} />
+            <span>{calloutLabel(callout.kind, lang)}</span>
+          </div>
           <div className="markdown-callout-content">{cleanedChildren}</div>
         </aside>
       );
@@ -263,11 +288,21 @@ export function MarkdownRenderer({ content, theme = "dark", lang, emptyText }: M
       if (!src) return null;
       return (
         <span className="markdown-image-frame">
-          <img src={src} alt={alt || ""} title={title} loading="lazy" />
+          <img src={src} alt={alt || ""} title={title} loading="lazy" decoding="async" />
           {alt && <span className="markdown-image-caption">{alt}</span>}
         </span>
       );
     },
+    audio: ({ children, ...props }) => (
+      <figure className="markdown-media-frame markdown-audio-frame">
+        <audio {...props} controls preload="metadata">{children}</audio>
+      </figure>
+    ),
+    video: ({ children, ...props }) => (
+      <figure className="markdown-media-frame markdown-video-frame">
+        <video {...props} controls preload="metadata">{children}</video>
+      </figure>
+    ),
     input: ({ type, checked }) => {
       if (type !== "checkbox") return <input type={type} checked={checked} readOnly />;
       return (
@@ -276,7 +311,12 @@ export function MarkdownRenderer({ content, theme = "dark", lang, emptyText }: M
         </span>
       );
     },
-    pre: ({ children }) => <>{children}</>,
+    pre: ({ children }) => {
+      const renderedCodeBlock = Children.toArray(children).some(
+        (child) => isValidElement(child) && child.type === CodeBlock,
+      );
+      return renderedCodeBlock ? <>{children}</> : <pre>{children}</pre>;
+    },
     code: ({ children, className }) => {
       const language = /language-([\w-]+)/.exec(className || "")?.[1];
       const rawCode = nodeToText(children);
@@ -296,7 +336,7 @@ export function MarkdownRenderer({ content, theme = "dark", lang, emptyText }: M
     >
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks, remarkMath]}
-        rehypePlugins={[rehypeRaw, rehypeSanitize, rehypeKatex]}
+        rehypePlugins={[rehypeRaw, [rehypeSanitize, markdownSanitizeSchema], rehypeKatex]}
         components={components}
       >
         {content}
