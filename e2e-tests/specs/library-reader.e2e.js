@@ -3,10 +3,39 @@ import { pause, observePause } from "../helpers/config.js";
 import TopBar from "../helpers/page-objects/TopBar.js";
 import LibraryPage from "../helpers/page-objects/LibraryPage.js";
 
+async function completeInitialLanguageSetup() {
+  await browser.waitUntil(
+    async () => {
+      return browser.execute(() => {
+        const hasNavigation = Boolean(document.querySelector("[data-testid='nav-library']"));
+        const hasLanguageSetup = Array.from(document.querySelectorAll("button")).some((button) => {
+          return /开始使用|Get Started/.test(button.textContent || "");
+        });
+        return hasNavigation || hasLanguageSetup;
+      });
+    },
+    { timeout: 10000, timeoutMsg: "Application did not reach the main shell or language setup" },
+  );
+
+  const continueButton = await $("//button[contains(., '开始使用') or contains(., 'Get Started')]");
+  if (await continueButton.isExisting()) {
+    const chineseButton = await $("//button[contains(., '简体中文')]");
+    if (await chineseButton.isExisting()) {
+      await chineseButton.click();
+    }
+    await continueButton.click();
+    await browser.waitUntil(
+      async () => browser.execute(() => Boolean(document.querySelector("[data-testid='nav-library']"))),
+      { timeout: 10000, timeoutMsg: "Language setup did not transition to the main shell" },
+    );
+  }
+}
+
 describe("Library reader and item actions", () => {
   let pinnedItem, favoriteItem, normalItem;
 
   before(async () => {
+    await completeInitialLanguageSetup();
     await cleanupAll();
     normalItem = await seedItem({ title: "普通笔记", content: "普通内容" });
     await seedItem({
@@ -91,7 +120,7 @@ describe("Library reader and item actions", () => {
     const preview = await browser.execute(() => {
       const root = document.querySelector("[data-testid='reader-drawer'] .markdown-preview");
       return {
-        heading: root?.querySelector("h1#阅读标题")?.textContent ?? "",
+        heading: root?.querySelector("h1")?.textContent ?? "",
         callout: root?.querySelector(".markdown-callout--tip")?.textContent ?? "",
         task: root?.querySelector(".markdown-task-box.is-checked") !== null,
         code: root?.querySelector(".markdown-code-block code.hljs")?.textContent ?? "",
