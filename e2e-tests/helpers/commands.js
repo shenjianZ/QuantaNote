@@ -174,6 +174,7 @@ const DEFAULT_APP_SETTINGS = {
   fontMono: "JetBrains Mono",
   fontSize: 15,
   accentColor: "#386c5f",
+  markdownStyle: "notion",
   customAccentColors: [],
   minimizeToTray: true,
   closeKeepRunning: false,

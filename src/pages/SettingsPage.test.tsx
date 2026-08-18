@@ -20,6 +20,7 @@ describe("SettingsPage", () => {
                 fontFamily: "Noto Sans SC",
                 fontMono: "JetBrains Mono",
                 fontSize: 16,
+                markdownStyle: "notion",
                 minimizeToTray: false,
                 closeKeepRunning: false,
                 autoBackup: false,
@@ -35,6 +36,7 @@ describe("SettingsPage", () => {
                     pretty: false,
                     maxLen: 4000,
                 },
+                locale: "zh-CN",
             },
             dbSize: "1.2 MB",
             dbPath: "D:\\data\\quanta_note.sqlite",
@@ -81,6 +83,12 @@ describe("SettingsPage", () => {
         const { user } = setup(<SettingsPage />);
         await user.click(screen.getByText("字体"));
         expect(screen.getByText("界面字体")).toBeInTheDocument();
+    });
+
+    it("changes Markdown style preset", async () => {
+        const { user } = setup(<SettingsPage />);
+        await user.click(screen.getByTestId("markdown-style-paper"));
+        expect(updateSettingMock).toHaveBeenCalledWith("markdownStyle", "paper");
     });
 
     it("changes accent color on click", async () => {

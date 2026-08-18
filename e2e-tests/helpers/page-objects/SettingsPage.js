@@ -31,6 +31,16 @@ class SettingsPage {
     return browser.execute(() => document.documentElement.getAttribute("data-theme"));
   }
 
+  async setMarkdownStyle(style) {
+    const btn = await $(`[data-testid='markdown-style-${style}']`);
+    await browser.execute((el) => el.click(), btn);
+    await observePause();
+  }
+
+  async getMarkdownStyle() {
+    return browser.execute(() => document.documentElement.getAttribute("data-markdown-style"));
+  }
+
   async setAccentColor(index) {
     const buttons = await $$("[data-testid='accent-color']");
     if (buttons[index]) {

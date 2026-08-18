@@ -7,6 +7,11 @@ import { useItemStore } from "./itemStore";
 import { useToastStore } from "./toastStore";
 import { isMobile } from "../utils/platform";
 import {
+    DEFAULT_MARKDOWN_STYLE,
+    normalizeMarkdownStyle,
+    type MarkdownStylePreset,
+} from "../utils/markdownStyle";
+import {
     getDbPath,
     setAutostart,
     getAutostart,
@@ -51,6 +56,7 @@ export interface AppSettings {
     fontMono: string;
     fontSize: number;
     accentColor: string;
+    markdownStyle: MarkdownStylePreset;
     customAccentColors: CustomColor[];
     minimizeToTray: boolean;
     closeKeepRunning: boolean;
@@ -76,6 +82,7 @@ const DEFAULTS: AppSettings = {
     fontMono: "JetBrains Mono",
     fontSize: isMobile() ? 14 : 15,
     accentColor: "#386c5f",
+    markdownStyle: DEFAULT_MARKDOWN_STYLE,
     customAccentColors: [],
     minimizeToTray: true,
     closeKeepRunning: false,
@@ -112,6 +119,7 @@ function normalizeSettings(settings: AppSettings): AppSettings {
             : DEFAULTS.fontMono,
         fontSize: Math.min(18, Math.max(14, Number(settings.fontSize) || DEFAULTS.fontSize)),
         accentColor: settings.accentColor,
+        markdownStyle: normalizeMarkdownStyle(settings.markdownStyle),
         customAccentColors: Array.isArray(settings.customAccentColors)
             ? settings.customAccentColors
             : DEFAULTS.customAccentColors,
@@ -230,6 +238,7 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
 
 function applySettings(settings: AppSettings) {
     const root = document.documentElement;
+    root.dataset.markdownStyle = settings.markdownStyle;
     const sansStack =
         settings.fontFamily === "system-ui"
             ? "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"

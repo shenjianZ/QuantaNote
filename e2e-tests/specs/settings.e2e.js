@@ -3,8 +3,33 @@ import { pause } from "../helpers/config.js";
 import TopBar from "../helpers/page-objects/TopBar.js";
 import SettingsPage from "../helpers/page-objects/SettingsPage.js";
 
+async function completeInitialLanguageSetup() {
+    await browser.waitUntil(
+        async () => browser.execute(() => {
+            const hasNavigation = Boolean(document.querySelector("[data-testid='nav-library']"));
+            const hasLanguageSetup = Array.from(document.querySelectorAll("button")).some((button) => {
+                return /开始使用|Get Started/.test(button.textContent || "");
+            });
+            return hasNavigation || hasLanguageSetup;
+        }),
+        { timeout: 10000, timeoutMsg: "Application did not reach the main shell or language setup" },
+    );
+
+    const continueButton = await $("//button[contains(., '开始使用') or contains(., 'Get Started')]");
+    if (await continueButton.isExisting()) {
+        const chineseButton = await $("//button[contains(., '简体中文')]");
+        if (await chineseButton.isExisting()) await chineseButton.click();
+        await continueButton.click();
+        await browser.waitUntil(
+            async () => browser.execute(() => Boolean(document.querySelector("[data-testid='nav-library']"))),
+            { timeout: 10000, timeoutMsg: "Language setup did not transition to the main shell" },
+        );
+    }
+}
+
 describe("Settings deep coverage", () => {
     before(async () => {
+        await completeInitialLanguageSetup();
         await cleanupAll();
         await resetAppState();
         await TopBar.openSettings();
@@ -84,5 +109,20 @@ describe("Settings deep coverage", () => {
         await SettingsPage.selectSection("外观");
         theme = await SettingsPage.getTheme();
         expect(theme).toBe("light");
+    });
+
+    it("markdown style changes and persists", async () => {
+        await SettingsPage.selectSection("外观");
+        await SettingsPage.setMarkdownStyle("paper");
+
+        let style = await SettingsPage.getMarkdownStyle();
+        expect(style).toBe("paper");
+        await waitForAppSetting("markdownStyle", (value) => value === "paper");
+
+        await TopBar.navLibrary();
+        await TopBar.openSettings();
+        await SettingsPage.selectSection("外观");
+        style = await SettingsPage.getMarkdownStyle();
+        expect(style).toBe("paper");
     });
 });

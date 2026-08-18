@@ -32,6 +32,7 @@ import { useAppStore } from "../stores/appStore";
 import { useToastStore } from "../stores/toastStore";
 import { useUpdaterStore } from "../stores/updaterStore";
 import { isMobile } from "../utils/platform";
+import type { MarkdownStylePreset } from "../utils/markdownStyle";
 
 const FONT_OPTIONS_KEYS = [
     { value: "Noto Sans SC", label: "Noto Sans SC" },
@@ -57,6 +58,33 @@ const ACCENT_COLOR_KEYS = [
     { value: "#6366f1", labelKey: "settings:appearance.colors.indigo" },
     { value: "#8b5cf6", labelKey: "settings:appearance.colors.violet" },
     { value: "#64748b", labelKey: "settings:appearance.colors.slate" },
+];
+
+const MARKDOWN_STYLE_OPTIONS: Array<{
+    value: MarkdownStylePreset;
+    labelKey: string;
+    descriptionKey: string;
+}> = [
+    {
+        value: "notion",
+        labelKey: "settings:appearance.styles.notion.label",
+        descriptionKey: "settings:appearance.styles.notion.description",
+    },
+    {
+        value: "paper",
+        labelKey: "settings:appearance.styles.paper.label",
+        descriptionKey: "settings:appearance.styles.paper.description",
+    },
+    {
+        value: "obsidian",
+        labelKey: "settings:appearance.styles.obsidian.label",
+        descriptionKey: "settings:appearance.styles.obsidian.description",
+    },
+    {
+        value: "editorial",
+        labelKey: "settings:appearance.styles.editorial.label",
+        descriptionKey: "settings:appearance.styles.editorial.description",
+    },
 ];
 
 interface SettingsPageProps {
@@ -219,6 +247,54 @@ export function SettingsPage({
                                     >
                                         <Icon className="h-4 w-4" />
                                         {opt.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </section>
+                    <section className="mb-6">
+                        <div className="mb-1 flex items-center justify-between gap-3">
+                            <h2 className="text-sm font-semibold text-[var(--text)]">
+                                {t("settings:appearance.markdownStyle")}
+                            </h2>
+                            <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--accent)]">
+                                Markdown
+                            </span>
+                        </div>
+                        <p className="mb-3 text-xs leading-relaxed text-[var(--muted)]">
+                            {t("settings:appearance.markdownStyleDesc")}
+                        </p>
+                        <div className="settings-markdown-style-grid">
+                            {MARKDOWN_STYLE_OPTIONS.map((opt) => {
+                                const selected = settings.markdownStyle === opt.value;
+                                return (
+                                    <button
+                                        key={opt.value}
+                                        type="button"
+                                        role="radio"
+                                        aria-checked={selected}
+                                        aria-label={t(opt.labelKey)}
+                                        data-testid={`markdown-style-${opt.value}`}
+                                        className={`settings-markdown-style-card${selected ? " is-selected" : ""}`}
+                                        onClick={() => updateSetting("markdownStyle", opt.value)}
+                                    >
+                                        <span className={`settings-markdown-style-preview settings-markdown-style-preview--${opt.value}`} aria-hidden="true">
+                                            <span className="settings-markdown-style-preview__title" />
+                                            <span className="settings-markdown-style-preview__line settings-markdown-style-preview__line--wide" />
+                                            <span className="settings-markdown-style-preview__quote" />
+                                            <span className="settings-markdown-style-preview__table">
+                                                <span />
+                                                <span />
+                                                <span />
+                                                <span />
+                                            </span>
+                                        </span>
+                                        <span className="mt-3 block text-left text-sm font-semibold text-[var(--text)]">
+                                            {t(opt.labelKey)}
+                                        </span>
+                                        <span className="mt-1 block text-left text-xs leading-relaxed text-[var(--muted)]">
+                                            {t(opt.descriptionKey)}
+                                        </span>
                                     </button>
                                 );
                             })}

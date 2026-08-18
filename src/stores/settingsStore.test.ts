@@ -22,6 +22,7 @@ describe("settingsStore", () => {
         fontMono: "JetBrains Mono",
         fontSize: 15,
         accentColor: "#386c5f",
+        markdownStyle: "notion",
         customAccentColors: [],
         minimizeToTray: true,
         closeKeepRunning: false,
@@ -35,8 +36,9 @@ describe("settingsStore", () => {
           toConsole: false,
           toFile: true,
           pretty: false,
-          maxLen: 4000,
+            maxLen: 4000,
         },
+        locale: "zh-CN",
       },
       dbSize: "计算中...",
     });
@@ -67,6 +69,13 @@ describe("settingsStore", () => {
     expect(rootStyle.getPropertyValue("--font-size-xs")).toBe("max(12px, calc(16px - 2px))");
     expect(rootStyle.getPropertyValue("--font-size-2xl")).toBe("calc(16px + 9px)");
     expect(rootStyle.getPropertyValue("--font-size-md-h1")).toBe("calc(16px + 13px)");
+  });
+
+  it("switches and applies the Markdown style preset", () => {
+    useSettingsStore.getState().updateSetting("markdownStyle", "paper");
+
+    expect(useSettingsStore.getState().settings.markdownStyle).toBe("paper");
+    expect(document.documentElement.dataset.markdownStyle).toBe("paper");
   });
 
   it("exports data through dialog and save_to_file command", async () => {

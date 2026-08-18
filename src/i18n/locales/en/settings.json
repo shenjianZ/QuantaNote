@@ -11,6 +11,26 @@
     "system": "System",
     "light": "Light",
     "dark": "Dark",
+    "markdownStyle": "Markdown Style",
+    "markdownStyleDesc": "Applied to both the editor and preview. Pick a layout that fits the way you read.",
+    "styles": {
+      "notion": {
+        "label": "Minimal",
+        "description": "Quiet and spacious for everyday notes and long-form reading"
+      },
+      "paper": {
+        "label": "Paper",
+        "description": "Warm paper tones with bookish headings and quotations"
+      },
+      "obsidian": {
+        "label": "Obsidian",
+        "description": "Compact, crisp, and high-contrast for technical notes"
+      },
+      "editorial": {
+        "label": "Editorial",
+        "description": "Stronger hierarchy and content blocks for feature writing"
+      }
+    },
     "accentColor": "Accent Color",
     "predefined": "Predefined",
     "custom": "Custom",

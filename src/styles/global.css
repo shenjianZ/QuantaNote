@@ -1513,3 +1513,346 @@ html.quick-note-mode .vditor-toolbar {
         transition: none;
     }
 }
+
+/* ── Switchable Markdown style presets ── */
+html[data-markdown-style="paper"] {
+    --md-heading: color-mix(in srgb, #8a562c 66%, var(--text));
+    --md-link: color-mix(in srgb, #a75e2d 72%, var(--text));
+    --md-link-hover: color-mix(in srgb, #7e421e 82%, var(--text));
+    --md-link-bg: color-mix(in srgb, #b8793f 12%, transparent);
+    --md-quote-bg: color-mix(in srgb, #b8793f 10%, var(--paper));
+    --md-quote-border: color-mix(in srgb, #b8793f 66%, var(--line));
+    --md-table-head: color-mix(in srgb, #b8793f 12%, var(--paper));
+    --md-table-row-alt: color-mix(in srgb, #b8793f 5%, var(--paper));
+    --code-inline-bg: color-mix(in srgb, #b8793f 10%, var(--field));
+    --code-inline-text: color-mix(in srgb, #874b27 78%, var(--text));
+    --code-block-bg: color-mix(in srgb, #9c6237 6%, var(--field));
+    --code-block-border: color-mix(in srgb, #9c6237 18%, var(--line));
+}
+
+html[data-markdown-style="obsidian"] {
+    --md-heading: color-mix(in srgb, var(--text) 96%, var(--accent));
+    --md-link: color-mix(in srgb, var(--accent) 86%, var(--text));
+    --md-link-hover: color-mix(in srgb, var(--accent) 100%, var(--text));
+    --md-link-bg: color-mix(in srgb, var(--accent) 12%, transparent);
+    --md-quote-bg: color-mix(in srgb, var(--text) 4%, var(--paper));
+    --md-quote-border: color-mix(in srgb, var(--accent) 76%, var(--line));
+    --md-table-head: color-mix(in srgb, var(--text) 7%, var(--paper));
+    --md-table-row-alt: color-mix(in srgb, var(--text) 3%, var(--paper));
+    --code-block-bg: color-mix(in srgb, var(--text) 8%, var(--paper));
+    --code-block-border: color-mix(in srgb, var(--text) 16%, var(--line));
+}
+
+html[data-markdown-style="editorial"] {
+    --md-heading: color-mix(in srgb, var(--text) 90%, var(--accent));
+    --md-link: color-mix(in srgb, var(--accent) 82%, var(--text));
+    --md-link-hover: color-mix(in srgb, var(--accent) 100%, var(--text));
+    --md-link-bg: color-mix(in srgb, var(--accent) 13%, transparent);
+    --md-quote-bg: color-mix(in srgb, var(--accent) 8%, var(--paper));
+    --md-quote-border: color-mix(in srgb, var(--accent) 82%, var(--line));
+    --md-table-head: color-mix(in srgb, var(--accent) 12%, var(--paper));
+    --md-table-row-alt: color-mix(in srgb, var(--accent) 4%, var(--paper));
+    --code-block-bg: color-mix(in srgb, var(--accent) 5%, var(--field));
+    --code-block-border: color-mix(in srgb, var(--accent) 18%, var(--line));
+}
+
+html[data-markdown-style="paper"] .markdown-preview,
+html[data-markdown-style="paper"] .vditor-ir,
+html[data-markdown-style="paper"] .vditor-reset {
+    font-family: ui-serif, "Noto Serif SC", "Songti SC", var(--font-sans), serif !important;
+    letter-spacing: 0.008em;
+}
+
+html[data-markdown-style="paper"] .markdown-preview {
+    width: min(100%, 820px);
+}
+
+html[data-markdown-style="paper"] .markdown-preview h1,
+html[data-markdown-style="paper"] .vditor-reset h1 {
+    font-weight: 700 !important;
+    letter-spacing: -0.025em !important;
+}
+
+html[data-markdown-style="paper"] .markdown-preview h2,
+html[data-markdown-style="paper"] .vditor-reset h2 {
+    border-left: 0 !important;
+    border-bottom: 1px solid var(--line) !important;
+    padding: 0 0 0.55rem !important;
+}
+
+html[data-markdown-style="paper"] .markdown-preview blockquote,
+html[data-markdown-style="paper"] .vditor-reset blockquote {
+    position: relative;
+    border: 1px solid color-mix(in srgb, var(--md-quote-border) 52%, var(--line)) !important;
+    border-left: 0 !important;
+    border-right: 0 !important;
+    border-radius: 0 !important;
+    background: transparent;
+    padding: 1.1rem 1.8rem 1.05rem !important;
+}
+
+html[data-markdown-style="paper"] .markdown-preview blockquote::before,
+html[data-markdown-style="paper"] .vditor-reset blockquote::before {
+    position: absolute;
+    top: 0.42rem;
+    left: 0.15rem;
+    color: var(--md-quote-border);
+    content: "“";
+    font-family: Georgia, serif;
+    font-size: 2.7rem;
+    line-height: 1;
+}
+
+html[data-markdown-style="paper"] .markdown-preview .markdown-table-wrap {
+    border-radius: 0.35rem;
+    box-shadow: none;
+}
+
+html[data-markdown-style="paper"] .markdown-preview table,
+html[data-markdown-style="paper"] .vditor-reset table {
+    border-radius: 0.35rem;
+}
+
+html[data-markdown-style="paper"] .markdown-preview table th,
+html[data-markdown-style="paper"] .vditor-reset table th {
+    background: transparent !important;
+    border-bottom: 2px solid var(--md-quote-border) !important;
+    text-align: left;
+}
+
+html[data-markdown-style="paper"] .markdown-preview table tbody tr:nth-child(2n),
+html[data-markdown-style="paper"] .vditor-reset table tbody tr:nth-child(2n) {
+    background: var(--md-table-row-alt) !important;
+}
+
+html[data-markdown-style="obsidian"] .markdown-preview {
+    width: min(100%, 900px);
+    padding-top: clamp(1rem, 3vw, 2rem);
+}
+
+html[data-markdown-style="obsidian"] .markdown-preview :where(p, li),
+html[data-markdown-style="obsidian"] .vditor-ir :where(p, li),
+html[data-markdown-style="obsidian"] .vditor-reset :where(p, li) {
+    letter-spacing: 0.012em;
+}
+
+html[data-markdown-style="obsidian"] .markdown-preview h1,
+html[data-markdown-style="obsidian"] .vditor-reset h1 {
+    padding-bottom: 1rem !important;
+    border-bottom: 1px solid var(--line) !important;
+    letter-spacing: -0.015em !important;
+}
+
+html[data-markdown-style="obsidian"] .markdown-preview h2,
+html[data-markdown-style="obsidian"] .vditor-reset h2 {
+    margin-top: 2.25rem !important;
+    border-left: 0 !important;
+    border-bottom: 1px dashed var(--line) !important;
+    padding: 0 0 0.45rem !important;
+}
+
+html[data-markdown-style="obsidian"] .markdown-preview blockquote,
+html[data-markdown-style="obsidian"] .vditor-reset blockquote {
+    border-left-width: 4px !important;
+    border-radius: 0.25rem !important;
+    background: color-mix(in srgb, var(--text) 4%, var(--paper));
+    padding: 0.75rem 1rem !important;
+}
+
+html[data-markdown-style="obsidian"] .markdown-preview .markdown-table-wrap {
+    border-radius: 0.45rem;
+    box-shadow: none;
+}
+
+html[data-markdown-style="obsidian"] .markdown-preview table th,
+html[data-markdown-style="obsidian"] .vditor-reset table th {
+    background: color-mix(in srgb, var(--accent) 10%, var(--paper)) !important;
+    letter-spacing: 0.035em;
+}
+
+html[data-markdown-style="obsidian"] .markdown-preview .markdown-code-block,
+html[data-markdown-style="obsidian"] .markdown-preview pre,
+html[data-markdown-style="obsidian"] .vditor-reset pre {
+    border-radius: 0.45rem !important;
+}
+
+html[data-markdown-style="editorial"] .markdown-preview {
+    width: min(100%, 860px);
+}
+
+html[data-markdown-style="editorial"] .markdown-preview h1 {
+    padding: 0 0 1rem !important;
+    border-bottom: 2px solid var(--accent) !important;
+    line-height: 1.15 !important;
+}
+
+html[data-markdown-style="editorial"] .markdown-preview h2 {
+    margin-top: 2.45rem !important;
+    border-left: 0 !important;
+    border-bottom: 1px solid var(--line) !important;
+    padding: 0 0 0.5rem !important;
+}
+
+html[data-markdown-style="editorial"] .markdown-preview p {
+    line-height: 1.95 !important;
+}
+
+html[data-markdown-style="editorial"] .markdown-preview blockquote,
+html[data-markdown-style="editorial"] .vditor-reset blockquote {
+    border-left-width: 5px !important;
+    border-radius: 0.25rem !important;
+    background: var(--md-quote-bg);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--md-quote-border) 18%, transparent);
+    font-size: 1.04em;
+    padding: 0.9rem 1.1rem !important;
+}
+
+html[data-markdown-style="editorial"] .markdown-preview .markdown-table-wrap {
+    border-radius: 0.35rem;
+    box-shadow: 0 10px 22px color-mix(in srgb, var(--text) 7%, transparent);
+}
+
+html[data-markdown-style="editorial"] .markdown-preview table th,
+html[data-markdown-style="editorial"] .vditor-reset table th {
+    background: var(--md-table-head) !important;
+    border-bottom: 2px solid var(--accent) !important;
+}
+
+/* Settings: compact visual samples for the preset switcher */
+.settings-markdown-style-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.settings-markdown-style-card {
+    min-width: 0;
+    padding: 0.65rem;
+    border: 1px solid var(--line);
+    border-radius: 0.85rem;
+    background: var(--field);
+    text-align: left;
+    transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+}
+
+.settings-markdown-style-card:hover {
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+    transform: translateY(-1px);
+}
+
+.settings-markdown-style-card.is-selected {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 7%, var(--field));
+    box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.settings-markdown-style-preview {
+    display: block;
+    height: 6.5rem;
+    overflow: hidden;
+    padding: 0.75rem;
+    border: 1px solid var(--line);
+    border-radius: 0.58rem;
+    background: var(--paper);
+}
+
+.settings-markdown-style-preview__title,
+.settings-markdown-style-preview__line,
+.settings-markdown-style-preview__quote,
+.settings-markdown-style-preview__table {
+    display: block;
+}
+
+.settings-markdown-style-preview__title {
+    width: 58%;
+    height: 0.55rem;
+    margin-bottom: 0.62rem;
+    border-radius: 0.2rem;
+    background: var(--text);
+    opacity: 0.88;
+}
+
+.settings-markdown-style-preview__line {
+    width: 76%;
+    height: 0.28rem;
+    margin-bottom: 0.32rem;
+    border-radius: 0.2rem;
+    background: var(--muted);
+    opacity: 0.46;
+}
+
+.settings-markdown-style-preview__line--wide {
+    width: 94%;
+}
+
+.settings-markdown-style-preview__quote {
+    width: 88%;
+    height: 1.05rem;
+    margin: 0.7rem 0;
+    border-left: 3px solid var(--accent);
+    border-radius: 0.18rem;
+    background: var(--accent-soft);
+}
+
+.settings-markdown-style-preview__table {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    width: 100%;
+    height: 1.05rem;
+    border: 1px solid var(--line);
+    background: var(--line);
+}
+
+.settings-markdown-style-preview__table span {
+    background: var(--paper);
+}
+
+.settings-markdown-style-preview__table span:nth-child(-n + 2) {
+    background: var(--md-table-head);
+}
+
+.settings-markdown-style-preview--paper {
+    font-family: Georgia, "Times New Roman", serif;
+    background: color-mix(in srgb, #b8793f 7%, var(--paper));
+}
+
+.settings-markdown-style-preview--paper .settings-markdown-style-preview__quote {
+    border-left: 0;
+    border-top: 1px solid color-mix(in srgb, #b8793f 58%, var(--line));
+    border-bottom: 1px solid color-mix(in srgb, #b8793f 58%, var(--line));
+    background: transparent;
+}
+
+.settings-markdown-style-preview--obsidian .settings-markdown-style-preview__quote {
+    border-left-width: 4px;
+    border-radius: 0;
+}
+
+.settings-markdown-style-preview--obsidian .settings-markdown-style-preview__table {
+    border-radius: 0.18rem;
+}
+
+.settings-markdown-style-preview--editorial .settings-markdown-style-preview__title {
+    width: 76%;
+    height: 0.65rem;
+    border-bottom: 2px solid var(--accent);
+    background: transparent;
+}
+
+.settings-markdown-style-preview--editorial .settings-markdown-style-preview__quote {
+    border-left-width: 5px;
+    border-radius: 0;
+}
+
+@media (max-width: 520px) {
+    .settings-markdown-style-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .settings-markdown-style-card {
+        transition: none;
+    }
+}
