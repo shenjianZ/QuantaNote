@@ -30,6 +30,11 @@ interface DocumentEditorPageProps {
   onModalStateChange?: (modalOpen: boolean) => void;
 }
 
+type ItemEcho = {
+  id: string;
+  fields: Record<string, string | boolean>;
+};
+
 export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: DocumentEditorPageProps) {
   const { t } = useTranslation(["document", "common"]);
   const selectedItemId = useAppStore((s) => s.selectedItemId);
@@ -47,9 +52,22 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
   const [isFavorite, setIsFavorite] = useState(false);
   const [versionPanelOpen, setVersionPanelOpen] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 仅忽略当前页面自己触发的 store 回声；同 ID 的 getItem/同步刷新仍需回填表单。
+  const pendingItemEchoesRef = useRef<ItemEcho[]>([]);
   const latestTitle = useRef(title);
   const latestSummary = useRef(summary);
   const latestContent = useRef(content);
+
+  function queueItemEcho(id: string, fields: ItemEcho["fields"]) {
+    const echo = { id, fields };
+    pendingItemEchoesRef.current.push(echo);
+    return echo;
+  }
+
+  function removeItemEcho(echo: ItemEcho) {
+    const index = pendingItemEchoesRef.current.indexOf(echo);
+    if (index >= 0) pendingItemEchoesRef.current.splice(index, 1);
+  }
 
   useEffect(() => { latestTitle.current = title; }, [title]);
   useEffect(() => { latestSummary.current = summary; }, [summary]);
@@ -80,6 +98,14 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
 
   useEffect(() => {
     if (!selectedItem) return;
+    const echoIndex = pendingItemEchoesRef.current.findIndex((echo) =>
+      echo.id === selectedItem.id
+      && Object.entries(echo.fields).every(([key, value]) => selectedItem[key as keyof typeof selectedItem] === value),
+    );
+    if (echoIndex >= 0) {
+      pendingItemEchoesRef.current.splice(echoIndex, 1);
+      return;
+    }
     setTitle(selectedItem.title);
     setSummary(selectedItem.summary || "");
     setContent(selectedItem.content || "");
@@ -89,6 +115,11 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
 
   const save = useCallback(async (newTitle: string, newSummary: string, newContent: string) => {
     if (!selectedItemId) return;
+    const echo = queueItemEcho(selectedItemId, {
+      title: newTitle,
+      summary: newSummary,
+      content: newContent,
+    });
     try {
       await updateItem(selectedItemId, {
         title: newTitle,
@@ -97,6 +128,7 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
       });
       setSaved(true);
     } catch (e) {
+      removeItemEcho(echo);
       console.error("Save failed:", e);
       useToastStore.getState().addToast("error", t("common:toast.saveFailed"));
     }
@@ -127,9 +159,11 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
     if (!selectedItemId) return;
     const next = !isFavorite;
     setIsFavorite(next);
+    const echo = queueItemEcho(selectedItemId, { favorite: next });
     try {
       await updateItem(selectedItemId, { favorite: next });
     } catch (e) {
+      removeItemEcho(echo);
       // 回滚乐观更新
       setIsFavorite(!next);
       console.error("Toggle favorite failed:", e);

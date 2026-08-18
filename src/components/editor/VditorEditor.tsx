@@ -212,6 +212,9 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
   const onChangeRef = useRef(onChange);
   const initialValueRef = useRef(initialValue);
   const skipNextValueRef = useRef<string | null>(null);
+  // 最近一次通过 onChange 上报给父组件的值;同步外部内容时用于识别"回声",
+  // 避免父组件把编辑器自己发出的值传回来时触发 setValue 导致光标被重置到文档开头
+  const lastEmittedRef = useRef<string | null>(null);
   const readyRef = useRef(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const searchMatchesRef = useRef<Array<{ start: number; end: number }>>([]);
@@ -513,6 +516,7 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
         }
         skipNextValueRef.current = null;
       }
+      lastEmittedRef.current = value;
       onChangeRef.current(value);
     };
     const onPaste = () => {
@@ -541,6 +545,7 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
           }
           skipNextValueRef.current = null;
         }
+        lastEmittedRef.current = value;
         onChangeRef.current(value);
       },
       placeholder: resolvedPlaceholder,
@@ -573,6 +578,7 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
         const latestValue = initialValueRef.current;
         if (vditor.getValue() !== latestValue) {
           skipNextValueRef.current = latestValue;
+          lastEmittedRef.current = latestValue;
           vditor.setValue(latestValue);
         }
       },
@@ -604,9 +610,13 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
   useEffect(() => {
     const vditor = vditorRef.current;
     if (!vditor || !readyRef.current) return;
+    // initialValue 就是本组件最近上报的值,说明是父组件回传的回声而非外部变更;
+    // 此时执行 setValue 会重建编辑区并把光标重置到文档开头(打字中尤其明显)
+    if (initialValue === lastEmittedRef.current) return;
     const current = vditor.getValue();
     if (current !== initialValue) {
       skipNextValueRef.current = initialValue;
+      lastEmittedRef.current = initialValue;
       vditor.setValue(initialValue);
     }
   }, [initialValue]);

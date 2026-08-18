@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import { setup } from "../test/test-utils";
 import { DocumentEditorPage } from "./DocumentEditorPage";
 import { useAppStore } from "../stores/appStore";
@@ -72,6 +72,27 @@ describe("DocumentEditorPage", () => {
     setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
     const input = screen.getByPlaceholderText("摘要") as HTMLTextAreaElement;
     expect(input.value).toBe("初始摘要");
+  });
+
+  it("refreshes same-id selectedItem updates", async () => {
+    setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
+
+    act(() => {
+      const current = useItemStore.getState().selectedItem;
+      if (!current) throw new Error("selectedItem is missing");
+      useItemStore.setState({
+        selectedItem: {
+          ...current,
+          title: "服务端最新标题",
+          content: "服务端最新内容",
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect((screen.getByTestId("doc-title-input") as HTMLInputElement).value).toBe("服务端最新标题");
+      expect((screen.getByTestId("vditor") as HTMLTextAreaElement).value).toBe("服务端最新内容");
+    });
   });
 
   it("shows saved status initially", () => {
