@@ -13,6 +13,21 @@ describe("Library reader and item actions", () => {
       title: "表格笔记",
       content: "| 列 1 | 列 2 | 列 3 |\n| --- | --- | --- |\n|     |     | 01   |\n|     |     | 01   |",
     });
+    await seedItem({
+      title: "丰富预览笔记",
+      content: [
+        "# 阅读标题",
+        "",
+        "> [!TIP]",
+        "> 这是一条阅读提示。",
+        "",
+        "- [x] 已完成",
+        "",
+        "```ts",
+        "const answer = 42;",
+        "```",
+      ].join("\n"),
+    });
     pinnedItem = await seedItem({ title: "置顶笔记", content: "置顶内容", pinned: true });
     favoriteItem = await seedItem({ title: "收藏笔记", content: "收藏内容", favorite: true });
     await TopBar.navLibrary();
@@ -60,6 +75,33 @@ describe("Library reader and item actions", () => {
 
     expect(geometry.tableWidth).toBeGreaterThan(0);
     expect(geometry.trailingGap).toBeLessThan(4);
+  });
+
+  it("renders rich markdown blocks in the reader", async () => {
+    await LibraryPage.closeReader();
+    await LibraryPage.clickItem("丰富预览笔记");
+
+    await browser.waitUntil(
+      async () => {
+        return browser.execute(() => Boolean(document.querySelector("[data-testid='reader-drawer'] .markdown-preview .markdown-code-block")));
+      },
+      { timeout: 3000, timeoutMsg: "Rich markdown preview was not rendered" },
+    );
+
+    const preview = await browser.execute(() => {
+      const root = document.querySelector("[data-testid='reader-drawer'] .markdown-preview");
+      return {
+        heading: root?.querySelector("h1#阅读标题")?.textContent ?? "",
+        callout: root?.querySelector(".markdown-callout--tip")?.textContent ?? "",
+        task: root?.querySelector(".markdown-task-box.is-checked") !== null,
+        code: root?.querySelector(".markdown-code-block code.hljs")?.textContent ?? "",
+      };
+    });
+
+    expect(preview.heading).toContain("阅读标题");
+    expect(preview.callout).toContain("这是一条阅读提示");
+    expect(preview.task).toBe(true);
+    expect(preview.code).toContain("const answer = 42;");
   });
 
   it("closing reader drawer", async () => {
