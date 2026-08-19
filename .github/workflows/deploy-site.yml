@@ -5,7 +5,9 @@ on:
     branches: [master]
     paths:
       - 'site/**'
+      - 'docs/**'
       - 'package.json'
+      - '.github/workflows/deploy-site.yml'
   workflow_dispatch:
 
 permissions:
@@ -38,6 +40,22 @@ jobs:
       - name: Build
         working-directory: site
         run: pnpm build
+
+      - name: Install documentation dependencies
+        working-directory: docs
+        run: pnpm install --frozen-lockfile
+
+      - name: Build documentation
+        working-directory: docs
+        env:
+          DOCS_BASE_PATH: /QuantaNote/docs/
+        run: pnpm build
+
+      - name: Assemble GitHub Pages artifact
+        shell: bash
+        run: |
+          mkdir -p site/dist/docs
+          cp -R docs/dist/. site/dist/docs/
 
       - uses: actions/upload-pages-artifact@v3
         with:

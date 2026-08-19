@@ -9,9 +9,14 @@ import { mdxComponentsPlugin } from "./vite-plugin-mdx-components";
 const FONT_BASE_URL = "https://file.shenjianl.cn/fonts/";
 
 function earlyDocsRuntimePreloadPlugin() {
+    let basePath = "/";
+
     return {
         name: "early-docs-runtime-preload",
         apply: "build",
+        configResolved(config) {
+            basePath = config.base.endsWith("/") ? config.base : `${config.base}/`;
+        },
         async writeBundle(options, bundle) {
             const preloadTargets = Object.values(bundle)
                 .filter((entry) => {
@@ -44,11 +49,11 @@ function earlyDocsRuntimePreloadPlugin() {
             const preloadTags = preloadTargets
                 .map(
                     (fileName) =>
-                        `    <link rel="modulepreload" crossorigin href="/${fileName}">`,
+                        `    <link rel="modulepreload" crossorigin href="${basePath}${fileName}">`,
                 )
                 .join("\n");
 
-            if (html.includes('rel="modulepreload" crossorigin href="/assets/MdxContent.lazy-')) {
+            if (html.includes(`rel="modulepreload" crossorigin href="${basePath}assets/MdxContent.lazy-`)) {
                 return;
             }
 
@@ -57,6 +62,10 @@ function earlyDocsRuntimePreloadPlugin() {
         },
     };
 }
+
+const DOCS_BASE_PATH =
+    process.env.DOCS_BASE_PATH ||
+    (process.env.GITHUB_ACTIONS ? "/QuantaNote/" : "/");
 
 function createManualChunks(id) {
     const normalizedId = id.replace(/\\/g, "/");
@@ -397,7 +406,7 @@ function publicHmrPlugin() {
 }
 
 export default defineConfig({
-    base: "/",
+    base: DOCS_BASE_PATH,
     plugins: [
         react(),
         mdxComponentsPlugin({
