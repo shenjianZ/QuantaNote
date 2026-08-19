@@ -29,6 +29,8 @@ function setWindowSettings(settings: {
       fontFamily: "Noto Sans SC",
       fontMono: "JetBrains Mono",
       fontSize: 15,
+      contentWidthProgress: 0,
+      showDocumentOutline: true,
       accentColor: "#386c5f",
       customAccentColors: [],
       minimizeToTray: settings.minimizeToTray,
@@ -110,5 +112,25 @@ describe("TopBar window behavior", () => {
     expect(windowMock.close).toHaveBeenCalledTimes(1);
     expect(windowMock.hide).not.toHaveBeenCalled();
     expect(windowMock.minimize).not.toHaveBeenCalled();
+  });
+
+  it("keeps the desktop search trigger at a compact fixed width", () => {
+    setWindowSettings({ minimizeToTray: false, closeKeepRunning: false });
+    renderTopBar();
+
+    const searchButton = screen.getByRole("button", { name: "搜索" });
+    expect(searchButton).toHaveClass("sm:w-44", "sm:flex-none");
+    expect(searchButton).not.toHaveClass("sm:flex-1");
+  });
+
+  it("renders the overflow menu in a fixed portal layer", async () => {
+    setWindowSettings({ minimizeToTray: false, closeKeepRunning: false });
+    const { user } = renderTopBar();
+
+    await user.click(screen.getByRole("button", { name: "菜单" }));
+
+    const panel = screen.getByTestId("topbar-menu-panel");
+    expect(panel).toHaveClass("fixed", "z-[70]");
+    expect(panel.parentElement).toBe(document.body);
   });
 });

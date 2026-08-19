@@ -117,7 +117,8 @@ export function CommandPalette({
       onClick={onClose}
     >
       <section
-        className="flex h-full w-full flex-col overflow-hidden sm:mx-auto sm:max-h-[72vh] sm:max-w-xl sm:rounded-3xl sm:border sm:border-[var(--line)] sm:shadow-2xl"
+        className="flex h-full w-full flex-col overflow-hidden bg-[var(--popover)] sm:mx-auto sm:max-h-[72vh] sm:max-w-xl sm:rounded-3xl sm:border sm:border-[var(--line)] sm:shadow-2xl"
+        data-testid="command-palette-panel"
         role="combobox"
         aria-expanded={true}
         aria-haspopup="listbox"
@@ -153,7 +154,7 @@ export function CommandPalette({
             onKeyDown={handleKeyDown}
             autoFocus
           />
-          <span className="hidden sm:inline-flex"><Kbd>Esc</Kbd></span>
+          <span className="hidden sm:inline-flex"><Kbd plain>Esc</Kbd></span>
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto p-2" id="palette-results" role="listbox">

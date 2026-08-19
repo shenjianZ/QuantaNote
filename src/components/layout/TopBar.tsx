@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Archive, Copy, Home, Minus, MoreHorizontal, Pin, Search, Settings, Square, User, X } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useTranslation } from "react-i18next";
@@ -24,6 +25,11 @@ interface TopBarProps {
   onOpenSearch: () => void;
 }
 
+interface MenuPosition {
+  top: number;
+  right: number;
+}
+
 export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
   const { t } = useTranslation(["topbar", "common"]);
   const settings = useSettingsStore((s) => s.settings);
@@ -33,8 +39,30 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
   const syncConfig = useSyncStore((s) => s.config);
   const isLoggedIn = Boolean(syncConfig.access_token && syncConfig.user_id);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null);
   const [isMaximized, setIsMaximized] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const menuPanelRef = useRef<HTMLDivElement>(null);
+
+  function updateMenuPosition() {
+    const trigger = menuButtonRef.current;
+    if (!trigger) return;
+
+    const rect = trigger.getBoundingClientRect();
+    const gap = 8;
+    const margin = 8;
+    const estimatedMenuHeight = 200;
+    const belowTop = rect.bottom + gap;
+    const top = belowTop + estimatedMenuHeight <= window.innerHeight - margin
+      ? belowTop
+      : Math.max(margin, rect.top - gap - estimatedMenuHeight);
+
+    setMenuPosition({
+      top,
+      right: Math.max(margin, window.innerWidth - rect.right),
+    });
+  }
 
   useEffect(() => {
     if (!appWindow) return;
@@ -49,7 +77,8 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
     if (!menuOpen) return;
 
     function handlePointerDown(event: PointerEvent) {
-      if (!menuRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (!menuRef.current?.contains(target) && !menuPanelRef.current?.contains(target)) {
         setMenuOpen(false);
       }
     }
@@ -57,12 +86,17 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") setMenuOpen(false);
     }
+    const handleViewportChange = () => updateMenuPosition();
 
     document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("scroll", handleViewportChange, true);
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("scroll", handleViewportChange, true);
     };
   }, [menuOpen]);
 
@@ -140,7 +174,7 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
 
       {/* 搜索按钮 — 移动端只显示图标，无底色 */}
       <button
-        className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--muted)] transition hover:text-[var(--text)] sm:w-44 sm:max-w-none sm:flex-1 sm:justify-start sm:gap-2 sm:border sm:border-[var(--line)] sm:bg-[var(--field)] sm:px-3 sm:[-webkit-app-region:no-drag] sm:hover:border-[var(--accent)]"
+        className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--muted)] transition hover:text-[var(--text)] sm:w-44 sm:max-w-none sm:flex-none sm:justify-start sm:gap-2 sm:border sm:border-[var(--line)] sm:bg-[var(--field)] sm:px-3 sm:[-webkit-app-region:no-drag] sm:hover:border-[var(--accent)]"
         onClick={onOpenSearch}
         type="button"
         aria-label={t("topbar:search")}
@@ -156,17 +190,32 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
       {/* 溢出菜单 — 始终显示 */}
       <div className="relative sm:[-webkit-app-region:no-drag]" ref={menuRef}>
         <button
+          ref={menuButtonRef}
           className={`flex h-8 w-8 items-center justify-center rounded-lg ${menuOpen ? "bg-[var(--field)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"}`}
           type="button"
           aria-label={t("topbar:menu")}
           aria-haspopup="menu"
           aria-expanded={menuOpen}
-          onClick={() => setMenuOpen((open) => !open)}
+          onClick={() => {
+            if (menuOpen) {
+              setMenuOpen(false);
+              return;
+            }
+            updateMenuPosition();
+            setMenuOpen(true);
+          }}
         >
           <MoreHorizontal className="h-4 w-4" />
         </button>
-        {menuOpen && (
-          <div className="absolute right-0 top-10 z-[60] w-40 overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--popover)] p-1 shadow-xl" role="menu">
+      </div>
+      {menuOpen && menuPosition && typeof document !== "undefined" && createPortal(
+        <div
+          ref={menuPanelRef}
+          className="fixed z-[70] max-h-[calc(100vh-1rem)] w-40 overflow-y-auto rounded-xl border border-[var(--line)] bg-[var(--popover)] p-1 shadow-xl"
+          data-testid="topbar-menu-panel"
+          role="menu"
+          style={{ top: menuPosition.top, right: menuPosition.right }}
+        >
             <button
               className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-[var(--text)] hover:bg-[var(--hover)]"
               type="button"
@@ -204,9 +253,9 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
               <User className="h-4 w-4" />
               {t("topbar:account")}
             </button>
-          </div>
-        )}
-      </div>
+        </div>,
+        document.body,
+      )}
 
       {/* 桌面端窗口控制按钮 — 移动端隐藏 */}
       <div className="hidden items-center gap-1 sm:flex sm:[-webkit-app-region:no-drag]">

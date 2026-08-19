@@ -104,4 +104,30 @@ describe("CommandPalette", () => {
 
     expect(screen.getByTestId("command-palette-overlay")).toHaveClass("pt-[env(safe-area-inset-top)]");
   });
+
+  it("keeps the desktop search panel opaque over the blurred backdrop", () => {
+    setup(
+      <CommandPalette
+        open
+        onClose={vi.fn()}
+        onSelectItem={vi.fn()}
+        items={items}
+      />,
+    );
+
+    expect(screen.getByTestId("command-palette-panel")).toHaveClass("bg-[var(--popover)]");
+  });
+
+  it("renders the Escape hint without a filled background", () => {
+    setup(
+      <CommandPalette
+        open
+        onClose={vi.fn()}
+        onSelectItem={vi.fn()}
+        items={items}
+      />,
+    );
+
+    expect(screen.getByText("Esc")).toHaveClass("kbd-plain");
+  });
 });
