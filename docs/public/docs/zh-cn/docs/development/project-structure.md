@@ -3,7 +3,7 @@ title: 项目结构
 description: QuantaNote 的目录结构设计和代码组织方式
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-19
 ---
 
 # 项目结构
@@ -24,7 +24,7 @@ QuantaNote/
 ├── CLAUDE.md                 # Claude Code 项目指引
 ├── src/                      # 前端源码
 ├── src-tauri/                # Rust 后端源码
-├── test/                     # E2E 测试文件
+├── e2e-tests/                # WebdriverIO E2E 测试
 └── docs/                     # 文档网站源码
 ```
 
@@ -146,14 +146,13 @@ src-tauri/
 │       └── logging.rs        # SQL 日志追踪
 ```
 
-## test/ — E2E 测试
+## e2e-tests/ — E2E 测试
 
 ```
-test/
-├── wdio.conf.ts              # WebdriverIO 配置
-├── pageobjects/              # Page Object Model 页面对象
-├── specs/                    # 测试用例
-└── helpers/                  # 测试辅助工具
+e2e-tests/
+├── wdio.conf.js              # WebdriverIO 配置
+├── helpers/                  # Page Object 和测试辅助工具
+└── specs/                    # 测试用例
 ```
 
 ## docs/ — 文档网站

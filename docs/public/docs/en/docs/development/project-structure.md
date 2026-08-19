@@ -3,7 +3,7 @@ title: Project Structure
 description: QuantaNote directory layout and codebase organization
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-19
 ---
 
 # Project Structure
@@ -24,7 +24,7 @@ QuantaNote/
 ├── CLAUDE.md                 # Claude Code project instructions
 ├── src/                      # Frontend source code
 ├── src-tauri/                # Rust backend source code
-├── test/                     # E2E test files
+├── e2e-tests/                # WebdriverIO E2E tests
 └── docs/                     # Documentation website source
 ```
 
@@ -146,14 +146,13 @@ src-tauri/
 │       └── logging.rs        # SQL logging and tracing
 ```
 
-## test/ — E2E Tests
+## e2e-tests/ — E2E Tests
 
 ```
-test/
-├── wdio.conf.ts              # WebdriverIO configuration
-├── pageobjects/              # Page Object Model page objects
-├── specs/                    # Test specifications
-└── helpers/                  # Test helper utilities
+e2e-tests/
+├── wdio.conf.js              # WebdriverIO configuration
+├── helpers/                  # Page objects and test helpers
+└── specs/                    # Test specifications
 ```
 
 ## docs/ — Documentation Website
