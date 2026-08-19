@@ -112,7 +112,7 @@ export function CommandPalette({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col bg-[var(--popover)] pt-[env(safe-area-inset-top)] sm:grid sm:place-items-start sm:bg-black/20 sm:px-4 sm:pt-16 sm:backdrop-blur-sm"
+      className="fixed inset-0 z-[80] flex flex-col bg-[var(--popover)] pt-[env(safe-area-inset-top)] sm:grid sm:place-items-start sm:bg-black/20 sm:px-4 sm:pt-16 sm:backdrop-blur-sm"
       data-testid="command-palette-overlay"
       onClick={onClose}
     >
