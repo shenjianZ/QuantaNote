@@ -24,6 +24,8 @@ const VDITOR_BUILD_ASSETS = [
   "js/icons/ant.js",
   "js/katex",
   "js/lute/lute.min.js",
+  // ```flowchart 代码块按需加载 flowchart.min.js,缺失时打包版流程图永远无法渲染
+  "js/flowchart.js",
   "js/mermaid",
   "js/i18n/en_US.js",
 ];
