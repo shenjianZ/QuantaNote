@@ -82,6 +82,13 @@ describe("DocumentEditorPage", () => {
     expect(input.value).toBe("初始摘要");
   });
 
+  it("keeps the summary input at a fixed height", () => {
+    setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
+    const input = screen.getByPlaceholderText("摘要");
+
+    expect(input).toHaveClass("h-24", "min-h-24", "max-h-24", "resize-none");
+  });
+
   it("refreshes same-id selectedItem updates", async () => {
     setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
 

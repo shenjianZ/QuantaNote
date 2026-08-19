@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, Clock, Loader2, Save, Star } from "lucide-react";
 import { useAppStore } from "../stores/appStore";
@@ -74,7 +74,9 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
   const latestTitle = useRef(title);
   const latestSummary = useRef(summary);
   const latestContent = useRef(content);
-  const outline = useMemo(() => parseMarkdownOutline(content), [content]);
+  const activeHeadingUpdateRef = useRef<(() => void) | null>(null);
+  const deferredContent = useDeferredValue(content);
+  const outline = useMemo(() => parseMarkdownOutline(deferredContent), [deferredContent]);
 
   useEffect(() => {
     const viewport = editorViewportRef.current;
@@ -85,7 +87,7 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
         ".vditor-ir h1, .vditor-ir h2, .vditor-ir h3, .vditor-ir h4, .vditor-ir h5, .vditor-ir h6",
       ));
       if (headings.length === 0) {
-        setActiveHeadingIndex(-1);
+        setActiveHeadingIndex((current) => current === -1 ? current : -1);
         return;
       }
 
@@ -94,20 +96,38 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
       headings.forEach((heading, index) => {
         if (heading.getBoundingClientRect().top <= threshold) nextIndex = index;
       });
-      setActiveHeadingIndex(nextIndex);
+      setActiveHeadingIndex((current) => current === nextIndex ? current : nextIndex);
     };
 
-    const initialUpdate = window.setTimeout(updateActiveHeading, 80);
-    viewport.addEventListener("scroll", updateActiveHeading, true);
-    window.addEventListener("scroll", updateActiveHeading, true);
-    window.addEventListener("resize", updateActiveHeading);
+    let updateTimer: number | null = null;
+    const scheduleActiveHeadingUpdate = () => {
+      if (updateTimer !== null) return;
+      updateTimer = window.setTimeout(() => {
+        updateTimer = null;
+        updateActiveHeading();
+      }, 0);
+    };
+
+    activeHeadingUpdateRef.current = scheduleActiveHeadingUpdate;
+    const initialUpdate = window.setTimeout(scheduleActiveHeadingUpdate, 80);
+    viewport.addEventListener("scroll", scheduleActiveHeadingUpdate, true);
+    window.addEventListener("scroll", scheduleActiveHeadingUpdate, true);
+    window.addEventListener("resize", scheduleActiveHeadingUpdate);
     return () => {
       window.clearTimeout(initialUpdate);
-      viewport.removeEventListener("scroll", updateActiveHeading, true);
-      window.removeEventListener("scroll", updateActiveHeading, true);
-      window.removeEventListener("resize", updateActiveHeading);
+      if (updateTimer !== null) window.clearTimeout(updateTimer);
+      viewport.removeEventListener("scroll", scheduleActiveHeadingUpdate, true);
+      window.removeEventListener("scroll", scheduleActiveHeadingUpdate, true);
+      window.removeEventListener("resize", scheduleActiveHeadingUpdate);
+      if (activeHeadingUpdateRef.current === scheduleActiveHeadingUpdate) {
+        activeHeadingUpdateRef.current = null;
+      }
     };
-  }, [content]);
+  }, []);
+
+  useEffect(() => {
+    activeHeadingUpdateRef.current?.();
+  }, [deferredContent]);
 
   function queueItemEcho(id: string, fields: ItemEcho["fields"]) {
     const echo = { id, fields };
@@ -272,7 +292,7 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
     }
   }
 
-  const charCount = content.replace(/\s/g, "").length;
+  const charCount = useMemo(() => deferredContent.replace(/\s/g, "").length, [deferredContent]);
   const latestVersionContent = versions[0]?.content;
   const canSaveVersion = versionsLoaded
     && (latestVersionContent === undefined
@@ -338,7 +358,7 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
             </label>
             <textarea
               id="doc-summary-input"
-              className="min-h-24 w-full resize-y rounded-xl border border-transparent bg-transparent px-3 py-2 text-sm leading-relaxed text-[var(--text)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent)]"
+              className="h-24 min-h-24 max-h-24 w-full resize-none overflow-y-auto rounded-xl border border-transparent bg-transparent px-3 py-2 text-sm leading-relaxed text-[var(--text)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent)]"
               data-testid="doc-summary-input"
               value={summary}
               onChange={(e) => handleSummaryChange(e.currentTarget.value)}

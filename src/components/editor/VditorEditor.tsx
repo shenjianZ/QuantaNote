@@ -48,7 +48,7 @@ const TABLE_ICON = `
   <path d="M16 7h.01"></path>
 </svg>`;
 
-let closeActiveTablePanel: (() => void) | null = null;
+type TablePanelCloseRef = { current: (() => void) | null };
 
 function clampTableSize(value: number) {
   if (!Number.isFinite(value)) return 1;
@@ -56,8 +56,34 @@ function clampTableSize(value: number) {
 }
 
 const TABLE_I18N = {
-  zh_CN: { title: "插入表格", row: "行", col: "列", cancel: "取消", insert: "插入", colName: "列" },
-  en_US: { title: "Insert Table", row: "Rows", col: "Cols", cancel: "Cancel", insert: "Insert", colName: "Col" },
+  zh_CN: {
+    title: "插入表格",
+    editTitle: "调整表格",
+    row: "行",
+    col: "列",
+    alignment: "当前列对齐",
+    left: "左对齐",
+    center: "居中",
+    right: "右对齐",
+    cancel: "取消",
+    insert: "插入",
+    apply: "应用",
+    colName: "列",
+  },
+  en_US: {
+    title: "Insert Table",
+    editTitle: "Edit Table",
+    row: "Rows",
+    col: "Cols",
+    alignment: "Current column alignment",
+    left: "Left",
+    center: "Center",
+    right: "Right",
+    cancel: "Cancel",
+    insert: "Insert",
+    apply: "Apply",
+    colName: "Col",
+  },
 } as const;
 
 function buildTableMarkdown(rowsInput: number, colsInput: number, lang: "zh_CN" | "en_US" = "zh_CN") {
@@ -79,24 +105,149 @@ function buildTableMarkdown(rowsInput: number, colsInput: number, lang: "zh_CN" 
   ].join("\n");
 }
 
-function showTableSizePanel(event: Event, onInsert: (rows: number, cols: number) => void, lang: "zh_CN" | "en_US" = "zh_CN") {
+function getEditorRange(vditor: Vditor): Range | null {
+  const editorState = vditor.vditor[vditor.vditor.currentMode];
+  const selection = window.getSelection();
+  if (editorState?.element && selection && selection.rangeCount > 0) {
+    const range = selection.getRangeAt(0);
+    if (editorState.element === range.startContainer || editorState.element.contains(range.startContainer)) {
+      return range.cloneRange();
+    }
+  }
+  return editorState?.range?.cloneRange() ?? null;
+}
+
+function getClosestElement(node: Node | null, selector: string): Element | null {
+  const element = node instanceof Element ? node : node?.parentElement;
+  return element?.closest(selector) ?? null;
+}
+
+function getTableFromRange(range: Range | null): HTMLTableElement | null {
+  return getClosestElement(range?.startContainer ?? null, "table") as HTMLTableElement | null;
+}
+
+function getCellFromRange(range: Range | null): HTMLTableCellElement | null {
+  return getClosestElement(range?.startContainer ?? null, "td, th") as HTMLTableCellElement | null;
+}
+
+function updateTableToolbarTip(trigger: HTMLElement, vditor: Vditor, lang: "zh_CN" | "en_US") {
+  const t = TABLE_I18N[lang];
+  const tip = getTableFromRange(getEditorRange(vditor)) ? t.editTitle : t.title;
+  trigger.setAttribute("aria-label", tip);
+}
+
+function restoreEditorRange(vditor: Vditor, range: Range | null) {
+  const editorState = vditor.vditor[vditor.vditor.currentMode];
+  if (!editorState?.element || !range || !editorState.element.contains(range.startContainer)) {
+    vditor.focus();
+    return null;
+  }
+
+  const restoredRange = range.cloneRange();
+  const selection = window.getSelection();
+  selection?.removeAllRanges();
+  selection?.addRange(restoredRange);
+  editorState.range = restoredRange;
+  return restoredRange;
+}
+
+function notifyTableChanged(vditor: Vditor) {
+  vditor.vditor.undo?.addToUndoStack(vditor.vditor);
+  vditor.vditor.options.input?.(vditor.getValue());
+}
+
+function setTableColumnAlignment(table: HTMLTableElement, range: Range | null, alignment: "left" | "center" | "right") {
+  const cell = getCellFromRange(range);
+  const columnIndex = cell?.cellIndex ?? 0;
+  Array.from(table.rows).forEach((row) => {
+    row.cells[columnIndex]?.setAttribute("align", alignment);
+  });
+}
+
+function createTableCell(tagName: "td" | "th", alignment?: string) {
+  const cell = document.createElement(tagName);
+  cell.textContent = " ";
+  if (alignment) cell.setAttribute("align", alignment);
+  return cell;
+}
+
+function resizeTable(table: HTMLTableElement, rowsInput: number, colsInput: number, range: Range | null) {
+  const rows = clampTableSize(rowsInput);
+  const cols = clampTableSize(colsInput);
+  const originalRows = Array.from(table.rows);
+  const originalColumns = originalRows[0]?.cells.length ?? 0;
+  if (originalRows.length === 0 || originalColumns === 0) return range;
+
+  const currentCell = getCellFromRange(range);
+  const currentRow = currentCell?.parentElement as HTMLTableRowElement | null;
+  const targetRowIndex = Math.min(currentRow?.rowIndex ?? 0, rows - 1);
+  const targetColumnIndex = Math.min(currentCell?.cellIndex ?? 0, cols - 1);
+  const columnAlignments = Array.from(originalRows[0].cells).map((cell) => cell.getAttribute("align") || undefined);
+
+  originalRows.forEach((row, rowIndex) => {
+    while (row.cells.length > cols) row.deleteCell(row.cells.length - 1);
+    while (row.cells.length < cols) {
+      const columnIndex = row.cells.length;
+      row.appendChild(createTableCell(rowIndex === 0 ? "th" : "td", columnAlignments[columnIndex]));
+    }
+  });
+
+  let body = table.tBodies[0];
+  while (table.rows.length > rows) {
+    table.rows[table.rows.length - 1].remove();
+  }
+  if (rows > 1) {
+    if (!body) {
+      body = document.createElement("tbody");
+      table.appendChild(body);
+    }
+    while (table.rows.length < rows) {
+      const row = document.createElement("tr");
+      for (let columnIndex = 0; columnIndex < cols; columnIndex++) {
+        row.appendChild(createTableCell("td", columnAlignments[columnIndex]));
+      }
+      body.appendChild(row);
+    }
+  } else if (body) {
+    body.remove();
+  }
+
+  const targetCell = table.rows[targetRowIndex]?.cells[targetColumnIndex];
+  if (!targetCell) return range;
+  const nextRange = document.createRange();
+  nextRange.selectNodeContents(targetCell);
+  nextRange.collapse(false);
+  return nextRange;
+}
+
+function showTableSizePanel(
+  event: Event,
+  onInsert: (rows: number, cols: number) => void,
+  lang: "zh_CN" | "en_US" = "zh_CN",
+  vditor: Vditor,
+  activePanelRef: TablePanelCloseRef,
+) {
   event.preventDefault();
   event.stopPropagation();
-  closeActiveTablePanel?.();
+  activePanelRef.current?.();
 
   const t = TABLE_I18N[lang];
+  const savedRange = getEditorRange(vditor);
+  const table = getTableFromRange(savedRange);
+  const isEditing = Boolean(table);
 
   const trigger = event.currentTarget instanceof HTMLElement
     ? event.currentTarget
     : event.target instanceof HTMLElement
       ? event.target.closest<HTMLElement>("button, .vditor-toolbar__item")
       : null;
+  if (trigger) trigger.setAttribute("aria-label", isEditing ? t.editTitle : t.title);
   const panel = document.createElement("div");
   panel.className = "quantanote-vditor-table-panel";
 
   const title = document.createElement("div");
   title.className = "quantanote-vditor-table-panel__title";
-  title.textContent = t.title;
+  title.textContent = isEditing ? t.editTitle : t.title;
 
   const form = document.createElement("form");
   form.className = "quantanote-vditor-table-panel__form";
@@ -107,7 +258,7 @@ function showTableSizePanel(event: Event, onInsert: (rows: number, cols: number)
   rowInput.type = "number";
   rowInput.min = "1";
   rowInput.step = "1";
-  rowInput.value = "3";
+  rowInput.value = String(table?.rows.length ?? 3);
   rowLabel.appendChild(rowInput);
 
   const colLabel = document.createElement("label");
@@ -116,7 +267,7 @@ function showTableSizePanel(event: Event, onInsert: (rows: number, cols: number)
   colInput.type = "number";
   colInput.min = "1";
   colInput.step = "1";
-  colInput.value = "3";
+  colInput.value = String(table?.rows[0]?.cells.length ?? 3);
   colLabel.appendChild(colInput);
 
   const actions = document.createElement("div");
@@ -128,8 +279,36 @@ function showTableSizePanel(event: Event, onInsert: (rows: number, cols: number)
 
   const insertButton = document.createElement("button");
   insertButton.type = "submit";
-  insertButton.textContent = t.insert;
+  insertButton.textContent = isEditing ? t.apply : t.insert;
   insertButton.className = "primary";
+
+  if (table) {
+    const alignmentGroup = document.createElement("div");
+    alignmentGroup.className = "quantanote-vditor-table-panel__alignment";
+    const alignmentLabel = document.createElement("div");
+    alignmentLabel.className = "quantanote-vditor-table-panel__alignment-label";
+    alignmentLabel.textContent = t.alignment;
+    const alignmentActions = document.createElement("div");
+    alignmentActions.className = "quantanote-vditor-table-panel__alignment-actions";
+    ([
+      ["left", t.left],
+      ["center", t.center],
+      ["right", t.right],
+    ] as const).forEach(([alignment, label]) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      button.dataset.tableAlign = alignment;
+      button.addEventListener("click", () => {
+        setTableColumnAlignment(table, savedRange, alignment);
+        restoreEditorRange(vditor, savedRange);
+        notifyTableChanged(vditor);
+      });
+      alignmentActions.appendChild(button);
+    });
+    alignmentGroup.append(alignmentLabel, alignmentActions);
+    form.append(alignmentGroup);
+  }
 
   actions.append(cancelButton, insertButton);
   form.append(rowLabel, colLabel, actions);
@@ -146,11 +325,15 @@ function showTableSizePanel(event: Event, onInsert: (rows: number, cols: number)
   panel.style.left = `${Math.max(12, left)}px`;
 
   const closePanel = () => {
+    if (activatePanelTimeout !== null) {
+      window.clearTimeout(activatePanelTimeout);
+      activatePanelTimeout = null;
+    }
     document.removeEventListener("pointerdown", handleOutsidePointer);
     document.removeEventListener("keydown", handleKeydown);
     panel.remove();
-    if (closeActiveTablePanel === closePanel) {
-      closeActiveTablePanel = null;
+    if (activePanelRef.current === closePanel) {
+      activePanelRef.current = null;
     }
   };
 
@@ -170,27 +353,43 @@ function showTableSizePanel(event: Event, onInsert: (rows: number, cols: number)
 
   form.addEventListener("submit", (submitEvent) => {
     submitEvent.preventDefault();
-    onInsert(Number(rowInput.value), Number(colInput.value));
+    if (table) {
+      const nextRange = resizeTable(table, Number(rowInput.value), Number(colInput.value), savedRange);
+      restoreEditorRange(vditor, nextRange);
+      notifyTableChanged(vditor);
+    } else {
+      restoreEditorRange(vditor, savedRange);
+      onInsert(Number(rowInput.value), Number(colInput.value));
+    }
     closePanel();
   });
   cancelButton.addEventListener("click", closePanel);
 
-  window.setTimeout(() => {
+  let activatePanelTimeout: number | null = window.setTimeout(() => {
+    activatePanelTimeout = null;
     document.addEventListener("pointerdown", handleOutsidePointer);
     document.addEventListener("keydown", handleKeydown);
     rowInput.focus();
     rowInput.select();
   });
 
-  closeActiveTablePanel = closePanel;
+  activePanelRef.current = closePanel;
 }
 
-function createTableToolbarItem(insertTable: (rows: number, cols: number) => void, lang: "zh_CN" | "en_US" = "zh_CN"): VditorToolbarItem {
+function createTableToolbarItem(
+  insertTable: (rows: number, cols: number) => void,
+  getVditor: () => Vditor | null,
+  activePanelRef: TablePanelCloseRef,
+  lang: "zh_CN" | "en_US" = "zh_CN",
+): VditorToolbarItem {
   return {
     name: "quantanote-table",
     icon: TABLE_ICON,
     tip: TABLE_I18N[lang].title,
-    click: (event) => showTableSizePanel(event, insertTable, lang),
+    click: (event) => {
+      const vditor = getVditor();
+      if (vditor) showTableSizePanel(event, insertTable, lang, vditor, activePanelRef);
+    },
   };
 }
 
@@ -217,9 +416,12 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
   // 避免父组件把编辑器自己发出的值传回来时触发 setValue 导致光标被重置到文档开头
   const lastEmittedRef = useRef<string | null>(null);
   const readyRef = useRef(false);
+  const activeTablePanelRef = useRef<TablePanelCloseRef["current"]>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const searchMatchesRef = useRef<Array<{ start: number; end: number }>>([]);
   const searchIdxRef = useRef(0);
+  const searchQueryRef = useRef("");
+  const searchCaseSensitiveRef = useRef(false);
 
   onChangeRef.current = onChange;
   initialValueRef.current = initialValue;
@@ -275,18 +477,7 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
 
     if (count === 0) return 0;
 
-    // 使用 Vditor 的搜索功能（如果可用）
-    try {
-      // Vditor 3.x 可能有 search 方法
-      if (typeof (vditor as any).search === "function") {
-        (vditor as any).search(query, caseSensitive);
-        return count;
-      }
-    } catch {
-      // 忽略错误，使用备用方案
-    }
-
-    // 备用方案：在 DOM 中高亮
+    // 在编辑区 DOM 中高亮，保证替换操作能定位到真实匹配节点。
     const contentEl = container.querySelector(".vditor-ir") as HTMLElement | null;
     if (!contentEl) return 0;
 
@@ -388,7 +579,24 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
     }
   }, []);
 
+  const commitEditorValue = useCallback((value: string) => {
+    const vditor = vditorRef.current;
+    if (!vditor) return false;
+
+    skipNextValueRef.current = value;
+    try {
+      vditor.setValue(value);
+      lastEmittedRef.current = value;
+      onChangeRef.current(value);
+      return true;
+    } finally {
+      skipNextValueRef.current = null;
+    }
+  }, []);
+
   const handleSearch = useCallback((query: string, caseSensitive: boolean) => {
+    searchQueryRef.current = query;
+    searchCaseSensitiveRef.current = caseSensitive;
     if (!query) {
       clearHighlights();
       searchMatchesRef.current = [];
@@ -419,7 +627,8 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
 
   const handleReplace = useCallback((replacement: string) => {
     const container = containerRef.current;
-    if (!container) return;
+    const vditor = vditorRef.current;
+    if (!container || !vditor) return;
     const activeMark = container.querySelector("mark[data-search-active]") as HTMLElement | null;
     if (activeMark && activeMark.parentNode) {
       const parent = activeMark.parentNode;
@@ -427,29 +636,19 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
       parent.replaceChild(textNode, activeMark);
       parent.normalize();
 
-      // 替换后，找到下一个匹配项并激活它
-      const remainingMarks = container.querySelectorAll("mark[data-search-highlight]");
-      if (remainingMarks.length > 0) {
-        // 找到当前索引的下一个
-        const currentIdx = searchIdxRef.current;
-        const nextMark = container.querySelector(`mark[data-search-index="${currentIdx}"]`) as HTMLElement | null
-          || container.querySelector(`mark[data-search-index="${currentIdx + 1}"]`) as HTMLElement | null
-          || remainingMarks[0] as HTMLElement;
-
-        if (nextMark) {
-          nextMark.setAttribute("data-search-active", "");
-          nextMark.style.outline = "2px solid var(--accent, #386c5f)";
-          nextMark.style.boxShadow = "0 0 0 2px var(--accent-soft, rgba(56, 108, 95, 0.3))";
-          nextMark.style.background = "rgba(56, 108, 95, 0.5)";
-          nextMark.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-      }
+      if (!commitEditorValue(vditor.getValue())) return;
+      clearHighlights();
+      const nextCount = highlightAll(searchQueryRef.current, searchCaseSensitiveRef.current);
+      searchMatchesRef.current = Array.from({ length: nextCount }, () => ({ start: 0, end: 0 }));
+      searchIdxRef.current = Math.min(searchIdxRef.current, Math.max(nextCount, 1));
+      if (nextCount > 0) scrollToMatch(searchIdxRef.current);
     }
-  }, []);
+  }, [clearHighlights, commitEditorValue, highlightAll, scrollToMatch]);
 
   const handleReplaceAll = useCallback((replacement: string) => {
     const container = containerRef.current;
-    if (!container) return;
+    const vditor = vditorRef.current;
+    if (!container || !vditor) return;
     const marks = container.querySelectorAll("mark[data-search-highlight]");
     marks.forEach((mark) => {
       if (mark.parentNode) {
@@ -458,7 +657,12 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
       }
     });
     container.normalize();
-  }, []);
+    if (marks.length > 0) {
+      commitEditorValue(vditor.getValue());
+      clearHighlights();
+      searchMatchesRef.current = [];
+    }
+  }, [clearHighlights, commitEditorValue]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -512,6 +716,8 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
 
     // 跟踪 Ctrl/Meta 按键状态，用于 Vditor link.click 回调
     let modifierHeld = false;
+    let disposed = false;
+    let removeTableToolbarTipListeners = () => {};
     const onKey = (e: KeyboardEvent) => { if (e.ctrlKey || e.metaKey) modifierHeld = true; };
     const onKeyUp = () => { modifierHeld = false; };
     const notifyCurrentValue = () => {
@@ -560,9 +766,9 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
       toolbar: normalizeToolbar(
         toolbar ?? DEFAULT_TOOLBAR,
         createTableToolbarItem((rows, cols) => {
-          vditorRef.current?.insertValue(buildTableMarkdown(rows, cols, resolvedLang), true);
+          vditorRef.current?.insertMD(buildTableMarkdown(rows, cols, resolvedLang));
           vditorRef.current?.focus();
-        }, resolvedLang),
+        }, () => vditorRef.current, activeTablePanelRef, resolvedLang),
       ) as never,
       preview: {
         theme: { current: theme === "dark" ? "dark" : "light" },
@@ -581,9 +787,22 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
         },
       },
       after: () => {
+        if (disposed) return;
         readyRef.current = true;
         if (containerRef.current) {
           containerRef.current.dataset.vditorReady = "true";
+        }
+        const tableToolbarButton = containerRef.current?.querySelector<HTMLElement>("button[data-type='quantanote-table']");
+        if (tableToolbarButton) {
+          const refreshTableToolbarTip = () => updateTableToolbarTip(tableToolbarButton, vditor, resolvedLang);
+          ["mouseenter", "focus", "mousedown"].forEach((eventName) => {
+            tableToolbarButton.addEventListener(eventName, refreshTableToolbarTip);
+          });
+          removeTableToolbarTipListeners = () => {
+            ["mouseenter", "focus", "mousedown"].forEach((eventName) => {
+              tableToolbarButton.removeEventListener(eventName, refreshTableToolbarTip);
+            });
+          };
         }
         const latestValue = initialValueRef.current;
         if (vditor.getValue() !== latestValue) {
@@ -601,12 +820,13 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("keyup", onKeyUp);
       containerRef.current?.removeEventListener("paste", onPaste, true);
+      removeTableToolbarTipListeners();
+      disposed = true;
+      activeTablePanelRef.current?.();
+      activeTablePanelRef.current = null;
       try {
-        if (readyRef.current) {
-          vditor.destroy();
-        }
+        vditor.destroy();
       } catch { /* ignore */ }
-      closeActiveTablePanel?.();
       if (containerRef.current) {
         delete (containerRef.current as HTMLDivElement & { __vditor?: Vditor }).__vditor;
         containerRef.current.dataset.vditorReady = "false";
