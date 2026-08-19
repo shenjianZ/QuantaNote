@@ -33,6 +33,7 @@ import { useAppStore } from "../stores/appStore";
 import { useToastStore } from "../stores/toastStore";
 import { useUpdaterStore } from "../stores/updaterStore";
 import { isMobile } from "../utils/platform";
+import { copyTextToSystemClipboard } from "../utils/clipboard";
 
 const FONT_OPTIONS_KEYS = [
     { value: "Noto Sans SC", label: "Noto Sans SC" },
@@ -160,7 +161,7 @@ export function SettingsPage({
             await openPath(logDir);
         } catch {
             try {
-                await navigator.clipboard.writeText(logDir);
+                await copyTextToSystemClipboard(logDir);
                 useToastStore
                     .getState()
                     .addToast("info", t("common:toast.pathCopied"));
@@ -688,9 +689,7 @@ export function SettingsPage({
                                 title={dbPath}
                                 onClick={async () => {
                                     try {
-                                        await navigator.clipboard.writeText(
-                                            dbPath,
-                                        );
+                                        await copyTextToSystemClipboard(dbPath);
                                         useToastStore
                                             .getState()
                                             .addToast(
@@ -793,7 +792,7 @@ export function SettingsPage({
                                 title={sqlLogPath}
                                 onClick={async () => {
                                     try {
-                                        await navigator.clipboard.writeText(sqlLogPath);
+                                        await copyTextToSystemClipboard(sqlLogPath);
                                         useToastStore
                                             .getState()
                                             .addToast("success", t("common:toast.sqlLogPathCopied"));

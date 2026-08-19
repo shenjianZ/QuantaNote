@@ -34,6 +34,7 @@
     "deleteFailed": "Delete failed",
     "copySuccess": "Copied to clipboard",
     "copyFailed": "Copy failed",
+    "pasteSuccess": "Pasted",
     "pathCopied": "Path copied to clipboard",
     "dbOptimized": "Database optimized, unused space reclaimed",
     "dbOptimizeFailed": "Database optimization failed",

@@ -1,5 +1,6 @@
 pub mod attachment;
 pub mod auto_backup;
+pub mod clipboard;
 pub mod data_io;
 pub mod diagnostics;
 pub mod item;

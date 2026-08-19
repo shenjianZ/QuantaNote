@@ -8,7 +8,8 @@ mod sync;
 mod utils;
 
 use commands::{
-    attachment, auto_backup, data_io, diagnostics, item, search, settings, tag, user, version,
+    attachment, auto_backup, clipboard, data_io, diagnostics, item, search, settings, tag, user,
+    version,
 };
 use db::DbState;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -332,6 +333,7 @@ pub fn run() {
             user::delete_account,
             update_window_behavior,
             request_app_exit,
+            clipboard::write_clipboard_text,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

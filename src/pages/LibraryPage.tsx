@@ -34,6 +34,7 @@ import { CONTENT_WIDTH_OUTLINE_LAYOUT, CONTENT_WIDTH_PREVIEW_BASE } from "../uti
 import { MOBILE_BACK_EVENT } from "../utils/platform";
 import { nativeLog } from "../utils/nativeLog";
 import { getVditorLang } from "../utils/vditorConfig";
+import { copyTextToSystemClipboard } from "../utils/clipboard";
 import type { Item } from "../types";
 
 type TabKey = "recent" | "pinned" | "favorite";
@@ -252,7 +253,7 @@ export function LibraryPage({
       selectedItemDto?.id === selectedItem.id ? selectedItemDto.content : "";
     const text = selectedContent || selectedItem.summary || selectedItem.title;
     try {
-      await navigator.clipboard.writeText(text);
+      await copyTextToSystemClipboard(text);
       useToastStore.getState().addToast("success", t("common:toast.copySuccess"));
     } catch {
       useToastStore.getState().addToast("error", t("common:toast.copyFailed"));

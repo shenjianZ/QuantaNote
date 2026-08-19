@@ -27,6 +27,8 @@ import { deriveRecordTitle } from "../utils/recordTitle";
 import { preloadVditorResources } from "../utils/vditorPreload";
 import { isMobile, MOBILE_BACK_EVENT } from "../utils/platform";
 import { nativeLog } from "../utils/nativeLog";
+import { getSelectedText, shouldPreventGlobalShortcut } from "../utils/keyboardShortcuts";
+import { copyTextToSystemClipboard } from "../utils/clipboard";
 import type { AppPage, Item } from "../types";
 import i18n from "../i18n";
 import "../styles/themes.css";
@@ -355,12 +357,26 @@ export function QuantaNoteApp() {
                     return; // 不阻止传播，让 VditorEditor 处理
                 }
 
-                // 其他快捷键完全阻止；编辑区域内保留系统级编辑/剪贴板快捷键。
-                const blockedKeys = ["p", "s", "u", "a", "r", "g", "j", "d", "e", "q", "w", "t", "i", "o", "z", "x", "c", "v"];
-                const editorKeys = ["a", "z", "x", "c", "v"];
+                // 其他快捷键完全阻止；编辑区域内保留系统级编辑快捷键。
+                // Ctrl/Cmd+C 和 Ctrl/Cmd+X 由 shouldPreventGlobalShortcut 始终放行，
+                // 确保阅读区鼠标选中的文本能交给 WebView 写入系统剪贴板。
                 const isEditor = isEditableShortcutTarget(e.target);
-                const hasSelection = !!window.getSelection()?.toString();
-                if (blockedKeys.includes(key) && !(editorKeys.includes(key) && (isEditor || (key === "c" && hasSelection)))) {
+                if (key === "c") {
+                    const selectedText = getSelectedText(e.target);
+                    if (selectedText) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        copyTextToSystemClipboard(selectedText)
+                            .then(() => {
+                                useToastStore.getState().addToast("success", i18n.t("common:toast.copySuccess"));
+                            })
+                            .catch(() => {
+                                useToastStore.getState().addToast("error", i18n.t("common:toast.copyFailed"));
+                            });
+                    }
+                    return;
+                }
+                if (shouldPreventGlobalShortcut(key, isEditor)) {
                     e.preventDefault();
                     e.stopPropagation();
                 }
@@ -383,9 +399,19 @@ export function QuantaNoteApp() {
                 handleCreateNote().catch(() => {});
             }
         }
+
+        function handlePaste(e: ClipboardEvent) {
+            if (!e.defaultPrevented) {
+                useToastStore.getState().addToast("success", i18n.t("common:toast.pasteSuccess"));
+            }
+        }
+
         document.addEventListener("keydown", handleKeyDown, true);
-        return () =>
+        document.addEventListener("paste", handlePaste);
+        return () => {
             document.removeEventListener("keydown", handleKeyDown, true);
+            document.removeEventListener("paste", handlePaste);
+        };
     }, [paletteOpen, openPalette, closePalette, handleCreateNote]);
 
     useEffect(() => {

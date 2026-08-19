@@ -34,6 +34,7 @@
     "deleteFailed": "删除失败",
     "copySuccess": "已复制到剪贴板",
     "copyFailed": "复制失败",
+    "pasteSuccess": "已粘贴",
     "pathCopied": "路径已复制到剪贴板",
     "dbOptimized": "数据库优化完成，已回收未使用空间",
     "dbOptimizeFailed": "数据库优化失败",
