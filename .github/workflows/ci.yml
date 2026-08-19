@@ -49,7 +49,8 @@ jobs:
 
           foreach ($file in @("docs/public/config/site.yaml", "docs/public/config/site.en.yaml")) {
             $content = Get-Content $file -Raw
-            if ($content -notmatch "version: \"v$([regex]::Escape($tagVersion))\"") {
+            $footerPattern = 'version: "v' + [regex]::Escape($tagVersion) + '"'
+            if ($content -notmatch $footerPattern) {
               throw "$file footer version does not match v$tagVersion"
             }
           }
