@@ -13,6 +13,10 @@ class DocumentEditorPage {
   get saveVersionBtn() { return "[data-testid='doc-save-version-btn']"; }
   get favoriteBtn() { return "[data-testid='doc-favorite-btn']"; }
   get backBtn() { return "[data-testid='doc-back-btn']"; }
+  get contentWidthControl() { return "[data-testid='document-editor-content-width-control']"; }
+  get contentWidthTarget() { return "[data-testid='document-editor-content']"; }
+  get outline() { return "[data-testid='document-outline']"; }
+  get outlineToggle() { return "[data-testid='document-outline-toggle']"; }
   get versionToggle() { return "[data-testid='doc-version-toggle']"; }
   get versionPanel() { return "[data-testid='version-panel']"; }
 
@@ -53,10 +57,43 @@ class DocumentEditorPage {
 
   async clearContent() {
     await clearVditor();
+    try {
+      await browser.waitUntil(
+        async () => (await getVditorText()).trim() === "",
+        { timeout: 800, timeoutMsg: "Vditor keyboard clear did not finish" },
+      );
+    } catch {
+      await setVditorValue("");
+    }
   }
 
   async getContent() {
     return getVditorText();
+  }
+
+  async getOutlineItemCount() {
+    return browser.execute(() => document.querySelectorAll("[data-testid^='document-outline-item-']").length);
+  }
+
+  async isOutlineVisible() {
+    const toggle = await $(this.outlineToggle);
+    return (await toggle.getAttribute("aria-pressed")) === "true";
+  }
+
+  async setOutlineVisible(visible) {
+    if ((await this.isOutlineVisible()) !== visible) {
+      await $(this.outlineToggle).click();
+      await observePause();
+    }
+  }
+
+  async clickOutlineItem(index) {
+    await $(`[data-testid='document-outline-item-${index}']`).click();
+    await observePause();
+  }
+
+  async hasToolbarCharacterCount() {
+    return browser.execute(() => Boolean(document.querySelector("[data-testid='document-editor-toolbar']")?.textContent?.match(/\d+\s*字/)));
   }
 
   async getSaveStatus() {
@@ -91,6 +128,33 @@ class DocumentEditorPage {
 
   async clickBack() {
     await $(this.backBtn).then(b => b.click());
+  }
+
+  async setContentWidth(value) {
+    const control = await $(this.contentWidthControl);
+    const trigger = await control.$("button");
+    const expanded = await trigger.getAttribute("aria-expanded");
+    if (expanded !== "true") await trigger.click();
+    await browser.execute((nextValue) => {
+      const input = document.querySelector("[data-testid='document-editor-content-width-control-slider']");
+      if (!input) throw new Error("Document editor content width slider not found");
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setter?.call(input, String(nextValue));
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }, value);
+    await browser.waitUntil(
+      async () => browser.execute((expected) => document.querySelector("[data-testid='document-editor-content-width-control-slider']")?.value === String(expected), value),
+      { timeout: 3000, timeoutMsg: `Document editor content width did not become ${value}` },
+    );
+  }
+
+  async getContentWidth() {
+    return browser.execute(() => document.querySelector("[data-testid='document-editor-content-width-control-slider']")?.value);
+  }
+
+  async getContentAreaWidth() {
+    return browser.execute((selector) => document.querySelector(selector)?.getBoundingClientRect().width ?? 0, this.contentWidthTarget);
   }
 
   // --- Version Panel ---

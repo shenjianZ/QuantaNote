@@ -62,6 +62,9 @@ fn request_app_exit(app: tauri::AppHandle) {
 fn show_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
+        if std::env::var("QUANTANOTE_E2E_FULLSCREEN").as_deref() == Ok("1") {
+            let _ = window.maximize();
+        }
         let _ = window.unminimize();
         let _ = window.set_focus();
     }

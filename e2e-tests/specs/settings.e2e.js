@@ -82,6 +82,14 @@ describe("Settings deep coverage", () => {
         await waitForAppSetting("closeKeepRunning", (value) => typeof value === "boolean");
     });
 
+    it("toggles document outline visibility setting", async () => {
+        await SettingsPage.selectSection("外观");
+        await SettingsPage.setDocumentOutlineVisible(false);
+        await waitForAppSetting("showDocumentOutline", (value) => value === false);
+        await SettingsPage.setDocumentOutlineVisible(true);
+        await waitForAppSetting("showDocumentOutline", (value) => value === true);
+    });
+
     it("refreshes db size", async () => {
         await SettingsPage.selectSection("数据");
         await pause(500);
@@ -109,20 +117,5 @@ describe("Settings deep coverage", () => {
         await SettingsPage.selectSection("外观");
         theme = await SettingsPage.getTheme();
         expect(theme).toBe("light");
-    });
-
-    it("markdown style changes and persists", async () => {
-        await SettingsPage.selectSection("外观");
-        await SettingsPage.setMarkdownStyle("paper");
-
-        let style = await SettingsPage.getMarkdownStyle();
-        expect(style).toBe("paper");
-        await waitForAppSetting("markdownStyle", (value) => value === "paper");
-
-        await TopBar.navLibrary();
-        await TopBar.openSettings();
-        await SettingsPage.selectSection("外观");
-        style = await SettingsPage.getMarkdownStyle();
-        expect(style).toBe("paper");
     });
 });

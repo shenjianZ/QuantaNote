@@ -31,16 +31,6 @@ class SettingsPage {
     return browser.execute(() => document.documentElement.getAttribute("data-theme"));
   }
 
-  async setMarkdownStyle(style) {
-    const btn = await $(`[data-testid='markdown-style-${style}']`);
-    await browser.execute((el) => el.click(), btn);
-    await observePause();
-  }
-
-  async getMarkdownStyle() {
-    return browser.execute(() => document.documentElement.getAttribute("data-markdown-style"));
-  }
-
   async setAccentColor(index) {
     const buttons = await $$("[data-testid='accent-color']");
     if (buttons[index]) {
@@ -83,6 +73,39 @@ class SettingsPage {
     const option = await $(`//button[normalize-space(.)='${size} px']`);
     await option.click();
     await observePause();
+  }
+
+  async setContentWidth(value) {
+    const control = await $("[data-testid='settings-content-width-control']");
+    const trigger = await control.$("button");
+    const expanded = await trigger.getAttribute("aria-expanded");
+    if (expanded !== "true") await trigger.click();
+    await browser.execute((nextValue) => {
+      const input = document.querySelector("[data-testid='settings-content-width-control-slider']");
+      if (!input) throw new Error("Content width slider not found");
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setter?.call(input, String(nextValue));
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }, value);
+    await browser.waitUntil(
+      async () => browser.execute((expected) => document.querySelector("[data-testid='settings-content-width-control-slider']")?.value === String(expected), value),
+      { timeout: 3000, timeoutMsg: `Content width did not become ${value}` },
+    );
+    await observePause();
+  }
+
+  async getContentWidth() {
+    return browser.execute(() => document.querySelector("[data-testid='settings-content-width-control-slider']")?.value);
+  }
+
+  async setDocumentOutlineVisible(visible) {
+    const toggle = await $("[data-testid='settings-document-outline-toggle']");
+    const current = (await toggle.getAttribute("aria-checked")) === "true";
+    if (current !== visible) {
+      await toggle.click();
+      await observePause();
+    }
   }
 
   async toggleSetting(label) {

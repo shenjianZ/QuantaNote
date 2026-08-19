@@ -21,6 +21,8 @@ class LibraryPage {
   get readerMenuBtn() { return "[data-testid='reader-menu-btn']"; }
   get readerTagsBtn() { return "[data-testid='reader-tags-btn']"; }
   get readerAttachmentsBtn() { return "[data-testid='reader-attachments-btn']"; }
+  get contentWidthControl() { return "[data-testid='reader-content-width-control']"; }
+  get contentWidthTarget() { return "[data-testid='reader-drawer']"; }
 
   // --- 页面导航 ---
   async isDisplayed() {
@@ -135,6 +137,18 @@ class LibraryPage {
 
   async clickEdit() {
     await $(this.readerEditBtn).then(b => b.click());
+  }
+
+  async getContentWidth() {
+    const control = await $(this.contentWidthControl);
+    const trigger = await control.$("button");
+    const expanded = await trigger.getAttribute("aria-expanded");
+    if (expanded !== "true") await trigger.click();
+    return browser.execute(() => document.querySelector("[data-testid='reader-content-width-control-slider']")?.value);
+  }
+
+  async getContentAreaWidth() {
+    return browser.execute((selector) => document.querySelector(selector)?.getBoundingClientRect().width ?? 0, this.contentWidthTarget);
   }
 
   // --- 阅读器菜单操作 ---

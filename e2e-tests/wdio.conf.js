@@ -41,6 +41,39 @@ function killExistingApp() {
   }
 }
 
+function maximizeNativeAppWindow() {
+  if (process.platform !== "win32") return false;
+  const script = `
+    Add-Type @'
+    using System;
+    using System.Runtime.InteropServices;
+    public static class QuantaNoteWindow {
+      [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr handle, int command);
+      [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr handle);
+    }
+    '@
+    $found = $false
+    for ($attempt = 0; $attempt -lt 10; $attempt++) {
+      $process = Get-Process -Name "quanta-note" -ErrorAction SilentlyContinue |
+        Where-Object { $_.MainWindowHandle -ne 0 } |
+        Select-Object -First 1
+      if ($process) {
+        [QuantaNoteWindow]::ShowWindow($process.MainWindowHandle, 3) | Out-Null
+        [QuantaNoteWindow]::SetForegroundWindow($process.MainWindowHandle) | Out-Null
+        $found = $true
+        break
+      }
+      Start-Sleep -Milliseconds 100
+    }
+    if (-not $found) { exit 1 }
+  `;
+  const result = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], {
+    stdio: "ignore",
+    windowsHide: true,
+  });
+  return result.status === 0;
+}
+
 function closeTauriDriver() {
   expectedExit = true;
   tauriDriver?.kill();
@@ -86,7 +119,19 @@ export const config = {
   ],
   logLevel: "warn",
   framework: "mocha",
-  before() {
+  async before() {
+    // 桌面端布局测试使用最大化窗口，避免小窗口下侧栏高度被压缩。
+    const nativeWindowMaximized = maximizeNativeAppWindow();
+    let webdriverWindowMaximized = false;
+    try {
+      await browser.maximizeWindow();
+      webdriverWindowMaximized = true;
+    } catch {
+      // WebView2 某些环境不支持 maximize，下面使用显式的大窗口尺寸兜底。
+    }
+    if (!nativeWindowMaximized && !webdriverWindowMaximized) {
+      await browser.setWindowSize(1920, 1080);
+    }
     console.log(`\n🎬 E2E 模式: ${isHeaded ? "有头 (headed)" : "无头 (headless)"}\n`);
   },
   reporters: ["spec"],
@@ -122,7 +167,11 @@ export const config = {
     killExistingApp();
     expectedExit = false;
     tauriDriver = spawn("tauri-driver", [], {
-      env: { ...process.env, QUANTANOTE_DATA_DIR: dataDir },
+      env: {
+        ...process.env,
+        QUANTANOTE_DATA_DIR: dataDir,
+        QUANTANOTE_E2E_FULLSCREEN: "1",
+      },
       stdio: ["ignore", "pipe", "pipe"],
       shell: true,
     });
