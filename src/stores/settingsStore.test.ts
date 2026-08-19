@@ -1,7 +1,7 @@
 import { mockIPC } from "@tauri-apps/api/mocks";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useItemStore } from "./itemStore";
-import { useSettingsStore } from "./settingsStore";
+import { normalizeSettings, useSettingsStore } from "./settingsStore";
 
 const saveMock = vi.fn();
 const openMock = vi.fn();
@@ -21,8 +21,9 @@ describe("settingsStore", () => {
         fontFamily: "Noto Sans SC",
         fontMono: "JetBrains Mono",
         fontSize: 15,
+        contentWidthProgress: 0,
+        showDocumentOutline: true,
         accentColor: "#386c5f",
-        markdownStyle: "notion",
         customAccentColors: [],
         minimizeToTray: true,
         closeKeepRunning: false,
@@ -71,11 +72,32 @@ describe("settingsStore", () => {
     expect(rootStyle.getPropertyValue("--font-size-md-h1")).toBe("calc(16px + 13px)");
   });
 
-  it("switches and applies the Markdown style preset", () => {
-    useSettingsStore.getState().updateSetting("markdownStyle", "paper");
+  it("normalizes content width progress when updating settings", () => {
+    useSettingsStore.getState().updateSetting("contentWidthProgress", 150);
+    expect(useSettingsStore.getState().settings.contentWidthProgress).toBe(50);
 
-    expect(useSettingsStore.getState().settings.markdownStyle).toBe("paper");
-    expect(document.documentElement.dataset.markdownStyle).toBe("paper");
+    useSettingsStore.getState().updateSetting("contentWidthProgress", -20);
+    expect(useSettingsStore.getState().settings.contentWidthProgress).toBe(0);
+  });
+
+  it("fills a missing content width setting with the default", () => {
+    const normalized = normalizeSettings({
+      ...useSettingsStore.getState().settings,
+      contentWidthProgress: undefined as unknown as number,
+    });
+
+    expect(normalized.contentWidthProgress).toBe(0);
+  });
+
+  it("defaults the document outline to visible and preserves an explicit boolean", () => {
+    const settings = useSettingsStore.getState().settings;
+    const missing = normalizeSettings({ ...settings, showDocumentOutline: undefined as unknown as boolean });
+    const hidden = normalizeSettings({ ...settings, showDocumentOutline: false });
+    const invalid = normalizeSettings({ ...settings, showDocumentOutline: "false" as unknown as boolean });
+
+    expect(missing.showDocumentOutline).toBe(true);
+    expect(hidden.showDocumentOutline).toBe(false);
+    expect(invalid.showDocumentOutline).toBe(true);
   });
 
   it("exports data through dialog and save_to_file command", async () => {

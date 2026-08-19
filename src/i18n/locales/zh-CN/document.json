@@ -3,6 +3,17 @@
   "charCount": "{{count}} 字",
   "titlePlaceholder": "文档标题",
   "summaryPlaceholder": "摘要",
+  "summaryLabel": "描述",
+  "sidebar": {
+    "show": "显示描述和目录",
+    "hide": "隐藏描述和目录"
+  },
+  "outline": {
+    "title": "目录",
+    "show": "显示目录",
+    "hide": "隐藏目录",
+    "empty": "暂无目录"
+  },
   "loadingEditor": "加载编辑器...",
   "saved": "已保存",
   "saving": "保存中...",

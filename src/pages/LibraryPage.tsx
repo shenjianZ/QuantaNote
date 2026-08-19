@@ -6,7 +6,7 @@ import {
   MoreHorizontal,
   Paperclip,
   Search,
-  SlidersHorizontal,
+  ListFilter,
   Star,
   Tag,
   Trash2,
@@ -14,7 +14,9 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { open } from "@tauri-apps/plugin-dialog";
-import { MarkdownRenderer } from "../components/common/MarkdownRenderer";
+import { MarkdownPreviewWithOutline } from "../components/common/MarkdownPreviewWithOutline";
+import { DocumentOutlineToggle } from "../components/editor/DocumentOutline";
+import { ContentWidthControl } from "../components/common/ContentWidthControl";
 import { Select } from "../components/common/Select";
 import { SkeletonList } from "../components/common/Skeleton";
 import { TagPickerModal } from "../components/common/TagPickerModal";
@@ -26,6 +28,9 @@ import { useItemStore } from "../stores/itemStore";
 import { useSearchStore } from "../stores/searchStore";
 import { useTagStore } from "../stores/tagStore";
 import { useToastStore } from "../stores/toastStore";
+import { useSettingsStore } from "../stores/settingsStore";
+import { useResponsiveContentWidth } from "../hooks/useResponsiveContentWidth";
+import { CONTENT_WIDTH_OUTLINE_LAYOUT, CONTENT_WIDTH_PREVIEW_BASE } from "../utils/contentWidth";
 import { MOBILE_BACK_EVENT } from "../utils/platform";
 import { nativeLog } from "../utils/nativeLog";
 import { getVditorLang } from "../utils/vditorConfig";
@@ -63,6 +68,9 @@ export function LibraryPage({
   onModalStateChange,
 }: LibraryPageProps) {
   const { t } = useTranslation(["library", "common"]);
+  const contentWidthProgress = useSettingsStore((s) => s.settings.contentWidthProgress);
+  const showDocumentOutline = useSettingsStore((s) => s.settings.showDocumentOutline);
+  const updateSetting = useSettingsStore((s) => s.updateSetting);
 
   const FILTERS: Array<{ key: TabKey; label: string }> = [
     { key: "recent", label: t("library:filter.all") },
@@ -298,6 +306,12 @@ export function LibraryPage({
   }
 
   const hasSelection = readerOpen && Boolean(selectedItem.id);
+  const readerWidth = useResponsiveContentWidth<HTMLElement>({
+    baseWidth: CONTENT_WIDTH_PREVIEW_BASE + (showDocumentOutline ? CONTENT_WIDTH_OUTLINE_LAYOUT : 0),
+    progress: contentWidthProgress,
+    horizontalGutter: 24,
+    enabled: hasSelection,
+  });
   const previewContent =
     selectedItemDto?.id === selectedItem.id ? selectedItemDto.content : "";
 
@@ -320,13 +334,15 @@ export function LibraryPage({
             </button>
           </div>
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <div className="grid grid-cols-3 gap-1 rounded-full border border-[var(--line)] bg-[var(--field)] p-1" aria-label={t("library:filter.title")}>
+            <div className="flex shrink-0 items-stretch border-b border-[var(--line)]" role="tablist" aria-label={t("library:filter.title")}>
               {FILTERS.map((filter) => (
                 <button
                   key={filter.key}
                   type="button"
                   data-testid={`library-tab-${filter.key}`}
-                  className={`h-8 rounded-full px-3 text-sm font-medium transition-colors ${activeTab === filter.key ? "bg-[var(--paper)] text-[var(--accent)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--text)]"}`}
+                  className={`h-10 border-b-2 px-3 text-sm font-medium transition-colors ${activeTab === filter.key ? "border-[var(--accent)] text-[var(--accent)]" : "border-transparent text-[var(--muted)] hover:border-[var(--line)] hover:text-[var(--text)]"}`}
+                  role="tab"
+                  aria-selected={activeTab === filter.key}
                   aria-pressed={activeTab === filter.key}
                   onClick={() => setActiveTab(filter.key)}
                 >
@@ -347,8 +363,8 @@ export function LibraryPage({
             </div>
 
             <details ref={filterDetailsRef} className="relative">
-              <summary className="grid h-10 w-10 cursor-pointer list-none place-items-center rounded-full border border-[var(--line)] bg-[var(--field)] text-[var(--muted)] hover:text-[var(--text)] [&::-webkit-details-marker]:hidden" data-testid="library-filter-btn">
-                <SlidersHorizontal className="h-4 w-4" />
+              <summary className="grid h-10 w-10 cursor-pointer list-none place-items-center rounded-full border border-[var(--line)] text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)] [&::-webkit-details-marker]:hidden" data-testid="library-filter-btn" aria-label={t("library:filter.title")}>
+                <ListFilter className="h-4 w-4" />
               </summary>
               <div className="absolute right-0 top-12 z-20 w-64 rounded-2xl border border-[var(--line)] bg-[var(--popover)] p-4 shadow-2xl" data-testid="library-filter-panel">
                 <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">{t("library:filter.title")}</div>
@@ -440,7 +456,7 @@ export function LibraryPage({
       </section>
 
       {hasSelection && (
-        <section className="fixed inset-0 z-[60] overflow-hidden bg-[var(--paper)] sm:inset-x-3 sm:bottom-8 sm:top-14 sm:mx-auto sm:rounded-3xl sm:border sm:border-[var(--line)] sm:shadow-2xl" style={{ maxWidth: "min(42rem, 100%)" }} data-testid="reader-drawer">
+        <section ref={readerWidth.ref} style={readerWidth.style} className="fixed inset-0 z-[60] overflow-hidden bg-[var(--paper)] sm:inset-x-3 sm:bottom-8 sm:top-14 sm:mx-auto sm:rounded-3xl sm:border sm:border-[var(--line)] sm:shadow-2xl" data-testid="reader-drawer" data-content-width-target="reader">
           <div className="flex h-full min-h-0 flex-col">
             <header className="flex shrink-0 items-start gap-2 border-b border-[var(--line)] px-3 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:gap-3 sm:px-4 sm:py-3 sm:pt-3">
               <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--field)] text-[var(--muted)]">
@@ -460,6 +476,12 @@ export function LibraryPage({
                   ))}
                 </div>
               </div>
+              <ContentWidthControl compact testId="reader-content-width-control" />
+              <DocumentOutlineToggle
+                visible={showDocumentOutline}
+                onToggle={() => updateSetting("showDocumentOutline", !showDocumentOutline)}
+                testId="reader-document-outline-toggle"
+              />
               <details ref={menuDetailsRef} className="relative shrink-0">
                 <summary className="grid h-8 w-8 cursor-pointer list-none place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)] [&::-webkit-details-marker]:hidden" data-testid="reader-menu-btn" aria-label={t("library:reader.moreActions")}>
                   <MoreHorizontal className="h-4 w-4" />
@@ -499,10 +521,11 @@ export function LibraryPage({
             </header>
 
             <div className="min-h-0 flex-1 overflow-auto px-4 py-4 sm:px-6" onCopy={() => useToastStore.getState().addToast("success", t("common:toast.copySuccess"))}>
-              <MarkdownRenderer
+              <MarkdownPreviewWithOutline
                 content={previewContent || selectedItem.summary || ""}
                 theme={theme === "light" ? "light" : "dark"}
                 lang={getVditorLang()}
+                testId="reader-preview-layout"
               />
             </div>
 

@@ -26,6 +26,7 @@ export interface VditorEditorHandle {
   getValue: () => string;
   setValue: (value: string) => void;
   focus: () => void;
+  scrollToHeading: (index: number) => void;
 }
 
 const DEFAULT_TOOLBAR = [
@@ -484,6 +485,13 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
     },
     focus: () => {
       vditorRef.current?.focus();
+    },
+    scrollToHeading: (index: number) => {
+      const headings = containerRef.current?.querySelectorAll<HTMLElement>(
+        ".vditor-ir h1, .vditor-ir h2, .vditor-ir h3, .vditor-ir h4, .vditor-ir h5, .vditor-ir h6",
+      );
+      const heading = headings?.[index];
+      heading?.scrollIntoView({ behavior: "smooth", block: "center" });
     },
   }), []);
 

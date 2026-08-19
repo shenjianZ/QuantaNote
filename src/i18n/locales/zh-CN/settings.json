@@ -11,26 +11,6 @@
     "system": "跟随系统",
     "light": "浅色",
     "dark": "深色",
-    "markdownStyle": "Markdown 样式",
-    "markdownStyleDesc": "同时应用于编辑器与预览。选择一套更符合你阅读习惯的排版。",
-    "styles": {
-      "notion": {
-        "label": "极简留白",
-        "description": "清爽克制，适合日常记录与长文阅读"
-      },
-      "paper": {
-        "label": "纸张阅读",
-        "description": "温暖的纸面感，衬线标题与引用更有书卷气"
-      },
-      "obsidian": {
-        "label": "墨石技术",
-        "description": "紧凑、清晰、对比鲜明，适合技术笔记"
-      },
-      "editorial": {
-        "label": "杂志排版",
-        "description": "更强的标题层级与内容块，适合专题文章"
-      }
-    },
     "accentColor": "强调色",
     "predefined": "预定义",
     "custom": "自定义",
@@ -72,6 +52,21 @@
     "fontSize": "字号",
     "uiFontSize": "界面字号",
     "preview": "这是一段预览文字 The quick brown fox"
+  },
+  "contentWidth": {
+    "title": "内容区域宽度",
+    "description": "调整编辑器和预览区域的宽度",
+    "presets": "内容宽度预设",
+    "default": "默认",
+    "comfortable": "舒适",
+    "immersive": "沉浸",
+    "slider": "自定义内容宽度",
+    "open": "调整内容宽度"
+  },
+  "documentOutline": {
+    "title": "文档侧栏",
+    "description": "控制文档编辑器右侧描述和目录是否显示",
+    "enabled": "显示描述和目录"
   },
   "data": {
     "autoBackup": "自动备份",

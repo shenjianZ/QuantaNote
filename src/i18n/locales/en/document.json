@@ -3,6 +3,17 @@
   "charCount": "{{count}} chars",
   "titlePlaceholder": "Document Title",
   "summaryPlaceholder": "Summary",
+  "summaryLabel": "Description",
+  "sidebar": {
+    "show": "Show description and outline",
+    "hide": "Hide description and outline"
+  },
+  "outline": {
+    "title": "Outline",
+    "show": "Show outline",
+    "hide": "Hide outline",
+    "empty": "No headings yet"
+  },
   "loadingEditor": "Loading editor...",
   "saved": "Saved",
   "saving": "Saving...",

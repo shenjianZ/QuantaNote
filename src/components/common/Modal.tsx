@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { isMobile, MOBILE_BACK_EVENT } from "../../utils/platform";
@@ -8,12 +9,21 @@ interface ModalProps {
   open: boolean;
   onClose: () => void;
   title: string;
-  children: React.ReactNode;
+  children: ReactNode;
   maxWidth?: string;
+  headerExtra?: ReactNode;
+  dialogStyle?: CSSProperties;
 }
 
-export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg" }: ModalProps) {
+const RESPONSIVE_MAX_WIDTH_CLASSES: Record<string, string> = {
+  "max-w-lg": "sm:max-w-lg",
+  "max-w-2xl": "sm:max-w-2xl",
+  "max-w-3xl": "sm:max-w-3xl",
+};
+
+export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg", headerExtra, dialogStyle }: ModalProps) {
   const { t } = useTranslation(["common"]);
+  const responsiveMaxWidth = RESPONSIVE_MAX_WIDTH_CLASSES[maxWidth] ?? RESPONSIVE_MAX_WIDTH_CLASSES["max-w-lg"];
   const backdropRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
@@ -96,20 +106,24 @@ export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg" }:
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`flex max-h-[90vh] w-full flex-col rounded-t-3xl border border-[var(--line)] bg-[var(--popover)] shadow-2xl sm:max-h-[85vh] sm:${maxWidth} sm:rounded-3xl`}
+        className={`flex max-h-[90vh] w-full flex-col rounded-t-3xl border border-[var(--line)] bg-[var(--popover)] shadow-2xl ${responsiveMaxWidth} sm:max-h-[85vh] sm:rounded-3xl`}
+        style={dialogStyle}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-[var(--line)] px-5 py-3">
           <h3 className="text-base font-semibold text-[var(--text)]">{title}</h3>
-          <button
-            className="grid h-8 w-8 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
-            type="button"
-            aria-label={t("common:buttons.close")}
-            data-testid="modal-close-btn"
-            onClick={onClose}
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            {headerExtra}
+            <button
+              className="grid h-8 w-8 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
+              type="button"
+              aria-label={t("common:buttons.close")}
+              data-testid="modal-close-btn"
+              onClick={onClose}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
         <div className="min-h-0 flex-1 overflow-auto px-5 py-4">{children}</div>
         {/* 移动端底部安全区域 */}

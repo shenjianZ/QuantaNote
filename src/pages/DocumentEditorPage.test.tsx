@@ -4,28 +4,33 @@ import { setup } from "../test/test-utils";
 import { DocumentEditorPage } from "./DocumentEditorPage";
 import { useAppStore } from "../stores/appStore";
 import { useItemStore } from "../stores/itemStore";
+import { useSettingsStore } from "../stores/settingsStore";
 import { mockIPC } from "@tauri-apps/api/mocks";
 
-vi.mock("../components/editor/VditorEditor", () => ({
-  VditorEditor: vi.fn(({ initialValue, onChange, theme }) => {
-    const React = require("react");
-    const ref = React.useRef<HTMLTextAreaElement>(null);
-    React.useImperativeHandle(
-      ref,
-      () => ({
-        getValue: () => initialValue,
-        focus: () => {},
-      }),
-      [initialValue]
-    );
-    return React.createElement("textarea", {
-      "data-testid": "vditor",
-      value: initialValue,
-      onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => onChange?.(e.target.value),
-      "data-theme": theme,
-    });
-  }),
-}));
+const { scrollToHeadingMock } = vi.hoisted(() => ({ scrollToHeadingMock: vi.fn() }));
+
+vi.mock("../components/editor/VditorEditor", () => {
+  const React = require("react");
+  return {
+    VditorEditor: React.forwardRef(({ initialValue, onChange, theme }, ref) => {
+      React.useImperativeHandle(
+        ref,
+        () => ({
+          getValue: () => initialValue,
+          focus: () => {},
+          scrollToHeading: scrollToHeadingMock,
+        }),
+        [initialValue],
+      );
+      return React.createElement("textarea", {
+        "data-testid": "vditor",
+        value: initialValue,
+        onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => onChange?.(e.target.value),
+        "data-theme": theme,
+      });
+    }),
+  };
+});
 
 describe("DocumentEditorPage", () => {
   const onBackToPreview = vi.fn();
@@ -54,6 +59,9 @@ describe("DocumentEditorPage", () => {
       getItem: vi.fn(async () => {}),
       updateItem: updateItemMock,
     });
+    useSettingsStore.setState((state) => ({
+      settings: { ...state.settings, contentWidthProgress: 0 },
+    }));
 
     mockIPC((cmd) => {
       if (cmd === "get_versions") return mockedVersions;
@@ -98,6 +106,44 @@ describe("DocumentEditorPage", () => {
   it("shows saved status initially", () => {
     setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
     expect(screen.getByText("已保存")).toBeInTheDocument();
+  });
+
+  it("shows the shared content width control", async () => {
+    const { user } = setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
+    expect(screen.getByTestId("document-editor-content-width-control")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "调整内容宽度" }));
+    await user.click(screen.getByTestId("document-editor-content-width-control-preset-immersive"));
+    expect(useSettingsStore.getState().settings.contentWidthProgress).toBe(50);
+  });
+
+  it("places the title beside preview, moves summary to the sidebar, and toggles the outline", async () => {
+    const current = useItemStore.getState().selectedItem;
+    if (!current) throw new Error("selectedItem is missing");
+    useItemStore.setState({
+      selectedItem: {
+        ...current,
+        content: "# 一级标题\n\n## 二级标题",
+      },
+    });
+
+    const { user } = setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
+    const toolbar = screen.getByTestId("document-editor-toolbar");
+    expect(toolbar).toContainElement(screen.getByTestId("doc-title-input"));
+    expect(toolbar).not.toHaveTextContent("字");
+    expect(screen.getByTestId("document-editor-sidebar")).toBeInTheDocument();
+    expect(screen.getByText("描述")).toBeInTheDocument();
+    expect(await screen.findByTestId("document-outline-item-1")).toHaveTextContent("二级标题");
+
+    await user.click(screen.getByTestId("document-outline-item-1"));
+    expect(scrollToHeadingMock).toHaveBeenCalledWith(1);
+
+    await user.click(screen.getByTestId("document-outline-toggle"));
+    expect(screen.queryByTestId("document-outline-item-1")).not.toBeInTheDocument();
+    expect(useSettingsStore.getState().settings.showDocumentOutline).toBe(false);
+
+    await user.click(screen.getByTestId("document-outline-toggle"));
+    expect(await screen.findByTestId("document-outline-item-1")).toBeInTheDocument();
   });
 
   it("shows saving status after edit", async () => {

@@ -1,0 +1,1158 @@
+/*
+ * Markdown 主题 — 标准 Notion 风格
+ *
+ * 同时覆盖两处渲染管线:
+ *   .markdown-preview  → MarkdownRenderer(react-markdown) 阅读预览
+ *   .vditor-reset / .vditor-ir → Vditor IR 编辑器内容区
+ * 色板取自 Notion 的页面变量(亮/暗), 内容区不跟随全局 accent 强调色。
+ * 大量 !important 用于压制 Vditor 自带的 light/dark 内容主题。
+ */
+
+/* ─────────────────────────── 1. Notion 色板 token ─────────────────────────── */
+
+:root,
+[data-theme="light"],
+[data-theme="system"] {
+    --md-text: var(--text);
+    --md-heading: var(--text);
+    --md-secondary: rgba(55, 53, 47, 0.45);
+    --md-blue: #2383e2;
+    --md-link: var(--md-text);
+    --md-link-hover: #2383e2;
+    --md-quote-border: rgb(55, 53, 47);
+    --md-quote-bg: transparent;
+    --md-border: rgba(55, 53, 47, 0.09);
+    --md-table-head: transparent;
+    --md-table-row-alt: transparent;
+    --md-mark-bg: rgba(255, 212, 0, 0.4);
+    --md-mark-text: inherit;
+    --md-image-shadow:
+        rgba(15, 15, 15, 0.1) 0 0 0 1px,
+        rgba(15, 15, 15, 0.1) 0 3px 6px,
+        rgba(15, 15, 15, 0.25) 0 9px 24px;
+    --code-inline-bg: rgba(135, 131, 120, 0.15);
+    --code-inline-text: #eb5757;
+    --code-block-bg: #f7f6f3;
+    --code-block-text: rgb(55, 53, 47);
+    --code-block-border: rgba(55, 53, 47, 0.06);
+    --code-token-muted: rgba(55, 53, 47, 0.4);
+    --code-token-keyword: #076187;
+    --code-token-string: #23818c;
+    --code-token-number: #ba5c25;
+    --code-token-title: #337ea9;
+    /* callout 分色(Notion 文字色板) */
+    --callout-note: #337ea9;
+    --callout-tip: #448361;
+    --callout-important: #9065b0;
+    --callout-warning: #d9730d;
+    --callout-caution: #e03e3e;
+}
+
+[data-theme="dark"] {
+    --md-text: var(--text);
+    --md-heading: var(--text);
+    --md-secondary: rgba(255, 255, 255, 0.45);
+    --md-blue: #2383e2;
+    --md-link: var(--md-text);
+    --md-link-hover: #6cc0ff;
+    --md-quote-border: rgba(255, 255, 255, 0.81);
+    --md-quote-bg: transparent;
+    --md-border: rgba(255, 255, 255, 0.11);
+    --md-table-head: transparent;
+    --md-table-row-alt: transparent;
+    --md-mark-bg: rgba(255, 212, 0, 0.4);
+    --md-mark-text: inherit;
+    --md-image-shadow:
+        rgba(255, 255, 255, 0.07) 0 0 0 1px,
+        rgba(0, 0, 0, 0.3) 0 3px 8px,
+        rgba(0, 0, 0, 0.45) 0 9px 24px;
+    --code-inline-bg: rgba(135, 131, 120, 0.28);
+    --code-inline-text: #ff7369;
+    --code-block-bg: #252525;
+    --code-block-text: rgba(255, 255, 255, 0.9);
+    --code-block-border: rgba(255, 255, 255, 0.07);
+    --code-token-muted: rgba(255, 255, 255, 0.4);
+    --code-token-keyword: #529cca;
+    --code-token-string: #5dd0ba;
+    --code-token-number: #d1938e;
+    --code-token-title: #6cc0ff;
+    --callout-note: #6cc0ff;
+    --callout-tip: #63c29a;
+    --callout-important: #b39ddb;
+    --callout-warning: #e6a26b;
+    --callout-caution: #ff7369;
+}
+
+@media (prefers-color-scheme: dark) {
+    [data-theme="system"] {
+        --md-text: var(--text);
+        --md-heading: var(--text);
+        --md-secondary: rgba(255, 255, 255, 0.45);
+        --md-link-hover: #6cc0ff;
+        --md-quote-border: rgba(255, 255, 255, 0.81);
+        --md-border: rgba(255, 255, 255, 0.11);
+        --md-mark-bg: rgba(255, 212, 0, 0.4);
+        --md-image-shadow:
+            rgba(255, 255, 255, 0.07) 0 0 0 1px,
+            rgba(0, 0, 0, 0.3) 0 3px 8px,
+            rgba(0, 0, 0, 0.45) 0 9px 24px;
+        --code-inline-bg: rgba(135, 131, 120, 0.28);
+        --code-inline-text: #ff7369;
+        --code-block-bg: #252525;
+        --code-block-text: rgba(255, 255, 255, 0.9);
+        --code-block-border: rgba(255, 255, 255, 0.07);
+        --code-token-muted: rgba(255, 255, 255, 0.4);
+        --code-token-keyword: #529cca;
+        --code-token-string: #5dd0ba;
+        --code-token-number: #d1938e;
+        --code-token-title: #6cc0ff;
+        --callout-note: #6cc0ff;
+        --callout-tip: #63c29a;
+        --callout-important: #b39ddb;
+        --callout-warning: #e6a26b;
+        --callout-caution: #ff7369;
+    }
+}
+
+/* ─────────────────────── 2. 预览容器与编辑器基座 ─────────────────────── */
+
+.markdown-preview {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: none;
+    margin: 0 auto;
+    padding: clamp(1.5rem, 4vw, 3rem) clamp(1rem, 4vw, 2.5rem) 3.5rem;
+    color: var(--md-text);
+    font-size: var(--font-size-md);
+    line-height: 1.6;
+    text-rendering: optimizeLegibility;
+    overflow-wrap: anywhere;
+}
+
+.markdown-preview > :first-child {
+    margin-top: 0 !important;
+}
+
+.markdown-preview > :last-child {
+    margin-bottom: 0 !important;
+}
+
+.markdown-preview :where(p, li, blockquote, .markdown-callout-content) {
+    text-wrap: pretty;
+}
+
+.markdown-empty {
+    display: grid;
+    min-height: 9rem;
+    place-items: center;
+    color: var(--md-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.markdown-preview ::selection,
+.vditor-ir ::selection {
+    background: color-mix(in srgb, var(--md-blue) 22%, transparent);
+}
+
+/* ─────────────────── 3. 共享排版(预览 + Vditor 内容区) ─────────────────── */
+
+/* 标题: Notion 式近黑 600, 无底边线无彩色装饰 */
+.markdown-preview :where(h1, h2, h3, h4, h5, h6),
+.vditor-reset :where(h1, h2, h3, h4, h5, h6) {
+    color: var(--md-heading) !important;
+    font-weight: 600 !important;
+    line-height: 1.3 !important;
+    letter-spacing: -0.01em !important;
+}
+
+.markdown-preview h1,
+.vditor-reset h1 {
+    margin: 1.4em 0 0.33em !important;
+    padding: 0 !important;
+    border: 0 !important;
+    font-size: var(--font-size-md-h1) !important;
+}
+
+.markdown-preview h2,
+.vditor-reset h2 {
+    margin: 1.3em 0 0.3em !important;
+    padding: 0 !important;
+    border: 0 !important;
+    font-size: var(--font-size-md-h2) !important;
+}
+
+.markdown-preview h3,
+.vditor-reset h3 {
+    margin: 1.2em 0 0.26em !important;
+    font-size: var(--font-size-md-h3) !important;
+}
+
+.markdown-preview :where(h4, h5, h6),
+.vditor-reset :where(h4, h5, h6) {
+    margin: 1em 0 0.24em !important;
+    font-size: var(--font-size-md) !important;
+}
+
+.markdown-preview p,
+.vditor-reset p {
+    margin: 0.4em 0 !important;
+}
+
+/* 链接: 文字色 + 下划线, hover 变 Notion 蓝 */
+.markdown-preview a,
+.vditor-reset a {
+    color: var(--md-link) !important;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.16em;
+}
+
+.markdown-preview a:hover,
+.vditor-reset a:hover {
+    background: none;
+    color: var(--md-link-hover) !important;
+    text-decoration-color: currentColor;
+}
+
+.markdown-preview :where(strong, b),
+.vditor-reset :where(strong, b) {
+    color: var(--md-heading);
+    font-weight: 700;
+}
+
+.markdown-preview :where(em, i),
+.vditor-reset :where(em, i) {
+    color: inherit;
+}
+
+.markdown-preview del,
+.vditor-reset del {
+    color: var(--md-secondary);
+}
+
+.markdown-preview mark,
+.vditor-reset mark {
+    border-radius: 2px;
+    background: var(--md-mark-bg);
+    color: var(--md-mark-text);
+    padding: 0.05em 0.15em;
+}
+
+/* 列表: 紧凑行距 + 中性灰 marker */
+.markdown-preview :where(ul, ol),
+.vditor-reset :where(ul, ol) {
+    margin: 0.3em 0 0.45em 1.3em !important;
+    padding-left: 0.8em !important;
+}
+
+/* Restore ordered-list numbering overridden by Tailwind preflight */
+.markdown-preview ol,
+.vditor-reset ol {
+    list-style-type: decimal !important;
+}
+
+.markdown-preview ol ol,
+.vditor-reset ol ol {
+    list-style-type: lower-alpha !important;
+}
+
+.markdown-preview ol ol ol,
+.vditor-reset ol ol ol {
+    list-style-type: lower-roman !important;
+}
+
+.markdown-preview ul,
+.vditor-reset ul {
+    list-style-type: disc !important;
+}
+
+.markdown-preview ul ul,
+.vditor-reset ul ul {
+    list-style-type: circle !important;
+}
+
+.markdown-preview li,
+.vditor-reset li {
+    margin: 0.14em 0 !important;
+    padding-left: 0.15em !important;
+}
+
+.markdown-preview li::marker,
+.vditor-reset li::marker {
+    color: var(--md-secondary);
+    font-weight: 400;
+}
+
+.markdown-preview input[type="checkbox"],
+.vditor-reset input[type="checkbox"] {
+    width: 0.95rem;
+    height: 0.95rem;
+    margin-right: 0.45rem;
+    accent-color: var(--md-blue);
+    vertical-align: -0.12rem;
+}
+
+/* 引用: 左侧 3px 近黑实线, 无底色无圆角 */
+.markdown-preview blockquote,
+.vditor-reset blockquote {
+    margin: 0.5em 0 !important;
+    border-left: 3px solid var(--md-quote-border) !important;
+    border-radius: 0 !important;
+    background: var(--md-quote-bg) !important;
+    color: var(--md-text);
+    padding: 0.1em 0.9em !important;
+}
+
+.markdown-preview blockquote p,
+.vditor-reset blockquote p {
+    margin: 0.3em 0 !important;
+}
+
+.markdown-preview hr,
+.vditor-reset hr {
+    height: 0 !important;
+    margin: 0.9em 0 !important;
+    border: 0 !important;
+    border-top: 1px solid var(--md-border) !important;
+    background: none !important;
+}
+
+/* 表格: 细网格线 + 无底色表头 + 无斑马纹 */
+.markdown-preview table,
+.vditor-reset table {
+    width: 100%;
+    margin: 0.6em 0 !important;
+    border-collapse: collapse !important;
+    border-spacing: 0 !important;
+    border: 1px solid var(--md-border) !important;
+    border-radius: 4px;
+    overflow: hidden;
+    background: transparent;
+}
+
+.markdown-preview table th,
+.vditor-reset table th {
+    background: var(--md-table-head) !important;
+    font-weight: 600 !important;
+}
+
+.markdown-preview table tr,
+.vditor-reset table tr {
+    border: 0 !important;
+    background: transparent !important;
+}
+
+.markdown-preview table td,
+.markdown-preview table th,
+.vditor-reset table td,
+.vditor-reset table th {
+    border: 0 !important;
+    border-right: 1px solid var(--md-border) !important;
+    border-bottom: 1px solid var(--md-border) !important;
+    padding: 0.45rem 0.6rem !important;
+    color: var(--md-text) !important;
+    white-space: normal !important;
+}
+
+/* 表头恢复近黑标题色(需在通用 td/th 规则之后覆盖) */
+.markdown-preview table th,
+.vditor-reset table th {
+    color: var(--md-heading) !important;
+}
+
+.markdown-preview table :where(td, th):last-child,
+.vditor-reset table :where(td, th):last-child {
+    border-right: 0 !important;
+}
+
+.markdown-preview table tr:last-child td,
+.vditor-reset table tr:last-child td {
+    border-bottom: 0 !important;
+}
+
+.markdown-preview table tbody tr:nth-child(2n),
+.vditor-reset table tbody tr:nth-child(2n) {
+    background: var(--md-table-row-alt) !important;
+}
+
+/* 编辑器内表格宽度布局(供 IR 光标导航) */
+.markdown-preview table,
+.vditor-ir table,
+.vditor-wysiwyg table {
+    display: table !important;
+    width: auto !important;
+    max-width: 100% !important;
+    table-layout: auto !important;
+}
+
+.markdown-preview img,
+.vditor-reset img {
+    max-width: 100%;
+    border-radius: 4px;
+    border: 0;
+}
+
+.markdown-preview img.emoji,
+.vditor-reset img.emoji {
+    border: 0;
+    border-radius: 0;
+}
+
+.markdown-preview kbd,
+.vditor-reset kbd {
+    border: 1px solid var(--md-border);
+    border-bottom-width: 2px;
+    border-radius: 3px;
+    background: var(--code-block-bg);
+    color: var(--md-text);
+    box-shadow: none;
+    padding: 0.1rem 0.35rem;
+    font-family: var(--font-mono);
+    font-size: 0.82em;
+}
+
+.markdown-preview :where(sup, sub),
+.vditor-reset :where(sup, sub) {
+    color: var(--md-secondary);
+    line-height: 0;
+}
+
+/* 折叠块: Notion toggle 式, 无边框卡片 */
+.markdown-preview details,
+.vditor-reset details {
+    margin: 0.3em 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    padding: 0.1em 0;
+}
+
+.markdown-preview summary,
+.vditor-reset summary {
+    border-radius: 3px;
+    color: var(--md-heading);
+    cursor: pointer;
+    font-weight: 500;
+    padding: 0.15em 0.45em;
+}
+
+.markdown-preview summary:hover,
+.vditor-reset summary:hover {
+    background: var(--hover);
+}
+
+/* 行内代码: Notion 红褐 + 浅灰底 */
+.markdown-preview :not(pre) > code,
+.vditor-reset :not(pre) > code,
+.vditor-ir :not(pre) > code,
+.vditor-wysiwyg :not(pre) > code {
+    border: 0 !important;
+    border-radius: 3px !important;
+    background: var(--code-inline-bg) !important;
+    color: var(--code-inline-text) !important;
+    padding: 0.14em 0.36em !important;
+    font-family: var(--font-mono) !important;
+    font-size: 0.86em !important;
+    white-space: break-spaces !important;
+}
+
+/* 代码块: Notion 灰底 + 小圆角 + 无边框无阴影 */
+.markdown-preview pre,
+.vditor-reset pre,
+.vditor-ir .vditor-ir__node[data-type="code-block"],
+.vditor-wysiwyg__block[data-type="code-block"] {
+    margin: 0.6em 0 !important;
+    border: 0 !important;
+    border-radius: 4px !important;
+    background: var(--code-block-bg) !important;
+    overflow: hidden !important;
+}
+
+.markdown-preview pre > code,
+.vditor-reset pre > code,
+.vditor-ir pre > code,
+.vditor-wysiwyg pre > code,
+.vditor-ir__node--expand .vditor-ir__marker--pre code,
+.vditor-wysiwyg__block pre:first-child code {
+    display: block !important;
+    min-height: 2.4rem;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: var(--code-block-bg) !important;
+    background-image: none !important;
+    color: var(--code-block-text) !important;
+    padding: 0.85rem 1rem !important;
+    font-family: var(--font-mono) !important;
+    font-size: var(--font-size-sm) !important;
+    line-height: 1.5 !important;
+    tab-size: 2;
+}
+
+/* Vditor IR 编辑区根节点(本身是 pre.vditor-reset), 不能被代码块样式染灰 */
+.vditor-ir pre.vditor-reset {
+    background: var(--paper) !important;
+}
+
+/* ───────────────────── 4. 预览增强(自研组件的 Notion 化) ───────────────────── */
+
+/* 标题锚点 */
+.markdown-preview .markdown-heading {
+    position: relative;
+    scroll-margin-top: 4rem;
+}
+
+.markdown-preview .markdown-heading > span:first-child {
+    display: inline;
+}
+
+.markdown-preview .markdown-heading-anchor {
+    display: inline-block;
+    margin-left: 0.45rem;
+    border-radius: 3px;
+    color: var(--md-secondary) !important;
+    font-family: var(--font-mono);
+    font-size: 0.72em;
+    font-weight: 500;
+    line-height: 1;
+    opacity: 0;
+    text-decoration: none !important;
+    transform: translateY(-0.08em);
+    transition: opacity 160ms ease, background-color 160ms ease, color 160ms ease;
+}
+
+.markdown-preview .markdown-heading:hover .markdown-heading-anchor,
+.markdown-preview .markdown-heading-anchor:focus-visible {
+    opacity: 1;
+}
+
+.markdown-preview .markdown-heading-anchor:hover {
+    background: var(--hover);
+    color: var(--md-link-hover) !important;
+}
+
+/* 表格横向滚动框 */
+.markdown-preview .markdown-table-wrap {
+    width: 100%;
+    margin: 0.6em 0;
+    overflow-x: auto;
+    border: 1px solid var(--md-border);
+    border-radius: 4px;
+    background: transparent;
+    box-shadow: none;
+    scrollbar-width: thin;
+}
+
+.markdown-preview .markdown-table-wrap table {
+    width: 100% !important;
+    min-width: 100%;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none;
+}
+
+.markdown-preview .markdown-table-wrap th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--md-table-head) !important;
+}
+
+/* 图片框 + 图注(Notion 图片阴影) */
+.markdown-preview .markdown-image-frame {
+    display: block;
+    width: fit-content;
+    max-width: 100%;
+    margin: 0.75em auto;
+    text-align: center;
+}
+
+.markdown-preview .markdown-image-frame img {
+    display: block;
+    max-height: min(38rem, 70vh);
+    margin: 0 auto;
+    object-fit: contain;
+    box-shadow: var(--md-image-shadow);
+}
+
+.markdown-preview .markdown-image-caption {
+    display: block;
+    margin-top: 0.55rem;
+    color: var(--md-secondary);
+    font-size: var(--font-size-xs);
+    line-height: 1.5;
+}
+
+/* 代码块工具栏: 低调灰条 + 语言标签 + 复制按钮 */
+.markdown-preview .markdown-code-block {
+    margin: 0.6em 0 !important;
+    overflow: hidden;
+    border: 0;
+    border-radius: 4px;
+    background: var(--code-block-bg);
+    box-shadow: none;
+}
+
+.markdown-preview .markdown-code-toolbar {
+    display: flex;
+    min-height: 2.1rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.3rem 0.55rem 0.3rem 0.9rem;
+    border-bottom: 1px solid var(--code-block-border);
+    background: transparent;
+}
+
+.markdown-preview .markdown-code-language {
+    color: var(--code-token-muted);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: lowercase;
+}
+
+.markdown-preview .markdown-code-copy {
+    display: inline-flex;
+    min-height: 1.8rem;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.48rem;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    color: var(--code-token-muted);
+    font-size: 0.72rem;
+    transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+}
+
+.markdown-preview .markdown-code-copy:hover,
+.markdown-preview .markdown-code-copy:focus-visible {
+    border-color: transparent;
+    background: var(--hover);
+    color: var(--md-text);
+}
+
+.markdown-preview .markdown-code-block > pre {
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+.markdown-preview .markdown-code-block > pre > code {
+    min-height: 2.4rem;
+    padding: 0.85rem 1rem !important;
+    background: transparent !important;
+    color: var(--code-block-text) !important;
+    font-size: 0.85rem !important;
+    line-height: 1.5 !important;
+    tab-size: 2;
+}
+
+/* Callout: Notion 灰底色块, 图标与标签按 kind 低饱和分色 */
+.markdown-preview .markdown-callout {
+    --callout-color: var(--callout-note);
+    margin: 0.6em 0;
+    padding: 0.85em 1em 0.95em;
+    border: 0;
+    border-radius: 4px;
+    background: var(--code-block-bg);
+}
+
+.markdown-preview .markdown-callout--note {
+    --callout-color: var(--callout-note);
+}
+
+.markdown-preview .markdown-callout--tip {
+    --callout-color: var(--callout-tip);
+}
+
+.markdown-preview .markdown-callout--important {
+    --callout-color: var(--callout-important);
+}
+
+.markdown-preview .markdown-callout--warning {
+    --callout-color: var(--callout-warning);
+}
+
+.markdown-preview .markdown-callout--caution {
+    --callout-color: var(--callout-caution);
+}
+
+.markdown-preview .markdown-callout-label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.3rem;
+    color: var(--callout-color);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.markdown-preview .markdown-callout-icon {
+    width: 0.95rem;
+    height: 0.95rem;
+    flex: 0 0 auto;
+    stroke-width: 2.1;
+}
+
+.markdown-preview .markdown-callout-content > :first-child {
+    margin-top: 0 !important;
+}
+
+.markdown-preview .markdown-callout-content > :last-child {
+    margin-bottom: 0 !important;
+}
+
+/* 任务框: Notion 蓝勾选 */
+.markdown-preview .markdown-task-box {
+    display: inline-grid;
+    width: 1rem;
+    height: 1rem;
+    margin-right: 0.42rem;
+    place-items: center;
+    vertical-align: -0.13rem;
+    border: 1.5px solid var(--md-secondary);
+    border-radius: 3px;
+    color: #fff;
+}
+
+.markdown-preview .markdown-task-box.is-checked {
+    border-color: var(--md-blue);
+    background: var(--md-blue);
+}
+
+.markdown-preview li:has(> .markdown-task-box),
+.markdown-preview li:has(> p > .markdown-task-box) {
+    margin-left: -1.35em !important;
+    padding-left: 0 !important;
+    list-style: none !important;
+}
+
+/* 音视频: 简洁边框 */
+.markdown-preview .markdown-media-frame {
+    width: 100%;
+    margin: 0.75em 0;
+    padding: 0.5rem;
+    border: 1px solid var(--md-border);
+    border-radius: 4px;
+    background: transparent;
+}
+
+.markdown-preview .markdown-media-frame audio,
+.markdown-preview .markdown-media-frame video {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 3px;
+}
+
+.markdown-preview .markdown-video-frame video {
+    max-height: min(38rem, 70vh);
+    background: var(--code-block-bg);
+    object-fit: contain;
+}
+
+/* 脚注 */
+.markdown-preview [data-footnotes] {
+    margin-top: 2.2rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--md-border);
+    color: var(--md-secondary);
+    font-size: 0.88em;
+}
+
+.markdown-preview [data-footnotes] h2 {
+    margin: 0 0 0.6rem !important;
+    padding: 0 !important;
+    border: 0 !important;
+    color: var(--md-heading) !important;
+    font-size: 0.86rem !important;
+    letter-spacing: 0.04em !important;
+    text-transform: uppercase;
+}
+
+.markdown-preview [data-footnotes] ol {
+    margin: 0 !important;
+    padding-left: 1.25rem !important;
+}
+
+.markdown-preview [data-footnotes] li {
+    margin: 0.3rem 0 !important;
+    padding-left: 0.2rem !important;
+}
+
+.markdown-preview .data-footnote-ref,
+.markdown-preview .data-footnote-backref {
+    border-radius: 3px;
+    color: var(--md-blue) !important;
+    text-decoration: none !important;
+}
+
+.markdown-preview .data-footnote-ref {
+    padding: 0 0.18rem;
+    background: color-mix(in srgb, var(--md-blue) 10%, transparent);
+    font-size: 0.78em;
+    font-weight: 600;
+    vertical-align: super;
+}
+
+.markdown-preview .data-footnote-backref:hover,
+.markdown-preview .data-footnote-ref:hover {
+    background: color-mix(in srgb, var(--md-blue) 18%, transparent);
+}
+
+/* KaTeX */
+.markdown-preview .katex-display {
+    margin: 0.9em 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0.4rem 0;
+    color: var(--md-text);
+    scrollbar-width: thin;
+}
+
+.markdown-preview .katex {
+    color: var(--md-text);
+}
+
+/* ───────────────────── 5. Vditor 编辑器 chrome ───────────────────── */
+
+.vditor-container {
+    height: 100%;
+}
+
+.vditor {
+    border-color: var(--line) !important;
+    border-radius: 6px !important;
+    overflow: hidden;
+    position: relative;
+}
+
+/* 工具栏: 透明底色、正文色图标，靠悬停和强调色表达交互状态 */
+.vditor {
+    --toolbar-background-color: transparent;
+    --toolbar-icon-color: var(--text);
+    --toolbar-icon-hover-color: var(--accent);
+    --border-color: transparent;
+}
+
+.vditor-toolbar {
+    position: relative;
+    z-index: 20;
+    overflow: visible !important;
+    background: transparent !important;
+    border: 0 !important;
+    padding: 0.35rem 0.5rem !important;
+}
+
+/* Vditor 默认提示位于工具栏上方，编辑器顶部的圆角容器会把它裁掉。
+ * 统一放到按钮下方，并提升工具栏层级，避免提示文字被编辑区覆盖。 */
+.vditor-toolbar__item .vditor-tooltipped::after {
+    top: calc(100% + 6px) !important;
+    right: 50% !important;
+    bottom: auto !important;
+    left: auto !important;
+    margin: 0 !important;
+    transform: translateX(50%) !important;
+    color: var(--paper) !important;
+    background: var(--text) !important;
+    border: 1px solid var(--line) !important;
+    box-shadow: 0 6px 18px rgb(15 23 42 / 18%);
+    z-index: 1000000 !important;
+}
+
+.vditor-toolbar__item .vditor-tooltipped::before {
+    top: calc(100% + 1px) !important;
+    right: 50% !important;
+    bottom: auto !important;
+    left: auto !important;
+    margin: 0 -5px 0 0 !important;
+    border-top-color: transparent !important;
+    border-right-color: transparent !important;
+    border-bottom-color: var(--text) !important;
+    border-left-color: transparent !important;
+    z-index: 1000001 !important;
+}
+
+.vditor-toolbar__item .vditor-tooltipped {
+    width: 30px;
+    height: 30px;
+    padding: 7px;
+    border-radius: 7px;
+    color: var(--text) !important;
+    opacity: 1 !important;
+}
+
+.vditor-toolbar__item .vditor-tooltipped:hover,
+.vditor-toolbar__item .vditor-tooltipped:focus-visible,
+.vditor-toolbar__item .vditor-tooltipped.vditor-icon--current {
+    background: var(--hover) !important;
+    color: var(--accent) !important;
+}
+
+.vditor-toolbar__item svg {
+    color: currentColor !important;
+    fill: currentColor;
+    stroke: currentColor;
+    stroke-width: 1.8;
+}
+
+.vditor-toolbar__divider {
+    border-left-color: var(--line) !important;
+    opacity: 0.7;
+}
+
+.vditor-ir,
+.vditor-reset {
+    background: var(--paper) !important;
+    color: var(--md-text) !important;
+    font-family: var(--font-sans) !important;
+    font-size: var(--font-size-md) !important;
+    line-height: 1.6 !important;
+}
+
+.vditor-toolbar__item svg {
+    stroke-width: 1.9;
+}
+
+.vditor-toolbar__item .quantanote-table-icon {
+    fill: none !important;
+    stroke: currentColor !important;
+    stroke-width: 1.9 !important;
+}
+
+.vditor-toolbar__item .quantanote-table-icon :where(rect, path) {
+    fill: none !important;
+    stroke: currentColor !important;
+    stroke-width: 1.9 !important;
+}
+
+/* IR 源码标记(**、## 等): 极淡灰, Notion 式不喧宾夺主 */
+.vditor-ir .vditor-ir__marker {
+    color: var(--md-secondary) !important;
+}
+
+.vditor-ir .vditor-ir__node--expand .vditor-ir__marker {
+    color: var(--md-secondary) !important;
+}
+
+/* 字数统计: 无边框灰字 */
+.vditor-counter {
+    position: absolute !important;
+    right: 0.75rem !important;
+    bottom: 0.5rem !important;
+    z-index: 2 !important;
+    float: none !important;
+    margin: 0 !important;
+    background: color-mix(in srgb, var(--paper) 88%, transparent) !important;
+    color: var(--md-secondary) !important;
+    border: 0 !important;
+    border-radius: 3px !important;
+    pointer-events: none;
+}
+
+.vditor-counter::before,
+.vditor-counter::after {
+    display: none !important;
+}
+
+.vditor-content {
+    padding-bottom: 1.75rem !important;
+}
+
+/* 工作区嵌入面板: 编辑器撑满, 去自身边框 */
+.workspace-editor-panel .vditor {
+    border: 0 !important;
+    border-radius: 0 !important;
+}
+
+.workspace-editor-panel .vditor-toolbar {
+    border-radius: 0 !important;
+}
+
+/* 表格插入面板: Notion 弹层(白底细边 + 蓝色主按钮) */
+.quantanote-vditor-table-panel {
+    position: fixed;
+    z-index: 1200;
+    width: 13rem;
+    padding: 0.75rem;
+    border: 1px solid var(--md-border);
+    border-radius: 6px;
+    background: var(--popover);
+    color: var(--md-text);
+    box-shadow:
+        rgba(15, 15, 15, 0.05) 0 0 0 1px,
+        rgba(15, 15, 15, 0.1) 0 3px 6px,
+        rgba(15, 15, 15, 0.16) 0 9px 28px;
+}
+
+.quantanote-vditor-table-panel__title {
+    margin-bottom: 0.65rem;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+}
+
+.quantanote-vditor-table-panel__form {
+    display: grid;
+    gap: 0.65rem;
+}
+
+.quantanote-vditor-table-panel__form label {
+    display: grid;
+    grid-template-columns: 2rem 1fr;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--md-secondary);
+    font-size: var(--font-size-xs);
+}
+
+.quantanote-vditor-table-panel__form input {
+    width: 100%;
+    border: 1px solid var(--md-border);
+    border-radius: 4px;
+    background: var(--field);
+    color: var(--md-text);
+    padding: 0.38rem 0.5rem;
+    font: inherit;
+}
+
+.quantanote-vditor-table-panel__form input:focus {
+    outline: 2px solid color-mix(in srgb, var(--md-blue) 25%, transparent);
+    outline-offset: 1px;
+    border-color: var(--md-blue);
+}
+
+.quantanote-vditor-table-panel__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 0.1rem;
+}
+
+.quantanote-vditor-table-panel__actions button {
+    border: 0;
+    border-radius: 4px;
+    background: var(--hover);
+    color: var(--md-text);
+    padding: 0.36rem 0.7rem;
+    font: inherit;
+    font-size: var(--font-size-xs);
+    cursor: pointer;
+}
+
+.quantanote-vditor-table-panel__actions button.primary {
+    border-color: transparent;
+    background: var(--md-blue);
+    color: #fff;
+}
+
+/* ───────────────────── 6. 语法高亮 token ───────────────────── */
+
+.markdown-preview .hljs,
+.markdown-preview .highlight-chroma,
+.vditor-reset .hljs,
+.vditor-reset .highlight-chroma {
+    background: var(--code-block-bg) !important;
+    color: var(--code-block-text) !important;
+}
+
+.markdown-preview .hljs-comment,
+.markdown-preview .hljs-quote,
+.markdown-preview .hljs-meta,
+.markdown-preview .chroma .c,
+.markdown-preview .chroma .cm,
+.markdown-preview .chroma .cp,
+.markdown-preview .chroma .c1,
+.vditor-reset .hljs-comment,
+.vditor-reset .hljs-quote,
+.vditor-reset .hljs-meta,
+.vditor-reset .chroma .c,
+.vditor-reset .chroma .cm,
+.vditor-reset .chroma .cp,
+.vditor-reset .chroma .c1 {
+    color: var(--code-token-muted) !important;
+}
+
+.markdown-preview .hljs-keyword,
+.markdown-preview .hljs-selector-tag,
+.markdown-preview .hljs-built_in,
+.markdown-preview .chroma .k,
+.markdown-preview .chroma .kc,
+.markdown-preview .chroma .kd,
+.markdown-preview .chroma .kn,
+.vditor-reset .hljs-keyword,
+.vditor-reset .hljs-selector-tag,
+.vditor-reset .hljs-built_in,
+.vditor-reset .chroma .k,
+.vditor-reset .chroma .kc,
+.vditor-reset .chroma .kd,
+.vditor-reset .chroma .kn {
+    color: var(--code-token-keyword) !important;
+}
+
+.markdown-preview .hljs-string,
+.markdown-preview .hljs-regexp,
+.markdown-preview .chroma .s,
+.markdown-preview .chroma .s1,
+.markdown-preview .chroma .s2,
+.vditor-reset .hljs-string,
+.vditor-reset .hljs-regexp,
+.vditor-reset .chroma .s,
+.vditor-reset .chroma .s1,
+.vditor-reset .chroma .s2 {
+    color: var(--code-token-string) !important;
+}
+
+.markdown-preview .hljs-number,
+.markdown-preview .hljs-literal,
+.markdown-preview .chroma .m,
+.markdown-preview .chroma .mi,
+.markdown-preview .chroma .mf,
+.vditor-reset .hljs-number,
+.vditor-reset .hljs-literal,
+.vditor-reset .chroma .m,
+.vditor-reset .chroma .mi,
+.vditor-reset .chroma .mf {
+    color: var(--code-token-number) !important;
+}
+
+.markdown-preview .hljs-title,
+.markdown-preview .hljs-function,
+.markdown-preview .hljs-attr,
+.markdown-preview .chroma .nf,
+.markdown-preview .chroma .na,
+.vditor-reset .hljs-title,
+.vditor-reset .hljs-function,
+.vditor-reset .hljs-attr,
+.vditor-reset .chroma .nf,
+.vditor-reset .chroma .na {
+    color: var(--code-token-title) !important;
+}
+
+/* ───────────────────── 7. 响应式与动效偏好 ───────────────────── */
+
+@media (max-width: 640px) {
+    .markdown-preview {
+        padding: 1.1rem 0.85rem 2.5rem;
+    }
+
+    .markdown-preview .markdown-code-block > pre > code {
+        padding: 0.75rem 0.8rem !important;
+        font-size: 0.78rem !important;
+    }
+
+    .markdown-preview .markdown-code-copy span {
+        display: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .markdown-preview .markdown-heading-anchor,
+    .markdown-preview .markdown-code-copy {
+        transition: none;
+    }
+}

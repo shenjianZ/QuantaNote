@@ -11,26 +11,6 @@
     "system": "System",
     "light": "Light",
     "dark": "Dark",
-    "markdownStyle": "Markdown Style",
-    "markdownStyleDesc": "Applied to both the editor and preview. Pick a layout that fits the way you read.",
-    "styles": {
-      "notion": {
-        "label": "Minimal",
-        "description": "Quiet and spacious for everyday notes and long-form reading"
-      },
-      "paper": {
-        "label": "Paper",
-        "description": "Warm paper tones with bookish headings and quotations"
-      },
-      "obsidian": {
-        "label": "Obsidian",
-        "description": "Compact, crisp, and high-contrast for technical notes"
-      },
-      "editorial": {
-        "label": "Editorial",
-        "description": "Stronger hierarchy and content blocks for feature writing"
-      }
-    },
     "accentColor": "Accent Color",
     "predefined": "Predefined",
     "custom": "Custom",
@@ -72,6 +52,21 @@
     "fontSize": "Font Size",
     "uiFontSize": "UI Font Size",
     "preview": "The quick brown fox jumps over the lazy dog"
+  },
+  "contentWidth": {
+    "title": "Content Width",
+    "description": "Adjust the width of editor and preview areas",
+    "presets": "Content width presets",
+    "default": "Default",
+    "comfortable": "Comfortable",
+    "immersive": "Immersive",
+    "slider": "Custom content width",
+    "open": "Adjust content width"
+  },
+  "documentOutline": {
+    "title": "Document Sidebar",
+    "description": "Control whether the description and outline are shown beside the document editor",
+    "enabled": "Show description and outline"
   },
   "data": {
     "autoBackup": "Auto Backup",

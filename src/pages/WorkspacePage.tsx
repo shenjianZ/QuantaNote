@@ -69,7 +69,7 @@ export function WorkspacePage({ onQuickCreate, onViewSaved }: WorkspacePageProps
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--app-bg)] px-3 py-3 sm:px-[clamp(1rem,4vw,4rem)] sm:py-4">
-      <section className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col">
+      <section className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col" data-testid="workspace-content">
         <div className="mb-3 flex shrink-0 items-center justify-between gap-3 sm:mb-4">
           <div className="min-w-0">
             <h1 className="app-hero-title text-[var(--text)]">{t("workspace:title")}</h1>

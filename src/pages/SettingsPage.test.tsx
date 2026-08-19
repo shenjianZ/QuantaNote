@@ -20,7 +20,8 @@ describe("SettingsPage", () => {
                 fontFamily: "Noto Sans SC",
                 fontMono: "JetBrains Mono",
                 fontSize: 16,
-                markdownStyle: "notion",
+                contentWidthProgress: 0,
+                showDocumentOutline: true,
                 minimizeToTray: false,
                 closeKeepRunning: false,
                 autoBackup: false,
@@ -77,18 +78,29 @@ describe("SettingsPage", () => {
     it("renders appearance section by default", () => {
         setup(<SettingsPage />);
         expect(screen.getByText("外观主题")).toBeInTheDocument();
+        expect(screen.getByTestId("settings-content-width-control")).toBeInTheDocument();
+    });
+
+    it("updates the shared content width setting from a preset", async () => {
+        const { user } = setup(<SettingsPage />);
+        await user.click(screen.getByTestId("settings-content-width-control-preset-comfortable"));
+        expect(updateSettingMock).toHaveBeenCalledWith("contentWidthProgress", 25);
+    });
+
+    it("toggles the document outline visibility setting", async () => {
+        const { user } = setup(<SettingsPage />);
+        const toggle = screen.getByTestId("settings-document-outline-toggle");
+
+        expect(toggle).toHaveAttribute("aria-checked", "true");
+        await user.click(toggle);
+
+        expect(updateSettingMock).toHaveBeenCalledWith("showDocumentOutline", false);
     });
 
     it("switches to font section", async () => {
         const { user } = setup(<SettingsPage />);
         await user.click(screen.getByText("字体"));
         expect(screen.getByText("界面字体")).toBeInTheDocument();
-    });
-
-    it("changes Markdown style preset", async () => {
-        const { user } = setup(<SettingsPage />);
-        await user.click(screen.getByTestId("markdown-style-paper"));
-        expect(updateSettingMock).toHaveBeenCalledWith("markdownStyle", "paper");
     });
 
     it("changes accent color on click", async () => {

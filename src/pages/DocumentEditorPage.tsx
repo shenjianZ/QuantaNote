@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, Clock, Loader2, Save, Star } from "lucide-react";
 import { useAppStore } from "../stores/appStore";
@@ -6,7 +6,14 @@ import { useItemStore } from "../stores/itemStore";
 import { getVditorLang } from "../utils/vditorConfig";
 import { useToastStore } from "../stores/toastStore";
 import { VersionPanel, type VersionDto } from "../components/editor/VersionPanel";
+import { DocumentOutline, DocumentOutlineToggle } from "../components/editor/DocumentOutline";
+import type { VditorEditorHandle } from "../components/editor/VditorEditor";
+import { ContentWidthControl } from "../components/common/ContentWidthControl";
 import { getVersions, createVersion, updateVersion, restoreVersion, deleteVersion } from "../services/tauriCommands";
+import { useSettingsStore } from "../stores/settingsStore";
+import { useResponsiveContentWidth } from "../hooks/useResponsiveContentWidth";
+import { CONTENT_WIDTH_EDITOR_BASE, CONTENT_WIDTH_OUTLINE_LAYOUT } from "../utils/contentWidth";
+import { parseMarkdownOutline } from "../utils/markdownOutline";
 
 const VditorEditor = lazy(() => import("../components/editor/VditorEditor").then((m) => ({ default: m.VditorEditor })));
 
@@ -39,6 +46,13 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
   const { t } = useTranslation(["document", "common"]);
   const selectedItemId = useAppStore((s) => s.selectedItemId);
   const theme = useAppStore((s) => s.theme);
+  const contentWidthProgress = useSettingsStore((s) => s.settings.contentWidthProgress);
+  const showDocumentOutline = useSettingsStore((s) => s.settings.showDocumentOutline);
+  const updateSetting = useSettingsStore((s) => s.updateSetting);
+  const editorWidth = useResponsiveContentWidth<HTMLDivElement>({
+    baseWidth: CONTENT_WIDTH_EDITOR_BASE + (showDocumentOutline ? CONTENT_WIDTH_OUTLINE_LAYOUT : 0),
+    progress: contentWidthProgress,
+  });
   const selectedItem = useItemStore((s) => s.selectedItem);
   const getItem = useItemStore((s) => s.getItem);
   const updateItem = useItemStore((s) => s.updateItem);
@@ -51,12 +65,49 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
   const [versionsLoaded, setVersionsLoaded] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [versionPanelOpen, setVersionPanelOpen] = useState(false);
+  const [activeHeadingIndex, setActiveHeadingIndex] = useState(-1);
+  const editorRef = useRef<VditorEditorHandle>(null);
+  const editorViewportRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 仅忽略当前页面自己触发的 store 回声；同 ID 的 getItem/同步刷新仍需回填表单。
   const pendingItemEchoesRef = useRef<ItemEcho[]>([]);
   const latestTitle = useRef(title);
   const latestSummary = useRef(summary);
   const latestContent = useRef(content);
+  const outline = useMemo(() => parseMarkdownOutline(content), [content]);
+
+  useEffect(() => {
+    const viewport = editorViewportRef.current;
+    if (!viewport) return;
+
+    const updateActiveHeading = () => {
+      const headings = Array.from(viewport.querySelectorAll<HTMLElement>(
+        ".vditor-ir h1, .vditor-ir h2, .vditor-ir h3, .vditor-ir h4, .vditor-ir h5, .vditor-ir h6",
+      ));
+      if (headings.length === 0) {
+        setActiveHeadingIndex(-1);
+        return;
+      }
+
+      const threshold = Math.min(window.innerHeight * 0.28, 220);
+      let nextIndex = 0;
+      headings.forEach((heading, index) => {
+        if (heading.getBoundingClientRect().top <= threshold) nextIndex = index;
+      });
+      setActiveHeadingIndex(nextIndex);
+    };
+
+    const initialUpdate = window.setTimeout(updateActiveHeading, 80);
+    viewport.addEventListener("scroll", updateActiveHeading, true);
+    window.addEventListener("scroll", updateActiveHeading, true);
+    window.addEventListener("resize", updateActiveHeading);
+    return () => {
+      window.clearTimeout(initialUpdate);
+      viewport.removeEventListener("scroll", updateActiveHeading, true);
+      window.removeEventListener("scroll", updateActiveHeading, true);
+      window.removeEventListener("resize", updateActiveHeading);
+    };
+  }, [content]);
 
   function queueItemEcho(id: string, fields: ItemEcho["fields"]) {
     const echo = { id, fields };
@@ -228,11 +279,11 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
       || normalizeForVersionCompare(content) !== normalizeForVersionCompare(latestVersionContent));
 
   return (
-    <div className="mx-auto flex h-full min-h-0 w-full max-w-4xl flex-col bg-[var(--app-bg)] p-2 sm:p-4">
-      {/* Top toolbar: back + favorite */}
-      <div className="mb-2 flex shrink-0 items-center gap-2 sm:mb-3">
+    <div ref={editorWidth.ref} style={editorWidth.style} className="mx-auto flex h-full min-h-0 w-full max-w-4xl flex-col bg-[var(--app-bg)] p-2 sm:p-4" data-testid="document-editor-content">
+      {/* Top toolbar: preview + title + actions */}
+      <div className="mb-2 flex shrink-0 items-center gap-2 sm:mb-3" data-testid="document-editor-toolbar">
         <button
-          className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--field)] px-3 text-sm text-[var(--text)] hover:bg-[var(--hover)]"
+          className="inline-flex h-9 items-center gap-2 rounded-full px-3 text-sm text-[var(--text)] hover:bg-[var(--hover)]"
           type="button"
           data-testid="doc-back-btn"
           onClick={onBackToPreview}
@@ -240,44 +291,75 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
           <ArrowLeft className="h-4 w-4" />
           {t("document:back")}
         </button>
-        <span className="ml-auto text-xs text-[var(--muted)]">{t("document:charCount", { count: charCount })}</span>
-        <button
-          className={`grid h-9 w-9 place-items-center rounded-full ${isFavorite ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "bg-[var(--field)] text-[var(--muted)] hover:text-[var(--text)]"}`}
-          type="button"
-          data-testid="doc-favorite-btn"
-          role="switch"
-          aria-checked={isFavorite}
-          aria-label={isFavorite ? t("document:unfavorite") : t("document:favorite")}
-          onClick={handleToggleFavorite}
-        >
-          <Star className="h-4 w-4" fill={isFavorite ? "currentColor" : "none"} />
-        </button>
-      </div>
-
-      {/* Editor */}
-      <article className="flex min-h-0 flex-1 flex-col rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3 sm:rounded-3xl sm:p-4">
         <input
-          className="app-editor-title mb-2 w-full bg-transparent text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
+          className="app-editor-title min-w-0 flex-1 bg-transparent text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
           type="text"
           data-testid="doc-title-input"
           value={title}
           onChange={(e) => handleTitleChange(e.currentTarget.value)}
           placeholder={t("document:titlePlaceholder")}
         />
-        <textarea
-          className="mb-3 max-h-24 min-h-12 w-full resize-y rounded-xl border border-transparent bg-[var(--field)] px-3 py-2 text-sm leading-relaxed text-[var(--muted)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:text-[var(--text)]"
-          data-testid="doc-summary-input"
-          value={summary}
-          onChange={(e) => handleSummaryChange(e.currentTarget.value)}
-          placeholder={t("document:summaryPlaceholder")}
-          rows={2}
-        />
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <Suspense fallback={<div className="flex h-full items-center justify-center text-[var(--muted)]"><Loader2 className="mr-2 h-4 w-4 animate-spin" />{t("document:loadingEditor")}</div>}>
-            <VditorEditor initialValue={content} onChange={handleContentChange} theme={resolveTheme(theme)} lang={getVditorLang()} />
-          </Suspense>
+        <div className="flex shrink-0 items-center gap-1" data-testid="document-editor-actions">
+          <ContentWidthControl compact testId="document-editor-content-width-control" />
+          <DocumentOutlineToggle
+            visible={showDocumentOutline}
+            onToggle={() => updateSetting("showDocumentOutline", !showDocumentOutline)}
+            ariaLabel={t(showDocumentOutline ? "document:sidebar.hide" : "document:sidebar.show")}
+          />
+          <button
+            className={`grid h-9 w-9 place-items-center rounded-full ${isFavorite ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "bg-transparent text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"}`}
+            type="button"
+            data-testid="doc-favorite-btn"
+            role="switch"
+            aria-checked={isFavorite}
+            aria-label={isFavorite ? t("document:unfavorite") : t("document:favorite")}
+            onClick={handleToggleFavorite}
+          >
+            <Star className="h-4 w-4" fill={isFavorite ? "currentColor" : "none"} />
+          </button>
         </div>
-      </article>
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto lg:flex-row lg:overflow-hidden">
+        {/* Editor */}
+        <article className="flex min-h-[24rem] min-w-0 flex-col rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3 sm:rounded-3xl sm:p-4 lg:min-h-0 lg:flex-1">
+          <div ref={editorViewportRef} className="min-h-0 flex-1 overflow-hidden">
+            <Suspense fallback={<div className="flex h-full items-center justify-center text-[var(--muted)]"><Loader2 className="mr-2 h-4 w-4" />{t("document:loadingEditor")}</div>}>
+              <VditorEditor ref={editorRef} initialValue={content} onChange={handleContentChange} theme={resolveTheme(theme)} lang={getVditorLang()} />
+            </Suspense>
+          </div>
+        </article>
+
+        {/* Summary and outline */}
+        {showDocumentOutline && <aside className="flex min-h-0 min-w-0 flex-col gap-3 lg:sticky lg:top-0 lg:h-full lg:w-[18rem] lg:shrink-0" data-testid="document-editor-sidebar">
+          <section className="shrink-0 rounded-2xl border border-[var(--line)] bg-transparent p-3">
+            <label className="mb-2 block text-sm font-semibold text-[var(--text)]" htmlFor="doc-summary-input">
+              {t("document:summaryLabel")}
+            </label>
+            <textarea
+              id="doc-summary-input"
+              className="min-h-24 w-full resize-y rounded-xl border border-transparent bg-transparent px-3 py-2 text-sm leading-relaxed text-[var(--text)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent)]"
+              data-testid="doc-summary-input"
+              value={summary}
+              onChange={(e) => handleSummaryChange(e.currentTarget.value)}
+              placeholder={t("document:summaryPlaceholder")}
+              rows={4}
+            />
+          </section>
+          <DocumentOutline
+            headings={outline}
+            visible
+            onToggle={() => updateSetting("showDocumentOutline", false)}
+            activeIndex={activeHeadingIndex}
+            onSelect={(index) => {
+              setActiveHeadingIndex(index);
+              editorRef.current?.scrollToHeading(index);
+            }}
+            showToggle={false}
+            className="lg:min-h-0 lg:flex-1"
+          />
+        </aside>}
+      </div>
 
       {/* Bottom status bar */}
       <div className="mt-2 flex shrink-0 flex-wrap items-center justify-between gap-2 px-1 text-xs text-[var(--muted)] safe-area-inset-bottom">

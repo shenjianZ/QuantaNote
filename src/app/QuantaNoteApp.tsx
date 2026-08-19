@@ -31,6 +31,7 @@ import type { AppPage, Item } from "../types";
 import i18n from "../i18n";
 import "../styles/themes.css";
 import "../styles/global.css";
+import "../styles/markdown.css";
 
 function getEmptyItem(): Item {
     return {

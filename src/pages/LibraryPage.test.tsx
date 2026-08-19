@@ -7,6 +7,7 @@ import { useItemStore } from "../stores/itemStore";
 import { useAttachmentStore } from "../stores/attachmentStore";
 import { useTagStore } from "../stores/tagStore";
 import { useSearchStore } from "../stores/searchStore";
+import { useSettingsStore } from "../stores/settingsStore";
 import { MOBILE_BACK_EVENT } from "../utils/platform";
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({
@@ -32,6 +33,9 @@ function makeProps(overrides = {}) {
 
 function setupStores() {
   useAppStore.setState({ theme: "light" });
+  useSettingsStore.setState((state) => ({
+    settings: { ...state.settings, contentWidthProgress: 0, showDocumentOutline: true },
+  }));
   useItemStore.setState({
     selectedItem: null,
     deleteItem: vi.fn(async () => {}),
@@ -92,6 +96,21 @@ describe("LibraryPage", () => {
     expect(screen.queryByText("Normal Note")).not.toBeInTheDocument();
   });
 
+  it("uses an underline to indicate the active library tab", async () => {
+    const props = makeProps();
+    const { user } = setup(<LibraryPage {...props} />);
+    const recentTab = screen.getByTestId("library-tab-recent");
+    const pinnedTab = screen.getByTestId("library-tab-pinned");
+
+    expect(recentTab).toHaveClass("border-b-2", "border-[var(--accent)]");
+    expect(pinnedTab).toHaveClass("border-b-2", "border-transparent");
+
+    await user.click(pinnedTab);
+
+    expect(pinnedTab).toHaveClass("border-b-2", "border-[var(--accent)]");
+    expect(recentTab).toHaveClass("border-b-2", "border-transparent");
+  });
+
   it("selects item on click and opens reader", async () => {
     const props = makeProps();
     const { user } = setup(<LibraryPage {...props} />);
@@ -117,6 +136,9 @@ describe("LibraryPage", () => {
 
     await user.click(screen.getByText("Note A"));
     expect(screen.getByTestId("reader-drawer")).toBeInTheDocument();
+    expect(screen.getByTestId("reader-content-width-control")).toBeInTheDocument();
+    expect(screen.getByTestId("reader-preview-layout")).toBeInTheDocument();
+    expect(screen.getByTestId("reader-document-outline-toggle")).toBeInTheDocument();
 
     const event = new Event(MOBILE_BACK_EVENT, { cancelable: true });
     window.dispatchEvent(event);

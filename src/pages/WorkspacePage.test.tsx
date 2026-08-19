@@ -29,6 +29,11 @@ vi.mock("../components/editor/VditorEditor", () => ({
 }));
 
 describe("WorkspacePage", () => {
+  it("does not show the content width control", () => {
+    setup(<WorkspacePage onQuickCreate={vi.fn()} />);
+    expect(screen.queryByTestId("workspace-content-width-control")).not.toBeInTheDocument();
+  });
+
   it("does not submit empty content", async () => {
     const onQuickCreate = vi.fn().mockResolvedValue(undefined);
     const { user } = setup(<WorkspacePage onQuickCreate={onQuickCreate} />);

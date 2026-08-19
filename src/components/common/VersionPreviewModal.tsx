@@ -1,8 +1,13 @@
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Modal } from "./Modal";
-import { MarkdownRenderer } from "./MarkdownRenderer";
+import { MarkdownPreviewWithOutline } from "./MarkdownPreviewWithOutline";
+import { ContentWidthControl } from "./ContentWidthControl";
+import { DocumentOutlineToggle } from "../editor/DocumentOutline";
 import { getVditorLang } from "../../utils/vditorConfig";
+import { useSettingsStore } from "../../stores/settingsStore";
+import { useViewportContentWidth } from "../../hooks/useResponsiveContentWidth";
+import { CONTENT_WIDTH_OUTLINE_LAYOUT, CONTENT_WIDTH_PREVIEW_BASE } from "../../utils/contentWidth";
 import type { VersionDto } from "../../types";
 
 interface VersionPreviewModalProps {
@@ -17,6 +22,14 @@ export function VersionPreviewModal({ open, version, onClose, onRestore, theme }
   const { t } = useTranslation(["editor"]);
   const [confirming, setConfirming] = useState(false);
   const confirmingRef = useRef(false);
+  const contentWidthProgress = useSettingsStore((s) => s.settings.contentWidthProgress);
+  const showDocumentOutline = useSettingsStore((s) => s.settings.showDocumentOutline);
+  const updateSetting = useSettingsStore((s) => s.updateSetting);
+  const previewWidth = useViewportContentWidth(
+    CONTENT_WIDTH_PREVIEW_BASE + (showDocumentOutline ? CONTENT_WIDTH_OUTLINE_LAYOUT : 0),
+    contentWidthProgress,
+    32,
+  );
 
   if (!version) return null;
 
@@ -38,12 +51,33 @@ export function VersionPreviewModal({ open, version, onClose, onRestore, theme }
   }
 
   return (
-    <Modal open={open} onClose={handleClose} title={t("editor:versionPreview.title", { name: version.name || `v${version.version_number}` })} maxWidth="max-w-2xl">
+    <Modal
+      open={open}
+      onClose={handleClose}
+      title={t("editor:versionPreview.title", { name: version.name || `v${version.version_number}` })}
+      maxWidth="max-w-2xl"
+      dialogStyle={previewWidth.style}
+      headerExtra={(
+        <>
+          <ContentWidthControl compact testId="version-preview-content-width-control" />
+          <DocumentOutlineToggle
+            visible={showDocumentOutline}
+            onToggle={() => updateSetting("showDocumentOutline", !showDocumentOutline)}
+            testId="version-preview-outline-toggle"
+          />
+        </>
+      )}
+    >
       {version.description && (
         <p className="mb-3 text-sm text-[var(--muted)]">{version.description}</p>
       )}
-      <div className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4">
-        <MarkdownRenderer content={version.content} theme={theme} lang={getVditorLang()} />
+      <div className="min-w-0">
+        <MarkdownPreviewWithOutline
+          content={version.content}
+          theme={theme}
+          lang={getVditorLang()}
+          testId="version-preview-layout"
+        />
       </div>
       <div className="mt-4 flex justify-end gap-2">
         <button

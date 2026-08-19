@@ -23,4 +23,14 @@ describe("Modal", () => {
     expect(event.defaultPrevented).toBe(true);
     expect(dispatched).toBe(false);
   });
+
+  it("applies the responsive max width class", () => {
+    setup(
+      <Modal open={true} onClose={vi.fn()} title="宽度测试" maxWidth="max-w-lg">
+        <p>弹窗内容</p>
+      </Modal>,
+    );
+
+    expect(screen.getByRole("dialog", { name: "宽度测试" })).toHaveClass("sm:max-w-lg");
+  });
 });

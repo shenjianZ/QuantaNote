@@ -6,11 +6,7 @@ import i18n from "../i18n";
 import { useItemStore } from "./itemStore";
 import { useToastStore } from "./toastStore";
 import { isMobile } from "../utils/platform";
-import {
-    DEFAULT_MARKDOWN_STYLE,
-    normalizeMarkdownStyle,
-    type MarkdownStylePreset,
-} from "../utils/markdownStyle";
+import { clampContentWidthProgress } from "../utils/contentWidth";
 import {
     getDbPath,
     setAutostart,
@@ -55,8 +51,9 @@ export interface AppSettings {
     fontFamily: string;
     fontMono: string;
     fontSize: number;
+    contentWidthProgress: number;
+    showDocumentOutline: boolean;
     accentColor: string;
-    markdownStyle: MarkdownStylePreset;
     customAccentColors: CustomColor[];
     minimizeToTray: boolean;
     closeKeepRunning: boolean;
@@ -81,8 +78,9 @@ const DEFAULTS: AppSettings = {
     fontFamily: "Noto Sans SC",
     fontMono: "JetBrains Mono",
     fontSize: isMobile() ? 14 : 15,
+    contentWidthProgress: 0,
+    showDocumentOutline: true,
     accentColor: "#386c5f",
-    markdownStyle: DEFAULT_MARKDOWN_STYLE,
     customAccentColors: [],
     minimizeToTray: true,
     closeKeepRunning: false,
@@ -108,7 +106,7 @@ const AVAILABLE_MONO_FAMILIES = new Set([
     "monospace",
 ]);
 
-function normalizeSettings(settings: AppSettings): AppSettings {
+export function normalizeSettings(settings: AppSettings): AppSettings {
     const locale = settings.locale === "zh-CN" ? "zh-CN" : "en";
     return {
         fontFamily: AVAILABLE_FONT_FAMILIES.has(settings.fontFamily)
@@ -118,8 +116,11 @@ function normalizeSettings(settings: AppSettings): AppSettings {
             ? settings.fontMono
             : DEFAULTS.fontMono,
         fontSize: Math.min(18, Math.max(14, Number(settings.fontSize) || DEFAULTS.fontSize)),
+        contentWidthProgress: clampContentWidthProgress(settings.contentWidthProgress),
+        showDocumentOutline: typeof settings.showDocumentOutline === "boolean"
+            ? settings.showDocumentOutline
+            : DEFAULTS.showDocumentOutline,
         accentColor: settings.accentColor,
-        markdownStyle: normalizeMarkdownStyle(settings.markdownStyle),
         customAccentColors: Array.isArray(settings.customAccentColors)
             ? settings.customAccentColors
             : DEFAULTS.customAccentColors,
@@ -238,7 +239,6 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
 
 function applySettings(settings: AppSettings) {
     const root = document.documentElement;
-    root.dataset.markdownStyle = settings.markdownStyle;
     const sansStack =
         settings.fontFamily === "system-ui"
             ? "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
@@ -296,6 +296,7 @@ function applySettings(settings: AppSettings) {
         `calc(${settings.fontSize}px + 3px)`,
     );
     root.style.setProperty("--accent", settings.accentColor);
+    root.style.setProperty("--content-width-progress", String(settings.contentWidthProgress));
     const rgb = hexToRgb(settings.accentColor);
     if (rgb) {
         root.style.setProperty(
@@ -421,25 +422,28 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     },
 
     updateSetting: async (key, value) => {
-        const settings = { ...get().settings, [key]: value };
+        const normalizedValue = key === "contentWidthProgress"
+            ? clampContentWidthProgress(value)
+            : value;
+        const settings = { ...get().settings, [key]: normalizedValue };
         persist(settings);
         applySettings(settings);
         set({ settings });
-        emitTauriEvent("quantanote-settings-changed", { key, value }).catch(() => {});
+        emitTauriEvent("quantanote-settings-changed", { key, value: normalizedValue }).catch(() => {});
 
         if (key === "locale") {
-            i18n.changeLanguage(value as string);
+            i18n.changeLanguage(normalizedValue as string);
         }
 
         // 同步到 Rust 端
         if (key === "autostart") {
             try {
-                await setAutostart(value as boolean);
+                await setAutostart(normalizedValue as boolean);
                 useToastStore
                     .getState()
                     .addToast(
                         "success",
-                        value ? i18n.t("common:toast.autostartEnabled") : i18n.t("common:toast.autostartDisabled"),
+                        normalizedValue ? i18n.t("common:toast.autostartEnabled") : i18n.t("common:toast.autostartDisabled"),
                     );
             } catch {
                 useToastStore
@@ -456,7 +460,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
                     .getState()
                     .addToast(
                         "success",
-                        value
+                        normalizedValue
                             ? i18n.t("common:toast.trayEnabled")
                             : i18n.t("common:toast.trayDisabled"),
                     );
@@ -475,7 +479,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
                     .getState()
                     .addToast(
                         "success",
-                        value
+                        normalizedValue
                             ? i18n.t("common:toast.closeTrayEnabled")
                             : i18n.t("common:toast.closeTrayDisabled"),
                     );
@@ -487,14 +491,20 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         } else if (key === "floatingBall") {
             window.dispatchEvent(
                 new CustomEvent("quantanote:floating-ball-toggle", {
-                    detail: { enabled: value },
+                    detail: { enabled: normalizedValue },
                 }),
             );
         }
     },
 
     updateSettings: (partial) => {
-        const settings = { ...get().settings, ...partial };
+        const normalizedPartial = partial.contentWidthProgress === undefined
+            ? partial
+            : {
+                ...partial,
+                contentWidthProgress: clampContentWidthProgress(partial.contentWidthProgress),
+            };
+        const settings = { ...get().settings, ...normalizedPartial };
         persist(settings);
         applySettings(settings);
         set({ settings });
