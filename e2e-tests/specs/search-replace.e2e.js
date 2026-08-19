@@ -1,14 +1,40 @@
-import { cleanupAll, seedItem } from "../helpers/commands.js";
+import { cleanupAll, getItemById, seedItem } from "../helpers/commands.js";
 import { pause, observePause } from "../helpers/config.js";
 import TopBar from "../helpers/page-objects/TopBar.js";
 import LibraryPage from "../helpers/page-objects/LibraryPage.js";
 import DocumentEditorPage from "../helpers/page-objects/DocumentEditorPage.js";
 import SearchReplaceBar from "../helpers/page-objects/SearchReplaceBar.js";
+import { waitForVditorReady } from "../helpers/waits.js";
+
+async function completeInitialLanguageSetup() {
+    await browser.waitUntil(
+        async () => browser.execute(() => {
+            const hasNavigation = Boolean(document.querySelector("[data-testid='nav-library']"));
+            const hasLanguageSetup = Array.from(document.querySelectorAll("button")).some((button) => {
+                return /开始使用|Get Started/.test(button.textContent || "");
+            });
+            return hasNavigation || hasLanguageSetup;
+        }),
+        { timeout: 10000, timeoutMsg: "Application did not reach the main shell or language setup" },
+    );
+
+    const continueButton = await $("//button[contains(., '开始使用') or contains(., 'Get Started')]");
+    if (await continueButton.isExisting()) {
+        const chineseButton = await $("//button[contains(., '简体中文')]");
+        if (await chineseButton.isExisting()) await chineseButton.click();
+        await continueButton.click();
+        await browser.waitUntil(
+            async () => browser.execute(() => Boolean(document.querySelector("[data-testid='nav-library']"))),
+            { timeout: 10000, timeoutMsg: "Language setup did not transition to the main shell" },
+        );
+    }
+}
 
 describe("Search and replace bar", () => {
     let testItem;
 
     before(async () => {
+        await completeInitialLanguageSetup();
         await cleanupAll();
         testItem = await seedItem({
             title: "搜索替换测试",
@@ -17,6 +43,7 @@ describe("Search and replace bar", () => {
         await TopBar.navLibrary();
         await LibraryPage.clickItem("搜索替换测试");
         await LibraryPage.clickEdit();
+        await waitForVditorReady();
     });
 
     after(async () => {
@@ -90,6 +117,35 @@ describe("Search and replace bar", () => {
         const replaceAllBtn = await $("[data-testid='replace-all-btn']");
         expect(await replaceBtn.isDisplayed()).toBe(true);
         expect(await replaceAllBtn.isDisplayed()).toBe(true);
+    });
+
+    it("persists a single replacement to the document", async () => {
+        await SearchReplaceBar.search("AAAA");
+        await SearchReplaceBar.setReplace("单次替换");
+        await SearchReplaceBar.clickReplace();
+
+        await browser.waitUntil(
+            async () => {
+                const item = await getItemById(testItem.id);
+                return item.content.includes("单次替换") && !item.content.includes("AAAA");
+            },
+            { timeout: 5000, timeoutMsg: "Single replacement was not persisted" },
+        );
+    });
+
+    it("persists replace-all changes to the document", async () => {
+        await DocumentEditorPage.setContent("批量 AAA 批量 AAA");
+        await SearchReplaceBar.search("AAA");
+        await SearchReplaceBar.setReplace("全部替换");
+        await SearchReplaceBar.clickReplaceAll();
+
+        await browser.waitUntil(
+            async () => {
+                const item = await getItemById(testItem.id);
+                return item.content.trim() === "批量 全部替换 批量 全部替换";
+            },
+            { timeout: 5000, timeoutMsg: "Replace-all changes were not persisted" },
+        );
     });
 
     it("close button closes the search bar", async () => {

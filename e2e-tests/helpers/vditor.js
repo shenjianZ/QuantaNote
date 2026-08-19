@@ -53,6 +53,10 @@ export async function getVditorText(containerSel = DEFAULT_CONTAINER) {
 /** 通过 browser.execute 直接设置 Vditor 的值 */
 export async function setVditorValue(markdown, containerSel = DEFAULT_CONTAINER) {
   await waitForVditorReady(containerSel);
+  const expectedProbe = markdown
+    .replace(/[`*_#>|()[\]!~=-]/g, " ")
+    .split(/\s+/)
+    .find(Boolean) ?? "";
   await browser.execute((sel, value) => {
     const root = document.querySelector(sel);
     const container = root?.classList?.contains("vditor-container")
@@ -75,9 +79,34 @@ export async function setVditorValue(markdown, containerSel = DEFAULT_CONTAINER)
     if (ce) {
       if (!updatedByInstance) {
         ce.textContent = value;
+        ce.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: value }));
       }
-      ce.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: value }));
     }
     vditorInstance?.options?.input?.(value);
   }, containerSel, markdown);
+
+  let repairAttempts = 0;
+  await browser.waitUntil(
+    async () => browser.execute((sel, value, probe, shouldRepair) => {
+      const root = document.querySelector(sel);
+      const container = root?.classList?.contains("vditor-container")
+        ? root
+        : root?.querySelector(".vditor-container");
+      const vditorInstance = container?.__vditor;
+      const normalize = (text) => text.replace(/\r\n/g, "\n").trim();
+      const currentValue = normalize(vditorInstance?.getValue?.() ?? "");
+      const valueMatches = probe ? currentValue.includes(probe) : currentValue === normalize(value);
+
+      if (!valueMatches && shouldRepair && vditorInstance?.setValue) {
+        try {
+          vditorInstance.setValue(value);
+          vditorInstance.options?.input?.(value);
+        } catch {
+          // 下一次轮询继续检查，避免测试夹具吞掉真实的渲染状态。
+        }
+      }
+      return valueMatches;
+    }, containerSel, markdown, expectedProbe, repairAttempts++ < 3),
+    { timeout: 3000, timeoutMsg: "Vditor value was not rendered consistently" },
+  );
 }

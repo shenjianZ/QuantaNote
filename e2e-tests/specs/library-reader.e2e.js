@@ -55,6 +55,20 @@ describe("Library reader and item actions", () => {
         "```ts",
         "const answer = 42;",
         "```",
+        "",
+        "Markdown",
+        ": 一种轻量级标记语言。",
+        "",
+        "```mermaid",
+        "graph TD",
+        "  A[开始] --> B[结束]",
+        "```",
+        "",
+        "```flowchart",
+        "st=>start: 开始",
+        "e=>end: 结束",
+        "st->e",
+        "```",
       ].join("\n"),
     });
     pinnedItem = await seedItem({ title: "置顶笔记", content: "置顶内容", pinned: true });
@@ -112,9 +126,17 @@ describe("Library reader and item actions", () => {
 
     await browser.waitUntil(
       async () => {
-        return browser.execute(() => Boolean(document.querySelector("[data-testid='reader-drawer'] .markdown-preview .markdown-code-block")));
+        return browser.execute(() => {
+          const root = document.querySelector("[data-testid='reader-drawer'] .markdown-preview");
+          return Boolean(
+            root?.querySelector(".markdown-code-block") &&
+            root?.querySelector("dl dt") &&
+            root?.querySelector(".markdown-diagram-block[data-language='mermaid'] svg") &&
+            root?.querySelector(".markdown-diagram-block[data-language='flowchart'] svg"),
+          );
+        });
       },
-      { timeout: 3000, timeoutMsg: "Rich markdown preview was not rendered" },
+      { timeout: 8000, timeoutMsg: "Rich markdown preview or diagrams were not rendered" },
     );
 
     const preview = await browser.execute(() => {
@@ -124,6 +146,9 @@ describe("Library reader and item actions", () => {
         callout: root?.querySelector(".markdown-callout--tip")?.textContent ?? "",
         task: root?.querySelector(".markdown-task-box.is-checked") !== null,
         code: root?.querySelector(".markdown-code-block code.hljs")?.textContent ?? "",
+        definition: root?.querySelector("dl dt")?.textContent ?? "",
+        mermaid: root?.querySelector(".markdown-diagram-block[data-language='mermaid'] svg") !== null,
+        flowchart: root?.querySelector(".markdown-diagram-block[data-language='flowchart'] svg") !== null,
       };
     });
 
@@ -131,6 +156,9 @@ describe("Library reader and item actions", () => {
     expect(preview.callout).toContain("这是一条阅读提示");
     expect(preview.task).toBe(true);
     expect(preview.code).toContain("const answer = 42;");
+    expect(preview.definition).toContain("Markdown");
+    expect(preview.mermaid).toBe(true);
+    expect(preview.flowchart).toBe(true);
   });
 
   it("closing reader drawer", async () => {

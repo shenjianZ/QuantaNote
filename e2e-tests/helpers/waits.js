@@ -40,6 +40,7 @@ export async function waitForVditorReady(containerSelector = ".vditor-container"
           ? root
           : root?.querySelector(".vditor-container");
         return container?.getAttribute("data-vditor-ready") === "true"
+          && Boolean(container.__vditor)
           && Boolean(container.querySelector(".vditor-ir [contenteditable]"));
       }, containerSelector);
     },

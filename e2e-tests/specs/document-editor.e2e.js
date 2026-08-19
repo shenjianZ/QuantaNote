@@ -66,6 +66,136 @@ describe("Document editor", () => {
     expect(updated.summary).toBe("手动修改后的摘要");
   });
 
+  it("inserts a table at the editor selection from the toolbar", async () => {
+    await DocumentEditorPage.setContent("表格插入位置");
+    await browser.execute(() => {
+      const editor = document.querySelector(".vditor-ir [contenteditable]");
+      if (!editor) throw new Error("Vditor editor not found");
+      editor.focus();
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      range.collapse(false);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    });
+
+    await $("button[data-type='quantanote-table']").click();
+    await browser.waitUntil(
+      async () => browser.execute(() => Boolean(document.querySelector(".quantanote-vditor-table-panel"))),
+      { timeout: 2000, timeoutMsg: "Table insertion panel did not open" },
+    );
+    const inputs = await $$(".quantanote-vditor-table-panel input");
+    await inputs[0].clearValue();
+    await inputs[0].setValue("2");
+    await inputs[1].clearValue();
+    await inputs[1].setValue("2");
+    await $(".quantanote-vditor-table-panel button.primary").click();
+
+    await browser.waitUntil(
+      async () => browser.execute(() => {
+        const table = document.querySelector(".vditor-ir table");
+        return table?.querySelectorAll("tr").length === 2 && table?.querySelector("tr")?.cells.length === 2;
+      }),
+      { timeout: 3000, timeoutMsg: "Inserted table was not rendered at the editor selection" },
+    );
+  });
+
+  it("adjusts an existing table from the toolbar", async () => {
+    await DocumentEditorPage.setContent("| A | B |\n| --- | --- |\n| C | D |");
+    await browser.waitUntil(
+      async () => browser.execute(() => Boolean(document.querySelector(".vditor-ir table tbody td"))),
+      { timeout: 8000, timeoutMsg: "Existing table was not rendered" },
+    );
+    await browser.execute(() => {
+      const cell = document.querySelector(".vditor-ir table tbody td");
+      const editor = document.querySelector(".vditor-ir [contenteditable]");
+      if (!cell || !editor) throw new Error("Existing table cell not found");
+      editor.focus();
+      const range = document.createRange();
+      range.selectNodeContents(cell);
+      range.collapse(false);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    });
+
+    const tableToolbarButton = await $("button[data-type='quantanote-table']");
+    await tableToolbarButton.moveTo();
+    await browser.waitUntil(
+      async () => (await tableToolbarButton.getAttribute("aria-label")) === "调整表格",
+      { timeout: 2000, timeoutMsg: "Existing table toolbar tip did not change to edit mode" },
+    );
+    await tableToolbarButton.click();
+    await browser.waitUntil(
+      async () => browser.execute(() => document.querySelector(".quantanote-vditor-table-panel")?.textContent?.includes("调整表格") ?? false),
+      { timeout: 2000, timeoutMsg: "Existing table edit panel did not open" },
+    );
+    expect(await $("button[data-table-align='center']").isDisplayed()).toBe(true);
+    await $("button[data-table-align='center']").click();
+
+    const inputs = await $$(".quantanote-vditor-table-panel input");
+    await inputs[0].clearValue();
+    await inputs[0].setValue("3");
+    await inputs[1].clearValue();
+    await inputs[1].setValue("3");
+    await $(".quantanote-vditor-table-panel button.primary").click();
+
+    await browser.waitUntil(
+      async () => browser.execute(() => {
+        const table = document.querySelector(".vditor-ir table");
+        return table?.querySelectorAll("tr").length === 3 && table?.querySelector("tr")?.cells.length === 3;
+      }),
+      { timeout: 3000, timeoutMsg: "Existing table dimensions were not updated" },
+    );
+    await DocumentEditorPage.waitForSaved(3000);
+    const updated = await getItemById(testItem.id);
+    expect(updated.content).toMatch(/\|\s*:-:\s*\|/);
+
+    await browser.execute(() => {
+      const cell = document.querySelector(".vditor-ir table tbody td");
+      const editor = document.querySelector(".vditor-ir [contenteditable]");
+      if (!cell || !editor) throw new Error("Adjusted table cell not found");
+      editor.focus();
+      const range = document.createRange();
+      range.selectNodeContents(cell);
+      range.collapse(false);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    });
+    await browser.keys(["Control", "z"]);
+    await browser.waitUntil(
+      async () => browser.execute(() => {
+        const table = document.querySelector(".vditor-ir table");
+        return table?.querySelectorAll("tr").length === 2 && table?.querySelector("tr")?.cells.length === 2;
+      }),
+      { timeout: 3000, timeoutMsg: "Table adjustment was not undoable" },
+    );
+
+    await browser.keys(["Control", "y"]);
+    await browser.waitUntil(
+      async () => browser.execute(() => {
+        const table = document.querySelector(".vditor-ir table");
+        return table?.querySelectorAll("tr").length === 3 && table?.querySelector("tr")?.cells.length === 3;
+      }),
+      { timeout: 3000, timeoutMsg: "Table adjustment was not redoable" },
+    );
+  });
+
+  it("keeps the summary textarea fixed-size", async () => {
+    const style = await browser.execute(() => {
+      const input = document.querySelector("[data-testid='doc-summary-input']");
+      if (!input) throw new Error("Summary input not found");
+      const computed = window.getComputedStyle(input);
+      return { height: computed.height, minHeight: computed.minHeight, maxHeight: computed.maxHeight, resize: computed.resize };
+    });
+
+    expect(style.height).toBe(style.minHeight);
+    expect(style.height).toBe(style.maxHeight);
+    expect(style.resize).toBe("none");
+  });
+
   it("shows and toggles the live document outline", async () => {
     await DocumentEditorPage.clearContent();
     await browser.waitUntil(
