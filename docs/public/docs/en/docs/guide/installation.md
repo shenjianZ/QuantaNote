@@ -1,120 +1,118 @@
 ---
 title: Installing QuantaNote
-description: Download and install QuantaNote on Windows, macOS, and Linux
+description: Download and install QuantaNote v0.4.0 on Windows, macOS, Linux, and Android
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-19
 ---
 
 # Installing QuantaNote
 
+QuantaNote v0.4.0 provides desktop packages for Windows, macOS, and Linux, plus an ARM64 Android APK. All release assets are published on [GitHub Releases](https://github.com/shenjianZ/QuantaNote/releases).
+
 ## System Requirements
 
-Before installing QuantaNote, make sure your device meets the following minimum requirements:
+| Platform | Minimum version | Architecture |
+|----------|-----------------|--------------|
+| Windows | Windows 10 1803+ | x64 |
+| macOS | macOS 10.15+ | Intel / Apple Silicon |
+| Linux | Ubuntu 20.04, Fedora 36, or another major distribution | x64 |
+| Android | Android 7.0 / API 24+ | ARM64 |
 
-| Platform | Minimum Version | Architecture |
-|----------|----------------|--------------|
-| Windows | Windows 10 (1803+) | x64 |
-| macOS | macOS 10.15 (Catalina)+ | x64 / Apple Silicon |
-| Linux | Major distributions (Ubuntu 20.04+, Fedora 36+, etc.) | x64 |
+Windows and macOS packages are typically about 20–40 MB; the Linux AppImage is larger. The data directory grows as notes, attachments, and version history accumulate.
 
-> **Disk Space**: The installer is approximately 20-40 MB, and the installed application takes up about 80-120 MB. Disk usage will gradually increase as you accumulate data and attachments over time.
+## Download Assets
 
-## Download and Install
+Choose the asset matching your platform and architecture:
 
-All QuantaNote releases are published on the GitHub Releases page:
+| Platform | Recommended file |
+|----------|------------------|
+| Windows | `QuantaNote-v0.4.0-windows-x64.msi` |
+| Windows portable | `QuantaNote-v0.4.0-windows-x64.exe` |
+| macOS Apple Silicon | `QuantaNote-v0.4.0-macos-aarch64.dmg` |
+| macOS Intel | `QuantaNote-v0.4.0-macos-x64.dmg` |
+| Universal Linux | `QuantaNote-v0.4.0-linux-x64.AppImage` |
+| Ubuntu/Debian | `QuantaNote-v0.4.0-linux-x64.deb` |
+| Fedora/RHEL | `QuantaNote-v0.4.0-linux-x64.rpm` |
+| Android | `QuantaNote-v0.4.0-android-arm64-v8a.apk` |
 
-👉 [GitHub Releases Download Page](https://github.com/shenjianZ/QuantaNote/releases)
+The `.sig` files next to desktop packages and `latest.json` are used for updater signature verification and do not need to be opened manually.
 
-### Windows
+## Windows
 
-1. Download the latest `.msi` installer (recommended) or `.exe` installer from the Releases page.
-2. Double-click the downloaded installer to run it.
-3. If Windows SmartScreen shows a security warning, click "More info" → "Run anyway".
-4. Follow the installation wizard to complete the installation.
-5. After installation, launch QuantaNote from the Start menu or desktop shortcut.
+1. Download the `.msi` or `.exe` package.
+2. Double-click the installer and follow the wizard.
+3. If Windows SmartScreen appears, confirm that the file came from the official Release and choose **More info** → **Run anyway**.
+4. Launch QuantaNote from the Start menu or desktop shortcut.
 
-> **Portable Version**: For a no-install experience, download the `.exe` portable version. Extract and run it directly — no administrator privileges required.
+The `.exe` can also be used as a portable build. The packaged Windows application uses the native clipboard path first, so copied text can appear in Clipboard History with `Win + V` when it is enabled.
 
-### macOS
+## macOS
 
-1. Download the latest `.dmg` file from the Releases page.
-2. Double-click to open the `.dmg` file.
-3. Drag the QuantaNote icon to the "Applications" folder.
-4. On first launch, if macOS prompts "Cannot verify the developer", go to "System Settings" → "Privacy & Security" → click "Open Anyway".
+1. Download `macos-aarch64` for Apple Silicon or `macos-x64` for Intel.
+2. Open the `.dmg` and drag QuantaNote to **Applications**.
+3. If macOS says the developer cannot be verified, open **System Settings** → **Privacy & Security** → **Open Anyway**.
 
-> **Apple Silicon (M1/M2/M3/M4)**: QuantaNote natively supports Apple Silicon — no Rosetta translation needed.
+Current macOS packages may not be notarized by Apple, so the first launch may require manual approval. The Apple Silicon build does not require Rosetta translation.
 
-### Linux
+## Linux
 
-**DEB Package (Ubuntu / Debian):**
+### AppImage
 
 ```bash
-# Install after downloading the .deb package
-sudo dpkg -i quantanote_x.x.x_amd64.deb
+chmod +x QuantaNote-v0.4.0-linux-x64.AppImage
+./QuantaNote-v0.4.0-linux-x64.AppImage
+```
 
-# If missing dependencies are reported, run:
+### Debian/Ubuntu
+
+```bash
+sudo dpkg -i QuantaNote-v0.4.0-linux-x64.deb
 sudo apt-get install -f
 ```
 
-**AppImage (Universal):**
+### Fedora/RHEL
 
 ```bash
-# Add execute permission after downloading the .AppImage file
-chmod +x quantanote_x.x.x_amd64.AppImage
-
-# Run
-./quantanote_x.x.x_amd64.AppImage
+sudo dnf install ./QuantaNote-v0.4.0-linux-x64.rpm
 ```
 
-## First Launch
+If the application does not start, check that WebKit, GTK, and system-tray runtime libraries are installed for your distribution.
 
-When you launch QuantaNote for the first time, the application automatically performs the following initialization:
+## Android
 
-1. **Create Data Directory** — Creates the `~/.quantanote/` directory in your home folder:
-   - Windows: `C:\Users\<YourUsername>\.quantanote\`
-   - macOS: `/Users/<YourUsername>/.quantanote/`
-   - Linux: `/home/<YourUsername>/.quantanote/`
+1. Download `QuantaNote-v0.4.0-android-arm64-v8a.apk`.
+2. Allow the file manager to install apps from this source when Android asks.
+3. Open the APK and complete the installation.
 
-2. **Initialize Database** — Automatically creates the `quanta_note.sqlite` database file and executes schema initialization to create all required tables and indexes:
-   - `items` — Note items table
-   - `tags` — Tags table
-   - `item_tags` — Many-to-many association table between notes and tags
-   - `attachments` — Attachments table
-   - `versions` — Version history table
-   - `items_fts` — FTS5 full-text search virtual table
+You can also install it with ADB:
 
-3. **Configure Database Parameters** — Automatically sets SQLite's WAL journal mode and enables foreign key constraints to ensure data integrity and high performance.
+```bash
+adb install QuantaNote-v0.4.0-android-arm64-v8a.apk
+```
 
-Once initialization is complete, you will see QuantaNote's main interface and can start creating notes immediately.
+The Android release provides an ARM64 APK. Allow the permissions needed for the app's data directory. If a test build with a different signing key is installed, uninstall it only after exporting or backing up your data.
+
+## First Launch and Data Directory
+
+The first launch creates the local data directory and SQLite database automatically:
+
+- Windows: `C:\Users\<username>\.quantanote\`
+- macOS: `~/.quantanote/`
+- Linux: `~/.quantanote/`
+- Android: an application-sandboxed data directory
+
+Uninstalling normally does not remove local data. Export or back up your data before deleting the data directory.
+
+## Automatic Updates
+
+Desktop builds check `latest.json` in GitHub Releases. An update package must pass signature verification before it can be installed. If an update fails, keep the current data directory and download the matching architecture manually from the official Release. See [Troubleshooting](./troubleshooting).
 
 ## Uninstalling
 
-If you need to uninstall QuantaNote, follow these steps:
+- Windows: Settings → Apps → QuantaNote → Uninstall.
+- macOS: Drag the application to the Trash.
+- Linux: Use the distribution package manager; delete an AppImage directly.
+- Android: Uninstall from the system app settings.
 
-### Windows
-
-- Go to "Settings" → "Apps" → find QuantaNote → click "Uninstall"
-- Or use "Programs and Features" in the Control Panel
-
-### macOS
-
-- Open the "Applications" folder and drag QuantaNote to the Trash
-- Or long-press the icon in Launchpad and click the delete button
-
-### Linux
-
-```bash
-# Uninstall DEB package installation
-sudo dpkg --remove quantanote
-
-# For AppImage, simply delete the file
-rm quantanote_x.x.x_amd64.AppImage
-```
-
-> **Data Retention**: Uninstalling QuantaNote does **not** delete your data. All notes, tags, attachments, and settings are preserved in the `~/.quantanote/` directory. If you want to completely remove all data, manually delete that directory:
->
-> ```bash
-> # Caution: deletes all QuantaNote data
-> rm -rf ~/.quantanote/
-> ```
+Uninstalling does not automatically delete data. Back up first, then remove the platform data directory if a complete cleanup is required.

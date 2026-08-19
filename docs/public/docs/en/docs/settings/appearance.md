@@ -3,7 +3,7 @@ title: Appearance Settings
 description: QuantaNote appearance settings including theme mode switching, 12 preset accent colors with custom color picker, and language selection
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-19
 ---
 
 # Appearance Settings
@@ -75,6 +75,18 @@ If the preset colors don't meet your needs, you can add custom accent colors via
 4. Click confirm; the custom color is immediately added to the color list
 
 Custom colors appear in the "Custom" section. Hover over a custom color to reveal a delete button.
+
+## Content Width and Document Outline
+
+Use the content-width control when reading long documents or wide tables:
+
+| Option | Best for |
+|--------|----------|
+| Comfortable | Regular notes and long-form reading |
+| Wide | Tables, code, and technical documents |
+| Custom | Choosing an exact width with the slider |
+
+Document previews also provide an outline panel generated from headings. Click a heading to jump to that section. Width and outline preferences persist and do not recreate the content when you scroll.
 
 ## Language
 

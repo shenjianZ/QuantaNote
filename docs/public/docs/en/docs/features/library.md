@@ -3,7 +3,7 @@ title: Library
 description: Browse, filter, and manage all your notes and items in the QuantaNote Library.
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-19
 ---
 
 # Library
@@ -75,7 +75,7 @@ Each item in the Library supports a set of actions accessible via the card's con
 - **Delete** — Remove the item permanently (with confirmation prompt).
 - **Pin** — Pin the item to the top of the Library for quick access.
 - **Favorite** — Toggle the favorite (star) status of the item.
-- **Copy Content** — Copy the item's Markdown content to the clipboard.
+- **Copy Content** — Copy the item's Markdown content to the system clipboard and show the result.
 - **Manage Tags** — Open the Tag Picker modal to add or remove tags.
 - **Manage Attachments** — Open the Attachment Manager modal to upload or remove files.
 

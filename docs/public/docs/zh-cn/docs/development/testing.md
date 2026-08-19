@@ -3,7 +3,7 @@ title: 测试指南
 description: QuantaNote 的三层测试策略和最佳实践
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-19
 ---
 
 # 测试指南
@@ -150,23 +150,20 @@ cargo test --manifest-path src-tauri/Cargo.toml -- test_create_item
 ### 测试文件组织
 
 ```
-test/
-├── wdio.conf.ts              # WebdriverIO 配置
-├── pageobjects/              # 页面对象
-│   ├── workspace.page.ts     # 工作台页面
-│   ├── library.page.ts       # 记录库页面
-│   └── settings.page.ts      # 设置页面
-├── specs/                    # 测试规格
-│   ├── workspace.spec.ts     # 工作台测试
-│   ├── library.spec.ts       # 记录库测试
-│   └── settings.spec.ts      # 设置测试
-└── helpers/                  # 测试辅助工具
+e2e-tests/
+├── wdio.conf.js              # WebdriverIO 配置
+├── helpers/                  # Page Object 和测试辅助工具
+└── specs/                    # 测试规格
+    ├── document-editor.e2e.js
+    ├── library-reader.e2e.js
+    ├── search-replace.e2e.js
+    └── settings.e2e.js
 ```
 
 ### 编写示例
 
 ```typescript
-// test/pageobjects/workspace.page.ts
+// e2e-tests/helpers/page-objects/DocumentEditorPage.js
 import { Page } from './base.page';
 
 export class WorkspacePage extends Page {
@@ -186,7 +183,7 @@ export class WorkspacePage extends Page {
 ```
 
 ```typescript
-// test/specs/workspace.spec.ts
+// e2e-tests/specs/document-editor.e2e.js
 import { expect } from '@wdio/globals';
 import { WorkspacePage } from '../pageobjects/workspace.page';
 
@@ -210,14 +207,21 @@ describe('Workspace', () => {
 # 运行所有 E2E 测试
 pnpm test:e2e
 
+# 按串行模式运行发布回归测试
+pnpm test:e2e:serial
+
 # 运行特定测试文件
-pnpm test:e2e -- --spec test/specs/workspace.spec.ts
+pnpm test:e2e -- --spec e2e-tests/specs/document-editor.e2e.js
 
 # 指定浏览器
 pnpm test:e2e -- --capabilities.browserName chrome
 ```
 
 > **注意**：E2E 测试需要先构建应用（`pnpm tauri build`），确保测试环境与生产环境一致。
+
+### v0.4.0 发布回归重点
+
+发布前需要覆盖表格插入与调整、Markdown 图表和公式渲染、滚动稳定性、摘要固定尺寸、复制粘贴提示、Windows 原生剪贴板以及内容宽度和文档大纲。
 
 ## 测试最佳实践
 

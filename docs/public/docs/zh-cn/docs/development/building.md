@@ -3,7 +3,7 @@ title: 从源码构建
 description: 了解如何搭建 QuantaNote 本地开发环境，克隆代码仓库并从源码构建项目
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-19
 ---
 
 # 从源码构建
@@ -14,18 +14,19 @@ lastUpdated: 2026-05-03
 
 在构建 QuantaNote 之前，你需要安装以下工具：
 
-- **Node.js 18+** — 前端运行时和包管理基础
+- **Node.js 20.19+（CI 使用 Node.js 22）** — 前端运行时和包管理基础
   ```bash
   # 推荐使用 nvm 管理Node.js版本
-  nvm install 18
-  nvm use 18
-  node --version  # 确认版本 >= 18
+  nvm install 22
+  nvm use 22
+  node --version  # 确认版本 >= 20.19
   ```
 
-- **pnpm 8+** — 包管理器（QuantaNote 仅支持 pnpm）
+- **pnpm 10.33.2** — 包管理器（QuantaNote 仅支持 pnpm）
   ```bash
-  npm install -g pnpm
-  pnpm --version  # 确认版本 >= 8
+  corepack enable
+  corepack prepare pnpm@10.33.2 --activate
+  pnpm --version  # 确认版本为 10.33.2
   ```
 
 - **Rust 工具链** — 后端编译所需
@@ -83,6 +84,8 @@ pnpm dev
 pnpm tauri build
 ```
 
+发布构建还会由 GitHub Actions 在 Windows、macOS Intel/Apple Silicon、Linux 和 Android ARM64 环境中执行。正式发布需要使用签名 Secrets，不能使用本地私钥文件代替 CI Secrets。
+
 此命令会：
 
 1. 执行 TypeScript 类型检查
@@ -111,6 +114,7 @@ cargo check --manifest-path src-tauri/Cargo.toml
 | **Windows** | `.msi` 安装包、`.exe` 可执行文件 |
 | **Linux** | `.deb` Debian 包、`.AppImage` 便携包 |
 | **macOS** | `.dmg` 磁盘映像、`.app` 应用包 |
+| **Android** | ARM64 `.apk` |
 
 构建产物路径示例：
 

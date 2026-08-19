@@ -2,6 +2,8 @@
 
 ## 📥 Download Links
 
+QuantaNote __TAG__ assets are produced by the release workflow after version, signature, and platform checks pass. The workflow publishes the Draft Release automatically; users should select the asset matching their platform and architecture.
+
 | Platform | Architecture | File | Size |
 |----------|--------------|------|------|
 | **Windows** | x64 | [QuantaNote-__TAG__-windows-x64.exe](https://github.com/shenjianZ/QuantaNote/releases/latest/download/QuantaNote-__TAG__-windows-x64.exe) | ~10 MB |
@@ -120,6 +122,12 @@ adb install QuantaNote-__TAG__-android-arm64-v8a.apk
 - **系统要求**：Android 7.0（API 24）及以上
 - **首次安装**：Android 可能会要求授予文件访问权限，请允许以确保笔记数据正常存储
 - **签名变更**：如果之前安装了不同签名的版本，需要先卸载旧版本
+
+Android release assets are ARM64-only. Existing installations must keep using the same signing key for in-place upgrades.
+
+## 🔄 Automatic Updates
+
+Desktop packages use the signed `latest.json` manifest. If signature verification fails, download the matching package from the official Release instead of deleting the local data directory.
 
 ---
 

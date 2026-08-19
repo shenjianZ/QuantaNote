@@ -1,138 +1,116 @@
-# QuantaNote Release 操作手册
+# QuantaNote v0.4.0 发布操作手册
 
-## 发布流程
+## 发布目标
 
-1. 更新 `CHANGELOG.md`，添加新版本内容
-2. 提交代码：`git commit -m "docs: update changelog for v0.2.0"`
-3. 推送：`git push origin master`
-4. 打 Tag：`git tag -a v0.2.0 -m "Release v0.2.0"`
-5. 推送 Tag：`git push origin v0.2.0`（触发 CI）
-6. 等待 CI 构建完成（Windows/Linux/macOS x4 + Android x1）
-7. 在 GitHub Releases 检查 Draft Release，确认包含以下文件：
-   - 桌面端：`.exe`, `.msi`, `.dmg`, `.AppImage`, `.deb`, `.rpm`
-   - Android：`.apk`
-   - 更新清单：`latest.json`
-8. 点击 Publish
+本次发布覆盖 Windows x64、macOS Intel/Apple Silicon、Linux x64、Android ARM64、桌面端自动更新和 QuantaNote Cloud 多架构镜像。
 
-## CHANGELOG.md 格式
+发布使用 `v0.4.0` Tag。Tag 推送后由 GitHub Actions 创建 Draft Release，所有桌面端、Android 和更新清单门禁通过后自动发布；云端镜像在客户端 Release 成功后再推广 `latest`。
 
-```markdown
-## [0.2.0] - 2026-05-15
+## 发布前检查
 
-### Added
-- 新增功能描述
-
-### Fixed
-- 修复问题描述
-
-### Changed
-- 变更描述
+```powershell
+git status --short
+git diff --check
+pnpm install --frozen-lockfile
+pnpm docs:check
+pnpm check
+pnpm test:unit
+pnpm test:rust
+pnpm format:rust:check
+pnpm test:e2e:serial
+pnpm docs:build
+pnpm server:check
 ```
 
-**注意**：版本号不带 `v` 前缀，Tag 带 `v` 前缀。
+确认工作区没有签名私钥、keystore、`.env` 或 `updater.info` 等敏感文件。
 
-## CI 工作原理
+## 版本号
 
-- 触发条件：推送 `v*` Tag
-- Job 1：从 CHANGELOG.md 提取对应版本内容，创建 Draft Release
-- Job 2：并行构建 4 个平台产物
+版本号不带 `v`，Tag 带 `v`：
 
-### CHANGELOG 提取规则
-
-```bash
-sed -n "/^## \[${TAG#v}\]/,/^## \[/p" CHANGELOG.md
+```powershell
+pnpm bump 0.4.0
 ```
 
-匹配 `## [版本号]` 到下一个 `## [` 之间的内容。
+需要确认根 package、site/docs package、Tauri 配置、Cargo、云端 CLI/health、站点下载页和文档页脚全部为 `0.4.0`。
 
-## 构建产物
+## GitHub Actions Secrets
 
-| 平台 | 产物 |
-|------|------|
-| Windows | `.msi` + `.exe` |
-| Linux | `.deb` + `.AppImage` |
-| macOS ARM | `.dmg` + `.app` |
-| macOS x64 | `.dmg` + `.app` |
-| Android | `.apk` (ARM64) |
+桌面端：
 
-## 常见问题
-
-**Tag 推送后未触发 CI**：检查 Tag 格式是否为 `v*`
-
-**CHANGELOG 未提取**：检查格式是否为 `## [版本号] - 日期`
-
-**重新发布**：删除 Tag → 删除 Draft Release → 重新打 Tag 推送
-
-## Android 构建配置
-
-### 所需 GitHub Secrets
-
-| Secret | 说明 |
+| Secret | 用途 |
 |--------|------|
-| `ANDROID_KEYSTORE_BASE64` | Base64 编码的签名 keystore 文件 |
-| `ANDROID_KEYSTORE_PASSWORD` | Keystore 密码 |
-| `ANDROID_KEY_ALIAS` | 签名密钥别名 |
+| `QUANTANOTE_TAURI_UPDATER_PUBLIC_KEY` | 更新器公钥 |
+| `QUANTANOTE_TAURI_SIGNING_PRIVATE_KEY` | 安装包签名私钥 |
+| `QUANTANOTE_TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | 签名密码 |
+
+Android：
+
+| Secret | 用途 |
+|--------|------|
+| `ANDROID_KEYSTORE_BASE64` | Base64 编码的 Android keystore |
+| `ANDROID_KEYSTORE_PASSWORD` | keystore 密码 |
+| `ANDROID_KEY_ALIAS` | 签名别名 |
 | `ANDROID_KEY_PASSWORD` | 签名密钥密码 |
 
-### 首次准备：生成 Keystore 并配置 Secrets
+云端镜像：
 
-#### 第一步：生成 Keystore
+| Secret | 用途 |
+|--------|------|
+| `ALIYUN_REGISTRY` | ACR 地址 |
+| `ALIYUN_NAME_SPACE` | ACR 命名空间 |
+| `ALIYUN_REGISTRY_USER` | ACR 用户名 |
+| `ALIYUN_REGISTRY_PASSWORD` | ACR 密码 |
 
-需要 JDK 环境中的 `keytool` 命令（安装 Android Studio 或 JDK 后自带）。
+任何必需 Secret 缺失都必须阻断发布。私钥只存在 GitHub Secrets，不提交到仓库。
 
-```powershell
-# Windows PowerShell — 在项目根目录执行
-keytool -genkey -v `
-  -keystore release.keystore `
-  -alias quantanote `
-  -keyalg RSA -keysize 2048 `
-  -validity 10000 `
-  -storetype PKCS12 `
-  -dname "CN=QuantaNote, OU=Dev, O=QuantaNote, L=Unknown, ST=Unknown, C=CN"
-```
-
-执行后输入：
-- **keystore 密码**：自定义，妥善保存
-- **密钥密码**：直接回车（与 keystore 密码相同），或设置独立密码
-
-生成 `release.keystore` 文件。**此文件为签名私钥，切勿提交到 Git，请妥善备份。**
-
-#### 第二步：Base64 编码
+## 提交和触发发布
 
 ```powershell
-# Windows PowerShell
-[Convert]::ToBase64String([IO.File]::ReadAllBytes("$PWD\release.keystore"))
+git push origin master
+git tag -a v0.4.0 -m "Release v0.4.0"
+git push origin v0.4.0
 ```
 
-复制输出的长字符串。
+Tag 推送后执行顺序：
 
-#### 第三步：配置 GitHub Secrets
+1. Release 工作流创建 Draft Release。
+2. Windows、Linux、macOS Intel、macOS Apple Silicon 并行构建。
+3. Android 构建 ARM64 APK。
+4. 合并并校验 `latest.json`。
+5. 校验所有安装包、签名、版本和下载链接。
+6. 自动发布 GitHub Release。
+7. 构建云端镜像版本标签并推广 `latest`。
 
-打开仓库 **Settings → Secrets and variables → Actions → New repository secret**，添加：
+## 预期 Release 资产
 
-| Secret 名称 | 填入内容 |
-|-------------|---------|
-| `ANDROID_KEYSTORE_BASE64` | 上一步 Base64 编码输出的字符串 |
-| `ANDROID_KEYSTORE_PASSWORD` | 第一步中设置的 keystore 密码 |
-| `ANDROID_KEY_ALIAS` | `quantanote`（即 `-alias` 参数值） |
-| `ANDROID_KEY_PASSWORD` | 密钥密码（如果设置了独立密码则填独立密码，否则与 keystore 密码相同） |
+```text
+QuantaNote-v0.4.0-windows-x64.exe
+QuantaNote-v0.4.0-windows-x64.msi
+QuantaNote-v0.4.0-macos-aarch64.dmg
+QuantaNote-v0.4.0-macos-x64.dmg
+QuantaNote-v0.4.0-linux-x64.AppImage
+QuantaNote-v0.4.0-linux-x64.deb
+QuantaNote-v0.4.0-linux-x64.rpm
+QuantaNote-v0.4.0-android-arm64-v8a.apk
+latest.json
+```
 
-#### 第四步：验证
+桌面端更新清单必须包含 `windows-x86_64`、`darwin-aarch64`、`darwin-x86_64` 和 `linux-x86_64`，每个平台都要有签名和 URL。
 
-手动触发一次 Android 构建（**Actions → Build Android → Run workflow**），检查是否成功生成签名 APK。
+## 发布后验收
 
-> **CI 签名原理**：工作流自动将 keystore 解码到临时目录并生成 `keystore.properties`，Gradle `signingConfigs.release` 读取该文件完成签名，无需命令行传参。
+- GitHub Release 为非 Draft 状态。
+- 所有资产可下载，`latest.json` 可访问。
+- Windows、macOS、Linux 和 Android 至少各完成一次安装启动验证。
+- 从 `v0.3.0` 升级到 `v0.4.0` 后数据、附件和版本历史保持不变。
+- 自动更新签名校验和下载成功。
+- 云端镜像存在 `v0.4.0` 多架构标签和 `latest` 标签。
+- 文档站和产品站显示 `v0.4.0`。
 
-### Android 构建产物
+## 失败和回滚
 
-| 文件 | 说明 |
-|------|------|
-| `QuantaNote-vX.Y.Z-android-arm64-v8a.apk` | ARM64 签名 APK，支持绝大部分 Android 设备 |
-
-### Android 常见问题
-
-**NDK 未找到**：检查 `sdkmanager "ndk;27.0.12077973"` 是否安装成功，确认 `ANDROID_NDK_HOME` 环境变量
-
-签名通过 `keystore.properties` 文件配置（CI 自动生成），Gradle `signingConfigs.release` 读取该文件完成签名。无需在命令行传递签名参数。
-
-**APK 未生成**：检查 `tauri android init` 是否成功，查看 Gradle 构建日志中的错误信息
+- 构建失败但 Release 尚未公开时，修复后重新运行工作流，不覆盖已发布 Tag。
+- 已公开版本出现严重问题时发布 `v0.4.1`，不移动 `v0.4.0`。
+- 云镜像保留不可变版本标签，只在确认后回退 `latest`。
+- Android 不得更换已有签名密钥，否则用户无法覆盖升级。

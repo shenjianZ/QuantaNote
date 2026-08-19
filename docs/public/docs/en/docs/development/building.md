@@ -3,7 +3,7 @@ title: Building from Source
 description: Learn how to set up a local development environment, clone the repository, and build QuantaNote from source
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-19
 ---
 
 # Building from Source
@@ -14,18 +14,19 @@ This guide will walk you through building QuantaNote from source. Before you beg
 
 Before building QuantaNote, you need to install the following tools:
 
-- **Node.js 18+** — Frontend runtime and package management foundation
+- **Node.js 20.19+ (CI uses Node.js 22)** — Frontend runtime and package management foundation
   ```bash
   # Recommended: use nvm to manage Node.js versions
-  nvm install 18
-  nvm use 18
-  node --version  # Confirm version >= 18
+  nvm install 22
+  nvm use 22
+  node --version  # Confirm version >= 20.19
   ```
 
-- **pnpm 8+** — Package manager (QuantaNote only supports pnpm)
+- **pnpm 10.33.2** — Package manager (QuantaNote only supports pnpm)
   ```bash
-  npm install -g pnpm
-  pnpm --version  # Confirm version >= 8
+  corepack enable
+  corepack prepare pnpm@10.33.2 --activate
+  pnpm --version  # Confirm version 10.33.2
   ```
 
 - **Rust toolchain** — Required for backend compilation
@@ -83,6 +84,8 @@ pnpm dev
 pnpm tauri build
 ```
 
+Release builds also run in GitHub Actions for Windows, macOS Intel/Apple Silicon, Linux, and Android ARM64. Production releases require signing Secrets; local private-key files must not replace CI Secrets.
+
 This command will:
 
 1. Run TypeScript type checking
@@ -111,6 +114,7 @@ After a successful production build, installers are located in `src-tauri/target
 | **Windows** | `.msi` installer, `.exe` executable |
 | **Linux** | `.deb` Debian package, `.AppImage` portable |
 | **macOS** | `.dmg` disk image, `.app` application bundle |
+| **Android** | ARM64 `.apk` |
 
 Build artifact path example:
 

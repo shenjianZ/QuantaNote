@@ -59,6 +59,8 @@ sidebar:
                         path: "/docs/guide/installation"
                       - title: "Quick Start"
                         path: "/docs/guide/quick-start"
+                      - title: "Troubleshooting"
+                        path: "/docs/guide/troubleshooting"
                 - title: "Features"
                   path: "/docs/features"
                   children:
@@ -182,8 +184,8 @@ footer:
     repository:
         url: "https://github.com/shenjianZ/QuantaNote"
         branch: "master"
-    lastUpdated: "2026-05-03"
-    version: "v0.3.0"
+    lastUpdated: "2026-08-19"
+    version: "v0.4.0"
     groups:
         - title: "Community"
           items:

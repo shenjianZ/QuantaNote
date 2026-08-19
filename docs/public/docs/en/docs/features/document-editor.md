@@ -1,75 +1,124 @@
 ---
 title: Document Editor
-description: The full-screen editing experience in QuantaNote with auto-save, version history, and a rich toolbar.
+description: Use the QuantaNote document editor for titles, summaries, Markdown formatting, table adjustments, auto-save, and version history
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-19
 ---
 
 # Document Editor
 
-The Document Editor is QuantaNote's full-screen editing environment. It provides a distraction-free space for writing and editing your notes with a rich Markdown toolbar, auto-save functionality, version history, and quick access to item metadata.
+The Document Editor provides a focused, full-screen editing experience. Open an item from the Library to edit it in the full editor.
+
+The editor uses Vditor's IR (Instant Rendering) mode, keeping Markdown editable while showing the formatted result as you type.
 
 ## Title and Summary
 
-At the top of the Document Editor, you will find two editable fields:
+The top of the editor contains item metadata:
 
-- **Title** — The main title of your item. This field is pre-filled with the auto-extracted title when the item was created. Edit it at any time to rename your note.
-- **Summary** — An optional short description or abstract of the item. The summary is displayed on Library cards and in search results to give you a quick preview of the content.
+- **Title**: Click the title to edit it; changes are synchronized with the Library.
+- **Summary**: Enter a short description for Library cards and search result previews.
+- **Fixed size**: The summary field keeps a fixed size. Put long content in the document body instead of expanding the summary.
 
-Both fields save automatically when you navigate away or trigger an auto-save cycle.
+Title and summary changes are included in auto-save. The application shows a status toast when saving succeeds or fails.
 
-## Vditor Editor
+## Toolbar
 
-The main editing area is powered by **Vditor**, a feature-rich Markdown editor running in IR (Instant Rendering) mode. This provides a WYSIWYG-like experience where Markdown syntax is rendered as you type, giving you a live preview of your formatted content.
+The toolbar provides headings, bold, italic, strikethrough, lists, quotes, code, links, and tables. Clicking a button inserts the syntax at the current caret position.
 
-Key capabilities of the Vditor editor include:
+### Insert a Table
 
-- Full Markdown toolbar with formatting buttons
-- Instant rendering of headings, bold, italic, lists, code blocks, tables, and links
-- Image and link insertion dialogs
-- Blockquote and horizontal rule support
-- Multiple editing modes (see [Markdown Editor](./markdown-editor.md) for details)
+1. Place the caret where the table should be inserted.
+2. Click the table toolbar button.
+3. Choose the row and column counts in the table panel.
+4. Confirm to insert the table at the original caret position.
 
-For a complete reference of toolbar buttons and keyboard shortcuts, see the [Markdown Editor](./markdown-editor.md) feature page.
+Opening the table panel preserves the editor selection. Clicking the panel does not lose the insertion location.
+
+### Adjust an Existing Table
+
+Place the caret inside an existing table and the table button changes its tooltip to **Adjust table**. The panel can:
+
+- add or remove rows;
+- add or remove columns;
+- set the active column to left, center, or right alignment.
+
+Reducing the row or column count removes cells from the end, so check the content before confirming. Existing cell content and alignment settings are preserved whenever possible.
+
+Markdown table alignment uses these separator forms:
+
+| Syntax | Result |
+|--------|--------|
+| `---` | Left aligned |
+| `:---:` | Center aligned |
+| `---:` | Right aligned |
+
+## Live Rendering
+
+The editor supports common Markdown, GFM, math, and chart syntax. Use the correct language markers for chart blocks:
+
+````markdown
+```mermaid
+flowchart TD
+    A[Start] --> B[Done]
+```
+
+```flowchart
+st=>start: Start
+e=>end: Done
+st->e
+```
+````
+
+Supported content includes:
+
+- headings, lists, task lists, blockquotes, and horizontal rules;
+- bold, italic, strikethrough, inline code, and fenced code blocks;
+- links, images, attachments, and HTML;
+- GFM tables, footnotes, and definition lists;
+- KaTeX inline and block formulas;
+- Mermaid and Flowchart diagrams.
+
+Scrolling does not recreate the entire preview. After scrolling stops, charts should remain stable without flicker or repeated initialization.
+
+## Search and Replace
+
+- `Ctrl + F`: open search for the current document.
+- `Ctrl + H`: open search and replace.
+- Use the arrow buttons to move between matches.
+- Replace one match at a time or replace all matches.
+- Press `Esc` to close the search bar.
+
+## Copy and Paste
+
+Select text and press `Ctrl + C` or use the copy action. A successful copy displays a toast. Pasting with `Ctrl + V` also displays a toast; failures are reported instead of being silent.
+
+The packaged Windows desktop application writes to the native system clipboard first. When Windows Clipboard History is enabled, copied text can be viewed with `Win + V`. macOS and Linux do not provide the same Windows panel, so QuantaNote uses the clipboard APIs available on those platforms.
 
 ## Auto-Save
 
-The Document Editor automatically saves your changes using a debounced save mechanism:
+The editor uses debounced saving:
 
-1. **Debounce Timer** — After you stop typing, a timer starts (typically 1-2 seconds). If no further changes are made before the timer expires, the save is triggered.
-2. **Status Indicator** — A save status indicator is displayed in the editor UI:
-   - **"Saving..."** — Changes are being written to the database.
-   - **"Saved"** — All changes have been persisted successfully.
-   - **"Unsaved changes"** — There are pending changes waiting for the debounce timer.
-3. **Manual Save** — You can also press `Ctrl+S` to force an immediate save.
-
-Auto-save ensures you never lose your work, even if you forget to save manually.
-
-## Favorite Toggle
-
-A star icon in the editor toolbar allows you to toggle the favorite status of the current item. When an item is favorited:
-
-- The star icon is filled/highlighted.
-- The item appears in the **Favorites** tab in the Library.
-- The favorite status is saved immediately.
-
-Click the star again to remove the item from favorites.
+- continuous typing is grouped instead of saved on every keystroke;
+- content is saved automatically after changes settle;
+- failed saves preserve the edited content and show an error toast;
+- leaving the editor performs a final save check when possible.
 
 ## Version Panel
 
-The Document Editor includes a side panel for version history. Open it by clicking the **Version History** button in the toolbar or pressing the designated shortcut.
+Use the Version Panel to review, compare, and restore previous versions:
 
-The Version Panel displays:
+1. Open the Version Panel on the right side of the editor.
+2. Browse versions in reverse chronological order.
+3. Select two versions for a diff comparison.
+4. Select a historical version and confirm the restore.
 
-- A chronological list of all versions for the current item.
-- Each version shows its timestamp, optional name, and description.
-- Actions to preview, compare (diff), or restore any version.
+Restoring creates a new snapshot, so the previous state remains recoverable. See [Version History](./version-history) for details.
 
-For full details on version management, see the [Version History](./version-history.md) feature page.
+## Outline and Reading Width
 
-## Navigation Back
+The document outline lets you jump between headings while reading or previewing a document. The content-width control in Settings provides comfortable, wide, and custom widths for normal notes and wide tables.
 
-A back arrow button is located in the top-left corner of the Document Editor. Clicking it returns you to the Library page. Any unsaved changes are auto-saved before navigating away, ensuring no data is lost.
+## Leaving the Editor
 
-You can also use the browser-style `Alt+Left` shortcut to navigate back.
+Click the back button to return to the Library. The editor performs a save check before leaving; if saving fails, resolve the error before deleting any local data directory.

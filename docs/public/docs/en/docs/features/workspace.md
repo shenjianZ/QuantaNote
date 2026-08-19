@@ -3,7 +3,7 @@ title: Workspace
 description: The quick capture page for instantly recording ideas, thoughts, and notes in QuantaNote.
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-19
 ---
 
 # Workspace
@@ -37,6 +37,8 @@ The Workspace includes a formatting toolbar above the editor with the following 
 | **Table** | Insert a table | — |
 
 These toolbar buttons insert Markdown syntax directly into the editor, which is rendered in real time.
+
+The Workspace table button inserts a table template. In the Document Editor, placing the caret inside an existing table changes the same button to “Adjust table”, where you can change rows, columns, and alignment.
 
 ## Save Status
 

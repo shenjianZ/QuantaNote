@@ -3,7 +3,7 @@ title: Diagnostics
 description: QuantaNote diagnostics tools including SQL logging configuration, log file management, database info display, and VACUUM optimization
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-19
 ---
 
 # Diagnostics
@@ -53,6 +53,8 @@ Controls the maximum number of characters per SQL log entry. Content exceeding t
 ## Log File Location
 
 The Settings page displays the full path to the SQL log file.
+
+Copying a path displays the result in a toast. The packaged Windows desktop application uses the native system clipboard first; macOS and Linux use the clipboard APIs available on each platform.
 
 ### Actions
 

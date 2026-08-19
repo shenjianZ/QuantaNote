@@ -3,7 +3,7 @@ title: Development Commands
 description: Quick reference for common QuantaNote development commands
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-19
 ---
 
 # Development Commands
@@ -99,11 +99,14 @@ cargo test --manifest-path src-tauri/Cargo.toml -- --nocapture
 ### E2E Tests
 
 ```bash
-# Run all E2E tests (serial mode)
+# Run all E2E tests
 pnpm test:e2e
 
+# Run release regression tests serially
+pnpm test:e2e:serial
+
 # Run a specific test file
-pnpm test:e2e -- --spec test/specs/example.spec.ts
+pnpm test:e2e -- --spec e2e-tests/specs/document-editor.e2e.js
 ```
 
 Uses WebdriverIO for end-to-end testing, executed in serial mode for stability.
@@ -129,6 +132,28 @@ Uses `cargo fmt` for Rust code formatting to ensure consistent code style.
 ```bash
 # Frontend build check + Rust type check
 pnpm build && cargo check --manifest-path src-tauri/Cargo.toml
+```
+
+### Project Check
+
+```bash
+pnpm check
+```
+
+This command runs the frontend build and desktop Rust type check.
+
+### Documentation Build
+
+```bash
+pnpm docs:build
+```
+
+This builds the bilingual documentation site and generates its search, sitemap, and feed assets.
+
+### Cloud Service Check
+
+```bash
+pnpm server:check
 ```
 
 This is the recommended check command to run before committing code, ensuring both frontend and backend have no type errors.
@@ -160,6 +185,10 @@ The frontend build process includes TypeScript type checking.
 | `pnpm test:unit` | Frontend unit tests | Verify component logic |
 | `pnpm test:rust` | Rust unit tests | Verify backend logic |
 | `pnpm test:e2e` | E2E tests | Verify complete workflows |
+| `pnpm test:e2e:serial` | Serial E2E tests | Stable release regression |
 | `pnpm format:rust` | Format Rust code | Before code commits |
 | `pnpm format:rust:check` | Check Rust formatting | CI checks |
+| `pnpm docs:build` | Documentation build | Before docs release |
+| `pnpm check` | Frontend and desktop checks | Basic release gate |
+| `pnpm server:check` | Cloud Rust check | Before cloud image release |
 | `cargo check` | Rust type check | Quick Rust code verification |

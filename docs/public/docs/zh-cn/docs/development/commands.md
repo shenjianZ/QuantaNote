@@ -3,7 +3,7 @@ title: 开发命令
 description: QuantaNote 常用开发命令速查表
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-19
 ---
 
 # 开发命令
@@ -99,11 +99,14 @@ cargo test --manifest-path src-tauri/Cargo.toml -- --nocapture
 ### E2E 测试
 
 ```bash
-# 运行所有 E2E 测试（串行模式）
+# 运行所有 E2E 测试
 pnpm test:e2e
 
+# 按串行模式运行发布回归测试
+pnpm test:e2e:serial
+
 # 运行特定测试文件
-pnpm test:e2e -- --spec test/specs/example.spec.ts
+pnpm test:e2e -- --spec e2e-tests/specs/document-editor.e2e.js
 ```
 
 使用 WebdriverIO 进行端到端测试，采用串行模式执行以确保稳定性。
@@ -129,6 +132,28 @@ pnpm format:rust:check
 ```bash
 # 前端构建检查 + Rust 类型检查
 pnpm build && cargo check --manifest-path src-tauri/Cargo.toml
+```
+
+### 项目检查
+
+```bash
+pnpm check
+```
+
+该命令执行前端构建和桌面端 Rust 类型检查。
+
+### 文档构建
+
+```bash
+pnpm docs:build
+```
+
+该命令构建双语文档站，并生成搜索、站点地图和 Feed 等发布资源。
+
+### 云端服务检查
+
+```bash
+pnpm server:check
 ```
 
 这是提交代码前推荐运行的检查命令，确保前后端代码都没有类型错误。
@@ -160,6 +185,10 @@ pnpm build
 | `pnpm test:unit` | 前端单元测试 | 验证组件逻辑 |
 | `pnpm test:rust` | Rust 单元测试 | 验证后端逻辑 |
 | `pnpm test:e2e` | E2E 测试 | 验证完整流程 |
+| `pnpm test:e2e:serial` | 串行 E2E 测试 | 发布前稳定回归 |
 | `pnpm format:rust` | 格式化 Rust 代码 | 代码提交前 |
 | `pnpm format:rust:check` | 检查 Rust 格式 | CI 检查 |
+| `pnpm docs:build` | 文档站构建 | 文档发布前 |
+| `pnpm check` | 前端和桌面端检查 | 发布前基础门禁 |
+| `pnpm server:check` | 云端 Rust 检查 | 云端镜像发布前 |
 | `cargo check` | Rust 类型检查 | 快速验证 Rust 代码 |

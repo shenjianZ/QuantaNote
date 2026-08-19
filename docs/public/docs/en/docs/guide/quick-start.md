@@ -3,7 +3,7 @@ title: Quick Start
 description: Learn the basics of QuantaNote in 5 minutes — create notes, browse the library, edit, use tags, and search
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-19
 ---
 
 # Quick Start
@@ -57,23 +57,25 @@ Click any note in the Library, or double-click a note preview card in the Worksp
 ### Title and Summary
 
 - **Title**: Edit the note title at the top of the page. Clear titles help with search and identification later.
-- **Summary**: Add a brief summary to your note, making it easy to scan in the Library list view.
+- **Summary**: Add a brief summary to your note, making it easy to scan in the Library list view. The field has a fixed size; put long content in the document body.
 
 ### Editor Features
 
 QuantaNote uses the Vditor editor for a WYSIWYG Markdown editing experience:
 
 - **Toolbar**: Common formatting buttons at the top of the editor (bold, italic, headings, lists, code blocks, links, etc.)
+- **Tables**: Insert a new table or adjust the row count, column count, and alignment of an existing table
 - **Live Preview**: Markdown formatting is rendered in real time as you type
 - **Keyboard Shortcuts**: Supports common Markdown shortcuts (e.g., `Ctrl+B` for bold, `Ctrl+I` for italic)
 - **Auto-Save**: Content is saved automatically — no manual action needed
 
-### Code Blocks and Math Formulas
+### Code Blocks, Math, and Charts
 
 You can insert code blocks and math formulas in your notes:
 
 - Use triple backticks `` ``` `` to wrap code blocks with syntax highlighting
 - Use `$$` to wrap math formulas (rendered with KaTeX)
+- Use `mermaid` and `flowchart` code block markers for diagrams
 
 ## Using Tags
 
@@ -120,7 +122,8 @@ Press `Ctrl + K` to open the global command palette. Type a keyword in the searc
 
 Congratulations on mastering the basics of QuantaNote! Here are some topics to explore next:
 
-- **[Data Management](/docs/features/data)** — Learn about data storage, automatic backup, and import/export
-- **[Multi-Device Sync](/docs/sync/sync)** — Set up syncing between devices and understand conflict resolution
-- **[Version History](/docs/features/data)** — Use version history to track and restore edits
-- **[Settings](/docs/settings/settings)** — Customize themes, fonts, keyboard shortcuts, and other personalization options
+- **[Data Management](/docs/data)** — Learn about data storage, automatic backup, and import/export
+- **[Multi-Device Sync](/docs/sync)** — Set up syncing between devices and understand conflict resolution
+- **[Version History](/docs/features/version-history)** — Use version history to track and restore edits
+- **[Settings](/docs/settings)** — Customize themes, fonts, keyboard shortcuts, and other personalization options
+- **[Troubleshooting](/docs/guide/troubleshooting)** — Resolve rendering, clipboard, installation, and update issues

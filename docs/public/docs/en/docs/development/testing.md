@@ -3,7 +3,7 @@ title: Testing Guide
 description: QuantaNote's three-tier testing strategy and best practices
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-19
 ---
 
 # Testing Guide
@@ -150,23 +150,20 @@ cargo test --manifest-path src-tauri/Cargo.toml -- test_create_item
 ### Test File Organization
 
 ```
-test/
-├── wdio.conf.ts              # WebdriverIO configuration
-├── pageobjects/              # Page objects
-│   ├── workspace.page.ts     # Workspace page
-│   ├── library.page.ts       # Library page
-│   └── settings.page.ts      # Settings page
-├── specs/                    # Test specifications
-│   ├── workspace.spec.ts     # Workspace tests
-│   ├── library.spec.ts       # Library tests
-│   └── settings.spec.ts      # Settings tests
-└── helpers/                  # Test helper utilities
+e2e-tests/
+├── wdio.conf.js              # WebdriverIO configuration
+├── helpers/                  # Page objects and test helpers
+└── specs/                    # Test specifications
+    ├── document-editor.e2e.js
+    ├── library-reader.e2e.js
+    ├── search-replace.e2e.js
+    └── settings.e2e.js
 ```
 
 ### Writing Tests
 
 ```typescript
-// test/pageobjects/workspace.page.ts
+// e2e-tests/helpers/page-objects/DocumentEditorPage.js
 import { Page } from './base.page';
 
 export class WorkspacePage extends Page {
@@ -186,7 +183,7 @@ export class WorkspacePage extends Page {
 ```
 
 ```typescript
-// test/specs/workspace.spec.ts
+// e2e-tests/specs/document-editor.e2e.js
 import { expect } from '@wdio/globals';
 import { WorkspacePage } from '../pageobjects/workspace.page';
 
@@ -210,14 +207,21 @@ describe('Workspace', () => {
 # Run all E2E tests
 pnpm test:e2e
 
+# Run release regression tests serially
+pnpm test:e2e:serial
+
 # Run a specific test file
-pnpm test:e2e -- --spec test/specs/workspace.spec.ts
+pnpm test:e2e -- --spec e2e-tests/specs/document-editor.e2e.js
 
 # Specify browser
 pnpm test:e2e -- --capabilities.browserName chrome
 ```
 
 > **Note:** E2E tests require building the application first (`pnpm tauri build`) to ensure the test environment matches production.
+
+### v0.4.0 Release Regression Focus
+
+Before release, cover table insertion and adjustment, Markdown chart and formula rendering, scroll stability, fixed summary size, copy/paste feedback, native Windows clipboard behavior, content width, and the document outline.
 
 ## Testing Best Practices
 

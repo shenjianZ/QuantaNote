@@ -1,96 +1,186 @@
 ---
 title: Markdown Editor
-description: The Vditor-based Markdown editor in QuantaNote with instant rendering, toolbar, search, and keyboard shortcuts.
+description: Use the QuantaNote Markdown editor with GFM, tables, charts, formulas, search and replace, and cross-platform shortcuts
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-19
 ---
 
 # Markdown Editor
 
-QuantaNote uses **Vditor** as its Markdown editing engine. Vditor is a browser-based Markdown editor that supports multiple editing modes. QuantaNote uses **IR (Instant Rendering)** mode as the default, providing a seamless WYSIWYG-like editing experience where Markdown syntax is rendered in real time as you type.
+QuantaNote uses Vditor's IR (Instant Rendering) mode. Markdown is rendered as you type while the source remains editable.
 
-## Editing Modes
+## Toolbar
 
-Vditor supports three editing modes:
+| Button | Function | Description |
+|--------|----------|-------------|
+| H1-H6 | Headings | Insert level-one through level-six headings |
+| **B** | Bold | Insert `**text**` |
+| *I* | Italic | Insert `*text*` |
+| ~~S~~ | Strikethrough | Insert `~~text~~` |
+| Lists | Lists | Insert ordered or unordered lists |
+| Task | Task list | Insert `- [ ]` |
+| Quote | Blockquote | Insert `> text` |
+| Code | Code block | Insert a fenced code block with a language marker |
+| `Code` | Inline code | Insert backtick code |
+| Link | Hyperlink | Insert `[text](URL)` |
+| Image | Image | Insert `![alt](URL)` |
+| Table | Insert or adjust table | Shows “Insert table” or “Adjust table” based on the caret |
 
-| Mode | Description |
-|------|-------------|
-| **IR (Instant Rendering)** | The default mode. Markdown syntax is rendered immediately as you type, combining the simplicity of plain text editing with the visual clarity of a formatted preview. |
-| **SV (Split View)** | Shows a split pane with raw Markdown on the left and rendered output on the right. Useful for users who prefer to see the raw syntax. |
-| **WYSIWYG** | A what-you-see-is-what-you-get mode that hides Markdown syntax entirely, similar to a traditional rich text editor. |
+The table panel saves the caret position from before it opens, so clicking table settings does not insert the table at the wrong location.
 
-QuantaNote primarily uses IR mode for the best balance of editing speed and visual feedback. The mode can be changed in the editor settings if needed.
+## Tables and Alignment
 
-## Toolbar Reference
+After inserting a table, place the caret inside it to adjust the row count, column count, and active column alignment.
 
-The Vditor toolbar provides quick access to common formatting operations:
+```markdown
+| Left | Center | Right |
+|:-----|:------:|------:|
+| Text | Text   | 12345 |
+```
 
-| Button | Action | Markdown Syntax |
-|--------|--------|----------------|
-| Headings (H1-H6) | Insert heading levels | `#`, `##`, `###`, etc. |
-| **B** | Bold text | `**bold**` |
-| *I* | Italic text | `*italic*` |
-| ~~S~~ | Strikethrough text | `~~strikethrough~~` |
-| `Code` | Inline code | `` `code` `` |
-| Code Block | Insert fenced code block | ` ``` ` |
-| Link | Insert hyperlink | `[text](url)` |
-| Image | Insert image | `![alt](url)` |
-| Ordered List | Numbered list | `1. item` |
-| Unordered List | Bullet list | `- item` |
-| Check List | Task list | `- [ ] task` |
-| Quote | Blockquote | `> quote` |
-| Table | Insert table | `\| col1 \| col2 \|` |
-| Horizontal Rule | Insert divider | `---` |
-| Undo | Undo last action | `Ctrl+Z` |
-| Redo | Redo last action | `Ctrl+Y` |
-| Fullscreen | Toggle fullscreen editing | `F11` |
+Alignment markers are:
+
+| Separator | Alignment |
+|-----------|-----------|
+| `:---` | Left |
+| `:---:` | Center |
+| `---:` | Right |
+
+Reducing the table size removes rows or columns from the end. Check the trailing content before confirming.
+
+## Supported Markdown Syntax
+
+### Basic Markdown
+
+```markdown
+# Heading
+**bold**, *italic*, ~~strikethrough~~, `inline code`
+
+- Unordered list
+1. Ordered list
+- [ ] Task item
+
+> Blockquote
+---
+[Link](https://example.com)
+![Image](image.png)
+```
+
+### GFM Extensions
+
+Supported extensions include tables, task lists, strikethrough, footnotes, and definition lists.
+
+Footnote example:
+
+```markdown
+Text with a footnote[^1].
+
+[^1]: Footnote text.
+```
+
+Definition list example:
+
+```markdown
+Markdown
+: A lightweight markup language
+
+QuantaNote
+: A note application that supports Markdown
+```
+
+### Code Blocks
+
+Wrap code in three backticks and provide a language name for syntax highlighting:
+
+````markdown
+```javascript
+function hello() {
+  console.log("Hello, QuantaNote!");
+}
+```
+````
+
+### Math Formulas
+
+Use a single `$` for inline formulas and `$$` for block formulas:
+
+```markdown
+Inline formula: $E = mc^2$
+
+$$
+e^{i\pi} + 1 = 0
+$$
+```
+
+### Mermaid and Flowchart
+
+Mermaid uses the `mermaid` marker:
+
+````markdown
+```mermaid
+graph TD
+    A[Start] --> B{Logged in?}
+    B -->|Yes| C[Home]
+    B -->|No| D[Login]
+```
+````
+
+Flowchart uses the `flowchart` marker:
+
+````markdown
+```flowchart
+st=>start: Start
+op=>operation: Process data
+e=>end: Done
+st->op->e
+```
+````
+
+Do not use `flow` as the marker for Flowchart syntax, or it will be displayed as a plain code block.
+
+### HTML
+
+Safe HTML is supported after sanitization:
+
+```html
+<div align="center">Centered HTML content</div>
+```
+
+Scripts, event attributes, and unsafe tags are filtered.
 
 ## Search and Replace
 
-The editor includes a built-in search and replace bar:
+| Action | Shortcut | Description |
+|--------|----------|-------------|
+| Open search | `Ctrl + F` | Find text in the current document |
+| Open replace | `Ctrl + H` | Show the replacement field |
+| Next match | `Enter` | Jump to the next result |
+| Previous match | `Shift + Enter` | Jump to the previous result |
+| Close | `Esc` | Close the search bar |
 
-- **Open Search** — Press `Ctrl+F` to open the search bar. Type your query and matches are highlighted in the editor.
-- **Open Replace** — Press `Ctrl+H` to open the search and replace bar. Enter a search term and a replacement, then use the replace buttons to substitute matches one at a time or all at once.
-- **Navigation** — Use the up/down arrows in the search bar to jump between matches.
-- **Close** — Press `Escape` to close the search bar.
+Case-sensitive search, single replacement, and replace-all are supported.
 
-## Supported Syntax
+## Copy, Paste, and Feedback
 
-QuantaNote supports the full range of Markdown and GFM (GitHub Flavored Markdown) syntax:
+Select content and press `Ctrl + C` to copy or `Ctrl + V` to paste. Both success and failure are reported with a toast.
 
-- **Headings** — H1 through H6 using `#` notation
-- **Emphasis** — Bold, italic, strikethrough
-- **Lists** — Ordered, unordered, and task lists (with checkboxes)
-- **Code** — Inline code and fenced code blocks with syntax highlighting for common languages
-- **Links** — Inline links with optional title text
-- **Images** — Inline images with alt text
-- **Tables** — GFM tables with alignment support
-- **Blockquotes** — Nested blockquotes
-- **Horizontal rules** — Section dividers
-- **Math** — LaTeX math expressions using `$$` delimiters (if supported by Vditor configuration)
-- **Emoji** — Standard emoji shortcodes
+The packaged Windows application uses the native clipboard first, so copied content can be checked with `Win + V` when Clipboard History is enabled. macOS and Linux use their available clipboard APIs and do not provide the Windows-specific history panel.
 
-## Keyboard Shortcuts
-
-The following keyboard shortcuts are available in the Markdown editor:
+## Shortcuts
 
 | Shortcut | Action |
 |----------|--------|
-| `Ctrl+B` | Bold |
-| `Ctrl+I` | Italic |
-| `Ctrl+D` | Strikethrough |
-| `Ctrl+`` | Inline code |
-| `Ctrl+K` | Insert link |
-| `Ctrl+Shift+K` | Insert code block |
-| `Ctrl+F` | Find |
-| `Ctrl+H` | Find and replace |
-| `Ctrl+Z` | Undo |
-| `Ctrl+Y` / `Ctrl+Shift+Z` | Redo |
-| `Ctrl+S` | Save |
-| `Ctrl+Enter` | Save (in Workspace) |
-| `Ctrl+1` through `Ctrl+6` | Insert heading H1-H6 |
-| `Ctrl+Shift+L` | Insert ordered list |
-| `Ctrl+L` | Insert unordered list |
-| `Tab` | Indent (in lists) |
-| `Shift+Tab` | Outdent (in lists) |
+| `Ctrl + B` | Bold |
+| `Ctrl + I` | Italic |
+| `Ctrl + D` | Strikethrough |
+| `Ctrl + F` | Search |
+| `Ctrl + H` | Search and replace |
+| `Ctrl + Z` | Undo |
+| `Ctrl + Shift + Z` | Redo |
+| `Ctrl + S` | Save |
+| `Ctrl + K` | Command Palette outside the editor |
+| `Tab` | Indent a list |
+| `Shift + Tab` | Outdent a list |
+
+On macOS, the system convention usually uses `Command` instead of `Ctrl`. Linux and Windows use `Ctrl`.

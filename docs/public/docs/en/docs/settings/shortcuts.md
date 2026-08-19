@@ -3,7 +3,7 @@ title: Keyboard Shortcuts
 description: QuantaNote keyboard shortcuts reference covering global shortcuts, workspace shortcuts, editor shortcuts, and navigation shortcuts
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-19
 ---
 
 # Keyboard Shortcuts
@@ -61,9 +61,9 @@ The Document Editor (Vditor) supports a rich set of editing shortcuts, including
 | `Ctrl + Z` | Undo | Undoes the last action |
 | `Ctrl + Shift + Z` | Redo | Redoes a previously undone action |
 | `Ctrl + A` | Select All | Selects all content in the editor |
-| `Ctrl + C` | Copy | Copies the selected text |
+| `Ctrl + C` | Copy | Copies selected text and displays the result |
 | `Ctrl + X` | Cut | Cuts the selected text |
-| `Ctrl + V` | Paste | Pastes content from the clipboard |
+| `Ctrl + V` | Paste | Pastes clipboard content and displays the result |
 
 ### Find and Replace
 
@@ -116,3 +116,11 @@ Use the top navigation bar icons to switch between main pages:
 | Settings | Gear icon in the top bar | Application settings |
 
 > **Tip**: Using `Ctrl + K` to open the Command Palette is the fastest way to jump to other records without leaving the keyboard.
+
+## Cross-Platform Notes
+
+- Windows and Linux normally use `Ctrl`.
+- macOS normally uses `Command (⌘)` instead of `Ctrl`.
+- The packaged Windows desktop app can use Windows Clipboard History with `Win + V` after copying.
+- macOS and Linux do not have a universal Windows Clipboard History panel, but copy and paste use the clipboard capabilities available on each platform.
+- Copy success, copy failure, and paste success are reported with toasts so you can verify clipboard availability.

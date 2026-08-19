@@ -3,7 +3,7 @@ title: 诊断工具
 description: QuantaNote 诊断工具详细说明，包括 SQL 日志配置、日志文件管理、数据库信息查看与 VACUUM 优化操作
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-19
 ---
 
 # 诊断工具
@@ -53,6 +53,8 @@ SQL 日志功能可以记录 QuantaNote 后端执行的所有 SQL 查询语句�
 ## 日志文件位置
 
 设置页面显示了 SQL 日志文件的完整路径。
+
+复制路径后会显示复制结果提示。Windows 正式桌面应用会优先使用原生系统剪贴板；macOS/Linux 使用平台可用的剪贴板 API。
 
 ### 操作
 
