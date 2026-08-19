@@ -167,7 +167,7 @@ class SettingsPage {
   }
 
   async toggleAutostart() {
-    await this.toggleSetting("开机自启");
+    await this.toggleSetting("开机自动启动");
   }
 
   async selectLocale(locale) {

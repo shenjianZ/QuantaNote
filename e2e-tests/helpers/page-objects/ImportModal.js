@@ -10,8 +10,7 @@ class ImportModal {
   get includeTags() { return "[data-testid='import-include-tags']"; }
   get includeAttachments() { return "[data-testid='import-include-attachments']"; }
   get includeVersions() { return "[data-testid='import-include-versions']"; }
-  get conflictSkip() { return "[data-testid='import-conflict-skip']"; }
-  get conflictOverwrite() { return "[data-testid='import-conflict-overwrite']"; }
+  get conflictSelect() { return "//div[./div[normalize-space(.)='冲突处理']]//button"; }
   get importBtn() { return "[data-testid='import-btn']"; }
   get cancelBtn() { return "[data-testid='import-cancel-btn']"; }
 
@@ -40,17 +39,18 @@ class ImportModal {
   }
 
   async isConflictSkipSelected() {
-    const el = await $(this.conflictSkip);
-    return el.isSelected();
+    const el = await $(this.conflictSelect);
+    return (await el.getText()).includes("跳过已有");
   }
 
   async isConflictOverwriteSelected() {
-    const el = await $(this.conflictOverwrite);
-    return el.isSelected();
+    const el = await $(this.conflictSelect);
+    return (await el.getText()).includes("覆盖已有");
   }
 
   async selectConflictOverwrite() {
-    await $(this.conflictOverwrite).then(b => b.click());
+    await $(this.conflictSelect).then(b => b.click());
+    await $("//button[normalize-space(.)='覆盖已有']").then(b => b.click());
     await observePause();
   }
 

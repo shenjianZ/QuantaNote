@@ -57,11 +57,18 @@ describe("Settings extended coverage", () => {
     it("displays version number in about section", async () => {
         await SettingsPage.selectSectionByIndex(4);
         const version = await SettingsPage.getAboutVersion();
-        expect(version).toContain("v0.1.0");
+        expect(version).toContain("v0.4.0");
     });
 
     it("displays GitHub, docs, and feedback links", async () => {
-        const links = await $$("//section//a[contains(@href, 'github.com')]");
+        const links = await $$('section a');
         expect(links.length).toBeGreaterThanOrEqual(3);
+        const hrefs = [];
+        for (let index = 0; index < links.length; index += 1) {
+            hrefs.push(await links[index].getAttribute("href"));
+        }
+        expect(hrefs.some((href) => href?.includes("github.com/shenjianZ/QuantaNote"))).toBe(true);
+        expect(hrefs.some((href) => href?.includes("quantanote-docs.shenjianl.cn"))).toBe(true);
+        expect(hrefs.some((href) => href?.includes("github.com/shenjianZ/QuantaNote/issues"))).toBe(true);
     });
 });

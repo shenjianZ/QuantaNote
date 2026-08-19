@@ -1,6 +1,12 @@
 import { pause, observePause } from "../helpers/config.js";
+import { cleanupAll, resetAppState } from "../helpers/commands.js";
 
 describe("QuantaNote desktop smoke", () => {
+  before(async () => {
+    await cleanupAll();
+    await resetAppState();
+  });
+
   async function closeOverlays() {
     await browser.keys("Escape");
     await browser.keys("Escape");

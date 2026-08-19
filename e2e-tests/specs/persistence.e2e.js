@@ -1,4 +1,4 @@
-import { cleanupAll, resetAppState, seedItem, waitForSetting } from "../helpers/commands.js";
+import { cleanupAll, getAllItems, resetAppState, seedItem, waitForSetting } from "../helpers/commands.js";
 import TopBar from "../helpers/page-objects/TopBar.js";
 import SettingsPage from "../helpers/page-objects/SettingsPage.js";
 import WorkspacePage from "../helpers/page-objects/WorkspacePage.js";
@@ -38,7 +38,10 @@ describe("Persistence across interactions", () => {
     await TopBar.navWorkspace();
     await WorkspacePage.typeContent("持久化测试笔记");
     await WorkspacePage.clickSave();
-    await WorkspacePage.waitForSaved();
+    await browser.waitUntil(
+      async () => (await getAllItems()).some((item) => item.content.includes("持久化测试笔记")),
+      { timeout: 5000, timeoutMsg: "Saved note was not persisted before navigation" },
+    );
 
     // 导航到记录库
     await TopBar.navLibrary();

@@ -188,6 +188,7 @@ const DEFAULT_APP_SETTINGS = {
     pretty: false,
     maxLen: 4000,
   },
+  locale: "zh-CN",
 };
 
 export async function loadSettingsMap() {
@@ -258,6 +259,31 @@ export async function setTheme(theme) {
 
 export async function cleanupAll() {
   await waitForTauriBridge();
+  await browser.waitUntil(
+    async () => browser.execute(() => {
+      const bodyText = document.body.innerText;
+      return bodyText.includes("Welcome") || Boolean(document.querySelector("[data-testid='nav-library']"));
+    }),
+    { timeout: 10000, timeoutMsg: "App shell did not finish initializing within 10000ms" },
+  );
+  // 每个串行 spec 使用全新的临时数据目录，跳过首次启动的语言选择页，确保导航元素可用。
+  const e2eSettings = JSON.stringify({ ...DEFAULT_APP_SETTINGS, locale: "zh-CN" });
+  await browser.waitUntil(
+    async () => {
+      await saveSettingsMap({
+        "has-selected-language": "true",
+        "quantanote-settings": e2eSettings,
+      });
+      const saved = await loadSettingsMap();
+      if (saved["has-selected-language"] !== "true") return false;
+      try {
+        return JSON.parse(saved["quantanote-settings"] || "{}").locale === "zh-CN";
+      } catch {
+        return false;
+      }
+    },
+    { timeout: 5000, timeoutMsg: "E2E language settings were not persisted" },
+  );
   await cleanupAllItems();
   await cleanupAllTags();
   await notifyDataChanged();

@@ -3,7 +3,7 @@
  */
 
 import { waitForDisplayed, waitForSavedStatus, waitForText } from "../waits.js";
-import { clearVditor, getVditorText, setVditorValue } from "../vditor.js";
+import { clearVditor, getVditorText, typeInVditor } from "../vditor.js";
 
 class WorkspacePage {
   get editorPanel() { return "[data-testid='workspace-editor']"; }
@@ -16,7 +16,11 @@ class WorkspacePage {
   }
 
   async typeContent(text) {
-    await setVditorValue(text, this.editorPanel);
+    await typeInVditor(text, this.editorPanel);
+    await browser.waitUntil(
+      async () => (await $(this.saveBtn)).isEnabled(),
+      { timeout: 3000, timeoutMsg: "Workspace save button did not become enabled after typing" },
+    );
   }
 
   async getContent() {

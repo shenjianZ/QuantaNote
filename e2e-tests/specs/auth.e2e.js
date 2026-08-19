@@ -1,17 +1,40 @@
-import { cleanupAll, resetAppState } from "../helpers/commands.js";
+import { cleanupAll, resetAppState, saveSyncConfig } from "../helpers/commands.js";
 import { observePause } from "../helpers/config.js";
 import TopBar from "../helpers/page-objects/TopBar.js";
-import SettingsPage from "../helpers/page-objects/SettingsPage.js";
-import SyncSettingsPanel from "../helpers/page-objects/SyncSettingsPanel.js";
 import AuthModals from "../helpers/page-objects/AuthModals.js";
+
+async function clickProfileLogin() {
+    const btn = await $("//button[normalize-space(.)='登录']");
+    await btn.click();
+    await observePause();
+}
+
+async function clickProfileRegister() {
+    const btn = await $("//button[normalize-space(.)='注册']");
+    await btn.click();
+    await observePause();
+}
 
 describe("Auth modals (UI interactions)", () => {
     before(async () => {
         await cleanupAll();
         await resetAppState();
-        await TopBar.openSettings();
-        // Navigate to sync section (index 3: Cloud icon)
-        await SettingsPage.selectSectionByIndex(3);
+        await saveSyncConfig({
+            enabled: false,
+            server_url: "https://test-server.example.com",
+            access_token: "",
+            refresh_token: "",
+            user_id: "",
+            device_id: "",
+            auto_sync: false,
+            sync_interval_minutes: 15,
+            conflict_resolution: "auto",
+            sync_attachments: true,
+            last_sync_at: null,
+            last_snapshot_id: null,
+        });
+        await browser.refresh();
+        await TopBar.openAccount();
     });
 
     after(async () => {
@@ -21,7 +44,7 @@ describe("Auth modals (UI interactions)", () => {
 
     // --- Login ---
     it("opens login modal when sync login button clicked", async () => {
-        await SyncSettingsPanel.clickLogin();
+        await clickProfileLogin();
         expect(await AuthModals.isLoginOpen()).toBe(true);
     });
 
@@ -45,7 +68,7 @@ describe("Auth modals (UI interactions)", () => {
         // Close current login first, then re-open from sync panel
         await browser.keys("Escape");
         await observePause();
-        await SyncSettingsPanel.clickLogin();
+        await clickProfileLogin();
         await AuthModals.clickSwitchToRegister();
         expect(await AuthModals.isRegisterOpen()).toBe(true);
     });
@@ -53,7 +76,7 @@ describe("Auth modals (UI interactions)", () => {
     it("login modal switches to forgot password modal via link", async () => {
         await browser.keys("Escape");
         await observePause();
-        await SyncSettingsPanel.clickLogin();
+        await clickProfileLogin();
         await AuthModals.clickSwitchToForgot();
         expect(await AuthModals.isForgotOpen()).toBe(true);
     });
@@ -62,7 +85,7 @@ describe("Auth modals (UI interactions)", () => {
         await browser.keys("Escape");
         await observePause();
         // Re-open login to test escape close
-        await SyncSettingsPanel.clickLogin();
+        await clickProfileLogin();
         expect(await AuthModals.isLoginOpen()).toBe(true);
         await browser.keys("Escape");
         await observePause();
@@ -70,7 +93,7 @@ describe("Auth modals (UI interactions)", () => {
 
     // --- Register ---
     it("opens register modal when sync register button clicked", async () => {
-        await SyncSettingsPanel.clickRegister();
+        await clickProfileRegister();
         expect(await AuthModals.isRegisterOpen()).toBe(true);
     });
 
@@ -96,7 +119,7 @@ describe("Auth modals (UI interactions)", () => {
     it("opens forgot password modal from login modal link", async () => {
         await browser.keys("Escape");
         await observePause();
-        await SyncSettingsPanel.clickLogin();
+        await clickProfileLogin();
         await AuthModals.clickSwitchToForgot();
         expect(await AuthModals.isForgotOpen()).toBe(true);
     });

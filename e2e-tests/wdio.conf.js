@@ -129,8 +129,15 @@ export const config = {
     } catch {
       // WebView2 某些环境不支持 maximize，下面使用显式的大窗口尺寸兜底。
     }
-    if (!nativeWindowMaximized && !webdriverWindowMaximized) {
-      await browser.setWindowSize(1920, 1080);
+    try {
+      const windowSize = await browser.getWindowSize();
+      if (windowSize.width < 640) {
+        await browser.setWindowSize(1280, 900);
+      }
+    } catch {
+      if (!nativeWindowMaximized && !webdriverWindowMaximized) {
+        await browser.setWindowSize(1920, 1080);
+      }
     }
     console.log(`\n🎬 E2E 模式: ${isHeaded ? "有头 (headed)" : "无头 (headless)"}\n`);
   },
