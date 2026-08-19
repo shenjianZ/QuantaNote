@@ -174,6 +174,23 @@ describe("Document editor", () => {
     await DocumentEditorPage.waitForSaved(3000);
   });
 
+  it("renders ==mark== highlight syntax", async () => {
+    await DocumentEditorPage.setContent("高亮段落\n\n==重点内容==");
+
+    await browser.waitUntil(
+      async () => {
+        return browser.execute(() => Boolean(document.querySelector(".vditor-ir mark")));
+      },
+      { timeout: 3000, timeoutMsg: "Editor mark highlight was not rendered" },
+    );
+
+    const highlighted = await browser.execute(() => document.querySelector(".vditor-ir mark")?.textContent);
+    expect(highlighted).toContain("重点内容");
+
+    await DocumentEditorPage.setContent("初始内容");
+    await DocumentEditorPage.waitForSaved(3000);
+  });
+
   it("toggles favorite state", async () => {
     await DocumentEditorPage.toggleFavorite();
     const isFav = await DocumentEditorPage.isFavorite();

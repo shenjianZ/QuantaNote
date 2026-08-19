@@ -566,6 +566,8 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
       ) as never,
       preview: {
         theme: { current: theme === "dark" ? "dark" : "light" },
+        // vditor 默认关闭 mark 语法(==高亮==),显式开启以支持 GFM 扩展
+        markdown: { mark: true },
       },
       counter: { enable: true },
       link: {
