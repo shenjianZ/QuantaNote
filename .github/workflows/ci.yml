@@ -9,7 +9,121 @@ permissions:
   contents: write
 
 jobs:
+  preflight:
+    name: Release preflight
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate release metadata
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $tagVersion = $env:GITHUB_REF_NAME.TrimStart("v")
+          if ($tagVersion -notmatch '^\d+\.\d+\.\d+(-[\w.]+)?$') {
+            throw "Release tag must contain a valid semver version: $($env:GITHUB_REF_NAME)"
+          }
+
+          $jsonFiles = @("package.json", "site/package.json", "docs/package.json", "src-tauri/tauri.conf.json")
+          foreach ($file in $jsonFiles) {
+            $version = (Get-Content $file -Raw | ConvertFrom-Json).version
+            if ($version -ne $tagVersion) { throw "$file version $version != tag $tagVersion" }
+          }
+
+          $textVersions = @{
+            "src-tauri/Cargo.toml" = '^version = "([^\"]+)"$'
+            "quantanote-cloud/Cargo.toml" = '^version = "([^\"]+)"$'
+            "quantanote-cloud/src/cli.rs" = '#\[command\(version = "([^\"]+)"\)\]'
+            "quantanote-cloud/src/handlers/health.rs" = '"version": "([^\"]+)"'
+          }
+          foreach ($entry in $textVersions.GetEnumerator()) {
+            $match = Select-String -Path $entry.Key -Pattern $entry.Value | Select-Object -First 1
+            if ($null -eq $match) { throw "Could not read version from $($entry.Key)" }
+            $version = $match.Matches[0].Groups[1].Value
+            if ($version -ne $tagVersion) { throw "$($entry.Key) version $version != tag $tagVersion" }
+          }
+
+          foreach ($file in @("docs/public/config/site.yaml", "docs/public/config/site.en.yaml")) {
+            $content = Get-Content $file -Raw
+            if ($content -notmatch "version: \"v$([regex]::Escape($tagVersion))\"") {
+              throw "$file footer version does not match v$tagVersion"
+            }
+          }
+
+          foreach ($file in @("site/src/components/Hero.tsx", "site/src/components/DownloadCTA.tsx")) {
+            $content = Get-Content $file -Raw
+            if ($content -notmatch "v$([regex]::Escape($tagVersion))") {
+              throw "$file does not contain v$tagVersion"
+            }
+          }
+
+          $changelog = Get-Content CHANGELOG.md -Raw
+          if ($changelog -notmatch "(?m)^## \[$([regex]::Escape($tagVersion))\] - \d{4}-\d{2}-\d{2}") {
+            throw "CHANGELOG.md has no dated section for $tagVersion"
+          }
+
+      - name: Check bilingual documentation
+        run: node scripts/check-docs.mjs
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: docs/pnpm-lock.yaml
+
+      - name: Install documentation dependencies
+        run: pnpm --dir docs install --frozen-lockfile
+
+      - name: Build documentation site
+        run: pnpm docs:build
+
+      - name: Validate release Secrets
+        env:
+          QUANTANOTE_TAURI_UPDATER_PUBLIC_KEY: ${{ secrets.QUANTANOTE_TAURI_UPDATER_PUBLIC_KEY }}
+          QUANTANOTE_TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.QUANTANOTE_TAURI_SIGNING_PRIVATE_KEY }}
+          QUANTANOTE_TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.QUANTANOTE_TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ALIYUN_REGISTRY: ${{ secrets.ALIYUN_REGISTRY }}
+          ALIYUN_NAME_SPACE: ${{ secrets.ALIYUN_NAME_SPACE }}
+          ALIYUN_REGISTRY_USER: ${{ secrets.ALIYUN_REGISTRY_USER }}
+          ALIYUN_REGISTRY_PASSWORD: ${{ secrets.ALIYUN_REGISTRY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(
+            QUANTANOTE_TAURI_UPDATER_PUBLIC_KEY
+            QUANTANOTE_TAURI_SIGNING_PRIVATE_KEY
+            QUANTANOTE_TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+            ANDROID_KEYSTORE_BASE64
+            ANDROID_KEYSTORE_PASSWORD
+            ANDROID_KEY_ALIAS
+            ANDROID_KEY_PASSWORD
+            ALIYUN_REGISTRY
+            ALIYUN_NAME_SPACE
+            ALIYUN_REGISTRY_USER
+            ALIYUN_REGISTRY_PASSWORD
+          )
+          for name in "${required[@]}"; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Missing required release secret: $name" >&2
+              exit 1
+            fi
+          done
+
   create-release:
+    needs: preflight
     runs-on: ubuntu-latest
     outputs:
       release_id: ${{ steps.create_release.outputs.id }}
@@ -123,7 +237,7 @@ jobs:
           QUANTANOTE_TAURI_UPDATER_PUBLIC_KEY: ${{ secrets.QUANTANOTE_TAURI_UPDATER_PUBLIC_KEY }}
         run: |
           if ([string]::IsNullOrWhiteSpace($env:QUANTANOTE_TAURI_UPDATER_PUBLIC_KEY)) {
-            Write-Warning "QUANTANOTE_TAURI_UPDATER_PUBLIC_KEY not set, updater will not work"
+            throw "QUANTANOTE_TAURI_UPDATER_PUBLIC_KEY is required for a release build"
           } else {
             $path = "src-tauri/tauri.conf.json"
             $content = Get-Content $path -Raw
@@ -289,6 +403,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload ${{ github.ref_name }} release-assets/* --clobber
 
+  build-android:
+    name: Build Android release
+    needs: create-release
+    uses: ./.github/workflows/build-android.yml
+    secrets: inherit
+
   merge-updater-manifest:
     needs:
       - create-release
@@ -300,6 +420,36 @@ jobs:
         with:
           path: all-artifacts
           merge-multiple: true
+
+      - name: Validate release assets
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $tag = $env:GITHUB_REF_NAME
+          $required = @(
+            "QuantaNote-$tag-windows-x64.exe",
+            "QuantaNote-$tag-windows-x64.msi",
+            "QuantaNote-$tag-macos-aarch64.dmg",
+            "QuantaNote-$tag-macos-x64.dmg",
+            "QuantaNote-$tag-linux-x64.AppImage",
+            "QuantaNote-$tag-linux-x64.deb",
+            "QuantaNote-$tag-linux-x64.rpm",
+            "QuantaNote-$tag-android-arm64-v8a.apk"
+          )
+          $available = Get-ChildItem -Path "all-artifacts" -Recurse -File | Select-Object -ExpandProperty Name
+          foreach ($asset in $required) {
+            if ($available -notcontains $asset) { throw "Missing release asset: $asset" }
+          }
+
+          $updaterAssets = @(
+            "QuantaNote-$tag-windows-x64.exe.sig",
+            "QuantaNote-$tag-linux-x64.AppImage.sig",
+            "QuantaNote-$tag-macos-aarch64.tar.gz.sig",
+            "QuantaNote-$tag-macos-x64.tar.gz.sig"
+          )
+          foreach ($asset in $updaterAssets) {
+            if ($available -notcontains $asset) { throw "Missing updater signature: $asset" }
+          }
 
       - name: Merge per-platform manifests into latest.json
         shell: pwsh
@@ -321,6 +471,17 @@ jobs:
           }
 
           $mergedJson = $merged | ConvertTo-Json -Depth 5
+          $expectedVersion = $env:GITHUB_REF_NAME.TrimStart("v")
+          if ($merged.version -ne $expectedVersion) {
+            throw "Updater manifest version $($merged.version) != $expectedVersion"
+          }
+          $expectedPlatforms = @("windows-x86_64", "darwin-aarch64", "darwin-x86_64", "linux-x86_64")
+          foreach ($platform in $expectedPlatforms) {
+            $entry = $merged.platforms.PSObject.Properties[$platform]
+            if ($null -eq $entry) { throw "Updater manifest missing platform: $platform" }
+            if ([string]::IsNullOrWhiteSpace($entry.Value.signature)) { throw "Missing updater signature for $platform" }
+            if ([string]::IsNullOrWhiteSpace($entry.Value.url)) { throw "Missing updater URL for $platform" }
+          }
           Set-Content -Path "latest.json" -Value $mergedJson
           Write-Host "Merged manifest:`n$mergedJson"
 
@@ -333,6 +494,7 @@ jobs:
     needs:
       - create-release
       - build
+      - build-android
       - merge-updater-manifest
     runs-on: ubuntu-latest
 
@@ -347,3 +509,9 @@ jobs:
               release_id: Number("${{ needs.create-release.outputs.release_id }}"),
               draft: false
             });
+
+  build-cloud-image:
+    name: Build and promote cloud image
+    needs: publish-release
+    uses: ./.github/workflows/build-cloud-image.yml
+    secrets: inherit
