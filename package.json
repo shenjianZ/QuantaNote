@@ -1,7 +1,7 @@
 {
   "name": "quanta-note",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -26,6 +26,7 @@
     "server:build": "cargo build --manifest-path quantanote-cloud/Cargo.toml --release",
     "docs:dev": "cd docs && pnpm dev",
     "docs:build": "cd docs && pnpm build",
+    "docs:check": "node scripts/check-docs.mjs",
     "bump": "node scripts/bump-version.mjs"
   },
   "dependencies": {

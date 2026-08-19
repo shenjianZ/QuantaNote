@@ -18,7 +18,7 @@ pub async fn health_check(State(state): State<AppState>) -> impl IntoResponse {
 pub async fn server_info() -> impl IntoResponse {
     Json(json!({
         "name": "quantanote-cloud",
-        "version": "0.3.0",
+        "version": "0.4.0",
         "status": "running",
         "timestamp": chrono::Utc::now().timestamp()
     }))
