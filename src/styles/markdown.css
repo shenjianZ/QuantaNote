@@ -283,6 +283,26 @@
     font-weight: 400;
 }
 
+/* 定义列表: 术语与描述保持清晰的层级关系 */
+.markdown-preview dl {
+    margin: 0.7em 0 !important;
+}
+
+.markdown-preview dt {
+    margin-top: 0.65em;
+    color: var(--md-heading);
+    font-weight: 600;
+}
+
+.markdown-preview dt:first-child {
+    margin-top: 0;
+}
+
+.markdown-preview dd {
+    margin: 0.18em 0 0.45em 1.35em;
+    color: var(--md-text);
+}
+
 .markdown-preview input[type="checkbox"],
 .vditor-reset input[type="checkbox"] {
     width: 0.95rem;
@@ -649,6 +669,20 @@
     font-size: 0.85rem !important;
     line-height: 1.5 !important;
     tab-size: 2;
+}
+
+/* Mermaid / flowchart: Vditor 会异步将代码节点替换为 SVG */
+.markdown-preview .markdown-diagram-block > pre > code {
+    overflow-x: auto;
+    text-align: center;
+    white-space: normal !important;
+}
+
+.markdown-preview .markdown-diagram-block svg {
+    display: inline-block;
+    max-width: 100%;
+    height: auto;
+    vertical-align: middle;
 }
 
 /* Callout: Notion 灰底色块, 图标与标签按 kind 低饱和分色 */
@@ -1024,6 +1058,40 @@
     outline: 2px solid color-mix(in srgb, var(--md-blue) 25%, transparent);
     outline-offset: 1px;
     border-color: var(--md-blue);
+}
+
+.quantanote-vditor-table-panel__alignment {
+    display: grid;
+    gap: 0.4rem;
+}
+
+.quantanote-vditor-table-panel__alignment-label {
+    color: var(--md-secondary);
+    font-size: var(--font-size-xs);
+}
+
+.quantanote-vditor-table-panel__alignment-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.35rem;
+}
+
+.quantanote-vditor-table-panel__alignment-actions button {
+    min-width: 0;
+    border: 1px solid var(--md-border);
+    border-radius: 4px;
+    background: var(--field);
+    color: var(--md-text);
+    padding: 0.3rem 0.25rem;
+    font: inherit;
+    font-size: var(--font-size-xs);
+    cursor: pointer;
+}
+
+.quantanote-vditor-table-panel__alignment-actions button:hover,
+.quantanote-vditor-table-panel__alignment-actions button:focus-visible {
+    border-color: var(--md-blue);
+    color: var(--md-blue);
 }
 
 .quantanote-vditor-table-panel__actions {

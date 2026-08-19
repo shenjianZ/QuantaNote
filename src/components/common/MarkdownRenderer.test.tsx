@@ -2,9 +2,17 @@ import { describe, expect, it, vi } from "vitest";
 import { screen } from "@testing-library/react";
 import { setup } from "../../test/test-utils";
 import { MarkdownRenderer } from "./MarkdownRenderer";
+import Vditor from "vditor";
 
 vi.mock("@tauri-apps/plugin-opener", () => ({
   openUrl: vi.fn(),
+}));
+
+vi.mock("vditor", () => ({
+  default: {
+    mermaidRender: vi.fn(),
+    flowchartRender: vi.fn(),
+  },
 }));
 
 describe("MarkdownRenderer", () => {
@@ -89,5 +97,77 @@ const answer: number = 42;
     expect(screen.getByText("展开补充说明")).toBeInTheDocument();
     expect(document.querySelector(".markdown-audio-frame audio")).toHaveAttribute("controls");
     expect(document.querySelector("pre")?.textContent).toContain("preserved text");
+  });
+
+  it("renders definition lists and delegates diagram blocks to Vditor", () => {
+    setup(
+      <MarkdownRenderer
+        theme="light"
+        content={`Markdown
+: 一种轻量级标记语言。
+
+QuantaNote
+: 一个支持 **Markdown** 的笔记应用。
+: 第二条定义。
+
+\`\`\`mermaid
+graph TD
+  A[开始] --> B[结束]
+\`\`\`
+
+\`\`\`flowchart
+st=>start: 开始
+e=>end: 结束
+st->e
+\`\`\``}
+      />,
+    );
+
+    expect(document.querySelector("dl")).toBeInTheDocument();
+    expect(document.querySelectorAll("dl dt")).toHaveLength(2);
+    expect(document.querySelectorAll("dl dd")).toHaveLength(3);
+    expect(document.querySelector("dl dd strong")).toHaveTextContent("Markdown");
+    expect(document.querySelector(".markdown-diagram-block[data-language='mermaid'] code")).toHaveTextContent("graph TD");
+    expect(document.querySelector(".markdown-diagram-block[data-language='flowchart'] code")).toHaveTextContent("st=>start: 开始");
+    expect(Vditor.mermaidRender).toHaveBeenCalledWith(expect.any(HTMLElement), "/vditor", "light");
+    expect(Vditor.flowchartRender).toHaveBeenCalledWith(expect.any(HTMLElement), "/vditor");
+  });
+
+  it("does not rerender diagrams when the parent rerenders with the same props", () => {
+    const view = setup(
+      <div>
+        <MarkdownRenderer
+          theme="dark"
+          content={`\`\`\`mermaid
+graph TD
+  A[开始] --> B[结束]
+\`\`\``}
+        />
+      </div>,
+    );
+
+    expect(Vditor.mermaidRender).toHaveBeenCalledTimes(1);
+
+    view.rerender(
+      <div data-render="after-scroll">
+        <MarkdownRenderer
+          theme="dark"
+          content={`\`\`\`mermaid
+graph TD
+  A[开始] --> B[结束]
+\`\`\``}
+        />
+      </div>,
+    );
+
+    expect(Vditor.mermaidRender).toHaveBeenCalledTimes(1);
+  });
+
+  it("loads preview images eagerly instead of showing lazy placeholders", () => {
+    setup(
+      <MarkdownRenderer content="![预览图片](https://example.com/image.png)" />,
+    );
+
+    expect(document.querySelector(".markdown-image-frame img")).toHaveAttribute("loading", "eager");
   });
 });

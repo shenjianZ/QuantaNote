@@ -1,10 +1,12 @@
-import { Children, cloneElement, isValidElement, useCallback, useState, type ReactElement, type ReactNode } from "react";
+import { Children, cloneElement, isValidElement, memo, useCallback, useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { Check, CircleAlert, Copy, Info, Lightbulb, OctagonAlert, TriangleAlert } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import Vditor from "vditor";
 import rehypeKatex from "rehype-katex";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkBreaks from "remark-breaks";
+import remarkDefinitionList, { defListHastHandlers } from "remark-definition-list";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import hljs from "highlight.js/lib/core";
@@ -21,6 +23,9 @@ import xml from "highlight.js/lib/languages/xml";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "react-i18next";
 import type { Components } from "react-markdown";
+import { VDITOR_CDN } from "../../utils/vditorConfig";
+import { copyTextToSystemClipboard } from "../../utils/clipboard";
+import { useToastStore } from "../../stores/toastStore";
 import "katex/dist/katex.min.css";
 
 hljs.registerLanguage("bash", bash);
@@ -42,7 +47,7 @@ const markdownSanitizeSchema = {
     source: [...(defaultSchema.attributes?.source ?? []), "src"],
     video: ["controls", "preload", "poster", "src"],
   },
-  tagNames: [...(defaultSchema.tagNames ?? []), "audio", "video"],
+  tagNames: [...(defaultSchema.tagNames ?? []), "audio", "video", "dl", "dt", "dd"],
 };
 
 interface MarkdownRendererProps {
@@ -115,32 +120,38 @@ function highlightCode(code: string, language?: string): string {
   }
 }
 
-function CodeBlock({ code, language, lang }: { code: string; language?: string; lang?: "zh_CN" | "en_US" }) {
+function CodeBlock({
+  code,
+  language,
+  lang,
+  theme,
+}: {
+  code: string;
+  language?: string;
+  lang?: "zh_CN" | "en_US";
+  theme: "dark" | "light";
+}) {
   const [copied, setCopied] = useState(false);
   const isEnglish = lang === "en_US";
 
   const handleCopy = async () => {
     try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(code);
-      } else {
-        const textarea = document.createElement("textarea");
-        textarea.value = code;
-        textarea.style.position = "fixed";
-        textarea.style.opacity = "0";
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand("copy");
-        textarea.remove();
-      }
+      await copyTextToSystemClipboard(code);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1400);
+      useToastStore.getState().addToast("success", isEnglish ? "Copied to clipboard" : "已复制到剪贴板");
     } catch {
       setCopied(false);
+      useToastStore.getState().addToast("error", isEnglish ? "Copy failed" : "复制失败");
     }
   };
 
   const label = language || (isEnglish ? "code" : "代码");
+
+  if (language === "mermaid" || language === "flowchart") {
+    return <DiagramBlock code={code} language={language} lang={lang} theme={theme} />;
+  }
+
   return (
     <figure className="markdown-code-block" data-language={language || undefined}>
       <div className="markdown-code-toolbar">
@@ -161,6 +172,71 @@ function CodeBlock({ code, language, lang }: { code: string; language?: string; 
           className={`hljs${language ? ` language-${language}` : ""}`}
           dangerouslySetInnerHTML={{ __html: highlightCode(code, language) }}
         />
+      </pre>
+    </figure>
+  );
+}
+
+function DiagramBlock({
+  code,
+  language,
+  lang,
+  theme,
+}: {
+  code: string;
+  language: "mermaid" | "flowchart";
+  lang?: "zh_CN" | "en_US";
+  theme: "dark" | "light";
+}) {
+  const codeRef = useRef<HTMLElement>(null);
+  const isEnglish = lang === "en_US";
+
+  useEffect(() => {
+    const codeElement = codeRef.current;
+    const container = codeElement?.closest<HTMLElement>(".markdown-diagram-block");
+    if (!codeElement || !container) return;
+
+    codeElement.textContent = code;
+    codeElement.removeAttribute("data-processed");
+    if (language === "mermaid") {
+      Vditor.mermaidRender(container, VDITOR_CDN, theme);
+    } else {
+      Vditor.flowchartRender(container, VDITOR_CDN);
+    }
+
+    return () => {
+      codeElement.textContent = code;
+      codeElement.removeAttribute("data-processed");
+    };
+  }, [code, language, theme]);
+
+  const handleCopy = async () => {
+    try {
+      await copyTextToSystemClipboard(code);
+      useToastStore.getState().addToast("success", isEnglish ? "Copied to clipboard" : "已复制到剪贴板");
+    } catch {
+      // Diagram rendering should remain usable when clipboard access is unavailable.
+      useToastStore.getState().addToast("error", isEnglish ? "Copy failed" : "复制失败");
+    }
+  };
+
+  return (
+    <figure className="markdown-code-block markdown-diagram-block" data-language={language}>
+      <div className="markdown-code-toolbar">
+        <span className="markdown-code-language">{language}</span>
+        <button
+          className="markdown-code-copy"
+          type="button"
+          onClick={handleCopy}
+          aria-label={isEnglish ? "Copy code" : "复制代码"}
+          title={isEnglish ? "Copy code" : "复制代码"}
+        >
+          <Copy className="h-3.5 w-3.5" />
+          <span>{isEnglish ? "Copy" : "复制"}</span>
+        </button>
+      </div>
+      <pre>
+        <code ref={codeRef} className={`language-${language}`}>{code}</code>
       </pre>
     </figure>
   );
@@ -202,7 +278,7 @@ function CalloutIcon({ kind }: { kind: CalloutKind }) {
   return <Icon className="markdown-callout-icon" aria-hidden="true" />;
 }
 
-export function MarkdownRenderer({ content, theme = "dark", lang, emptyText }: MarkdownRendererProps) {
+export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme = "dark", lang, emptyText }: MarkdownRendererProps) {
   const { t } = useTranslation();
   const resolvedEmptyText = emptyText ?? t("common:emptyItem.noContent");
   const headingCounts = new Map<string, number>();
@@ -288,7 +364,7 @@ export function MarkdownRenderer({ content, theme = "dark", lang, emptyText }: M
       if (!src) return null;
       return (
         <span className="markdown-image-frame">
-          <img src={src} alt={alt || ""} title={title} loading="lazy" decoding="async" />
+          <img src={src} alt={alt || ""} title={title} loading="eager" decoding="async" />
           {alt && <span className="markdown-image-caption">{alt}</span>}
         </span>
       );
@@ -323,7 +399,7 @@ export function MarkdownRenderer({ content, theme = "dark", lang, emptyText }: M
       const code = rawCode.replace(/\n$/, "");
       const isBlock = Boolean(language) || rawCode.includes("\n");
       if (!isBlock) return <code className={className}>{children}</code>;
-      return <CodeBlock code={code} language={language} lang={lang} />;
+      return <CodeBlock code={code} language={language} lang={lang} theme={theme} />;
     },
   };
 
@@ -335,7 +411,8 @@ export function MarkdownRenderer({ content, theme = "dark", lang, emptyText }: M
       onClick={handleClick}
     >
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkBreaks, remarkMath]}
+        remarkPlugins={[remarkGfm, remarkBreaks, remarkMath, remarkDefinitionList]}
+        remarkRehypeOptions={{ handlers: defListHastHandlers }}
         rehypePlugins={[rehypeRaw, [rehypeSanitize, markdownSanitizeSchema], rehypeKatex]}
         components={components}
       >
@@ -343,4 +420,4 @@ export function MarkdownRenderer({ content, theme = "dark", lang, emptyText }: M
       </ReactMarkdown>
     </article>
   );
-}
+});
