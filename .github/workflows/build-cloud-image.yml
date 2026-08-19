@@ -27,7 +27,7 @@ env:
 
 jobs:
     build-cloud:
-        if: github.event_name == 'workflow_call' || (github.event_name == 'workflow_dispatch' && inputs.cloud == true)
+        if: github.event_name != 'workflow_dispatch' || inputs.cloud == true
         runs-on: ubuntu-latest
 
         steps:
