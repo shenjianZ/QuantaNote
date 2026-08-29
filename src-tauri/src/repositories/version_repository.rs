@@ -2,6 +2,7 @@ use rusqlite::params;
 
 use crate::db::DbState;
 use crate::error::AppError;
+use crate::models::item::ItemDto;
 use crate::models::version::VersionDto;
 use crate::utils::ids;
 
@@ -47,6 +48,121 @@ pub fn create_version(
         description: description.to_string(),
         created_at: now,
     })
+}
+
+/// Restore a version and preserve the current content as a new version.
+///
+/// The snapshot and item update must be committed together. Otherwise a
+/// failed second operation could leave the user without a way to undo the
+/// restore or leave the editor showing content that was not persisted.
+pub fn restore_version_with_snapshot(db: &DbState, version_id: &str) -> Result<ItemDto, AppError> {
+    let mut conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    let tx = conn
+        .transaction()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+    let version = tx
+        .query_row(
+            "SELECT id, item_id, version_number, content, change_summary, name, description, created_at
+             FROM versions WHERE id = ?1",
+            params![version_id],
+            |row| {
+                Ok(VersionDto {
+                    id: row.get(0)?,
+                    item_id: row.get(1)?,
+                    version_number: row.get(2)?,
+                    content: row.get(3)?,
+                    change_summary: row.get(4)?,
+                    name: row.get(5)?,
+                    description: row.get(6)?,
+                    created_at: row.get(7)?,
+                })
+            },
+        )
+        .map_err(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => {
+                AppError::NotFound(format!("Version {}", version_id))
+            }
+            _ => AppError::Database(e.to_string()),
+        })?;
+
+    let current = tx
+        .query_row(
+            "SELECT id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at
+             FROM items WHERE id = ?1",
+            params![version.item_id],
+            |row| {
+                Ok(ItemDto {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    item_type: row.get(2)?,
+                    content: row.get(3)?,
+                    summary: row.get(4)?,
+                    pinned: row.get::<_, i32>(5)? != 0,
+                    favorite: row.get::<_, i32>(6)? != 0,
+                    encrypted: row.get::<_, i32>(7)? != 0,
+                    created_at: row.get(8)?,
+                    updated_at: row.get(9)?,
+                })
+            },
+        )
+        .map_err(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => {
+                AppError::NotFound(format!("Item {}", version.item_id))
+            }
+            _ => AppError::Database(e.to_string()),
+        })?;
+
+    let restored = if current.content == version.content {
+        current
+    } else {
+        let max_ver: i32 = tx
+            .query_row(
+                "SELECT COALESCE(MAX(version_number), 0) FROM versions WHERE item_id = ?1",
+                params![version.item_id],
+                |row| row.get(0),
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        let snapshot_id = ids::new_id("ver");
+        let snapshot_created_at = chrono::Utc::now().to_rfc3339();
+        let snapshot_name = format!("恢复前快照 · v{}", version.version_number);
+        let snapshot_summary = format!("恢复自版本 v{} 前自动快照", version.version_number);
+
+        tx.execute(
+            "INSERT INTO versions (id, item_id, version_number, content, change_summary, name, description, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                snapshot_id,
+                version.item_id,
+                max_ver + 1,
+                current.content,
+                snapshot_summary,
+                snapshot_name,
+                "用于撤销本次恢复操作",
+                snapshot_created_at,
+            ],
+        )
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+        let updated_at = chrono::Utc::now().to_rfc3339();
+        tx.execute(
+            "UPDATE items SET content = ?1, updated_at = ?2 WHERE id = ?3",
+            params![version.content, updated_at, version.item_id],
+        )
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+        ItemDto {
+            content: version.content,
+            updated_at,
+            ..current
+        }
+    };
+
+    tx.commit().map_err(|e| AppError::Database(e.to_string()))?;
+    Ok(restored)
 }
 
 pub fn get_versions(db: &DbState, item_id: &str) -> Result<Vec<VersionDto>, AppError> {

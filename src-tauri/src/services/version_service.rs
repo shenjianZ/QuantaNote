@@ -39,31 +39,11 @@ pub fn update_version(
     version_repository::update_version(db, id, name, description)
 }
 
-pub fn restore_version(db: &DbState, version_id: &str) -> Result<(), AppError> {
-    let version = version_repository::get_version(db, version_id)?;
-    item_repository::update(
-        db,
-        crate::models::item::UpdateItemPayload {
-            id: version.item_id.clone(),
-            title: None,
-            content: Some(version.content.clone()),
-            summary: None,
-            pinned: None,
-            favorite: None,
-            encrypted: None,
-        },
-    )?;
-    Ok(())
-}
-
 pub fn restore_version_and_get_item(
     db: &DbState,
     version_id: &str,
 ) -> Result<crate::models::item::ItemDto, AppError> {
-    let version = version_repository::get_version(db, version_id)?;
-    let item_id = version.item_id.clone();
-    restore_version(db, version_id)?;
-    item_repository::get_item(db, &item_id)
+    version_repository::restore_version_with_snapshot(db, version_id)
 }
 
 pub fn delete_version(db: &DbState, version_id: &str) -> Result<(), AppError> {
@@ -105,7 +85,7 @@ mod tests {
     }
 
     #[test]
-    fn restore_version_updates_content_without_touching_title_or_flags() {
+    fn restore_version_creates_undo_snapshot_and_preserves_item_metadata() {
         let db = crate::test_support::test_db();
         let item = crate::services::item_service::create_item(
             &db,
@@ -130,13 +110,21 @@ mod tests {
         let version = create_version(&db, &item.id, "历史内容", "手动保存", Some("history"), None)
             .expect("create version");
 
-        restore_version(&db, &version.id).expect("restore version");
+        restore_version_and_get_item(&db, &version.id).expect("restore version");
 
         let restored = crate::services::item_service::get_item(&db, &item.id).expect("get item");
         assert_eq!(restored.title, "恢复测试-改名");
         assert_eq!(restored.content, "历史内容");
+        assert_eq!(restored.summary, "初始内容");
         assert!(restored.pinned);
         assert!(restored.favorite);
+
+        let versions = get_versions(&db, &item.id).expect("get restored versions");
+        assert_eq!(versions.len(), 3);
+        assert_eq!(versions[0].content, "当前内容");
+        assert_eq!(versions[0].name, "恢复前快照 · v2");
+        assert_eq!(versions[0].change_summary, "恢复自版本 v2 前自动快照");
+        assert_eq!(versions[0].description, "用于撤销本次恢复操作");
     }
 
     #[test]

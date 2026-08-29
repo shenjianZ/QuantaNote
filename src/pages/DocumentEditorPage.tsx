@@ -9,7 +9,7 @@ import { VersionPanel, type VersionDto } from "../components/editor/VersionPanel
 import { DocumentOutline, DocumentOutlineToggle } from "../components/editor/DocumentOutline";
 import type { VditorEditorHandle } from "../components/editor/VditorEditor";
 import { ContentWidthControl } from "../components/common/ContentWidthControl";
-import { getVersions, createVersion, updateVersion, restoreVersion, deleteVersion } from "../services/tauriCommands";
+import { getVersions, createVersion, updateVersion, restoreVersion, deleteVersion, type ItemDto } from "../services/tauriCommands";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useResponsiveContentWidth } from "../hooks/useResponsiveContentWidth";
 import { CONTENT_WIDTH_EDITOR_BASE, CONTENT_WIDTH_OUTLINE_LAYOUT } from "../utils/contentWidth";
@@ -362,9 +362,28 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
 
   async function handleRestore(version: VersionDto) {
     try {
-      const updatedItem = await restoreVersion(version.id) as { id: string; title: string; content: string };
+      const updatedItem = await restoreVersion(version.id) as ItemDto;
       setContent(updatedItem.content);
       setTitle(updatedItem.title);
+      setSummary(updatedItem.summary || "");
+      latestTitle.current = updatedItem.title;
+      latestSummary.current = updatedItem.summary || "";
+      latestContent.current = updatedItem.content;
+      setSaved(true);
+      editorRef.current?.setValue(updatedItem.content);
+
+      if (selectedItemId) {
+        setVersionsLoaded(false);
+        try {
+          const refreshedVersions = await getVersions(selectedItemId);
+          setVersions(refreshedVersions as VersionDto[]);
+        } catch (refreshError) {
+          console.error("Refresh versions after restore failed:", refreshError);
+        } finally {
+          setVersionsLoaded(true);
+        }
+      }
+
       useToastStore.getState().addToast("success", t("common:toast.versionRestored"));
     } catch (e) {
       console.error("Restore version failed:", e);

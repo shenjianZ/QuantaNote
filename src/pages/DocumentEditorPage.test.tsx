@@ -8,7 +8,10 @@ import { useSettingsStore } from "../stores/settingsStore";
 import { useAttachmentStore } from "../stores/attachmentStore";
 import { mockIPC } from "@tauri-apps/api/mocks";
 
-const { scrollToHeadingMock } = vi.hoisted(() => ({ scrollToHeadingMock: vi.fn() }));
+const { scrollToHeadingMock, setValueMock } = vi.hoisted(() => ({
+  scrollToHeadingMock: vi.fn(),
+  setValueMock: vi.fn(),
+}));
 
 vi.mock("../components/editor/VditorEditor", () => {
   const React = require("react");
@@ -18,7 +21,7 @@ vi.mock("../components/editor/VditorEditor", () => {
         ref,
         () => ({
           getValue: () => initialValue,
-          setValue: () => {},
+          setValue: setValueMock,
           focus: () => {},
           saveSelection: () => {},
           scrollToHeading: scrollToHeadingMock,
@@ -40,11 +43,35 @@ describe("DocumentEditorPage", () => {
   const onBackToPreview = vi.fn();
   const updateItemMock = vi.fn(async () => {});
   let mockedVersions: unknown[] = [];
+  let mockedRestoredItem = {
+    id: "item-1",
+    title: "恢复后的标题",
+    item_type: "note",
+    content: "恢复后的内容",
+    summary: "恢复后的摘要",
+    pinned: false,
+    favorite: false,
+    encrypted: false,
+    created_at: "2026-01-01",
+    updated_at: "2026-01-02",
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useRealTimers();
     mockedVersions = [];
+    mockedRestoredItem = {
+      id: "item-1",
+      title: "恢复后的标题",
+      item_type: "note",
+      content: "恢复后的内容",
+      summary: "恢复后的摘要",
+      pinned: false,
+      favorite: false,
+      encrypted: false,
+      created_at: "2026-01-01",
+      updated_at: "2026-01-02",
+    };
 
     useAppStore.setState({ selectedItemId: "item-1", theme: "light" });
     useItemStore.setState({
@@ -72,6 +99,7 @@ describe("DocumentEditorPage", () => {
       if (cmd === "get_versions") return mockedVersions;
       if (cmd === "get_attachments") return [];
       if (cmd === "create_version") return { id: "ver-1", version_number: 1, content: "c", name: "v1", description: "", created_at: new Date().toISOString() };
+      if (cmd === "restore_version") return mockedRestoredItem;
       return null;
     });
   });
@@ -214,6 +242,40 @@ describe("DocumentEditorPage", () => {
     const button = await screen.findByTitle("保存为新版本");
     await user.click(button);
     expect(screen.getByText(/版本 \(1\)/)).toBeInTheDocument();
+  });
+
+  it("restores a version and refreshes editor state and version list", async () => {
+    mockedVersions = [{
+      id: "ver-history",
+      item_id: "item-1",
+      version_number: 1,
+      content: "历史内容",
+      change_summary: "初始版本",
+      name: "初始版本",
+      description: "",
+      created_at: "2026-01-01",
+    }];
+    mockedRestoredItem = {
+      ...mockedRestoredItem,
+      title: "历史标题",
+      content: "历史内容",
+      summary: "历史摘要",
+    };
+
+    const { user } = setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
+    await user.click(screen.getByTestId("doc-version-toggle"));
+    await user.click(await screen.findByTestId("version-panel-view-btn"));
+    await user.click(screen.getByTestId("version-restore-btn"));
+    await user.click(screen.getByTestId("version-restore-btn"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("vditor")).toHaveValue("历史内容");
+      expect(screen.getByTestId("doc-title-input")).toHaveValue("历史标题");
+      expect(screen.getByTestId("doc-summary-input")).toHaveValue("历史摘要");
+      expect(screen.getByText(/版本 \(1\)/)).toBeInTheDocument();
+    });
+    expect(setValueMock).toHaveBeenCalledWith("历史内容");
+    expect(screen.getByText("已保存")).toBeInTheDocument();
   });
 
   it("disables save version when current content matches latest version", async () => {
