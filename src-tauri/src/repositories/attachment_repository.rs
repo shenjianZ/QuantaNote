@@ -1,5 +1,5 @@
 use rusqlite::params;
-use std::path::PathBuf;
+use std::path::{Component, Path, PathBuf};
 
 use crate::db::DbState;
 use crate::error::AppError;
@@ -8,6 +8,142 @@ use crate::utils::{ids, paths};
 
 fn resolve_file_path(relative_path: &str) -> PathBuf {
     paths::quantanote_dir().join(relative_path)
+}
+
+const CLEANUP_QUEUE_FILENAME: &str = ".attachment-cleanup-queue.json";
+
+fn cleanup_queue_path() -> PathBuf {
+    paths::quantanote_dir().join(CLEANUP_QUEUE_FILENAME)
+}
+
+fn read_cleanup_queue() -> Result<Vec<String>, AppError> {
+    let path = cleanup_queue_path();
+    let content = match std::fs::read_to_string(path) {
+        Ok(content) => content,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(AppError::Io(error.to_string())),
+    };
+
+    serde_json::from_str(&content)
+        .map_err(|error| AppError::Io(format!("读取附件清理队列失败: {}", error)))
+}
+
+fn write_cleanup_queue(paths: &[String]) -> Result<(), AppError> {
+    let queue_path = cleanup_queue_path();
+    if paths.is_empty() {
+        match std::fs::remove_file(queue_path) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(AppError::Io(error.to_string())),
+        }
+        return Ok(());
+    }
+
+    let content = serde_json::to_vec_pretty(paths)
+        .map_err(|error| AppError::Io(format!("写入附件清理队列失败: {}", error)))?;
+    std::fs::write(queue_path, content).map_err(|error| AppError::Io(error.to_string()))
+}
+
+fn enqueue_cleanup_paths(paths: &[String]) -> Result<(), AppError> {
+    if paths.is_empty() {
+        return Ok(());
+    }
+
+    let mut queued = read_cleanup_queue()?;
+    for path in paths {
+        if !queued.iter().any(|existing| existing == path) {
+            queued.push(path.clone());
+        }
+    }
+    write_cleanup_queue(&queued)
+}
+
+/// 只允许删除附件目录内的相对文件，避免数据库中的异常路径影响其他文件。
+fn resolve_safe_attachment_file_path(relative_path: &str) -> Result<PathBuf, AppError> {
+    let path = Path::new(relative_path);
+    if path.is_absolute() {
+        return Err(AppError::Validation(format!(
+            "附件路径必须是相对路径: {}",
+            relative_path
+        )));
+    }
+
+    let mut components = path.components();
+    match components.next() {
+        Some(Component::Normal(name)) if name == "attachments" => {}
+        _ => {
+            return Err(AppError::Validation(format!(
+                "附件路径必须位于 attachments 目录: {}",
+                relative_path
+            )))
+        }
+    }
+
+    if components.any(|component| !matches!(component, Component::Normal(_))) {
+        return Err(AppError::Validation(format!(
+            "附件路径包含非法组件: {}",
+            relative_path
+        )));
+    }
+
+    Ok(paths::quantanote_dir().join(path))
+}
+
+/// 清理附件文件。数据库记录删除后，如果文件暂时无法删除，会进入可重试队列。
+pub fn cleanup_file_paths(relative_paths: &[String]) -> Result<(), AppError> {
+    let _ = retry_pending_file_cleanup();
+    let mut failed = Vec::new();
+
+    for relative_path in relative_paths {
+        let full_path = resolve_safe_attachment_file_path(relative_path)?;
+        match std::fs::remove_file(&full_path) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(_) => failed.push(relative_path.clone()),
+        }
+    }
+
+    if failed.is_empty() {
+        return Ok(());
+    }
+
+    enqueue_cleanup_paths(&failed).map_err(|error| {
+        AppError::Io(format!(
+            "附件记录已删除，但文件清理失败且无法加入重试队列: {}",
+            error
+        ))
+    })?;
+    log::warn!("{} 个附件文件暂时无法删除，已加入重试队列", failed.len());
+    Ok(())
+}
+
+/// 重试之前因权限、占用等原因未能删除的附件文件。
+pub fn retry_pending_file_cleanup() -> Result<usize, AppError> {
+    let queued = read_cleanup_queue()?;
+    if queued.is_empty() {
+        return Ok(0);
+    }
+
+    let mut remaining = Vec::new();
+    let mut cleaned = 0;
+    for relative_path in queued {
+        let full_path = match resolve_safe_attachment_file_path(&relative_path) {
+            Ok(path) => path,
+            Err(error) => {
+                log::error!("跳过非法附件清理路径 {}: {}", relative_path, error);
+                remaining.push(relative_path);
+                continue;
+            }
+        };
+        match std::fs::remove_file(full_path) {
+            Ok(()) => cleaned += 1,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => cleaned += 1,
+            Err(_) => remaining.push(relative_path),
+        }
+    }
+
+    write_cleanup_queue(&remaining)?;
+    Ok(cleaned)
 }
 
 /// 清洗路径组件，仅保留安全字符，防止路径穿越
@@ -276,10 +412,7 @@ pub fn delete(db: &DbState, id: &str) -> Result<(), AppError> {
 
     // 删除文件（在 DB 记录删除之后，避免删了文件但 DB 记录还在的不一致状态）
     if let Some(rel) = relative_path {
-        let full_path = resolve_file_path(&rel);
-        if full_path.exists() {
-            std::fs::remove_file(&full_path).map_err(|e| AppError::Io(e.to_string()))?;
-        }
+        cleanup_file_paths(&[rel])?;
     }
 
     Ok(())
@@ -336,6 +469,24 @@ mod tests {
 
         let list = get_by_item(&db, &item_id).unwrap();
         assert!(list.is_empty());
+    }
+
+    #[test]
+    fn retry_pending_file_cleanup_removes_queued_file() {
+        let data_dir = crate::test_support::unique_temp_dir("att-cleanup-queue");
+        let _guard = crate::test_support::lock_test_data_dir(&data_dir);
+        let relative_path = format!("attachments/retry-{}/pending.bin", uuid::Uuid::new_v4());
+        let full_path = paths::quantanote_dir().join(&relative_path);
+        std::fs::create_dir_all(full_path.parent().expect("pending file parent"))
+            .expect("create pending file parent");
+        std::fs::write(&full_path, b"pending").expect("write pending file");
+        write_cleanup_queue(std::slice::from_ref(&relative_path)).expect("write cleanup queue");
+
+        assert_eq!(retry_pending_file_cleanup().expect("retry cleanup"), 1);
+        assert!(!full_path.exists());
+        assert!(!cleanup_queue_path().exists());
+
+        let _ = std::fs::remove_dir_all(data_dir);
     }
 
     #[test]

@@ -423,6 +423,7 @@ pub fn collect_local_attachments(
 }
 
 pub fn apply_pulled_records(records: &[SyncRecordPayload], db: &DbState) -> Result<(), AppError> {
+    use crate::repositories::attachment_repository;
     use crate::sync::{apply_attachment, apply_item, apply_item_tag, apply_tag, apply_version};
 
     let conn = db
@@ -436,8 +437,37 @@ pub fn apply_pulled_records(records: &[SyncRecordPayload], db: &DbState) -> Resu
 
     let mut sorted_records: Vec<&SyncRecordPayload> = records.iter().collect();
     sorted_records.sort_by_key(|r| table_priority(&r.table_name));
+    let mut attachment_cleanup_paths = Vec::new();
 
     for record in sorted_records {
+        if record.data["_deleted"].as_bool().unwrap_or(false) {
+            match record.table_name.as_str() {
+                "items" => {
+                    let item_id = record.data["id"].as_str().unwrap_or_default();
+                    let mut stmt = tx
+                        .prepare("SELECT file_path FROM attachments WHERE item_id = ?1")
+                        .map_err(|e| AppError::Database(e.to_string()))?;
+                    let paths = stmt
+                        .query_map(rusqlite::params![item_id], |row| row.get::<_, String>(0))
+                        .map_err(|e| AppError::Database(e.to_string()))?
+                        .collect::<Result<Vec<_>, _>>()
+                        .map_err(|e| AppError::Database(e.to_string()))?;
+                    attachment_cleanup_paths.extend(paths);
+                }
+                "attachments" => {
+                    let attachment_id = record.data["id"].as_str().unwrap_or_default();
+                    if let Ok(file_path) = tx.query_row(
+                        "SELECT file_path FROM attachments WHERE id = ?1",
+                        rusqlite::params![attachment_id],
+                        |row| row.get::<_, String>(0),
+                    ) {
+                        attachment_cleanup_paths.push(file_path);
+                    }
+                }
+                _ => {}
+            }
+        }
+
         let result = match record.table_name.as_str() {
             "items" => apply_item(&tx, &record.data),
             "tags" => apply_tag(&tx, &record.data),
@@ -455,6 +485,9 @@ pub fn apply_pulled_records(records: &[SyncRecordPayload], db: &DbState) -> Resu
 
     tx.commit()
         .map_err(|e| AppError::Database(format!("提交事务失败: {}", e)))?;
+    drop(conn);
+
+    attachment_repository::cleanup_file_paths(&attachment_cleanup_paths)?;
 
     Ok(())
 }
@@ -467,5 +500,114 @@ fn table_priority(table_name: &str) -> u8 {
         "versions" => 3,
         "attachments" => 4,
         _ => 5,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::sync::SyncRecordPayload;
+    use crate::repositories::{attachment_repository, item_repository};
+
+    fn deleted_record(
+        table_name: &str,
+        record_id: &str,
+        data: serde_json::Value,
+    ) -> SyncRecordPayload {
+        SyncRecordPayload {
+            table_name: table_name.to_string(),
+            record_id: record_id.to_string(),
+            content_hash: String::new(),
+            updated_at: "2026-08-29T00:00:00Z".to_string(),
+            data,
+        }
+    }
+
+    #[test]
+    fn pulled_item_deletion_removes_attachment_files_after_transaction_commit() {
+        let data_dir = crate::test_support::unique_temp_dir("sync-delete-item-attachments");
+        let _guard = crate::test_support::lock_test_data_dir(&data_dir);
+        let db = crate::test_support::test_db();
+        let item = item_repository::create(
+            &db,
+            crate::models::item::CreateItemPayload {
+                title: "同步删除笔记".to_string(),
+                item_type: "note".to_string(),
+                content: None,
+                summary: String::new(),
+            },
+        )
+        .expect("create item");
+        let attachment = attachment_repository::add_bytes(
+            &db,
+            item.id.clone(),
+            "image.png".to_string(),
+            "image/png".to_string(),
+            vec![1, 2, 3],
+        )
+        .expect("add attachment");
+
+        apply_pulled_records(
+            &[deleted_record(
+                "items",
+                &item.id,
+                serde_json::json!({
+                    "id": item.id,
+                    "_deleted": true,
+                    "deleted_at": "2026-08-29T00:00:00Z"
+                }),
+            )],
+            &db,
+        )
+        .expect("apply deleted item");
+
+        assert!(!std::path::Path::new(&attachment.file_path).exists());
+        assert!(item_repository::get_item(&db, &item.id).is_err());
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn pulled_attachment_deletion_removes_attachment_file_after_transaction_commit() {
+        let data_dir = crate::test_support::unique_temp_dir("sync-delete-attachment");
+        let _guard = crate::test_support::lock_test_data_dir(&data_dir);
+        let db = crate::test_support::test_db();
+        let item = item_repository::create(
+            &db,
+            crate::models::item::CreateItemPayload {
+                title: "同步删除附件".to_string(),
+                item_type: "note".to_string(),
+                content: None,
+                summary: String::new(),
+            },
+        )
+        .expect("create item");
+        let attachment = attachment_repository::add_bytes(
+            &db,
+            item.id.clone(),
+            "image.png".to_string(),
+            "image/png".to_string(),
+            vec![4, 5, 6],
+        )
+        .expect("add attachment");
+
+        apply_pulled_records(
+            &[deleted_record(
+                "attachments",
+                &attachment.id,
+                serde_json::json!({
+                    "id": attachment.id,
+                    "_deleted": true,
+                    "deleted_at": "2026-08-29T00:00:00Z"
+                }),
+            )],
+            &db,
+        )
+        .expect("apply deleted attachment");
+
+        assert!(!std::path::Path::new(&attachment.file_path).exists());
+        assert!(attachment_repository::get_by_item(&db, &item.id)
+            .expect("list attachments")
+            .is_empty());
+        let _ = std::fs::remove_dir_all(data_dir);
     }
 }

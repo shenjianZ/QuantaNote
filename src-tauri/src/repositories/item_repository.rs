@@ -3,6 +3,7 @@ use rusqlite::params;
 use crate::db::DbState;
 use crate::error::AppError;
 use crate::models::item::*;
+use crate::repositories::attachment_repository;
 use crate::utils::ids;
 
 fn row_to_item(row: &rusqlite::Row) -> rusqlite::Result<ItemDto> {
@@ -166,6 +167,17 @@ pub fn delete(db: &DbState, id: &str) -> Result<(), AppError> {
         return Err(AppError::NotFound(format!("Item {}", id)));
     }
 
+    let attachment_paths: Vec<String> = {
+        let mut stmt = conn
+            .prepare("SELECT file_path FROM attachments WHERE item_id = ?1")
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        let rows = stmt
+            .query_map(params![id], |row| row.get::<_, String>(0))
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| AppError::Database(e.to_string()))?
+    };
+
     // 记录 tombstone（用于同步删除操作）
     let now = chrono::Utc::now().to_rfc3339();
     conn.execute(
@@ -230,6 +242,9 @@ pub fn delete(db: &DbState, id: &str) -> Result<(), AppError> {
     // 硬删除（CASCADE 会清理 item_tags, attachments, versions）
     conn.execute("DELETE FROM items WHERE id = ?1", params![id])
         .map_err(|e| AppError::Database(e.to_string()))?;
+
+    drop(conn);
+    attachment_repository::cleanup_file_paths(&attachment_paths)?;
 
     Ok(())
 }
@@ -378,6 +393,36 @@ mod tests {
 
         let err = delete(&db, "nonexistent-id");
         assert!(err.is_err());
+    }
+
+    #[test]
+    fn delete_removes_item_attachments_and_physical_files() {
+        let data_dir = crate::test_support::unique_temp_dir("item-delete-attachments");
+        let _guard = crate::test_support::lock_test_data_dir(&data_dir);
+        let db = crate::test_support::test_db();
+        let created = create_test_item(&db, "带附件的笔记", "note");
+        let attachment = crate::repositories::attachment_repository::add_bytes(
+            &db,
+            created.id.clone(),
+            "image.png".to_string(),
+            "image/png".to_string(),
+            vec![1, 2, 3],
+        )
+        .expect("add attachment");
+        assert!(std::path::Path::new(&attachment.file_path).exists());
+
+        delete(&db, &created.id).expect("delete item");
+
+        assert!(!std::path::Path::new(&attachment.file_path).exists());
+        let conn = db.conn.lock().expect("lock db");
+        let attachment_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM attachments WHERE item_id = ?1",
+                params![created.id],
+                |row| row.get(0),
+            )
+            .expect("count attachments");
+        assert_eq!(attachment_count, 0);
     }
 
     #[test]
