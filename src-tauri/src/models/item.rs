@@ -34,6 +34,12 @@ pub struct ItemDto {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct TrashItemDto {
+    pub item: ItemDto,
+    pub deleted_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TagDto {
     pub name: String,
     pub color: String,

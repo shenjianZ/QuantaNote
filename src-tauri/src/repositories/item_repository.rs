@@ -1,4 +1,4 @@
-use rusqlite::params;
+use rusqlite::{params, OptionalExtension};
 
 use crate::db::DbState;
 use crate::error::AppError;
@@ -18,6 +18,24 @@ fn row_to_item(row: &rusqlite::Row) -> rusqlite::Result<ItemDto> {
         encrypted: row.get::<_, i32>(7)? != 0,
         created_at: row.get(8)?,
         updated_at: row.get(9)?,
+    })
+}
+
+fn row_to_trash_item(row: &rusqlite::Row) -> rusqlite::Result<TrashItemDto> {
+    Ok(TrashItemDto {
+        item: ItemDto {
+            id: row.get(0)?,
+            title: row.get(1)?,
+            item_type: row.get(2)?,
+            content: row.get(3)?,
+            summary: row.get(4)?,
+            pinned: row.get::<_, i32>(5)? != 0,
+            favorite: row.get::<_, i32>(6)? != 0,
+            encrypted: row.get::<_, i32>(7)? != 0,
+            created_at: row.get(8)?,
+            updated_at: row.get(9)?,
+        },
+        deleted_at: row.get(10)?,
     })
 }
 
@@ -72,7 +90,7 @@ pub fn get_items(
     let items: Vec<ItemDto> = if let Some(t) = item_type {
         let mut stmt = conn.prepare(
             "SELECT id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at
-             FROM items WHERE item_type = ?1 ORDER BY updated_at DESC LIMIT ?2 OFFSET ?3"
+             FROM items WHERE item_type = ?1 AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT ?2 OFFSET ?3"
         ).map_err(|e| AppError::Database(e.to_string()))?;
         let rows: Vec<ItemDto> = stmt
             .query_map(params![t, limit, offset], row_to_item)
@@ -83,7 +101,7 @@ pub fn get_items(
     } else {
         let mut stmt = conn.prepare(
             "SELECT id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at
-             FROM items ORDER BY updated_at DESC LIMIT ?1 OFFSET ?2"
+             FROM items WHERE deleted_at IS NULL ORDER BY updated_at DESC LIMIT ?1 OFFSET ?2"
         ).map_err(|e| AppError::Database(e.to_string()))?;
         let rows: Vec<ItemDto> = stmt
             .query_map(params![limit, offset], row_to_item)
@@ -103,7 +121,7 @@ pub fn get_item(db: &DbState, id: &str) -> Result<ItemDto, AppError> {
         .map_err(|e| AppError::Database(e.to_string()))?;
     let mut stmt = conn.prepare(
         "SELECT id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at
-         FROM items WHERE id = ?1"
+         FROM items WHERE id = ?1 AND deleted_at IS NULL"
     ).map_err(|e| AppError::Database(e.to_string()))?;
 
     stmt.query_row(params![id], row_to_item)
@@ -119,7 +137,7 @@ pub fn update(db: &DbState, payload: UpdateItemPayload) -> Result<ItemDto, AppEr
 
     let existing = conn.query_row(
         "SELECT id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at
-         FROM items WHERE id = ?1",
+         FROM items WHERE id = ?1 AND deleted_at IS NULL",
         params![payload.id],
         row_to_item,
     ).map_err(|_| AppError::NotFound(format!("Item {}", payload.id)))?;
@@ -151,6 +169,37 @@ pub fn update(db: &DbState, payload: UpdateItemPayload) -> Result<ItemDto, AppEr
     })
 }
 
+pub fn trash(db: &DbState, id: &str) -> Result<(), AppError> {
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    let state: Option<Option<String>> = conn
+        .query_row(
+            "SELECT deleted_at FROM items WHERE id = ?1",
+            params![id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+    match state {
+        None => return Err(AppError::NotFound(format!("Item {}", id))),
+        Some(Some(_)) => return Ok(()),
+        Some(None) => {}
+    }
+
+    let now = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "UPDATE items SET deleted_at = ?1, updated_at = ?1
+         WHERE id = ?2 AND deleted_at IS NULL",
+        params![now, id],
+    )
+    .map_err(|e| AppError::Database(e.to_string()))?;
+    Ok(())
+}
+
+/// Permanently deletes an item and its related records/files.
 pub fn delete(db: &DbState, id: &str) -> Result<(), AppError> {
     let conn = db
         .conn
@@ -256,7 +305,7 @@ pub fn get_pinned(db: &DbState) -> Result<Vec<ItemDto>, AppError> {
         .map_err(|e| AppError::Database(e.to_string()))?;
     let mut stmt = conn.prepare(
         "SELECT id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at
-         FROM items WHERE pinned = 1 ORDER BY updated_at DESC"
+         FROM items WHERE pinned = 1 AND deleted_at IS NULL ORDER BY updated_at DESC"
     ).map_err(|e| AppError::Database(e.to_string()))?;
 
     let items: Vec<ItemDto> = stmt
@@ -275,7 +324,7 @@ pub fn get_recent(db: &DbState, limit: i64) -> Result<Vec<ItemDto>, AppError> {
         .map_err(|e| AppError::Database(e.to_string()))?;
     let mut stmt = conn.prepare(
         "SELECT id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at
-         FROM items ORDER BY updated_at DESC LIMIT ?1"
+         FROM items WHERE deleted_at IS NULL ORDER BY updated_at DESC LIMIT ?1"
     ).map_err(|e| AppError::Database(e.to_string()))?;
 
     let items: Vec<ItemDto> = stmt
@@ -285,6 +334,75 @@ pub fn get_recent(db: &DbState, limit: i64) -> Result<Vec<ItemDto>, AppError> {
         .map_err(|e| AppError::Database(e.to_string()))?;
 
     Ok(items)
+}
+
+pub fn get_trash(db: &DbState) -> Result<Vec<TrashItemDto>, AppError> {
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at, deleted_at
+             FROM items WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC",
+        )
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    let items = stmt
+        .query_map([], row_to_trash_item)
+        .map_err(|e| AppError::Database(e.to_string()))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    Ok(items)
+}
+
+pub fn restore(db: &DbState, id: &str) -> Result<ItemDto, AppError> {
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    let now = chrono::Utc::now().to_rfc3339();
+    let changed = conn
+        .execute(
+            "UPDATE items SET deleted_at = NULL, updated_at = ?1
+             WHERE id = ?2 AND deleted_at IS NOT NULL",
+            params![now, id],
+        )
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    if changed == 0 {
+        return Err(AppError::NotFound(format!("Trash item {}", id)));
+    }
+    drop(conn);
+    get_item(db, id)
+}
+
+pub fn cleanup_trash(db: &DbState, older_than_days: i64) -> Result<usize, AppError> {
+    let cutoff = (chrono::Utc::now() - chrono::Duration::days(older_than_days)).to_rfc3339();
+    let ids = {
+        let conn = db
+            .conn
+            .lock()
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT id FROM items
+                 WHERE deleted_at IS NOT NULL AND deleted_at <= ?1
+                 ORDER BY deleted_at ASC",
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        let ids = stmt
+            .query_map(params![cutoff], |row| row.get::<_, String>(0))
+            .map_err(|e| AppError::Database(e.to_string()))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        ids
+    };
+
+    let mut deleted = 0;
+    for id in ids {
+        delete(db, &id)?;
+        deleted += 1;
+    }
+    Ok(deleted)
 }
 
 #[cfg(test)]

@@ -3,7 +3,7 @@ use tauri::State;
 
 use crate::db::DbState;
 use crate::error::AppError;
-use crate::models::item::{ItemDto, TagDto, UpdateItemPayload};
+use crate::models::item::{ItemDto, TagDto, TrashItemDto, UpdateItemPayload};
 use crate::services::{item_service, tag_service};
 
 #[derive(Serialize)]
@@ -71,6 +71,29 @@ pub fn update_item(
 #[tauri::command]
 pub fn delete_item(db: State<'_, DbState>, id: String) -> Result<(), AppError> {
     item_service::delete_item(&db, &id)
+}
+
+#[tauri::command]
+pub fn get_trash_items(db: State<'_, DbState>) -> Result<Vec<TrashItemDto>, AppError> {
+    item_service::get_trash_items(&db)
+}
+
+#[tauri::command]
+pub fn restore_item(db: State<'_, DbState>, id: String) -> Result<ItemDto, AppError> {
+    item_service::restore_item(&db, &id)
+}
+
+#[tauri::command]
+pub fn permanently_delete_item(db: State<'_, DbState>, id: String) -> Result<(), AppError> {
+    item_service::permanently_delete_item(&db, &id)
+}
+
+#[tauri::command]
+pub fn cleanup_trash(
+    db: State<'_, DbState>,
+    older_than_days: Option<i64>,
+) -> Result<usize, AppError> {
+    item_service::cleanup_trash(&db, older_than_days.unwrap_or(30))
 }
 
 #[tauri::command]

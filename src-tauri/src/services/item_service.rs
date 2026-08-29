@@ -76,7 +76,28 @@ pub fn update_item(db: &DbState, payload: UpdateItemPayload) -> Result<ItemDto, 
 }
 
 pub fn delete_item(db: &DbState, id: &str) -> Result<(), AppError> {
+    item_repository::trash(db, id)
+}
+
+pub fn get_trash_items(db: &DbState) -> Result<Vec<TrashItemDto>, AppError> {
+    item_repository::get_trash(db)
+}
+
+pub fn restore_item(db: &DbState, id: &str) -> Result<ItemDto, AppError> {
+    item_repository::restore(db, id)
+}
+
+pub fn permanently_delete_item(db: &DbState, id: &str) -> Result<(), AppError> {
     item_repository::delete(db, id)
+}
+
+pub fn cleanup_trash(db: &DbState, older_than_days: i64) -> Result<usize, AppError> {
+    if !(1..=3650).contains(&older_than_days) {
+        return Err(AppError::Validation(
+            "回收站清理时间必须在 1 到 3650 天之间".to_string(),
+        ));
+    }
+    item_repository::cleanup_trash(db, older_than_days)
 }
 
 pub fn get_pinned(db: &DbState) -> Result<Vec<ItemDto>, AppError> {
@@ -199,7 +220,7 @@ mod tests {
     }
 
     #[test]
-    fn delete_item_removes_related_rows_via_foreign_keys() {
+    fn delete_item_moves_to_trash_and_preserves_related_rows() {
         let db = crate::test_support::test_db();
         let item = create_item(
             &db,
@@ -208,6 +229,16 @@ mod tests {
             Some("正文".to_string()),
         )
         .expect("create item");
+        update_item(
+            &db,
+            UpdateItemPayload {
+                id: item.id.clone(),
+                pinned: Some(true),
+                favorite: Some(true),
+                ..Default::default()
+            },
+        )
+        .expect("mark item");
         crate::services::tag_service::set_item_tags(
             &db,
             &item.id,
@@ -218,6 +249,9 @@ mod tests {
         delete_item(&db, &item.id).expect("delete item");
 
         assert!(get_item(&db, &item.id).is_err());
+        let trash = get_trash_items(&db).expect("trash items");
+        assert_eq!(trash.len(), 1);
+        assert_eq!(trash[0].item.id, item.id);
         let conn = db.conn.lock().expect("lock db");
         let mappings: i64 = conn
             .query_row(
@@ -233,8 +267,53 @@ mod tests {
                 |row| row.get(0),
             )
             .expect("version count");
+        assert_eq!(mappings, 2);
+        assert_eq!(versions, 1);
+        drop(conn);
+
+        restore_item(&db, &item.id).expect("restore item");
+        let restored = get_item(&db, &item.id).expect("restored item");
+        assert_eq!(restored.title, "待删除");
+        assert!(restored.pinned);
+        assert!(restored.favorite);
+
+        permanently_delete_item(&db, &item.id).expect("permanently delete item");
+        assert!(get_item(&db, &item.id).is_err());
+        let conn = db.conn.lock().expect("lock db");
+        let mappings: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM item_tags WHERE item_id = ?1",
+                [&item.id],
+                |row| row.get(0),
+            )
+            .expect("mapping count after permanent delete");
+        let versions: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM versions WHERE item_id = ?1",
+                [&item.id],
+                |row| row.get(0),
+            )
+            .expect("version count after permanent delete");
         assert_eq!(mappings, 0);
         assert_eq!(versions, 0);
+    }
+
+    #[test]
+    fn cleanup_trash_permanently_deletes_expired_items() {
+        let db = crate::test_support::test_db();
+        let item = create_item(&db, "过期记录".to_string(), "note".to_string(), None).unwrap();
+        delete_item(&db, &item.id).expect("trash item");
+
+        let conn = db.conn.lock().expect("lock db");
+        conn.execute(
+            "UPDATE items SET deleted_at = '2020-01-01T00:00:00Z' WHERE id = ?1",
+            [&item.id],
+        )
+        .expect("backdate trash item");
+        drop(conn);
+
+        assert_eq!(cleanup_trash(&db, 30).expect("cleanup trash"), 1);
+        assert!(get_trash_items(&db).unwrap().is_empty());
     }
 
     #[test]

@@ -58,9 +58,9 @@ pub fn apply_item(conn: &rusqlite::Connection, data: &serde_json::Value) -> Resu
     let updated_at = data["updated_at"].as_str().unwrap_or_default();
 
     conn.execute(
-        "INSERT INTO items (id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
-         ON CONFLICT(id) DO UPDATE SET title=excluded.title, item_type=excluded.item_type, content=excluded.content, summary=excluded.summary, pinned=excluded.pinned, favorite=excluded.favorite, encrypted=excluded.encrypted, created_at=excluded.created_at, updated_at=excluded.updated_at",
-        rusqlite::params![id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at],
+        "INSERT INTO items (id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at, deleted_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+         ON CONFLICT(id) DO UPDATE SET title=excluded.title, item_type=excluded.item_type, content=excluded.content, summary=excluded.summary, pinned=excluded.pinned, favorite=excluded.favorite, encrypted=excluded.encrypted, created_at=excluded.created_at, updated_at=excluded.updated_at, deleted_at=excluded.deleted_at",
+        rusqlite::params![id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at, data["deleted_at"].as_str()],
     ).map_err(|e| AppError::Database(e.to_string()))?;
 
     // 清理可能残留的 tombstone（记录被重新创建的场景）
@@ -420,5 +420,64 @@ mod tests {
             .expect("count attachments");
         assert_eq!(count, 0);
         let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn apply_item_preserves_soft_deleted_state() {
+        let db = crate::test_support::test_db();
+        let conn = db.conn.lock().expect("lock db");
+        apply_item(
+            &conn,
+            &serde_json::json!({
+                "id": "sync-trash-item",
+                "title": "同步回收站记录",
+                "item_type": "note",
+                "content": "正文",
+                "summary": "摘要",
+                "pinned": false,
+                "favorite": false,
+                "encrypted": false,
+                "created_at": "2026-08-29T00:00:00Z",
+                "updated_at": "2026-08-29T00:00:00Z",
+                "deleted_at": "2026-08-29T01:00:00Z"
+            }),
+        )
+        .expect("apply soft deleted item");
+
+        let deleted_at: Option<String> = conn
+            .query_row(
+                "SELECT deleted_at FROM items WHERE id = 'sync-trash-item'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("read deleted state");
+        assert_eq!(deleted_at.as_deref(), Some("2026-08-29T01:00:00Z"));
+
+        apply_item(
+            &conn,
+            &serde_json::json!({
+                "id": "sync-trash-item",
+                "title": "同步恢复记录",
+                "item_type": "note",
+                "content": "正文",
+                "summary": "摘要",
+                "pinned": false,
+                "favorite": false,
+                "encrypted": false,
+                "created_at": "2026-08-29T00:00:00Z",
+                "updated_at": "2026-08-29T02:00:00Z",
+                "deleted_at": null
+            }),
+        )
+        .expect("apply restored item");
+
+        let restored_deleted_at: Option<String> = conn
+            .query_row(
+                "SELECT deleted_at FROM items WHERE id = 'sync-trash-item'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("read restored state");
+        assert!(restored_deleted_at.is_none());
     }
 }

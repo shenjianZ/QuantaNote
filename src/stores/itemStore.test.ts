@@ -22,6 +22,7 @@ describe("itemStore", () => {
       selectedItem: null,
       pinnedItems: [],
       recentItems: [],
+      trashItems: [],
       loading: false,
       error: null,
     });
@@ -68,5 +69,26 @@ describe("itemStore", () => {
     expect(useItemStore.getState().items).toEqual([]);
     expect(useItemStore.getState().error).toContain("database down");
     expect(useItemStore.getState().loading).toBe(false);
+  });
+
+  it("loads, restores, and removes trash items through the Tauri commands", async () => {
+    const trashItem = { item, deleted_at: "2026-01-02T00:00:00Z" };
+    mockIPC((cmd) => {
+      if (cmd === "get_trash_items") return [trashItem];
+      if (cmd === "restore_item") return item;
+      if (cmd === "permanently_delete_item") return null;
+      return null;
+    });
+
+    await useItemStore.getState().fetchTrashItems();
+    expect(useItemStore.getState().trashItems).toEqual([trashItem]);
+
+    await useItemStore.getState().restoreItem(item.id);
+    expect(useItemStore.getState().trashItems).toEqual([]);
+    expect(useItemStore.getState().items).toEqual([item]);
+
+    useItemStore.setState({ trashItems: [trashItem] });
+    await useItemStore.getState().permanentlyDeleteItem(item.id);
+    expect(useItemStore.getState().trashItems).toEqual([]);
   });
 });

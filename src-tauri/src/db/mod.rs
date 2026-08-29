@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS settings (
 INSERT OR IGNORE INTO schema_version (version) VALUES (1);
 ";
 
-const SCHEMA_VERSION: i64 = 6;
+const SCHEMA_VERSION: i64 = 7;
 
 impl DbState {
     pub fn open(db_path: &str) -> Result<Self, AppError> {
@@ -222,6 +222,14 @@ impl DbState {
                     updated_at TEXT NOT NULL
                  );
                  INSERT OR IGNORE INTO schema_version (version) VALUES (6);",
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+
+        if current_version < 7 {
+            conn.execute_batch(
+                "ALTER TABLE items ADD COLUMN deleted_at TEXT;
+                 INSERT OR IGNORE INTO schema_version (version) VALUES (7);",
             )
             .map_err(|e| AppError::Database(e.to_string()))?;
         }

@@ -217,4 +217,14 @@ describe("Library reader and item actions", () => {
 
     await LibraryPage.expectItemNotVisible("收藏笔记");
   });
+
+  it("restores deleted item from trash", async () => {
+    await LibraryPage.openTrash();
+    await expect($("//*[@role='dialog'][@aria-label='回收站']")).toBeDisplayed();
+    await LibraryPage.restoreTrashItem("收藏笔记");
+    await pause(500);
+    await expect($("//*[@role='dialog'][@aria-label='回收站']//*[contains(., '回收站是空的')]")).toBeDisplayed();
+    await $("[data-testid='modal-close-btn']").click();
+    await LibraryPage.expectItemVisible("收藏笔记");
+  });
 });

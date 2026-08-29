@@ -22,6 +22,7 @@ import { SkeletonList } from "../components/common/Skeleton";
 import { TagPickerModal } from "../components/common/TagPickerModal";
 import { TagManagerModal } from "../components/common/TagManagerModal";
 import { AttachmentManagerModal } from "../components/common/AttachmentManagerModal";
+import { TrashModal } from "../components/common/TrashModal";
 import { useAppStore } from "../stores/appStore";
 import { useAttachmentStore } from "../stores/attachmentStore";
 import { useItemStore } from "../stores/itemStore";
@@ -89,6 +90,7 @@ export function LibraryPage({
   const [tagModalOpen, setTagModalOpen] = useState(false);
   const [tagManagerOpen, setTagManagerOpen] = useState(false);
   const [attachmentModalOpen, setAttachmentModalOpen] = useState(false);
+  const [trashModalOpen, setTrashModalOpen] = useState(false);
   const [deleteConfirming, setDeleteConfirming] = useState(false);
   const filterDetailsRef = useRef<HTMLDetailsElement>(null);
   const menuDetailsRef = useRef<HTMLDetailsElement>(null);
@@ -175,10 +177,10 @@ export function LibraryPage({
 
   // 通知父组件模态框状态变化
   useEffect(() => {
-    const anyOpen = tagModalOpen || tagManagerOpen || attachmentModalOpen;
+    const anyOpen = tagModalOpen || tagManagerOpen || attachmentModalOpen || trashModalOpen;
     onModalStateChange?.(anyOpen);
     return () => { onModalStateChange?.(false); };
-  }, [tagModalOpen, tagManagerOpen, attachmentModalOpen, onModalStateChange]);
+  }, [tagModalOpen, tagManagerOpen, attachmentModalOpen, trashModalOpen, onModalStateChange]);
 
   useEffect(() => {
     if (!readerOpen) return;
@@ -289,7 +291,7 @@ export function LibraryPage({
       await deleteItem(selectedItem.id);
       setReaderOpen(false);
       onPreviewRequestClear?.();
-      useToastStore.getState().addToast("success", t("common:toast.deleteSuccess"));
+      useToastStore.getState().addToast("success", t("library:toast.movedToTrash"));
     } catch {
       useToastStore.getState().addToast("error", t("common:toast.deleteFailed"));
     }
@@ -337,15 +339,27 @@ export function LibraryPage({
               <h1 className="app-hero-title text-[var(--text)]">{t("library:title")}</h1>
               <p className="mt-1 hidden text-sm text-[var(--muted)] sm:block">{t("library:subtitle")}</p>
             </div>
-            <button
-              className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full bg-[var(--accent)] px-3 text-sm font-medium text-white hover:opacity-90"
-              type="button"
-              data-testid="library-new-btn"
-              onClick={onCreateItem}
-            >
-              <Edit3 className="h-4 w-4" />
-              {t("library:newBtn")}
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                className="inline-flex h-9 items-center gap-2 rounded-full border border-[var(--line)] px-3 text-sm font-medium text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
+                type="button"
+                data-testid="library-trash-btn"
+                aria-label={t("library:trash.title")}
+                onClick={() => setTrashModalOpen(true)}
+              >
+                <Trash2 className="h-4 w-4" />
+                <span className="hidden sm:inline">{t("library:trash.title")}</span>
+              </button>
+              <button
+                className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent)] px-3 text-sm font-medium text-white hover:opacity-90"
+                type="button"
+                data-testid="library-new-btn"
+                onClick={onCreateItem}
+              >
+                <Edit3 className="h-4 w-4" />
+                {t("library:newBtn")}
+              </button>
+            </div>
           </div>
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <div className="flex shrink-0 items-stretch border-b border-[var(--line)]" role="tablist" aria-label={t("library:filter.title")}>
@@ -601,6 +615,12 @@ export function LibraryPage({
           </div>
         </section>
       )}
+
+      <TrashModal
+        open={trashModalOpen}
+        onClose={() => setTrashModalOpen(false)}
+        onDataChanged={loadLibraryData}
+      />
     </div>
   );
 }

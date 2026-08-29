@@ -1,10 +1,20 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
-import { getLibraryData, type ItemDto, type TagDto } from "../services/tauriCommands";
+import {
+  cleanupTrash,
+  getLibraryData,
+  getTrashItems,
+  permanentlyDeleteItem,
+  restoreItem,
+  type ItemDto,
+  type TagDto,
+  type TrashItemDto,
+} from "../services/tauriCommands";
 import { useToastStore } from "./toastStore";
 import i18n from "../i18n";
 
 export type { ItemDto };
+export type { TrashItemDto };
 
 interface LibraryResult {
   items: ItemDto[];
@@ -18,6 +28,7 @@ interface ItemState {
   selectedItem: ItemDto | null;
   pinnedItems: ItemDto[];
   recentItems: ItemDto[];
+  trashItems: TrashItemDto[];
   loading: boolean;
   error: string | null;
   fetchItems: (itemType?: string) => Promise<void>;
@@ -27,6 +38,10 @@ interface ItemState {
   createItem: (title: string, itemType: string, content?: string) => Promise<ItemDto>;
   updateItem: (id: string, updates: Record<string, unknown>) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
+  fetchTrashItems: () => Promise<void>;
+  restoreItem: (id: string) => Promise<void>;
+  permanentlyDeleteItem: (id: string) => Promise<void>;
+  cleanupTrash: (olderThanDays?: number) => Promise<number>;
   fetchPinned: () => Promise<void>;
   fetchRecent: (limit?: number) => Promise<void>;
 }
@@ -37,6 +52,7 @@ export const useItemStore = create<ItemState>((set) => ({
   selectedItem: null,
   pinnedItems: [],
   recentItems: [],
+  trashItems: [],
   loading: false,
   error: null,
 
@@ -128,6 +144,53 @@ export const useItemStore = create<ItemState>((set) => ({
     } catch (e) {
       set({ error: String(e) });
       useToastStore.getState().addToast("error", i18n.t("common:toast.itemDeleteFailed"));
+      throw e;
+    }
+  },
+
+  fetchTrashItems: async () => {
+    try {
+      const trashItems = await getTrashItems();
+      set({ trashItems });
+    } catch (e) {
+      set({ error: String(e) });
+      throw e;
+    }
+  },
+
+  restoreItem: async (id) => {
+    set({ error: null });
+    try {
+      const restored = await restoreItem(id);
+      set((state) => ({
+        items: [restored, ...state.items.filter((item) => item.id !== id)],
+        trashItems: state.trashItems.filter((trashItem) => trashItem.item.id !== id),
+      }));
+    } catch (e) {
+      set({ error: String(e) });
+      throw e;
+    }
+  },
+
+  permanentlyDeleteItem: async (id) => {
+    set({ error: null });
+    try {
+      await permanentlyDeleteItem(id);
+      set((state) => ({
+        trashItems: state.trashItems.filter((trashItem) => trashItem.item.id !== id),
+      }));
+    } catch (e) {
+      set({ error: String(e) });
+      throw e;
+    }
+  },
+
+  cleanupTrash: async (olderThanDays) => {
+    try {
+      const deletedCount = await cleanupTrash(olderThanDays);
+      return deletedCount;
+    } catch (e) {
+      set({ error: String(e) });
       throw e;
     }
   },

@@ -23,6 +23,20 @@
   "searchResult": "搜索结果",
   "unnamed": "未命名",
   "noPreview": "无正文预览",
+  "toast": {
+    "movedToTrash": "记录已移入回收站"
+  },
+  "trash": {
+    "title": "回收站",
+    "retentionHint": "回收站中的记录会保留 30 天，之后自动清理。",
+    "cleanup": "立即清理过期记录",
+    "emptyTitle": "回收站是空的",
+    "emptySubtitle": "移入回收站的记录会在这里保留一段时间。",
+    "deletedAt": "删除于 {{time}}",
+    "restore": "恢复",
+    "permanentDelete": "彻底删除",
+    "confirmPermanentDelete": "再次点击确认"
+  },
   "reader": {
     "pin": "置顶",
     "unpin": "取消置顶",

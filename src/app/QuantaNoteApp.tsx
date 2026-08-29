@@ -211,6 +211,7 @@ export function QuantaNoteApp() {
         selectedItem: selectedDbItem,
         getItem,
         createItem,
+        cleanupTrash,
     } = useItemStore();
     const hasSelectedLanguage = useSettingsStore((s) => s.hasSelectedLanguage);
     const [initDone, setInitDone] = useState(false);
@@ -228,6 +229,10 @@ export function QuantaNoteApp() {
         useSettingsStore.getState().init().finally(() => setInitDone(true));
         useSyncStore.getState().init();
     }, []);
+
+    useEffect(() => {
+        cleanupTrash(30).catch(() => {});
+    }, [cleanupTrash]);
 
     useEffect(() => {
         // LibraryPage 通过 fetchLibraryData 统一加载，这里只在非 library 页面加载

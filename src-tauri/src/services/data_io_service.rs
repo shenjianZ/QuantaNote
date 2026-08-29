@@ -1132,6 +1132,33 @@ mod tests {
     }
 
     #[test]
+    fn export_and_import_round_trip_keeps_trash_state() {
+        let data_dir = crate::test_support::unique_temp_dir("data-io-trash-round-trip");
+        let _guard = crate::test_support::lock_test_data_dir(&data_dir);
+        let source = crate::test_support::test_db();
+        let item = crate::services::item_service::create_item(
+            &source,
+            "回收站备份".to_string(),
+            "note".to_string(),
+            Some("需要保留的内容".to_string()),
+        )
+        .expect("create source item");
+        crate::services::item_service::delete_item(&source, &item.id).expect("trash source item");
+
+        let json = export_data(&source).expect("export data");
+        let target = crate::test_support::test_db();
+        import_data(&target, json).expect("import data");
+
+        assert!(crate::services::item_service::get_item(&target, &item.id).is_err());
+        let trash =
+            crate::services::item_service::get_trash_items(&target).expect("imported trash");
+        assert_eq!(trash.len(), 1);
+        assert_eq!(trash[0].item.content, "需要保留的内容");
+
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
     fn export_and_import_zip_round_trip_restores_attachment_record_and_file() {
         let data_dir = crate::test_support::unique_temp_dir("data-io-zip-attachment");
         let _guard = crate::test_support::lock_test_data_dir(&data_dir);

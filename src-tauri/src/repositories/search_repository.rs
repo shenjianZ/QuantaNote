@@ -18,14 +18,14 @@ pub fn search(
         "SELECT i.id, i.title, i.item_type, COALESCE(i.summary, '') as summary
          FROM items_fts f
          JOIN items i ON i.rowid = f.rowid
-         WHERE items_fts MATCH ?1 AND i.item_type = ?2
+         WHERE items_fts MATCH ?1 AND i.item_type = ?2 AND i.deleted_at IS NULL
          ORDER BY rank
          LIMIT 50"
     } else {
         "SELECT i.id, i.title, i.item_type, COALESCE(i.summary, '') as summary
          FROM items_fts f
          JOIN items i ON i.rowid = f.rowid
-         WHERE items_fts MATCH ?1
+         WHERE items_fts MATCH ?1 AND i.deleted_at IS NULL
          ORDER BY rank
          LIMIT 50"
     };
@@ -77,14 +77,14 @@ pub fn search_trigram(
         "SELECT i.id, i.title, i.item_type, COALESCE(i.summary, '') as summary
          FROM items_fts_trigram f
          JOIN items i ON i.rowid = f.rowid
-         WHERE items_fts_trigram MATCH ?1 AND i.item_type = ?2
+         WHERE items_fts_trigram MATCH ?1 AND i.item_type = ?2 AND i.deleted_at IS NULL
          ORDER BY rank
          LIMIT 50"
     } else {
         "SELECT i.id, i.title, i.item_type, COALESCE(i.summary, '') as summary
          FROM items_fts_trigram f
          JOIN items i ON i.rowid = f.rowid
-         WHERE items_fts_trigram MATCH ?1
+         WHERE items_fts_trigram MATCH ?1 AND i.deleted_at IS NULL
          ORDER BY rank
          LIMIT 50"
     };
@@ -151,7 +151,7 @@ pub fn search_like(
         let sql = format!(
             "SELECT i.id, i.title, i.item_type, COALESCE(i.summary, '') as summary
              FROM items i
-             WHERE i.item_type = ? AND ({})
+             WHERE i.item_type = ? AND i.deleted_at IS NULL AND ({})
              ORDER BY i.updated_at DESC
              LIMIT 50",
             term_filters
@@ -190,7 +190,7 @@ pub fn search_like(
         let sql = format!(
             "SELECT i.id, i.title, i.item_type, COALESCE(i.summary, '') as summary
              FROM items i
-             WHERE {}
+             WHERE i.deleted_at IS NULL AND {}
              ORDER BY i.updated_at DESC
              LIMIT 50",
             term_filters
@@ -301,5 +301,24 @@ mod tests {
         let results = search_like(&db, "content-only", None).unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].summary, "manually edited summary");
+    }
+
+    #[test]
+    fn search_excludes_items_in_trash() {
+        let db = crate::test_support::test_db();
+        let item = item_repository::create(
+            &db,
+            CreateItemPayload {
+                title: "回收站内容".to_string(),
+                item_type: "note".to_string(),
+                content: Some("should not be searchable".to_string()),
+                summary: "trash".to_string(),
+            },
+        )
+        .unwrap();
+        item_repository::trash(&db, &item.id).unwrap();
+
+        assert!(search(&db, "回收站*", None).unwrap().is_empty());
+        assert!(search_like(&db, "should not", None).unwrap().is_empty());
     }
 }

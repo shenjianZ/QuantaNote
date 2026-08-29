@@ -39,6 +39,10 @@ function setupStores() {
   useItemStore.setState({
     selectedItem: null,
     deleteItem: vi.fn(async () => {}),
+    cleanupTrash: vi.fn(async () => 0),
+    fetchTrashItems: vi.fn(async () => {}),
+    restoreItem: vi.fn(async () => {}),
+    permanentlyDeleteItem: vi.fn(async () => {}),
     updateItem: vi.fn(async () => {}),
   });
   useAttachmentStore.setState({

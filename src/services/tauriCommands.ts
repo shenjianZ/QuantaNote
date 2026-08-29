@@ -61,6 +61,22 @@ export async function deleteItem(id: string) {
     return invoke("delete_item", { id });
 }
 
+export async function getTrashItems() {
+    return invoke<TrashItemDto[]>("get_trash_items");
+}
+
+export async function restoreItem(id: string) {
+    return invoke<ItemDto>("restore_item", { id });
+}
+
+export async function permanentlyDeleteItem(id: string) {
+    return invoke("permanently_delete_item", { id });
+}
+
+export async function cleanupTrash(olderThanDays?: number) {
+    return invoke<number>("cleanup_trash", { olderThanDays: olderThanDays ?? 30 });
+}
+
 export async function getRecentItems(limit?: number) {
     return invoke("get_recent_items", { limit: limit ?? 20 });
 }
@@ -158,6 +174,11 @@ export interface ItemDto {
     encrypted: boolean;
     created_at: string;
     updated_at: string;
+}
+
+export interface TrashItemDto {
+    item: ItemDto;
+    deleted_at: string;
 }
 
 // Tag commands

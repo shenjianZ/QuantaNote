@@ -63,10 +63,18 @@ export async function deleteItemById(id) {
   return result;
 }
 
+export async function permanentlyDeleteItemById(id) {
+  return tauriInvoke("permanently_delete_item", { id });
+}
+
 export async function cleanupAllItems() {
   const items = await getAllItems();
   for (const item of items) {
-    await deleteItemById(item.id);
+    await permanentlyDeleteItemById(item.id);
+  }
+  const trashItems = await tauriInvoke("get_trash_items");
+  for (const trashItem of trashItems) {
+    await permanentlyDeleteItemById(trashItem.item.id);
   }
 }
 

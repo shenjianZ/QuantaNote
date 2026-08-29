@@ -6,6 +6,10 @@ import {
   getItems,
   updateItem,
   deleteItem,
+  getTrashItems,
+  restoreItem,
+  permanentlyDeleteItem,
+  cleanupTrash,
   searchItems,
   addAttachment,
   exportAttachment,
@@ -66,6 +70,22 @@ describe("tauriCommands", () => {
     await getVersions("item-1");
     expect(captured?.cmd).toBe("get_versions");
     expect(captured?.args).toMatchObject({ itemId: "item-1" });
+  });
+
+  it("calls trash lifecycle commands with stable arguments", async () => {
+    await getTrashItems();
+    expect(captured?.cmd).toBe("get_trash_items");
+
+    await restoreItem("id-1");
+    expect(captured?.cmd).toBe("restore_item");
+    expect(captured?.args).toMatchObject({ id: "id-1" });
+
+    await permanentlyDeleteItem("id-1");
+    expect(captured?.cmd).toBe("permanently_delete_item");
+
+    await cleanupTrash(30);
+    expect(captured?.cmd).toBe("cleanup_trash");
+    expect(captured?.args).toMatchObject({ olderThanDays: 30 });
   });
 
   it("exportAttachment passes source and destination paths", async () => {

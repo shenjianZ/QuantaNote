@@ -9,7 +9,7 @@ fn db_err(e: rusqlite::Error) -> AppError {
 pub fn query_items_json(conn: &Connection) -> Result<Vec<serde_json::Value>, AppError> {
     let mut stmt = conn
         .prepare(
-            "SELECT id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at FROM items",
+            "SELECT id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at, deleted_at FROM items",
         )
         .map_err(db_err)?;
     let rows = stmt
@@ -25,6 +25,7 @@ pub fn query_items_json(conn: &Connection) -> Result<Vec<serde_json::Value>, App
                 "encrypted": row.get::<_, i32>(7)? != 0,
                 "created_at": row.get::<_, String>(8)?,
                 "updated_at": row.get::<_, String>(9)?,
+                "deleted_at": row.get::<_, Option<String>>(10)?,
             }))
         })
         .map_err(db_err)?;
@@ -111,11 +112,11 @@ pub fn import_items(
     overwrite: bool,
 ) -> Result<(), AppError> {
     let sql = if overwrite {
-        "INSERT OR REPLACE INTO items (id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)"
+        "INSERT OR REPLACE INTO items (id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at, deleted_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)"
     } else {
-        "INSERT OR IGNORE INTO items (id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)"
+        "INSERT OR IGNORE INTO items (id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at, deleted_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)"
     };
     for item in items {
         tx.execute(
@@ -131,6 +132,7 @@ pub fn import_items(
                 val_bool(item, "encrypted"),
                 val_str(item, "created_at"),
                 val_str(item, "updated_at"),
+                item["deleted_at"].as_str(),
             ],
         )
         .map_err(db_err)?;

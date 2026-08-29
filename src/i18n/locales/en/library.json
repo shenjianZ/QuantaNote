@@ -23,6 +23,20 @@
   "searchResult": "Search Result",
   "unnamed": "Untitled",
   "noPreview": "No preview",
+  "toast": {
+    "movedToTrash": "Note moved to Trash"
+  },
+  "trash": {
+    "title": "Trash",
+    "retentionHint": "Items in Trash are kept for 30 days, then cleaned up automatically.",
+    "cleanup": "Clean up expired items",
+    "emptyTitle": "Trash is empty",
+    "emptySubtitle": "Items moved to Trash will stay here for a while.",
+    "deletedAt": "Deleted {{time}}",
+    "restore": "Restore",
+    "permanentDelete": "Delete forever",
+    "confirmPermanentDelete": "Click again to confirm"
+  },
   "reader": {
     "pin": "Pin",
     "unpin": "Unpin",

@@ -12,6 +12,7 @@ async function clickByDom(element) {
 class LibraryPage {
   // --- 选择器 ---
   get newBtn() { return "[data-testid='library-new-btn']"; }
+  get trashBtn() { return "[data-testid='library-trash-btn']"; }
   get searchInput() { return "[data-testid='library-search-input']"; }
   get filterBtn() { return "[data-testid='library-filter-btn']"; }
   get items() { return "[data-testid='library-item']"; }
@@ -137,6 +138,17 @@ class LibraryPage {
 
   async clickEdit() {
     await $(this.readerEditBtn).then(b => b.click());
+  }
+
+  async openTrash() {
+    await $(this.trashBtn).then(b => b.click());
+    await waitForDisplayed("[role='dialog'][aria-label='回收站']");
+  }
+
+  async restoreTrashItem(title) {
+    const row = await $(`//*[@role='dialog'][@aria-label='回收站']//*[contains(., '${title}')]/ancestor::div[.//button[contains(@data-testid, 'trash-restore-')]][1]`);
+    const restore = await row.$("button[data-testid^='trash-restore-']");
+    await restore.click();
   }
 
   async getContentWidth() {
