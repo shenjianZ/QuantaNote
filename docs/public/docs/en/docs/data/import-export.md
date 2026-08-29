@@ -3,7 +3,7 @@ title: Import & Export
 description: QuantaNote data import and export features supporting JSON and ZIP formats with selective export of tags, attachments, and version history
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-29
 ---
 
 # Import & Export
@@ -32,17 +32,19 @@ The ZIP format is the recommended export method. It packages all your data into 
 ```
 quantanote_export_20260503.zip
 ├── data.json              # All notes and metadata
-├── attachments/           # Attachment files
-│   ├── abc123.pdf
-│   └── def456.png
-└── meta.json              # Export metadata (version, timestamps, etc.)
+├── manifest.json          # ZIP format version and attachment records
+└── attachments/           # Files exported from attachment records
+    ├── item-id/...
+    └── item-id/...
 ```
+
+manifest.json stores each attachment's ID, owning note, original filename, database path, MIME type, file size, and SHA-256. During import, the manifest and files are validated before the files and attachment records are restored; unsafe paths or failed integrity checks abort the import.
 
 > **Note:** For large datasets, the export process may take several seconds to tens of seconds. Do not close the application during export.
 
 ## Export as JSON
 
-JSON format export contains only structured data without the actual attachment files. This is suitable for:
+JSON format export contains structured data, attachment metadata, and attachment contents as Base64 strings in the file_data field. Because attachments can make the JSON large, it is suitable for:
 
 - Data analysis and statistics
 - Migration to other note-taking tools
@@ -61,6 +63,8 @@ The JSON export data structure matches the database table structure, using UTF-8
 ## Import from ZIP
 
 Importing from a ZIP file restores previously exported complete data.
+
+The current ZIP format restores both attachment files and their database records, so attachment references in note content continue to work after reopening the editor. Older ZIP files that contain attachment files without an attachment manifest are rejected because their records cannot be restored reliably; export them again with the current version.
 
 **Steps:**
 
@@ -85,7 +89,7 @@ Importing from a ZIP file restores previously exported complete data.
 
 ## Import from JSON
 
-The JSON import flow is similar to ZIP import, but does not import attachment files (since the JSON export does not include them).
+The JSON import flow is similar to ZIP import and also attempts to restore attachment files and records carried in file_data. For a complete backup, ZIP is recommended.
 
 1. Select a `.json` file
 2. Review the import preview
