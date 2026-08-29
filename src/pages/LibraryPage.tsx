@@ -35,7 +35,9 @@ import { MOBILE_BACK_EVENT } from "../utils/platform";
 import { nativeLog } from "../utils/nativeLog";
 import { getVditorLang } from "../utils/vditorConfig";
 import { copyTextToSystemClipboard } from "../utils/clipboard";
+import { removeAttachmentReferences } from "../utils/markdownAttachments";
 import type { Item } from "../types";
+import type { AttachmentDto } from "../stores/attachmentStore";
 
 type TabKey = "recent" | "pinned" | "favorite";
 type SortOption = "updated" | "created" | "title";
@@ -102,6 +104,7 @@ export function LibraryPage({
   const attachments = useAttachmentStore((s) => s.attachments);
   const fetchAttachments = useAttachmentStore((s) => s.fetchAttachments);
   const addAttachmentAction = useAttachmentStore((s) => s.addAttachment);
+  const deleteAttachment = useAttachmentStore((s) => s.deleteAttachment);
   const allTags = useTagStore((s) => s.tags) as { name: string; color: string }[];
   const itemTags = useTagStore((s) => s.itemTags) as { name: string; color: string }[];
   const setTags = useTagStore((s) => s.setTags);
@@ -259,6 +262,16 @@ export function LibraryPage({
       useToastStore.getState().addToast("error", t("common:toast.copyFailed"));
     }
   }
+
+  const handleDeleteAttachment = useCallback(async (attachment: AttachmentDto) => {
+    if (!(await deleteAttachment(attachment.id))) return false;
+    const currentContent = selectedItemDto?.id === selectedItem.id ? selectedItemDto.content : "";
+    const nextContent = removeAttachmentReferences(currentContent, attachment.id);
+    if (nextContent !== currentContent) {
+      await updateItem(selectedItem.id, { content: nextContent });
+    }
+    return true;
+  }, [deleteAttachment, selectedItem.id, selectedItemDto, updateItem]);
 
   async function handleToggleFavorite() {
     if (!selectedItem.id) return;
@@ -527,6 +540,7 @@ export function LibraryPage({
                 theme={theme === "light" ? "light" : "dark"}
                 lang={getVditorLang()}
                 testId="reader-preview-layout"
+                attachments={attachments}
               />
             </div>
 
@@ -581,6 +595,7 @@ export function LibraryPage({
                 open={attachmentModalOpen}
                 onClose={() => setAttachmentModalOpen(false)}
                 itemId={selectedItem.id}
+                onDeleteAttachment={handleDeleteAttachment}
               />
             </footer>
           </div>

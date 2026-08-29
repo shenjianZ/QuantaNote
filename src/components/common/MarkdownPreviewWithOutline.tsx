@@ -3,12 +3,14 @@ import { MarkdownRenderer } from "./MarkdownRenderer";
 import { DocumentOutline } from "../editor/DocumentOutline";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { parseMarkdownOutline } from "../../utils/markdownOutline";
+import type { MarkdownAttachment } from "../../utils/markdownAttachments";
 
 interface MarkdownPreviewWithOutlineProps {
   content: string;
   theme: "dark" | "light";
   lang?: "zh_CN" | "en_US";
   testId?: string;
+  attachments?: readonly MarkdownAttachment[];
 }
 
 export function MarkdownPreviewWithOutline({
@@ -16,6 +18,7 @@ export function MarkdownPreviewWithOutline({
   theme,
   lang,
   testId = "markdown-preview-layout",
+  attachments = [],
 }: MarkdownPreviewWithOutlineProps) {
   const markdownRef = useRef<HTMLDivElement>(null);
   const showDocumentOutline = useSettingsStore((s) => s.settings.showDocumentOutline);
@@ -112,7 +115,7 @@ export function MarkdownPreviewWithOutline({
         className="min-w-0 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4 sm:rounded-3xl sm:p-5"
         data-testid={`${testId}-markdown`}
       >
-        <MarkdownRenderer content={content} theme={theme} lang={lang} />
+        <MarkdownRenderer content={content} theme={theme} lang={lang} attachments={attachments} />
       </div>
       {showDocumentOutline && (
         <DocumentOutline

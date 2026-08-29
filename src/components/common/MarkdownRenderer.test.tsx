@@ -5,7 +5,12 @@ import { MarkdownRenderer } from "./MarkdownRenderer";
 import Vditor from "vditor";
 
 vi.mock("@tauri-apps/plugin-opener", () => ({
+  openPath: vi.fn(),
   openUrl: vi.fn(),
+}));
+
+vi.mock("@tauri-apps/api/core", () => ({
+  convertFileSrc: (path: string) => `asset://${path}`,
 }));
 
 vi.mock("vditor", () => ({
@@ -169,5 +174,24 @@ graph TD
     );
 
     expect(document.querySelector(".markdown-image-frame img")).toHaveAttribute("loading", "eager");
+  });
+
+  it("resolves local attachment references in the reader", () => {
+    setup(
+      <MarkdownRenderer
+        content="![本地截图](attachment://att-1)"
+        attachments={[{
+          id: "att-1",
+          filename: "截图.png",
+          file_path: "C:/attachments/att-1.png",
+          mime_type: "image/png",
+        }]}
+      />,
+    );
+
+    expect(document.querySelector(".markdown-image-frame img")).toHaveAttribute(
+      "src",
+      "asset://C:/attachments/att-1.png",
+    );
   });
 });

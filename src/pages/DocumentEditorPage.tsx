@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, Clock, Loader2, Save, Star } from "lucide-react";
+import { ArrowLeft, Clock, Loader2, Paperclip, Save, Star } from "lucide-react";
 import { useAppStore } from "../stores/appStore";
 import { useItemStore } from "../stores/itemStore";
 import { getVditorLang } from "../utils/vditorConfig";
@@ -14,6 +14,9 @@ import { useSettingsStore } from "../stores/settingsStore";
 import { useResponsiveContentWidth } from "../hooks/useResponsiveContentWidth";
 import { CONTENT_WIDTH_EDITOR_BASE, CONTENT_WIDTH_OUTLINE_LAYOUT } from "../utils/contentWidth";
 import { parseMarkdownOutline } from "../utils/markdownOutline";
+import { useAttachmentStore, type AttachmentDto } from "../stores/attachmentStore";
+import { AttachmentManagerModal } from "../components/common/AttachmentManagerModal";
+import { isImageAttachment, removeAttachmentReferences } from "../utils/markdownAttachments";
 
 const VditorEditor = lazy(() => import("../components/editor/VditorEditor").then((m) => ({ default: m.VditorEditor })));
 
@@ -33,7 +36,7 @@ function normalizeForVersionCompare(value: string | undefined) {
 }
 
 interface DocumentEditorPageProps {
-  onBackToPreview: () => void;
+  onBackToPreview: () => void | Promise<void>;
   onModalStateChange?: (modalOpen: boolean) => void;
 }
 
@@ -56,6 +59,11 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
   const selectedItem = useItemStore((s) => s.selectedItem);
   const getItem = useItemStore((s) => s.getItem);
   const updateItem = useItemStore((s) => s.updateItem);
+  const attachments = useAttachmentStore((s) => s.attachments);
+  const fetchAttachments = useAttachmentStore((s) => s.fetchAttachments);
+  const addAttachment = useAttachmentStore((s) => s.addAttachment);
+  const addAttachmentData = useAttachmentStore((s) => s.addAttachmentData);
+  const deleteAttachment = useAttachmentStore((s) => s.deleteAttachment);
 
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
@@ -65,6 +73,7 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
   const [versionsLoaded, setVersionsLoaded] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [versionPanelOpen, setVersionPanelOpen] = useState(false);
+  const [attachmentModalOpen, setAttachmentModalOpen] = useState(false);
   const [activeHeadingIndex, setActiveHeadingIndex] = useState(-1);
   const editorRef = useRef<VditorEditorHandle>(null);
   const editorViewportRef = useRef<HTMLDivElement>(null);
@@ -74,6 +83,7 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
   const latestTitle = useRef(title);
   const latestSummary = useRef(summary);
   const latestContent = useRef(content);
+  const savePromiseRef = useRef<Promise<boolean> | null>(null);
   const activeHeadingUpdateRef = useRef<(() => void) | null>(null);
   const deferredContent = useDeferredValue(content);
   const outline = useMemo(() => parseMarkdownOutline(deferredContent), [deferredContent]);
@@ -146,9 +156,9 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
 
   // 通知父组件版本面板状态变化
   useEffect(() => {
-    onModalStateChange?.(versionPanelOpen);
+    onModalStateChange?.(versionPanelOpen || attachmentModalOpen);
     return () => { onModalStateChange?.(false); };
-  }, [versionPanelOpen, onModalStateChange]);
+  }, [versionPanelOpen, attachmentModalOpen, onModalStateChange]);
 
   // 组件卸载时清理防抖定时器
   useEffect(() => {
@@ -168,6 +178,12 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
   }, [selectedItemId, getItem]);
 
   useEffect(() => {
+    if (!selectedItemId) return;
+    fetchAttachments(selectedItemId).catch(() => {});
+    setAttachmentModalOpen(false);
+  }, [selectedItemId, fetchAttachments]);
+
+  useEffect(() => {
     if (!selectedItem) return;
     const echoIndex = pendingItemEchoesRef.current.findIndex((echo) =>
       echo.id === selectedItem.id
@@ -180,12 +196,15 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
     setTitle(selectedItem.title);
     setSummary(selectedItem.summary || "");
     setContent(selectedItem.content || "");
+    latestTitle.current = selectedItem.title;
+    latestSummary.current = selectedItem.summary || "";
+    latestContent.current = selectedItem.content || "";
     setIsFavorite(selectedItem.favorite);
     setSaved(true);
   }, [selectedItem]);
 
-  const save = useCallback(async (newTitle: string, newSummary: string, newContent: string) => {
-    if (!selectedItemId) return;
+  const save = useCallback(async (newTitle: string, newSummary: string, newContent: string): Promise<boolean> => {
+    if (!selectedItemId) return false;
     const echo = queueItemEcho(selectedItemId, {
       title: newTitle,
       summary: newSummary,
@@ -198,33 +217,105 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
         content: newContent,
       });
       setSaved(true);
+      return true;
     } catch (e) {
       removeItemEcho(echo);
       console.error("Save failed:", e);
       useToastStore.getState().addToast("error", t("common:toast.saveFailed"));
+      return false;
     }
-  }, [selectedItemId, updateItem]);
+  }, [selectedItemId, updateItem, t]);
 
-  function scheduleSave(newTitle: string, newSummary: string, newContent: string) {
+  const triggerSave = useCallback((newTitle: string, newSummary: string, newContent: string) => {
+    const promise = save(newTitle, newSummary, newContent);
+    savePromiseRef.current = promise;
+    void promise.then(
+      () => { if (savePromiseRef.current === promise) savePromiseRef.current = null; },
+      () => { if (savePromiseRef.current === promise) savePromiseRef.current = null; },
+    );
+    return promise;
+  }, [save]);
+
+  const scheduleSave = useCallback((newTitle: string, newSummary: string, newContent: string) => {
     setSaved(false);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => save(newTitle, newSummary, newContent), 1000);
-  }
+    debounceRef.current = setTimeout(() => {
+      debounceRef.current = null;
+      void triggerSave(newTitle, newSummary, newContent);
+    }, 1000);
+  }, [triggerSave]);
+
+  const flushSave = useCallback(async () => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    // Always write the latest refs before leaving. This covers the window where the
+    // debounce timer has not fired yet, and also waits for a save already in flight.
+    const previousSave = savePromiseRef.current;
+    const latestSave = triggerSave(latestTitle.current, latestSummary.current, latestContent.current);
+    const [latestResult] = await Promise.all([
+      latestSave,
+      previousSave && previousSave !== latestSave ? previousSave : Promise.resolve(true),
+    ]);
+    return latestResult;
+  }, [triggerSave]);
 
   function handleTitleChange(value: string) {
+    latestTitle.current = value;
     setTitle(value);
     scheduleSave(value, latestSummary.current, latestContent.current);
   }
 
   function handleSummaryChange(value: string) {
+    latestSummary.current = value;
     setSummary(value);
     scheduleSave(latestTitle.current, value, latestContent.current);
   }
 
-  function handleContentChange(value: string) {
+  const handleContentChange = useCallback((value: string) => {
+    latestContent.current = value;
     setContent(value);
     scheduleSave(latestTitle.current, latestSummary.current, value);
+  }, [scheduleSave]);
+
+  async function handleBack() {
+    if (!(await flushSave())) return;
+    await onBackToPreview();
   }
+
+  const handleDeleteAttachment = useCallback(async (attachment: AttachmentDto) => {
+    // 先把编辑器中的未保存内容落盘，避免删除附件时覆盖掉用户刚刚的编辑。
+    if (!(await flushSave())) return false;
+    if (!(await deleteAttachment(attachment.id))) return false;
+
+    const nextContent = removeAttachmentReferences(latestContent.current, attachment.id);
+    if (nextContent !== latestContent.current) {
+      latestContent.current = nextContent;
+      setContent(nextContent);
+      editorRef.current?.setValue(nextContent);
+      await triggerSave(latestTitle.current, latestSummary.current, nextContent);
+    }
+    return true;
+  }, [deleteAttachment, flushSave, triggerSave]);
+
+  const handleInsertAttachment = useCallback((attachment: AttachmentDto) => {
+    editorRef.current?.insertAttachment(attachment, isImageAttachment(attachment));
+    setAttachmentModalOpen(false);
+  }, []);
+
+  const handleAddAttachment = useCallback((path: string) => {
+    return selectedItemId ? addAttachment(selectedItemId, path) : Promise.resolve(null);
+  }, [selectedItemId, addAttachment]);
+
+  const handleAddAttachmentData = useCallback((filename: string, mimeType: string, data: string) => {
+    return selectedItemId ? addAttachmentData(selectedItemId, filename, mimeType, data) : Promise.resolve(null);
+  }, [selectedItemId, addAttachmentData]);
+
+  const handleOpenAttachments = useCallback(() => {
+    editorRef.current?.saveSelection();
+    setAttachmentModalOpen(true);
+  }, []);
 
   async function handleToggleFavorite() {
     if (!selectedItemId) return;
@@ -306,7 +397,7 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
           className="inline-flex h-9 items-center gap-2 rounded-full px-3 text-sm text-[var(--text)] hover:bg-[var(--hover)]"
           type="button"
           data-testid="doc-back-btn"
-          onClick={onBackToPreview}
+          onClick={() => { void handleBack(); }}
         >
           <ArrowLeft className="h-4 w-4" />
           {t("document:back")}
@@ -327,6 +418,18 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
             ariaLabel={t(showDocumentOutline ? "document:sidebar.hide" : "document:sidebar.show")}
           />
           <button
+            className="relative grid h-9 w-9 place-items-center rounded-full bg-transparent text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
+            type="button"
+            data-testid="doc-attachments-btn"
+            aria-label={t("document:attachments")}
+            title={t("document:attachments")}
+            onPointerDown={handleOpenAttachments}
+            onClick={handleOpenAttachments}
+          >
+            <Paperclip className="h-4 w-4" />
+            {attachments.length > 0 && <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-[var(--accent)] px-1 text-[9px] leading-4 text-white">{attachments.length}</span>}
+          </button>
+          <button
             className={`grid h-9 w-9 place-items-center rounded-full ${isFavorite ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "bg-transparent text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"}`}
             type="button"
             data-testid="doc-favorite-btn"
@@ -345,7 +448,17 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
         <article className="flex min-h-[24rem] min-w-0 flex-col rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3 sm:rounded-3xl sm:p-4 lg:min-h-0 lg:flex-1">
           <div ref={editorViewportRef} className="min-h-0 flex-1 overflow-hidden">
             <Suspense fallback={<div className="flex h-full items-center justify-center text-[var(--muted)]"><Loader2 className="mr-2 h-4 w-4" />{t("document:loadingEditor")}</div>}>
-              <VditorEditor ref={editorRef} initialValue={content} onChange={handleContentChange} theme={resolveTheme(theme)} lang={getVditorLang()} />
+              <VditorEditor
+                ref={editorRef}
+                initialValue={content}
+                onChange={handleContentChange}
+                theme={resolveTheme(theme)}
+                lang={getVditorLang()}
+                attachments={attachments}
+                onAddAttachment={handleAddAttachment}
+                onAddAttachmentData={handleAddAttachmentData}
+                onOpenAttachments={handleOpenAttachments}
+              />
             </Suspense>
           </div>
         </article>
@@ -426,6 +539,13 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
         onUpdateMeta={handleUpdateVersionMeta}
         onDelete={handleDeleteVersion}
         theme={resolveTheme(theme)}
+      />
+      <AttachmentManagerModal
+        open={attachmentModalOpen}
+        onClose={() => setAttachmentModalOpen(false)}
+        itemId={selectedItemId ?? ""}
+        onInsertAttachment={handleInsertAttachment}
+        onDeleteAttachment={handleDeleteAttachment}
       />
     </div>
   );

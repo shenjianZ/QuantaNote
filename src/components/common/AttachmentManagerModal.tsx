@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
-import { FileText, FolderOpen, Music, Plus, Trash2, Video, X } from "lucide-react";
+import { FileText, FolderOpen, ImagePlus, Link2, Music, Plus, Trash2, Video, X } from "lucide-react";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
 import { Modal } from "./Modal";
-import { useAttachmentStore } from "../../stores/attachmentStore";
+import { useAttachmentStore, type AttachmentDto } from "../../stores/attachmentStore";
 import { useToastStore } from "../../stores/toastStore";
 
 interface AttachmentManagerModalProps {
   open: boolean;
   onClose: () => void;
   itemId: string;
+  onInsertAttachment?: (attachment: AttachmentDto) => void;
+  onDeleteAttachment?: (attachment: AttachmentDto) => Promise<boolean>;
 }
 
 type FileCategory = "image" | "audio" | "video" | "pdf" | "text" | "other";
@@ -66,12 +68,18 @@ function getExtension(filename: string) {
   return parts.length > 1 ? parts.pop()!.toLowerCase() : "";
 }
 
-export function AttachmentManagerModal({ open: isOpen, onClose, itemId }: AttachmentManagerModalProps) {
+export function AttachmentManagerModal({
+  open: isOpen,
+  onClose,
+  itemId,
+  onInsertAttachment,
+  onDeleteAttachment,
+}: AttachmentManagerModalProps) {
   const { t } = useTranslation(["modals", "common"]);
   const attachments = useAttachmentStore((s) => s.attachments);
   const fetchAttachments = useAttachmentStore((s) => s.fetchAttachments);
   const addAttachment = useAttachmentStore((s) => s.addAttachment);
-  const deleteAttachment = useAttachmentStore((s) => s.deleteAttachment);
+  const deleteAttachmentAction = useAttachmentStore((s) => s.deleteAttachment);
   const [preview, setPreview] = useState<PreviewState | null>(null);
   const [loadingText, setLoadingText] = useState(false);
 
@@ -95,9 +103,12 @@ export function AttachmentManagerModal({ open: isOpen, onClose, itemId }: Attach
     }
   }
 
-  async function handleDelete(id: string) {
+  async function handleDelete(attachment: AttachmentDto) {
     try {
-      await deleteAttachment(id);
+      const deleted = onDeleteAttachment
+        ? await onDeleteAttachment(attachment)
+        : await deleteAttachmentAction(attachment.id);
+      if (!deleted) return;
     } catch {
       useToastStore.getState().addToast("error", t("common:toast.attachmentDeleteFailed"));
     }
@@ -206,6 +217,17 @@ export function AttachmentManagerModal({ open: isOpen, onClose, itemId }: Attach
 
                     {/* Actions */}
                     <div className="flex shrink-0 items-center gap-1">
+                      {onInsertAttachment && (
+                        <button
+                          className="rounded-full p-1.5 text-[var(--muted)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
+                          type="button"
+                          data-testid="attachment-insert-btn"
+                          onClick={() => { onInsertAttachment(att); onClose(); }}
+                          title={category === "image" ? t("modals:attachment.insertImage") : t("modals:attachment.insertLink")}
+                        >
+                          {category === "image" ? <ImagePlus className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
+                        </button>
+                      )}
                       <button
                         className="rounded-full p-1.5 text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
                         type="button"
@@ -217,7 +239,7 @@ export function AttachmentManagerModal({ open: isOpen, onClose, itemId }: Attach
                       <button
                         className="rounded-full p-1.5 text-[var(--muted)] hover:bg-red-500/10 hover:text-red-400"
                         type="button"
-                        onClick={() => handleDelete(att.id)}
+                        onClick={() => handleDelete(att)}
                         title={t("modals:attachment.deleteAttachment")}
                       >
                         <Trash2 className="h-4 w-4" />

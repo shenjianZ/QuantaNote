@@ -148,6 +148,24 @@ describe("Search and replace bar", () => {
         );
     });
 
+    it("counts and replaces visible text inside complex Markdown", async () => {
+        await DocumentEditorPage.setContent("普通 AAAA\n\n**AAAA**\n\n[AAAA](https://example.com/AAAA)");
+        await SearchReplaceBar.search("AAAA");
+        const count = await SearchReplaceBar.getMatchCountText();
+        expect(count).toContain("/3");
+
+        await SearchReplaceBar.setReplace("全部替换");
+        await SearchReplaceBar.clickReplaceAll();
+        await browser.waitUntil(
+            async () => {
+                const item = await getItemById(testItem.id);
+                return (item.content.match(/全部替换/g) ?? []).length === 3
+                    && item.content.includes("https://example.com/AAAA");
+            },
+            { timeout: 5000, timeoutMsg: "Complex Markdown replacement was not persisted correctly" },
+        );
+    });
+
     it("close button closes the search bar", async () => {
         await SearchReplaceBar.close();
         expect(await SearchReplaceBar.isOpen()).toBe(false);

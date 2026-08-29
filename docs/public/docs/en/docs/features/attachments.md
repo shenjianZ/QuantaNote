@@ -3,7 +3,7 @@ title: Attachments
 description: Manage files associated with your notes and items in QuantaNote.
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-29
 ---
 
 # Attachments
@@ -14,10 +14,12 @@ Attachments allow you to associate external files with your items. Whether it is
 
 To upload a file attachment to an item:
 
-1. Open the **Attachment Manager Modal** — accessible from the Document Editor toolbar or an item's context menu in the Library.
-2. Click the **"Upload"** button or drag and drop files onto the modal.
-3. A file picker dialog opens, allowing you to select one or more files from your local filesystem.
+1. Open the **Attachment Manager Modal** from the Document Editor toolbar or the reader's attachment action.
+2. Click **Add File** to open the system file picker.
+3. Select files from the local filesystem.
 4. Selected files are copied to the QuantaNote data directory and linked to the current item.
+
+Inside the Document Editor, files can also be dropped directly into the editor. Images can be pasted from the clipboard; these actions create the attachment and insert an image or attachment link at the caret. The image toolbar button filters for images, while the attachment button supports multiple files.
 
 ### Supported Formats
 
@@ -50,9 +52,9 @@ File types that do not support inline preview show a file icon and a button to o
 
 The **Attachment Manager Modal** is the primary interface for managing an item's attachments:
 
-- **Upload** — Add new files via the file picker or drag-and-drop.
+- **Upload** — Add new files via the file picker. The Document Editor also supports file drag-and-drop.
 - **Preview** — Click an attachment to open its preview (image, audio, video, PDF, or text).
-- **Download** — Save a copy of the attachment to a custom location on your filesystem.
+- **Insert** — From the editor's manager, insert an image as Markdown media or another file as an attachment link.
 - **Delete** — Remove an attachment from the item. The file is deleted from the QuantaNote data directory. A confirmation prompt prevents accidental deletion.
 - **File Info** — Each attachment displays its filename, file size, and upload date.
 
@@ -70,7 +72,7 @@ On Windows, this resolves to:
 %USERPROFILE%\.quantanote\attachments\{item_id}\
 ```
 
-Each item has its own subdirectory named after the item's UUID. Files are stored with their original filenames. When an item is deleted, its attachment directory and all contained files are removed automatically.
+Each item has its own subdirectory named after the item's ID. Documents refer to attachments with stable `attachment://<id>` references, and the reader resolves them to local asset URLs. When an item is deleted, its attachment directory and all contained files are removed automatically.
 
 ### Backup Considerations
 

@@ -12,6 +12,9 @@ class DocumentEditorPage {
   get saveStatus() { return "[data-testid='doc-save-status']"; }
   get saveVersionBtn() { return "[data-testid='doc-save-version-btn']"; }
   get favoriteBtn() { return "[data-testid='doc-favorite-btn']"; }
+  get attachmentsBtn() { return "[data-testid='doc-attachments-btn']"; }
+  get imageToolbarBtn() { return "button[data-type='quantanote-image']"; }
+  get attachmentToolbarBtn() { return "button[data-type='quantanote-attachment']"; }
   get backBtn() { return "[data-testid='doc-back-btn']"; }
   get contentWidthControl() { return "[data-testid='document-editor-content-width-control']"; }
   get contentWidthTarget() { return "[data-testid='document-editor-content']"; }
@@ -128,6 +131,18 @@ class DocumentEditorPage {
 
   async clickBack() {
     await $(this.backBtn).then(b => b.click());
+  }
+
+  async hasAttachmentToolbar() {
+    return (await $(this.attachmentsBtn)).isDisplayed();
+  }
+
+  async hasImageInsertionToolbar() {
+    return (await $(this.imageToolbarBtn)).isDisplayed();
+  }
+
+  async hasAttachmentInsertionToolbar() {
+    return (await $(this.attachmentToolbarBtn)).isDisplayed();
   }
 
   async setContentWidth(value) {

@@ -1,4 +1,7 @@
 {
+  "insertImage": "插入图片",
+  "insertAttachment": "插入附件",
+  "dropFiles": "拖入文件以插入",
   "searchReplace": {
     "search": "搜索",
     "replace": "替换",

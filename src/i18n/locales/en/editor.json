@@ -1,4 +1,7 @@
 {
+  "insertImage": "Insert image",
+  "insertAttachment": "Insert attachment",
+  "dropFiles": "Drop files to insert",
   "searchReplace": {
     "search": "Search",
     "replace": "Replace",

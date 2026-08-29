@@ -30,7 +30,9 @@
     "deleteAttachment": "Delete Attachment",
     "preview": "Preview",
     "loading": "Loading...",
-    "selectFile": "Select Attachment",
+      "selectFile": "Select Attachment",
+      "insertImage": "Insert image",
+      "insertLink": "Insert attachment link",
     "categories": {
       "image": "Image",
       "audio": "Audio",

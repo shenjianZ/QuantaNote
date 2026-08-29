@@ -269,6 +269,7 @@ pub fn run() {
             item::get_recent_items,
             search::search_items,
             attachment::add_attachment,
+            attachment::add_attachment_data,
             attachment::get_attachments,
             attachment::delete_attachment,
             version::get_versions,

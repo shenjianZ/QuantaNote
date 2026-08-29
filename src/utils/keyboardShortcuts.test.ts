@@ -23,6 +23,9 @@ describe("shouldPreventGlobalShortcut", () => {
 
     it("keeps editor shortcuts available inside editable elements", () => {
         expect(shouldPreventGlobalShortcut("a", true)).toBe(false);
+        expect(shouldPreventGlobalShortcut("b", true)).toBe(false);
+        expect(shouldPreventGlobalShortcut("i", true)).toBe(false);
+        expect(shouldPreventGlobalShortcut("d", true)).toBe(false);
         expect(shouldPreventGlobalShortcut("z", true)).toBe(false);
         expect(shouldPreventGlobalShortcut("v", true)).toBe(false);
     });
@@ -31,5 +34,6 @@ describe("shouldPreventGlobalShortcut", () => {
         expect(shouldPreventGlobalShortcut("a", false)).toBe(true);
         expect(shouldPreventGlobalShortcut("v", false)).toBe(true);
         expect(shouldPreventGlobalShortcut("p", false)).toBe(true);
+        expect(shouldPreventGlobalShortcut("s", false)).toBe(true);
     });
 });

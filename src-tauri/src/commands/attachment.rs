@@ -15,6 +15,22 @@ pub fn add_attachment(
 }
 
 #[tauri::command]
+pub fn add_attachment_data(
+    db: State<'_, DbState>,
+    item_id: String,
+    filename: String,
+    mime_type: String,
+    data: String,
+) -> Result<AttachmentDto, AppError> {
+    use base64::Engine;
+
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(data)
+        .map_err(|error| AppError::Validation(format!("图片数据无效: {}", error)))?;
+    attachment_service::add_attachment_data(&db, item_id, filename, mime_type, bytes)
+}
+
+#[tauri::command]
 pub fn get_attachments(
     db: State<'_, DbState>,
     item_id: String,

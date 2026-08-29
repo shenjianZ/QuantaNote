@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 // Types
-interface AttachmentResult {
+export interface AttachmentResult {
     id: string;
     item_id: string;
     filename: string;
@@ -56,6 +56,20 @@ export async function searchItems(query: string, itemType?: string) {
 // Attachment commands
 export async function addAttachment(itemId: string, path: string) {
     return invoke<AttachmentResult>("add_attachment", { itemId, path });
+}
+
+export async function addAttachmentData(
+    itemId: string,
+    filename: string,
+    mimeType: string,
+    data: string,
+) {
+    return invoke<AttachmentResult>("add_attachment_data", {
+        itemId,
+        filename,
+        mimeType,
+        data,
+    });
 }
 
 export async function getAttachments(itemId: string) {

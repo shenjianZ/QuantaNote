@@ -1,6 +1,6 @@
 import { Children, cloneElement, isValidElement, memo, useCallback, useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { Check, CircleAlert, Copy, Info, Lightbulb, OctagonAlert, TriangleAlert } from "lucide-react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import Vditor from "vditor";
 import rehypeKatex from "rehype-katex";
 import rehypeRaw from "rehype-raw";
@@ -20,12 +20,14 @@ import rust from "highlight.js/lib/languages/rust";
 import sql from "highlight.js/lib/languages/sql";
 import typescript from "highlight.js/lib/languages/typescript";
 import xml from "highlight.js/lib/languages/xml";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "react-i18next";
 import type { Components } from "react-markdown";
 import { VDITOR_CDN } from "../../utils/vditorConfig";
 import { copyTextToSystemClipboard } from "../../utils/clipboard";
 import { useToastStore } from "../../stores/toastStore";
+import type { MarkdownAttachment } from "../../utils/markdownAttachments";
+import { getAttachmentIdFromSource, resolveAttachmentSource } from "../../utils/markdownAttachments";
 import "katex/dist/katex.min.css";
 
 hljs.registerLanguage("bash", bash);
@@ -41,6 +43,11 @@ hljs.registerLanguage("xml", xml);
 
 const markdownSanitizeSchema = {
   ...defaultSchema,
+  protocols: {
+    ...defaultSchema.protocols,
+    href: [...(defaultSchema.protocols?.href ?? []), "attachment"],
+    src: [...(defaultSchema.protocols?.src ?? []), "attachment"],
+  },
   attributes: {
     ...defaultSchema.attributes,
     audio: ["controls", "preload", "src"],
@@ -55,6 +62,7 @@ interface MarkdownRendererProps {
   theme?: "dark" | "light";
   lang?: "zh_CN" | "en_US";
   emptyText?: string;
+  attachments?: readonly MarkdownAttachment[];
 }
 
 type CalloutKind = "note" | "tip" | "important" | "warning" | "caution";
@@ -278,7 +286,7 @@ function CalloutIcon({ kind }: { kind: CalloutKind }) {
   return <Icon className="markdown-callout-icon" aria-hidden="true" />;
 }
 
-export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme = "dark", lang, emptyText }: MarkdownRendererProps) {
+export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme = "dark", lang, emptyText, attachments = [] }: MarkdownRendererProps) {
   const { t } = useTranslation();
   const resolvedEmptyText = emptyText ?? t("common:emptyItem.noContent");
   const headingCounts = new Map<string, number>();
@@ -287,6 +295,14 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme 
     const anchor = (e.target as HTMLElement).closest("a");
     if (!anchor) return;
 
+    const attachmentId = anchor.getAttribute("data-attachment-id");
+    const attachment = attachmentId ? attachments.find((candidate) => candidate.id === attachmentId) : undefined;
+    if (attachment && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      openPath(attachment.file_path).catch(() => {});
+      return;
+    }
+
     const href = anchor.getAttribute("href") || "";
     if (!href || href.startsWith("#")) return;
 
@@ -294,7 +310,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme 
     if (e.ctrlKey || e.metaKey) {
       openUrl(anchor.href).catch(() => {});
     }
-  }, []);
+  }, [attachments]);
 
   if (!content.trim()) {
     return <div className="markdown-empty">{resolvedEmptyText}</div>;
@@ -325,11 +341,19 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme 
     h4: makeHeading(4),
     h5: makeHeading(5),
     h6: makeHeading(6),
-    a: ({ children, href, title }) => (
-      <a href={href} title={title} rel={href?.startsWith("http") ? "noreferrer" : undefined}>
+    a: ({ children, href, title }) => {
+      const attachmentId = href ? getAttachmentIdFromSource(href) : null;
+      return (
+      <a
+        href={href ? resolveAttachmentSource(href, attachments) : href}
+        data-attachment-id={attachmentId ?? undefined}
+        title={title}
+        rel={href?.startsWith("http") ? "noreferrer" : undefined}
+      >
         {children}
       </a>
-    ),
+      );
+    },
     blockquote: ({ children }) => {
       const childNodes = Children.toArray(children);
       const firstContentIndex = childNodes.findIndex((child) => nodeToText(child).trim().length > 0);
@@ -364,7 +388,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme 
       if (!src) return null;
       return (
         <span className="markdown-image-frame">
-          <img src={src} alt={alt || ""} title={title} loading="eager" decoding="async" />
+          <img src={resolveAttachmentSource(src, attachments)} alt={alt || ""} title={title} loading="eager" decoding="async" />
           {alt && <span className="markdown-image-caption">{alt}</span>}
         </span>
       );
@@ -414,6 +438,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme 
         remarkPlugins={[remarkGfm, remarkBreaks, remarkMath, remarkDefinitionList]}
         remarkRehypeOptions={{ handlers: defListHastHandlers }}
         rehypePlugins={[rehypeRaw, [rehypeSanitize, markdownSanitizeSchema], rehypeKatex]}
+        urlTransform={(url) => url.toLowerCase().startsWith("attachment://") ? url : defaultUrlTransform(url)}
         components={components}
       >
         {content}

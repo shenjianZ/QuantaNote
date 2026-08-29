@@ -3,7 +3,7 @@ title: Markdown Editor
 description: Use the QuantaNote Markdown editor with GFM, tables, charts, formulas, search and replace, and cross-platform shortcuts
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-08-19
+lastUpdated: 2026-08-29
 ---
 
 # Markdown Editor
@@ -20,11 +20,14 @@ QuantaNote uses Vditor's IR (Instant Rendering) mode. Markdown is rendered as yo
 | ~~S~~ | Strikethrough | Insert `~~text~~` |
 | Lists | Lists | Insert ordered or unordered lists |
 | Task | Task list | Insert `- [ ]` |
+| Indent | Indentation | Increase or decrease list indentation |
 | Quote | Blockquote | Insert `> text` |
 | Code | Code block | Insert a fenced code block with a language marker |
 | `Code` | Inline code | Insert backtick code |
 | Link | Hyperlink | Insert `[text](URL)` |
-| Image | Image | Insert `![alt](URL)` |
+| Line | Horizontal rule | Insert a Markdown horizontal rule |
+| Image | Image attachment | Choose a local image and insert a stable `attachment://...` reference |
+| Attachment | Attachment link | Choose one or more files, insert links, or open the Attachment Manager |
 | Table | Insert or adjust table | Shows “Insert table” or “Adjust table” based on the caret |
 
 The table panel saves the caret position from before it opens, so clicking table settings does not insert the table at the wrong location.
@@ -64,8 +67,10 @@ Reducing the table size removes rows or columns from the end. Check the trailing
 > Blockquote
 ---
 [Link](https://example.com)
-![Image](image.png)
+![Image](attachment://att-example)
 ```
+
+The image button creates the attachment automatically. You can also drop an image into the editor or paste a screenshot from the clipboard. The Attachment Manager's insert action can place an existing attachment at the current caret.
 
 ### GFM Extensions
 
@@ -159,7 +164,7 @@ Scripts, event attributes, and unsafe tags are filtered.
 | Previous match | `Shift + Enter` | Jump to the previous result |
 | Close | `Esc` | Close the search bar |
 
-Case-sensitive search, single replacement, and replace-all are supported.
+Search and replacement use the text actually rendered by the editor, so link URLs, image references, and Markdown markers are not counted as visible text. Case-sensitive search, single replacement, and replace-all are supported.
 
 ## Copy, Paste, and Feedback
 
@@ -178,9 +183,10 @@ The packaged Windows application uses the native clipboard first, so copied cont
 | `Ctrl + H` | Search and replace |
 | `Ctrl + Z` | Undo |
 | `Ctrl + Shift + Z` | Redo |
-| `Ctrl + S` | Save |
 | `Ctrl + K` | Command Palette outside the editor |
 | `Tab` | Indent a list |
 | `Shift + Tab` | Outdent a list |
 
 On macOS, the system convention usually uses `Command` instead of `Ctrl`. Linux and Windows use `Ctrl`.
+
+The editor saves automatically, so `Ctrl + S` is not required. When leaving the editor, QuantaNote waits for the final save; if saving fails, it keeps the editor open and shows the error.

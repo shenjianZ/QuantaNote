@@ -1,9 +1,19 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import Vditor from "vditor";
 import "vditor/dist/index.css";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useTranslation } from "react-i18next";
 import { VDITOR_CDN, getVditorLang } from "../../utils/vditorConfig";
+import type { AttachmentDto } from "../../stores/attachmentStore";
+import {
+  buildAttachmentMarkdown,
+  isImageAttachment,
+  isImagePath,
+  normalizeAttachmentReferences,
+  resolveAttachmentReferences,
+} from "../../utils/markdownAttachments";
 import { SearchReplaceBar } from "./SearchReplaceBar";
 
 type VditorToolbarItem = string | {
@@ -20,20 +30,26 @@ interface VditorEditorProps {
   lang?: "zh_CN" | "en_US";
   toolbar?: string[];
   placeholder?: string;
+  attachments?: readonly AttachmentDto[];
+  onAddAttachment?: (path: string) => Promise<AttachmentDto | null>;
+  onAddAttachmentData?: (filename: string, mimeType: string, data: string) => Promise<AttachmentDto | null>;
+  onOpenAttachments?: () => void;
 }
 
 export interface VditorEditorHandle {
   getValue: () => string;
   setValue: (value: string) => void;
   focus: () => void;
+  saveSelection: () => void;
   scrollToHeading: (index: number) => void;
+  insertAttachment: (attachment: AttachmentDto, asImage?: boolean) => void;
 }
 
 const DEFAULT_TOOLBAR = [
-  "headings", "bold", "italic", "strike", "|",
-  "list", "ordered-list", "check", "|",
+  "headings", "bold", "italic", "strike", "emoji", "|",
+  "list", "ordered-list", "check", "outdent", "indent", "|",
   "quote", "code", "inline-code", "|",
-  "link", "table", "|",
+  "link", "table", "line", "quantanote-image", "quantanote-attachment", "|",
   "undo", "redo",
 ];
 
@@ -46,6 +62,18 @@ const TABLE_ICON = `
   <path d="M7 7h.01"></path>
   <path d="M11.5 7h.01"></path>
   <path d="M16 7h.01"></path>
+</svg>`;
+
+const IMAGE_ICON = `
+<svg class="quantanote-image-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <rect x="3.5" y="4.5" width="17" height="15" rx="2.5"></rect>
+  <circle cx="8.5" cy="9" r="1.4"></circle>
+  <path d="m4.5 17 4.7-4.7a1.5 1.5 0 0 1 2.1 0l2.2 2.2 1.5-1.5a1.5 1.5 0 0 1 2.1 0l2.4 2.4"></path>
+</svg>`;
+
+const ATTACHMENT_ICON = `
+<svg class="quantanote-attachment-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="m13.5 6.5-6.9 6.9a3.4 3.4 0 0 0 4.8 4.8l7-7a4.8 4.8 0 0 0-6.8-6.8l-7.1 7.1a6.2 6.2 0 0 0 8.8 8.8l6.1-6.1"></path>
 </svg>`;
 
 type TablePanelCloseRef = { current: (() => void) | null };
@@ -105,7 +133,7 @@ function buildTableMarkdown(rowsInput: number, colsInput: number, lang: "zh_CN" 
   ].join("\n");
 }
 
-function getEditorRange(vditor: Vditor): Range | null {
+function getLiveEditorRange(vditor: Vditor): Range | null {
   const editorState = vditor.vditor[vditor.vditor.currentMode];
   const selection = window.getSelection();
   if (editorState?.element && selection && selection.rangeCount > 0) {
@@ -114,7 +142,110 @@ function getEditorRange(vditor: Vditor): Range | null {
       return range.cloneRange();
     }
   }
+  return null;
+}
+
+function getEditorRange(vditor: Vditor): Range | null {
+  const editorState = vditor.vditor[vditor.vditor.currentMode];
+  const liveRange = getLiveEditorRange(vditor);
+  if (liveRange) return liveRange;
   return editorState?.range?.cloneRange() ?? null;
+}
+
+interface EditorSelectionBookmark {
+  start: number;
+  end: number;
+}
+
+/**
+ * DOM Range 保存的是具体的 DOM 节点。编辑器被 setValue 或附件解析刷新后，
+ * 这些节点可能已经脱离当前编辑器，继续使用它会让 Vditor 回退到文档开头。
+ * 用可见文本偏移保存选区，插入前再根据当前 DOM 重建 Range，可以跨越这类刷新。
+ */
+function getEditorSelectionBookmark(vditor: Vditor): EditorSelectionBookmark | null {
+  const editorState = vditor.vditor[vditor.vditor.currentMode];
+  const range = getLiveEditorRange(vditor);
+  const editor = editorState?.element;
+  if (!editor || !range) return null;
+
+  const preSelectionRange = range.cloneRange();
+  if (editor.childNodes[0]) {
+    preSelectionRange.setStart(editor, 0);
+  } else {
+    preSelectionRange.selectNodeContents(editor);
+  }
+  preSelectionRange.setEnd(range.startContainer, range.startOffset);
+
+  return {
+    start: Math.max(0, preSelectionRange.toString().length),
+    end: Math.max(0, preSelectionRange.toString().length + range.toString().length),
+  };
+}
+
+function setRangeBoundary(range: Range, boundary: "start" | "end", node: Node, offset: number) {
+  if (boundary === "start") range.setStart(node, offset);
+  else range.setEnd(node, offset);
+}
+
+function restoreEditorSelection(vditor: Vditor, bookmark: EditorSelectionBookmark | null | undefined) {
+  const editorState = vditor.vditor[vditor.vditor.currentMode];
+  const editor = editorState?.element;
+  if (!editor || !bookmark) {
+    vditor.focus();
+    return null;
+  }
+
+  const textNodes: Text[] = [];
+  const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+  let currentNode = walker.nextNode();
+  while (currentNode) {
+    textNodes.push(currentNode as Text);
+    currentNode = walker.nextNode();
+  }
+
+  const totalLength = textNodes.reduce((total, node) => total + node.data.length, 0);
+  const start = Math.min(Math.max(0, bookmark.start), totalLength);
+  const end = Math.min(Math.max(start, bookmark.end), totalLength);
+  const restoredRange = document.createRange();
+
+  const setBoundaryByOffset = (boundary: "start" | "end", offset: number) => {
+    if (textNodes.length === 0) {
+      setRangeBoundary(restoredRange, boundary, editor, offset === 0 ? 0 : editor.childNodes.length);
+      return;
+    }
+
+    let charIndex = 0;
+    for (const textNode of textNodes) {
+      const nextCharIndex = charIndex + textNode.data.length;
+      if (offset <= nextCharIndex) {
+        setRangeBoundary(restoredRange, boundary, textNode, offset - charIndex);
+        return;
+      }
+      charIndex = nextCharIndex;
+    }
+
+    const lastTextNode = textNodes[textNodes.length - 1];
+    setRangeBoundary(restoredRange, boundary, lastTextNode, lastTextNode.data.length);
+  };
+
+  setBoundaryByOffset("start", start);
+  setBoundaryByOffset("end", end);
+  const selection = window.getSelection();
+  selection?.removeAllRanges();
+  selection?.addRange(restoredRange);
+  editorState.range = restoredRange;
+  return restoredRange;
+}
+
+async function fileToBase64(file: File) {
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+  return btoa(binary);
 }
 
 function getClosestElement(node: Node | null, selector: string): Element | null {
@@ -393,17 +524,31 @@ function createTableToolbarItem(
   };
 }
 
-function normalizeToolbar(items: string[], tableItem: VditorToolbarItem): VditorToolbarItem[] {
-  return items.map((item) => item === "table" ? tableItem : item);
+function normalizeToolbar(
+  items: string[],
+  tableItem: VditorToolbarItem,
+  imageItem?: VditorToolbarItem,
+  attachmentItem?: VditorToolbarItem,
+): VditorToolbarItem[] {
+  return items.flatMap((item) => {
+    if (item === "table") return [tableItem];
+    if (item === "quantanote-image") return imageItem ? [imageItem] : [];
+    if (item === "quantanote-attachment") return attachmentItem ? [attachmentItem] : [];
+    return [item];
+  });
 }
 
-export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(function VditorEditor({
+const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(function VditorEditor({
   initialValue,
   onChange,
   theme = "dark",
   lang,
   toolbar,
   placeholder,
+  attachments = [],
+  onAddAttachment,
+  onAddAttachmentData,
+  onOpenAttachments,
 }, ref) {
   const { t } = useTranslation();
   const resolvedPlaceholder = placeholder ?? t("editor:placeholder");
@@ -411,6 +556,12 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
   const vditorRef = useRef<Vditor | null>(null);
   const onChangeRef = useRef(onChange);
   const initialValueRef = useRef(initialValue);
+  const attachmentsRef = useRef<readonly AttachmentDto[]>(attachments);
+  const onAddAttachmentRef = useRef(onAddAttachment);
+  const onAddAttachmentDataRef = useRef(onAddAttachmentData);
+  const onOpenAttachmentsRef = useRef(onOpenAttachments);
+  const savedInsertRangeRef = useRef<EditorSelectionBookmark | null>(null);
+  const lastEditorRangeRef = useRef<EditorSelectionBookmark | null>(null);
   const skipNextValueRef = useRef<string | null>(null);
   // 最近一次通过 onChange 上报给父组件的值;同步外部内容时用于识别"回声",
   // 避免父组件把编辑器自己发出的值传回来时触发 setValue 导致光标被重置到文档开头
@@ -422,9 +573,14 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
   const searchIdxRef = useRef(0);
   const searchQueryRef = useRef("");
   const searchCaseSensitiveRef = useRef(false);
+  const [dragActive, setDragActive] = useState(false);
 
   onChangeRef.current = onChange;
   initialValueRef.current = initialValue;
+  attachmentsRef.current = attachments;
+  onAddAttachmentRef.current = onAddAttachment;
+  onAddAttachmentDataRef.current = onAddAttachmentData;
+  onOpenAttachmentsRef.current = onOpenAttachments;
 
   // 获取 Vditor 编辑区域元素
   const getContentElement = useCallback((): HTMLElement | null => {
@@ -461,21 +617,15 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
     const container = containerRef.current;
     if (!container || !query) return 0;
 
-    // 获取编辑器内容
     const vditor = vditorRef.current;
     if (!vditor) return 0;
+    if (!vditor.getValue()) return 0;
 
-    const text = vditor.getValue();
-    if (!text) return 0;
-
-    // 计算匹配数量
+    // 搜索以编辑器实际渲染出来的文本为准，而不是直接搜索 Markdown 源码。
+    // 这样不会把链接地址、图片语法或加粗标记误算成可见匹配项。
     const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const flags = caseSensitive ? "g" : "gi";
     const regex = new RegExp(escapedQuery, flags);
-    const matches = text.match(regex);
-    const count = matches ? matches.length : 0;
-
-    if (count === 0) return 0;
 
     // 在编辑区 DOM 中高亮，保证替换操作能定位到真实匹配节点。
     const contentEl = container.querySelector(".vditor-ir") as HTMLElement | null;
@@ -485,7 +635,17 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
     const walker = document.createTreeWalker(
       contentEl,
       NodeFilter.SHOW_TEXT,
-      null
+      {
+        acceptNode(node) {
+          // IR mode renders Markdown syntax (including link URLs) as helper
+          // marker nodes. They are visible in the editing surface but are not
+          // document text, so searching them would count/replace Markdown
+          // syntax and link destinations unexpectedly.
+          return node.parentElement?.closest(".vditor-ir__marker")
+            ? NodeFilter.FILTER_REJECT
+            : NodeFilter.FILTER_ACCEPT;
+        },
+      },
     );
 
     const textNodes: Text[] = [];
@@ -579,15 +739,33 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
     }
   }, []);
 
+  const insertAttachment = useCallback((
+    attachment: AttachmentDto,
+    asImage = isImageAttachment(attachment),
+    bookmark: EditorSelectionBookmark | null | undefined = savedInsertRangeRef.current,
+  ) => {
+    const vditor = vditorRef.current;
+    if (!vditor) return;
+    savedInsertRangeRef.current = null;
+    restoreEditorSelection(vditor, bookmark);
+    const markdown = resolveAttachmentReferences(
+      buildAttachmentMarkdown(attachment, asImage),
+      attachmentsRef.current,
+    );
+    vditor.insertMD(markdown);
+    vditor.focus();
+  }, []);
+
   const commitEditorValue = useCallback((value: string) => {
     const vditor = vditorRef.current;
     if (!vditor) return false;
 
-    skipNextValueRef.current = value;
+    const normalizedValue = normalizeAttachmentReferences(value, attachmentsRef.current);
+    skipNextValueRef.current = normalizedValue;
     try {
-      vditor.setValue(value);
-      lastEmittedRef.current = value;
-      onChangeRef.current(value);
+      vditor.setValue(resolveAttachmentReferences(normalizedValue, attachmentsRef.current));
+      lastEmittedRef.current = normalizedValue;
+      onChangeRef.current(normalizedValue);
       return true;
     } finally {
       skipNextValueRef.current = null;
@@ -664,8 +842,66 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
     }
   }, [clearHighlights, commitEditorValue]);
 
+  const insertAttachmentAtRange = useCallback((attachment: AttachmentDto, bookmark: EditorSelectionBookmark | null, asImage?: boolean) => {
+    const vditor = vditorRef.current;
+    if (!vditor) return;
+    insertAttachment(attachment, asImage, bookmark);
+  }, [insertAttachment]);
+
+  const addAttachmentFromPath = useCallback(async (path: string, bookmark: EditorSelectionBookmark | null, forceImage = false) => {
+    const add = onAddAttachmentRef.current;
+    if (!add) return;
+    const attachment = await add(path);
+    if (attachment) {
+      insertAttachmentAtRange(attachment, bookmark, forceImage || isImageAttachment(attachment) || isImagePath(path));
+    }
+  }, [insertAttachmentAtRange]);
+
+  const addAttachmentFromFile = useCallback(async (file: File, bookmark: EditorSelectionBookmark | null) => {
+    const path = (file as File & { path?: string }).path;
+    if (path && onAddAttachmentRef.current) {
+      await addAttachmentFromPath(path, bookmark, file.type.startsWith("image/"));
+      return;
+    }
+    if (!file.type.startsWith("image/") || !onAddAttachmentDataRef.current) return;
+    const data = await fileToBase64(file);
+    const attachment = await onAddAttachmentDataRef.current(
+      file.name || `pasted-image-${Date.now()}.png`,
+      file.type || "image/png",
+      data,
+    );
+    if (attachment) insertAttachmentAtRange(attachment, bookmark, true);
+  }, [addAttachmentFromPath, insertAttachmentAtRange]);
+
+  const openAttachmentPicker = useCallback(async (asImage: boolean, multiple: boolean) => {
+    const add = onAddAttachmentRef.current;
+    const vditor = vditorRef.current;
+    if (!add || !vditor) return;
+    const savedBookmark = savedInsertRangeRef.current ?? getEditorSelectionBookmark(vditor);
+    const selected = await openDialog({
+      multiple,
+      title: asImage ? "Insert image" : "Insert attachment",
+      filters: asImage ? [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif", "tiff"] }] : undefined,
+    });
+    const paths = Array.isArray(selected) ? selected : selected ? [selected] : [];
+    for (const path of paths) {
+      await addAttachmentFromPath(path, savedBookmark, asImage);
+    }
+  }, [addAttachmentFromPath]);
+
+  const saveSelection = useCallback(() => {
+    const vditor = vditorRef.current;
+    if (!vditor) return;
+    const bookmark = getEditorSelectionBookmark(vditor) ?? lastEditorRangeRef.current;
+    if (bookmark) {
+      // 按钮获得焦点后浏览器可能暂时没有编辑器选区，此时使用最近一次有效选区。
+      savedInsertRangeRef.current = { ...bookmark };
+    }
+  }, []);
+
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      if (!(e.target instanceof Node) || !containerRef.current?.contains(e.target)) return;
       const mod = e.metaKey || e.ctrlKey;
       if (mod && e.key.toLowerCase() === "f") {
         e.preventDefault();
@@ -675,21 +911,31 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
         setSearchOpen(true);
       }
     }
+    const handleEditorSearch = () => setSearchOpen(true);
     document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("quantanote-open-editor-search", handleEditorSearch);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("quantanote-open-editor-search", handleEditorSearch);
+    };
   }, []);
 
   useImperativeHandle(ref, () => ({
-    getValue: () => vditorRef.current?.getValue() ?? initialValueRef.current,
+    getValue: () => normalizeAttachmentReferences(
+      vditorRef.current?.getValue() ?? initialValueRef.current,
+      attachmentsRef.current,
+    ),
     setValue: (value: string) => {
       const vditor = vditorRef.current;
       if (!vditor) return;
-      skipNextValueRef.current = value;
-      vditor.setValue(value);
+      const normalizedValue = normalizeAttachmentReferences(value, attachmentsRef.current);
+      skipNextValueRef.current = normalizedValue;
+      vditor.setValue(resolveAttachmentReferences(normalizedValue, attachmentsRef.current));
     },
     focus: () => {
       vditorRef.current?.focus();
     },
+    saveSelection,
     scrollToHeading: (index: number) => {
       const headings = containerRef.current?.querySelectorAll<HTMLElement>(
         ".vditor-ir h1, .vditor-ir h2, .vditor-ir h3, .vditor-ir h4, .vditor-ir h5, .vditor-ir h6",
@@ -697,10 +943,12 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
       const heading = headings?.[index];
       heading?.scrollIntoView({ behavior: "smooth", block: "center" });
     },
-  }), []);
+    insertAttachment,
+  }), [insertAttachment, saveSelection]);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    const container = containerRef.current;
+    if (!container) return;
 
     // 语言切换前保存当前内容，重建后恢复
     const currentVditor = vditorRef.current;
@@ -712,37 +960,62 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
     }
 
     readyRef.current = false;
-    containerRef.current.dataset.vditorReady = "false";
+    container.dataset.vditorReady = "false";
+
+    // Vditor loads Lute asynchronously. Give every lifecycle run its own host
+    // node so a late initialization from a disposed instance cannot overwrite
+    // the DOM owned by the current instance.
+    const mount = document.createElement("div");
+    mount.className = "quantanote-vditor-mount";
+    mount.style.height = "100%";
+    container.appendChild(mount);
 
     // 跟踪 Ctrl/Meta 按键状态，用于 Vditor link.click 回调
     let modifierHeld = false;
     let disposed = false;
     let removeTableToolbarTipListeners = () => {};
+    let removeAttachmentToolbarSelectionListener = () => {};
     const onKey = (e: KeyboardEvent) => { if (e.ctrlKey || e.metaKey) modifierHeld = true; };
     const onKeyUp = () => { modifierHeld = false; };
     const notifyCurrentValue = () => {
       const value = vditorRef.current?.getValue();
       if (value === undefined) return;
+      const normalizedValue = normalizeAttachmentReferences(value, attachmentsRef.current);
       if (skipNextValueRef.current !== null) {
-        if (value === skipNextValueRef.current) {
+        if (normalizedValue === skipNextValueRef.current) {
           skipNextValueRef.current = null;
           return;
         }
         skipNextValueRef.current = null;
       }
-      lastEmittedRef.current = value;
-      onChangeRef.current(value);
+      lastEmittedRef.current = normalizedValue;
+      onChangeRef.current(normalizedValue);
     };
-    const onPaste = () => {
+    const onPaste = (event: ClipboardEvent) => {
+      const imageFile = Array.from(event.clipboardData?.files ?? []).find((file) => file.type.startsWith("image/"));
+      if (imageFile && (onAddAttachmentDataRef.current || onAddAttachmentRef.current)) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        const currentEditor = vditorRef.current ?? vditor;
+        void addAttachmentFromFile(imageFile, getEditorSelectionBookmark(currentEditor)).catch(() => {});
+        return;
+      }
       window.setTimeout(notifyCurrentValue, 0);
       window.setTimeout(notifyCurrentValue, 50);
     };
+    const rememberEditorSelection = () => {
+      const currentEditor = vditorRef.current;
+      if (!currentEditor) return;
+      const bookmark = getEditorSelectionBookmark(currentEditor);
+      if (bookmark) lastEditorRangeRef.current = bookmark;
+    };
     window.addEventListener("keydown", onKey);
     window.addEventListener("keyup", onKeyUp);
-    containerRef.current.addEventListener("paste", onPaste, true);
+    document.addEventListener("selectionchange", rememberEditorSelection);
+    container.addEventListener("paste", onPaste, true);
 
     const resolvedLang = lang ?? getVditorLang();
-    const vditor = new Vditor(containerRef.current, {
+    const vditor = new Vditor(mount, {
       cdn: VDITOR_CDN,
       lang: resolvedLang,
       mode: "ir",
@@ -750,17 +1023,18 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
       theme: theme === "dark" ? "dark" : "classic",
       icon: "ant",
       cache: { enable: false },
-      value: initialValue,
+      value: resolveAttachmentReferences(initialValue, attachmentsRef.current),
       input: (value) => {
+        const normalizedValue = normalizeAttachmentReferences(value, attachmentsRef.current);
         if (skipNextValueRef.current !== null) {
-          if (value === skipNextValueRef.current) {
+          if (normalizedValue === skipNextValueRef.current) {
             skipNextValueRef.current = null;
             return;
           }
           skipNextValueRef.current = null;
         }
-        lastEmittedRef.current = value;
-        onChangeRef.current(value);
+        lastEmittedRef.current = normalizedValue;
+        onChangeRef.current(normalizedValue);
       },
       placeholder: resolvedPlaceholder,
       toolbar: normalizeToolbar(
@@ -769,6 +1043,21 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
           vditorRef.current?.insertMD(buildTableMarkdown(rows, cols, resolvedLang));
           vditorRef.current?.focus();
         }, () => vditorRef.current, activeTablePanelRef, resolvedLang),
+        onAddAttachmentRef.current ? {
+          name: "quantanote-image",
+          icon: IMAGE_ICON,
+          tip: t("editor:insertImage"),
+          click: () => { void openAttachmentPicker(true, false).catch(() => {}); },
+        } : undefined,
+        onAddAttachmentRef.current ? {
+          name: "quantanote-attachment",
+          icon: ATTACHMENT_ICON,
+          tip: t("editor:insertAttachment"),
+          click: () => {
+            if (onOpenAttachmentsRef.current) onOpenAttachmentsRef.current();
+            else void openAttachmentPicker(false, true).catch(() => {});
+          },
+        } : undefined,
       ) as never,
       preview: {
         theme: { current: theme === "dark" ? "dark" : "light" },
@@ -787,12 +1076,10 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
         },
       },
       after: () => {
-        if (disposed) return;
+        if (disposed || vditorRef.current !== vditor || !container.contains(mount)) return;
         readyRef.current = true;
-        if (containerRef.current) {
-          containerRef.current.dataset.vditorReady = "true";
-        }
-        const tableToolbarButton = containerRef.current?.querySelector<HTMLElement>("button[data-type='quantanote-table']");
+        container.dataset.vditorReady = "true";
+        const tableToolbarButton = mount.querySelector<HTMLElement>("button[data-type='quantanote-table']");
         if (tableToolbarButton) {
           const refreshTableToolbarTip = () => updateTableToolbarTip(tableToolbarButton, vditor, resolvedLang);
           ["mouseenter", "focus", "mousedown"].forEach((eventName) => {
@@ -804,11 +1091,25 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
             });
           };
         }
-        const latestValue = initialValueRef.current;
-        if (vditor.getValue() !== latestValue) {
+        const attachmentToolbarButtons = mount.querySelectorAll<HTMLElement>(
+          "button[data-type='quantanote-image'], button[data-type='quantanote-attachment']",
+        );
+        if (attachmentToolbarButtons.length > 0) {
+          const saveAttachmentSelection = () => saveSelection();
+          attachmentToolbarButtons.forEach((button) => ["pointerdown", "mousedown"].forEach((eventName) => {
+            button.addEventListener(eventName, saveAttachmentSelection);
+          }));
+          removeAttachmentToolbarSelectionListener = () => {
+            attachmentToolbarButtons.forEach((button) => ["pointerdown", "mousedown"].forEach((eventName) => {
+              button.removeEventListener(eventName, saveAttachmentSelection);
+            }));
+          };
+        }
+        const latestValue = normalizeAttachmentReferences(initialValueRef.current, attachmentsRef.current);
+        if (normalizeAttachmentReferences(vditor.getValue(), attachmentsRef.current) !== latestValue) {
           skipNextValueRef.current = latestValue;
           lastEmittedRef.current = latestValue;
-          vditor.setValue(latestValue);
+          vditor.setValue(resolveAttachmentReferences(latestValue, attachmentsRef.current));
         }
       },
     });
@@ -819,37 +1120,134 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
     return () => {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("keyup", onKeyUp);
-      containerRef.current?.removeEventListener("paste", onPaste, true);
+      document.removeEventListener("selectionchange", rememberEditorSelection);
+      container.removeEventListener("paste", onPaste, true);
       removeTableToolbarTipListeners();
+      removeAttachmentToolbarSelectionListener();
       disposed = true;
       activeTablePanelRef.current?.();
       activeTablePanelRef.current = null;
       try {
-        vditor.destroy();
+        if (vditor.vditor) vditor.destroy();
       } catch { /* ignore */ }
-      if (containerRef.current) {
-        delete (containerRef.current as HTMLDivElement & { __vditor?: Vditor }).__vditor;
-        containerRef.current.dataset.vditorReady = "false";
+      mount.remove();
+      const mountedEditor = container as HTMLDivElement & { __vditor?: Vditor };
+      if (mountedEditor.__vditor === vditor) {
+        delete mountedEditor.__vditor;
+        container.dataset.vditorReady = "false";
       }
-      vditorRef.current = null;
-      readyRef.current = false;
+      if (vditorRef.current === vditor) {
+        vditorRef.current = null;
+        readyRef.current = false;
+      }
     };
   }, [lang]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Tauri 原生拖拽不会触发浏览器的 drop 事件，因此同时监听 Webview 拖拽事件；
+  // 浏览器开发模式则走下面的 DOM fallback，可直接测试图片粘贴/拖拽体验。
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || (!onAddAttachmentRef.current && !onAddAttachmentDataRef.current)) return;
+
+    const isInsideEditor = (position?: { x: number; y: number }) => {
+      if (!position) return true;
+      const rect = container.getBoundingClientRect();
+      const scale = window.devicePixelRatio || 1;
+      const x = position.x / scale;
+      const y = position.y / scale;
+      return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+    };
+
+    const handleTauriDrop = (event: { payload: { type: string; paths?: string[]; position?: { x: number; y: number } } }) => {
+      const payload = event.payload;
+      const inside = isInsideEditor(payload.position);
+      if (payload.type === "enter" || payload.type === "over") {
+        setDragActive(inside);
+        return;
+      }
+      if (payload.type === "leave") {
+        setDragActive(false);
+        return;
+      }
+      if (payload.type !== "drop" || !inside) return;
+      setDragActive(false);
+      const currentEditor = vditorRef.current;
+      if (!currentEditor) return;
+      const bookmark = getEditorSelectionBookmark(currentEditor);
+      for (const path of payload.paths ?? []) {
+        void addAttachmentFromPath(path, bookmark, isImagePath(path)).catch(() => {});
+      }
+    };
+
+    const handleDomDragOver = (event: DragEvent) => {
+      if (!event.dataTransfer?.types.includes("Files")) return;
+      event.preventDefault();
+      setDragActive(true);
+    };
+    const handleDomDragLeave = (event: DragEvent) => {
+      if (event.currentTarget === event.target) setDragActive(false);
+    };
+    const handleDomDrop = (event: DragEvent) => {
+      if (!event.dataTransfer?.files.length) return;
+      event.preventDefault();
+      setDragActive(false);
+      const currentEditor = vditorRef.current;
+      if (!currentEditor) return;
+      const bookmark = getEditorSelectionBookmark(currentEditor);
+      for (const file of Array.from(event.dataTransfer.files)) {
+        void addAttachmentFromFile(file, bookmark).catch(() => {});
+      }
+    };
+
+    container.addEventListener("dragover", handleDomDragOver);
+    container.addEventListener("dragleave", handleDomDragLeave);
+    container.addEventListener("drop", handleDomDrop);
+
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    try {
+      getCurrentWebview().onDragDropEvent(handleTauriDrop).then((cleanup) => {
+        if (disposed) cleanup();
+        else unlisten = cleanup;
+      }).catch(() => {});
+    } catch {
+      // 普通浏览器开发环境没有 Tauri runtime。
+    }
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+      container.removeEventListener("dragover", handleDomDragOver);
+      container.removeEventListener("dragleave", handleDomDragLeave);
+      container.removeEventListener("drop", handleDomDrop);
+      setDragActive(false);
+    };
+  }, [addAttachmentFromFile, addAttachmentFromPath, attachments]);
 
   // Sync external content changes
   useEffect(() => {
     const vditor = vditorRef.current;
     if (!vditor || !readyRef.current) return;
-    // initialValue 就是本组件最近上报的值,说明是父组件回传的回声而非外部变更;
-    // 此时执行 setValue 会重建编辑区并把光标重置到文档开头(打字中尤其明显)
-    if (initialValue === lastEmittedRef.current) return;
-    const current = vditor.getValue();
-    if (current !== initialValue) {
-      skipNextValueRef.current = initialValue;
-      lastEmittedRef.current = initialValue;
-      vditor.setValue(initialValue);
+    const normalizedInitialValue = normalizeAttachmentReferences(initialValue, attachmentsRef.current);
+    const resolvedInitialValue = resolveAttachmentReferences(normalizedInitialValue, attachmentsRef.current);
+    const currentValue = vditor.getValue();
+    const current = normalizeAttachmentReferences(currentValue, attachmentsRef.current);
+    // initialValue 就是本组件最近上报的值,且编辑区已经显示了同一个解析后的值,
+    // 说明是父组件回传的回声而非外部变更;此时不要 setValue,避免打字时光标跳回开头。
+    // 如果附件列表刚刚异步加载,编辑区的原始值仍是 attachment://...,
+    // 但解析后的值已经变成真实资源地址,必须继续向下执行一次刷新。
+    if (initialValue === lastEmittedRef.current && currentValue === resolvedInitialValue) return;
+    // The first Vditor render can happen before the asynchronous attachment
+    // query completes. In that case both logical values are equal
+    // (`attachment://...`), but the DOM still contains an unresolved source.
+    // Compare the rendered value as well so the newly loaded attachment list
+    // triggers one view-only re-resolution without changing saved Markdown.
+    if (current !== normalizedInitialValue || currentValue !== resolvedInitialValue) {
+      skipNextValueRef.current = normalizedInitialValue;
+      lastEmittedRef.current = normalizedInitialValue;
+      vditor.setValue(resolvedInitialValue);
     }
-  }, [initialValue]);
+  }, [initialValue, attachments]);
 
   // Sync theme changes
   useEffect(() => {
@@ -875,6 +1273,14 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
   return (
     <div className="relative h-full">
       <div ref={containerRef} className="vditor-container" />
+      {dragActive && (
+        <div className="quantanote-editor-drop-overlay" data-testid="editor-drop-overlay" aria-hidden="true">
+          <div className="quantanote-editor-drop-overlay__content">
+            <span className="quantanote-editor-drop-overlay__icon">⌁</span>
+            <span>{t("editor:dropFiles")}</span>
+          </div>
+        </div>
+      )}
       {searchOpen && (
         <SearchReplaceBar
           onSearch={handleSearch}
@@ -888,3 +1294,7 @@ export const VditorEditor = forwardRef<VditorEditorHandle, VditorEditorProps>(fu
     </div>
   );
 });
+
+// Vditor owns the DOM inside its mount node. Avoid rebuilding that subtree when
+// the document page re-renders for unrelated fields such as title or summary.
+export const VditorEditor = memo(VditorEditorBase);

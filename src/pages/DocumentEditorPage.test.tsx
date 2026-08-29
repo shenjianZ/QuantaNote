@@ -5,6 +5,7 @@ import { DocumentEditorPage } from "./DocumentEditorPage";
 import { useAppStore } from "../stores/appStore";
 import { useItemStore } from "../stores/itemStore";
 import { useSettingsStore } from "../stores/settingsStore";
+import { useAttachmentStore } from "../stores/attachmentStore";
 import { mockIPC } from "@tauri-apps/api/mocks";
 
 const { scrollToHeadingMock } = vi.hoisted(() => ({ scrollToHeadingMock: vi.fn() }));
@@ -17,8 +18,11 @@ vi.mock("../components/editor/VditorEditor", () => {
         ref,
         () => ({
           getValue: () => initialValue,
+          setValue: () => {},
           focus: () => {},
+          saveSelection: () => {},
           scrollToHeading: scrollToHeadingMock,
+          insertAttachment: () => {},
         }),
         [initialValue],
       );
@@ -62,9 +66,11 @@ describe("DocumentEditorPage", () => {
     useSettingsStore.setState((state) => ({
       settings: { ...state.settings, contentWidthProgress: 0 },
     }));
+    useAttachmentStore.setState({ attachments: [], loading: false, error: null });
 
     mockIPC((cmd) => {
       if (cmd === "get_versions") return mockedVersions;
+      if (cmd === "get_attachments") return [];
       if (cmd === "create_version") return { id: "ver-1", version_number: 1, content: "c", name: "v1", description: "", created_at: new Date().toISOString() };
       return null;
     });
@@ -161,6 +167,29 @@ describe("DocumentEditorPage", () => {
     await user.type(input, "新标题");
 
     expect(screen.getByText("保存中...")).toBeInTheDocument();
+  });
+
+  it("flushes the latest debounced edit before returning to the reader", async () => {
+    const { user } = setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
+    const input = screen.getByPlaceholderText("文档标题");
+    await user.clear(input);
+    await user.type(input, "快速返回前的标题");
+
+    await user.click(screen.getByTestId("doc-back-btn"));
+
+    await waitFor(() => expect(onBackToPreview).toHaveBeenCalledTimes(1));
+    expect(updateItemMock).toHaveBeenLastCalledWith("item-1", {
+      title: "快速返回前的标题",
+      summary: "初始摘要",
+      content: "初始内容",
+    });
+  });
+
+  it("exposes the attachment manager from the editor toolbar", async () => {
+    const { user } = setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
+    await user.click(screen.getByTestId("doc-attachments-btn"));
+    expect(screen.getByText("管理附件")).toBeInTheDocument();
+    expect(screen.getByTestId("attachment-add-btn")).toBeInTheDocument();
   });
 
   it("auto-saves summary edits", async () => {

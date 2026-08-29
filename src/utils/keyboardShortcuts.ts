@@ -17,7 +17,9 @@ const BLOCKED_GLOBAL_SHORTCUT_KEYS = new Set([
     "v",
 ]);
 
-const EDITOR_SHORTCUT_KEYS = new Set(["a", "z", "v"]);
+// Vditor handles these formatting/navigation shortcuts itself. The global
+// handler must not cancel them while focus is inside an editor.
+const EDITOR_SHORTCUT_KEYS = new Set(["a", "b", "d", "i", "j", "k", "l", "o", "u", "v", "z"]);
 
 export function getSelectedText(target: EventTarget | null): string {
     if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {

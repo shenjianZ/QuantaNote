@@ -3,7 +3,7 @@ title: Document Editor
 description: Use the QuantaNote document editor for titles, summaries, Markdown formatting, table adjustments, auto-save, and version history
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-08-19
+lastUpdated: 2026-08-29
 ---
 
 # Document Editor
@@ -24,7 +24,16 @@ Title and summary changes are included in auto-save. The application shows a sta
 
 ## Toolbar
 
-The toolbar provides headings, bold, italic, strikethrough, lists, quotes, code, links, and tables. Clicking a button inserts the syntax at the current caret position.
+The toolbar provides headings, bold, italic, strikethrough, lists, indentation, quotes, code, links, horizontal rules, images, attachments, and tables. Clicking a button inserts the syntax at the current caret position.
+
+### Inserting Images and Attachments
+
+- Click the image button and choose a file from the system picker. The image is copied into the current item's attachment directory and inserted at the caret.
+- The attachment button can choose one or more files for insertion as attachment links, or open the Attachment Manager.
+- Drop an image into the editor, or paste a screenshot from the clipboard, to create an image attachment and insert it automatically.
+- Documents store stable `attachment://...` references. The reader resolves those references by attachment ID, so local paths do not need to be maintained manually.
+
+Use the attachment button at the top of the editor when you only want to manage files without inserting a link.
 
 ### Insert a Table
 
@@ -91,7 +100,7 @@ Scrolling does not recreate the entire preview. After scrolling stops, charts sh
 
 ## Copy and Paste
 
-Select text and press `Ctrl + C` or use the copy action. A successful copy displays a toast. Pasting with `Ctrl + V` also displays a toast; failures are reported instead of being silent.
+Select text and press `Ctrl + C` to copy, or `Ctrl + V` to paste. The editor handles copy natively. Pasting a screenshot creates an image attachment; ordinary text paste displays the paste feedback toast.
 
 The packaged Windows desktop application writes to the native system clipboard first. When Windows Clipboard History is enabled, copied text can be viewed with `Win + V`. macOS and Linux do not provide the same Windows panel, so QuantaNote uses the clipboard APIs available on those platforms.
 
@@ -102,7 +111,8 @@ The editor uses debounced saving:
 - continuous typing is grouped instead of saved on every keystroke;
 - content is saved automatically after changes settle;
 - failed saves preserve the edited content and show an error toast;
-- leaving the editor performs a final save check when possible.
+- leaving the editor waits for the final save to finish; when saving fails, the editor stays open so the content is not silently hidden.
+- `Ctrl + S` is not required because the editor saves automatically.
 
 ## Version Panel
 

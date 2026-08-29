@@ -1,4 +1,4 @@
-import { cleanupAll, seedItem, getItemById, getVersions, loadAppSettings } from "../helpers/commands.js";
+import { cleanupAll, seedItem, getItemById, getVersions, loadAppSettings, createTestFile, tauriInvoke, notifyDataChanged } from "../helpers/commands.js";
 import { pause, observePause } from "../helpers/config.js";
 import TopBar from "../helpers/page-objects/TopBar.js";
 import LibraryPage from "../helpers/page-objects/LibraryPage.js";
@@ -35,6 +35,16 @@ describe("Document editor", () => {
     await completeInitialLanguageSetup();
     await cleanupAll();
     testItem = await seedItem({ title: "编辑器测试笔记", content: "初始内容" });
+    const imagePath = await createTestFile(
+      "quantanote-editor-reentry.svg",
+      "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"120\" height=\"80\"><rect width=\"120\" height=\"80\" fill=\"#2563eb\"/></svg>",
+    );
+    const attachment = await tauriInvoke("add_attachment", { itemId: testItem.id, path: imagePath });
+    await tauriInvoke("update_item", {
+      id: testItem.id,
+      content: `![quantanote-editor-reentry.svg](attachment://${encodeURIComponent(attachment.id)})`,
+    });
+    await notifyDataChanged();
     await TopBar.navLibrary();
     await LibraryPage.clickItem("编辑器测试笔记");
     await LibraryPage.clickEdit();
@@ -64,6 +74,96 @@ describe("Document editor", () => {
 
     const updated = await getItemById(testItem.id);
     expect(updated.summary).toBe("手动修改后的摘要");
+  });
+
+  it("exposes image and attachment insertion controls", async () => {
+    await browser.waitUntil(
+      async () => DocumentEditorPage.hasImageInsertionToolbar() && DocumentEditorPage.hasAttachmentInsertionToolbar(),
+      { timeout: 5000, timeoutMsg: "Image and attachment toolbar buttons did not load" },
+    );
+    expect(await DocumentEditorPage.hasAttachmentToolbar()).toBe(true);
+  });
+
+  it("resolves image attachments after reopening the editor", async () => {
+    const hasLoadedImage = async () => browser.execute(() => {
+      const image = document.querySelector(".vditor-ir img");
+      return Boolean(image && image.complete && image.naturalWidth > 0 && !image.src.startsWith("attachment://"));
+    });
+
+    await DocumentEditorPage.clickBack();
+    await expect($("[data-testid='reader-drawer']")).toBeDisplayed();
+    await LibraryPage.clickEdit();
+    await browser.waitUntil(
+      async () => DocumentEditorPage.isDisplayed(),
+      { timeout: 5000, timeoutMsg: "Editor did not reopen for attachment rendering check" },
+    );
+    await browser.waitUntil(hasLoadedImage, {
+      timeout: 5000,
+      timeoutMsg: "Image attachment was not resolved after reopening the editor",
+    });
+  });
+
+  it("inserts an attachment at the saved editor cursor position", async () => {
+    await DocumentEditorPage.clearContent();
+    await DocumentEditorPage.typeContent("前文\n\n后文");
+    await DocumentEditorPage.waitForSaved(3000);
+    await browser.waitUntil(
+      async () => {
+        const updated = await getItemById(testItem.id);
+        return updated.content.includes("前文") && updated.content.includes("后文");
+      },
+      { timeout: 5000, timeoutMsg: "Editor text was not persisted before cursor setup" },
+    );
+    await browser.execute(() => {
+      const editor = document.querySelector(".vditor-ir [contenteditable]");
+      if (!editor) throw new Error("Vditor editor not found");
+      const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+      let node = walker.nextNode();
+      while (node && !node.textContent?.includes("前文")) node = walker.nextNode();
+      if (!node) throw new Error("Editor text node for cursor position not found");
+      const offset = node.textContent.indexOf("前文") + "前文".length;
+      const range = document.createRange();
+      range.setStart(node, offset);
+      range.collapse(true);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    });
+
+    await $("[data-testid='doc-attachments-btn']").click();
+    await browser.waitUntil(
+      async () => (await $$("[data-testid='attachment-item']")).length === 1,
+      { timeout: 3000, timeoutMsg: "Attachment manager did not load the seeded attachment" },
+    );
+    await $("[data-testid='attachment-insert-btn']").click();
+    await browser.waitUntil(
+      async () => {
+        const updated = await getItemById(testItem.id);
+        const imageIndex = updated.content.indexOf("quantanote-editor-reentry.svg");
+        return imageIndex > updated.content.indexOf("前文") && imageIndex < updated.content.indexOf("后文");
+      },
+      { timeout: 5000, timeoutMsg: "Attachment was not inserted at the saved cursor position" },
+    );
+  });
+
+  it("removes inserted image references when its attachment is deleted", async () => {
+    await $("[data-testid='doc-attachments-btn']").click();
+    await browser.waitUntil(
+      async () => (await $$("[data-testid='attachment-item']")).length === 1,
+      { timeout: 3000, timeoutMsg: "Attachment manager did not reopen" },
+    );
+    await $("[data-testid='attachment-item'] button[title='删除附件']").click();
+    await browser.waitUntil(
+      async () => (await $$("[data-testid='attachment-item']")).length === 0,
+      { timeout: 3000, timeoutMsg: "Deleted attachment remained in the manager" },
+    );
+    await browser.waitUntil(
+      async () => browser.execute(() => !document.querySelector(".vditor-ir img")),
+      { timeout: 3000, timeoutMsg: "Deleted attachment image remained in the editor" },
+    );
+    const updated = await getItemById(testItem.id);
+    expect(updated.content).not.toContain("attachment://");
+    await $("[data-testid='modal-close-btn']").click();
   });
 
   it("inserts a table at the editor selection from the toolbar", async () => {

@@ -154,6 +154,59 @@ pub fn add(db: &DbState, item_id: String, source_path: String) -> Result<Attachm
     })
 }
 
+pub fn add_bytes(
+    db: &DbState,
+    item_id: String,
+    filename: String,
+    mime_type: String,
+    bytes: Vec<u8>,
+) -> Result<AttachmentDto, AppError> {
+    let id = ids::new_id("att");
+    let now = chrono::Utc::now().to_rfc3339();
+    let safe_item_id = sanitize_path_component(&item_id);
+    let filename = std::path::Path::new(&filename)
+        .file_name()
+        .map(|value| value.to_string_lossy().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "pasted-image.png".to_string());
+    let relative_path = PathBuf::from("attachments")
+        .join(&safe_item_id)
+        .join(format!("{}-{}", &id[..8], filename));
+    let dest_path = paths::quantanote_dir().join(&relative_path);
+    std::fs::create_dir_all(
+        dest_path
+            .parent()
+            .ok_or_else(|| AppError::Validation("附件路径无效".to_string()))?,
+    )
+    .map_err(|e| AppError::Io(e.to_string()))?;
+    std::fs::write(&dest_path, bytes).map_err(|e| AppError::Io(e.to_string()))?;
+
+    let file_size = std::fs::metadata(&dest_path)
+        .map(|metadata| metadata.len() as i64)
+        .unwrap_or(0);
+    let relative_str = relative_path.to_string_lossy().to_string();
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    conn.execute(
+        "INSERT INTO attachments (id, item_id, filename, file_path, mime_type, file_size, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params![id, item_id, filename, relative_str, mime_type, file_size, now],
+    )
+    .map_err(|e| AppError::Database(e.to_string()))?;
+
+    Ok(AttachmentDto {
+        id,
+        item_id,
+        filename,
+        file_path: dest_path.to_string_lossy().to_string(),
+        mime_type,
+        file_size,
+        created_at: now,
+    })
+}
+
 pub fn get_by_item(db: &DbState, item_id: &str) -> Result<Vec<AttachmentDto>, AppError> {
     let conn = db
         .conn

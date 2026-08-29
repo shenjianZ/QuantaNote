@@ -346,6 +346,13 @@ export function QuantaNoteApp() {
         function handleKeyDown(e: KeyboardEvent) {
             const mod = e.metaKey || e.ctrlKey;
             const key = e.key.toLowerCase();
+            const isEditor = isEditableShortcutTarget(e.target);
+            // WebDriver and native key events may target `body` even though the
+            // document editor is the active page. Use the mounted editor as a
+            // fallback so Ctrl/Cmd+F/H still opens the editor-local search bar.
+            const isVditorEditor =
+                (e.target instanceof Element && Boolean(e.target.closest(".vditor-container"))) ||
+                Boolean(document.querySelector(".vditor-container"));
 
             // 禁用浏览器默认快捷键，只保留 F12 (DevTools)
             // 注意：Ctrl+F 和 Ctrl+H 保留给应用内搜索，仅阻止浏览器默认行为
@@ -354,14 +361,19 @@ export function QuantaNoteApp() {
                 const preventOnlyKeys = ["f", "h"];
                 if (preventOnlyKeys.includes(key)) {
                     e.preventDefault();
-                    return; // 不阻止传播，让 VditorEditor 处理
+                    if (isVditorEditor) {
+                        // Ctrl/Cmd+H is also a Vditor heading shortcut. Intercept it
+                        // before Vditor and route it to the app's search bar instead.
+                        e.stopPropagation();
+                        window.dispatchEvent(new Event("quantanote-open-editor-search"));
+                    }
+                    return; // 编辑器内由上面的自定义事件打开搜索栏
                 }
 
                 // 其他快捷键完全阻止；编辑区域内保留系统级编辑快捷键。
-                // Ctrl/Cmd+C 和 Ctrl/Cmd+X 由 shouldPreventGlobalShortcut 始终放行，
-                // 确保阅读区鼠标选中的文本能交给 WebView 写入系统剪贴板。
-                const isEditor = isEditableShortcutTarget(e.target);
+                // 编辑器内的复制交给 Vditor，避免全局处理器把富文本选择降级成纯文本。
                 if (key === "c") {
+                    if (isEditor) return;
                     const selectedText = getSelectedText(e.target);
                     if (selectedText) {
                         e.preventDefault();
@@ -390,11 +402,13 @@ export function QuantaNoteApp() {
 
             // 应用内快捷键
             if (mod && key === "k") {
+                if (isEditableShortcutTarget(e.target)) return;
                 e.preventDefault();
                 if (paletteOpen) closePalette();
                 else openPalette();
             }
             if (mod && key === "n") {
+                if (isEditableShortcutTarget(e.target)) return;
                 e.preventDefault();
                 handleCreateNote().catch(() => {});
             }
