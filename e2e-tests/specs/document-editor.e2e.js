@@ -166,6 +166,74 @@ describe("Document editor", () => {
     await $("[data-testid='modal-close-btn']").click();
   });
 
+  it("inserts multiple dropped images in selection order", async () => {
+    await DocumentEditorPage.clearContent();
+    await DocumentEditorPage.typeContent("前文\n\n后文");
+    await DocumentEditorPage.waitForSaved(3000);
+    await browser.waitUntil(
+      async () => {
+        const updated = await getItemById(testItem.id);
+        return updated.content.includes("前文") && updated.content.includes("后文");
+      },
+      { timeout: 5000, timeoutMsg: "Editor text was not persisted before multi-image drop" },
+    );
+    await browser.execute(() => {
+      const editor = document.querySelector(".vditor-ir [contenteditable]");
+      if (!editor) throw new Error("Vditor editor not found");
+      const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+      let node = walker.nextNode();
+      while (node && !node.textContent?.includes("前文")) node = walker.nextNode();
+      if (!node) throw new Error("Editor text node for drop position not found");
+      const offset = node.textContent.indexOf("前文") + "前文".length;
+      const range = document.createRange();
+      range.setStart(node, offset);
+      range.collapse(true);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+
+      const dropEvent = new Event("drop", { bubbles: true, cancelable: true });
+      Object.defineProperty(dropEvent, "dataTransfer", {
+        value: {
+          files: [
+            new File(["drop-a"], "drop-a.png", { type: "image/png" }),
+            new File(["drop-b"], "drop-b.png", { type: "image/png" }),
+          ],
+        },
+      });
+      const container = document.querySelector(".vditor-container");
+      if (!container) throw new Error("Vditor container not found");
+      container.dispatchEvent(dropEvent);
+    });
+
+    let latestContent = "";
+    try {
+      await browser.waitUntil(
+        async () => {
+          const updated = await getItemById(testItem.id);
+          latestContent = updated.content;
+          const first = updated.content.indexOf("drop-a.png");
+          const second = updated.content.indexOf("drop-b.png");
+          return first > updated.content.indexOf("前文")
+            && second > first
+            && second < updated.content.indexOf("后文");
+        },
+        { timeout: 8000, timeoutMsg: "Dropped images were not inserted in selection order" },
+      );
+      await browser.keys("批量后文本");
+      await browser.waitUntil(
+        async () => {
+          const updated = await getItemById(testItem.id);
+          const lastImage = updated.content.indexOf("drop-b.png");
+          return lastImage >= 0 && updated.content.indexOf("批量后文本") > lastImage;
+        },
+        { timeout: 5000, timeoutMsg: "Caret did not move after the last dropped image" },
+      );
+    } catch (error) {
+      throw new Error(`${error.message}; latest content: ${latestContent}`);
+    }
+  });
+
   it("inserts a table at the editor selection from the toolbar", async () => {
     await DocumentEditorPage.setContent("表格插入位置");
     await browser.execute(() => {

@@ -36,6 +36,11 @@ interface VditorEditorProps {
   onOpenAttachments?: () => void;
 }
 
+interface AttachmentInsertItem {
+  attachment: AttachmentDto;
+  asImage: boolean;
+}
+
 export interface VditorEditorHandle {
   getValue: () => string;
   setValue: (value: string) => void;
@@ -155,6 +160,7 @@ function getEditorRange(vditor: Vditor): Range | null {
 interface EditorSelectionBookmark {
   start: number;
   end: number;
+  range?: Range;
 }
 
 /**
@@ -164,9 +170,9 @@ interface EditorSelectionBookmark {
  */
 function getEditorSelectionBookmark(vditor: Vditor): EditorSelectionBookmark | null {
   const editorState = vditor.vditor[vditor.vditor.currentMode];
-  const range = getLiveEditorRange(vditor);
+  const range = getEditorRange(vditor);
   const editor = editorState?.element;
-  if (!editor || !range) return null;
+  if (!editor || !range || !editor.contains(range.startContainer) || !editor.contains(range.endContainer)) return null;
 
   const preSelectionRange = range.cloneRange();
   if (editor.childNodes[0]) {
@@ -179,6 +185,7 @@ function getEditorSelectionBookmark(vditor: Vditor): EditorSelectionBookmark | n
   return {
     start: Math.max(0, preSelectionRange.toString().length),
     end: Math.max(0, preSelectionRange.toString().length + range.toString().length),
+    range: range.cloneRange(),
   };
 }
 
@@ -190,9 +197,36 @@ function setRangeBoundary(range: Range, boundary: "start" | "end", node: Node, o
 function restoreEditorSelection(vditor: Vditor, bookmark: EditorSelectionBookmark | null | undefined) {
   const editorState = vditor.vditor[vditor.vditor.currentMode];
   const editor = editorState?.element;
-  if (!editor || !bookmark) {
+  if (!editor) {
     vditor.focus();
     return null;
+  }
+
+  // 模态框只会让浏览器选区失焦，并不会改变编辑器 DOM。优先恢复原始
+  // Range，这样可以保留段落、换行和 Vditor 标记节点之间的准确位置。
+  if (bookmark?.range
+    && editor.contains(bookmark.range.startContainer)
+    && editor.contains(bookmark.range.endContainer)) {
+    const restoredRange = bookmark.range.cloneRange();
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(restoredRange);
+    editorState.range = restoredRange;
+    return restoredRange;
+  }
+
+  // 没有可用书签时插入到正文末尾，避免浏览器/Vditor 的默认 focus 行为
+  // 把内容插到文档开头。正常入口都会带有文本偏移书签，因此这里只是
+  // 最后的安全兜底。
+  if (!bookmark) {
+    const endRange = document.createRange();
+    endRange.selectNodeContents(editor);
+    endRange.collapse(false);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(endRange);
+    editorState.range = endRange;
+    return endRange;
   }
 
   const textNodes: Text[] = [];
@@ -740,21 +774,95 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
   }, []);
 
   const insertAttachment = useCallback((
-    attachment: AttachmentDto,
-    asImage = isImageAttachment(attachment),
-    bookmark: EditorSelectionBookmark | null | undefined = savedInsertRangeRef.current,
+    attachment: AttachmentDto | readonly AttachmentInsertItem[],
+    asImage?: boolean,
+    bookmark?: EditorSelectionBookmark | null,
   ) => {
     const vditor = vditorRef.current;
     if (!vditor) return;
+    const insertionItems: readonly AttachmentInsertItem[] = Array.isArray(attachment)
+      ? attachment as readonly AttachmentInsertItem[]
+      : [{ attachment: attachment as AttachmentDto, asImage: asImage ?? isImageAttachment(attachment as AttachmentDto) }];
+    const insertionBookmark = bookmark
+      ?? savedInsertRangeRef.current
+      ?? getEditorSelectionBookmark(vditor)
+      ?? lastEditorRangeRef.current;
     savedInsertRangeRef.current = null;
-    restoreEditorSelection(vditor, bookmark);
-    const markdown = resolveAttachmentReferences(
-      buildAttachmentMarkdown(attachment, asImage),
-      attachmentsRef.current,
-    );
+    restoreEditorSelection(vditor, insertionBookmark);
+    const markdown = insertionItems
+      .map(({ attachment: itemAttachment, asImage: itemAsImage }) => resolveAttachmentReferences(
+        buildAttachmentMarkdown(itemAttachment, itemAsImage),
+        attachmentsRef.current,
+      ))
+      .join("");
+    if (!markdown) return;
     vditor.insertMD(markdown);
+    const nextBookmark = getEditorSelectionBookmark(vditor);
+    // insertMD 会先把浏览器选区移动到插入内容之后；先保存这个位置，
+    // 再恢复编辑器焦点，避免 focus() 让下一张附件回到文档开头。
     vditor.focus();
+    if (nextBookmark) {
+      savedInsertRangeRef.current = nextBookmark;
+      lastEditorRangeRef.current = nextBookmark;
+    }
   }, []);
+
+  const insertAttachmentBatch = useCallback((items: readonly AttachmentInsertItem[], bookmark: EditorSelectionBookmark | null) => {
+    if (items.length === 0) return;
+    const vditor = vditorRef.current;
+    if (!vditor) return;
+    const baseBookmark = bookmark
+      ?? getEditorSelectionBookmark(vditor)
+      ?? lastEditorRangeRef.current;
+    // Vditor 的 insertMD 对连续块节点只保留最后一个节点。逐个插入时从后
+    // 往前使用同一个文本偏移，最终正文仍保持用户选择的正向顺序。
+    // 多个插入之间不复用上一次的 Range，避免 DOM 变更后 Range 脱离编辑器。
+    const fixedBookmark = items.length > 1 && baseBookmark
+      ? { start: baseBookmark.start, end: baseBookmark.end }
+      : baseBookmark;
+    for (let index = items.length - 1; index >= 0; index -= 1) {
+      const item = items[index];
+      insertAttachment(item.attachment, item.asImage, fixedBookmark);
+    }
+
+    const lastItem = items[items.length - 1];
+    const editorState = vditor?.vditor[vditor.vditor.currentMode];
+    const editor = editorState?.element;
+    if (!editor || !lastItem.asImage) return;
+
+    // 每次单独插入都会把选区放到当前附件后面，倒序插入结束时它会停在
+    // 第一张附件后。根据最后一张图片节点重建折叠 Range，保证用户继续输入
+    // 时位于整批附件之后，而不是落到两张图片之间。
+    const imageNodes = Array.from(editor.querySelectorAll<HTMLImageElement>("img"));
+    const expectedPath = lastItem.attachment.file_path.replace(/[\\]/g, "/").toLowerCase();
+    const lastImage = [...imageNodes].reverse().find((image) => {
+      if (image.alt !== lastItem.attachment.filename) return false;
+      const rawSource = image.getAttribute("src") || "";
+      let source = rawSource;
+      try {
+        source = decodeURIComponent(rawSource);
+      } catch {
+        // 某些外部资源地址可能包含非法编码，继续使用原始地址匹配。
+      }
+      source = source.replace(/[\\]/g, "/").toLowerCase();
+      return source.includes(lastItem.attachment.id.toLowerCase()) || source.endsWith(expectedPath);
+    });
+    const imageNode = lastImage?.closest<HTMLElement>(".vditor-ir__node[data-type='img']");
+    if (!imageNode?.parentNode) return;
+
+    const finalRange = document.createRange();
+    finalRange.setStartAfter(imageNode);
+    finalRange.collapse(true);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(finalRange);
+    editorState.range = finalRange;
+    const finalBookmark = getEditorSelectionBookmark(vditor);
+    if (finalBookmark) {
+      savedInsertRangeRef.current = finalBookmark;
+      lastEditorRangeRef.current = finalBookmark;
+    }
+  }, [insertAttachment]);
 
   const commitEditorValue = useCallback((value: string) => {
     const vditor = vditorRef.current;
@@ -848,46 +956,52 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
     insertAttachment(attachment, asImage, bookmark);
   }, [insertAttachment]);
 
-  const addAttachmentFromPath = useCallback(async (path: string, bookmark: EditorSelectionBookmark | null, forceImage = false) => {
+  const addAttachmentFromPath = useCallback(async (path: string, bookmark: EditorSelectionBookmark | null, forceImage = false, insert = true) => {
     const add = onAddAttachmentRef.current;
-    if (!add) return;
+    if (!add) return null;
     const attachment = await add(path);
-    if (attachment) {
+    if (attachment && insert) {
       insertAttachmentAtRange(attachment, bookmark, forceImage || isImageAttachment(attachment) || isImagePath(path));
     }
+    return attachment;
   }, [insertAttachmentAtRange]);
 
-  const addAttachmentFromFile = useCallback(async (file: File, bookmark: EditorSelectionBookmark | null) => {
+  const addAttachmentFromFile = useCallback(async (file: File, bookmark: EditorSelectionBookmark | null, insert = true) => {
     const path = (file as File & { path?: string }).path;
     if (path && onAddAttachmentRef.current) {
-      await addAttachmentFromPath(path, bookmark, file.type.startsWith("image/"));
-      return;
+      return addAttachmentFromPath(path, bookmark, file.type.startsWith("image/"), insert);
     }
-    if (!file.type.startsWith("image/") || !onAddAttachmentDataRef.current) return;
+    if (!file.type.startsWith("image/") || !onAddAttachmentDataRef.current) return null;
     const data = await fileToBase64(file);
     const attachment = await onAddAttachmentDataRef.current(
       file.name || `pasted-image-${Date.now()}.png`,
       file.type || "image/png",
       data,
     );
-    if (attachment) insertAttachmentAtRange(attachment, bookmark, true);
+    if (attachment && insert) insertAttachmentAtRange(attachment, bookmark, true);
+    return attachment;
   }, [addAttachmentFromPath, insertAttachmentAtRange]);
 
   const openAttachmentPicker = useCallback(async (asImage: boolean, multiple: boolean) => {
     const add = onAddAttachmentRef.current;
     const vditor = vditorRef.current;
     if (!add || !vditor) return;
-    const savedBookmark = savedInsertRangeRef.current ?? getEditorSelectionBookmark(vditor);
+    const insertionBookmark = savedInsertRangeRef.current ?? getEditorSelectionBookmark(vditor);
     const selected = await openDialog({
       multiple,
       title: asImage ? "Insert image" : "Insert attachment",
       filters: asImage ? [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif", "tiff"] }] : undefined,
     });
     const paths = Array.isArray(selected) ? selected : selected ? [selected] : [];
+    const pending: AttachmentInsertItem[] = [];
     for (const path of paths) {
-      await addAttachmentFromPath(path, savedBookmark, asImage);
+      const attachment = await add(path);
+      if (attachment) pending.push({ attachment, asImage });
     }
-  }, [addAttachmentFromPath]);
+    if (pending.length > 0) {
+      insertAttachmentBatch(pending, insertionBookmark);
+    }
+  }, [insertAttachmentBatch]);
 
   const saveSelection = useCallback(() => {
     const vditor = vditorRef.current;
@@ -992,12 +1106,22 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
       onChangeRef.current(normalizedValue);
     };
     const onPaste = (event: ClipboardEvent) => {
-      const imageFile = Array.from(event.clipboardData?.files ?? []).find((file) => file.type.startsWith("image/"));
-      if (imageFile && (onAddAttachmentDataRef.current || onAddAttachmentRef.current)) {
+      const imageFiles = Array.from(event.clipboardData?.files ?? []).filter((file) => file.type.startsWith("image/"));
+      if (imageFiles.length > 0 && (onAddAttachmentDataRef.current || onAddAttachmentRef.current)) {
         event.preventDefault();
         event.stopImmediatePropagation();
         const currentEditor = vditorRef.current ?? vditor;
-        void addAttachmentFromFile(imageFile, getEditorSelectionBookmark(currentEditor)).catch(() => {});
+        void (async () => {
+          const insertionBookmark = getEditorSelectionBookmark(currentEditor);
+          const pending: AttachmentInsertItem[] = [];
+          for (const imageFile of imageFiles) {
+            const attachment = await addAttachmentFromFile(imageFile, null, false);
+            if (attachment) pending.push({ attachment, asImage: true });
+          }
+          if (pending.length > 0) {
+            insertAttachmentBatch(pending, insertionBookmark);
+          }
+        })().catch(() => {});
         return;
       }
       window.setTimeout(notifyCurrentValue, 0);
@@ -1173,10 +1297,17 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
       setDragActive(false);
       const currentEditor = vditorRef.current;
       if (!currentEditor) return;
-      const bookmark = getEditorSelectionBookmark(currentEditor);
-      for (const path of payload.paths ?? []) {
-        void addAttachmentFromPath(path, bookmark, isImagePath(path)).catch(() => {});
-      }
+      void (async () => {
+        const insertionBookmark = getEditorSelectionBookmark(currentEditor);
+        const pending: AttachmentInsertItem[] = [];
+        for (const path of payload.paths ?? []) {
+          const attachment = await addAttachmentFromPath(path, null, isImagePath(path), false);
+          if (attachment) pending.push({ attachment, asImage: isImagePath(path) || isImageAttachment(attachment) });
+        }
+        if (pending.length > 0) {
+          insertAttachmentBatch(pending, insertionBookmark);
+        }
+      })().catch(() => {});
     };
 
     const handleDomDragOver = (event: DragEvent) => {
@@ -1188,15 +1319,23 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
       if (event.currentTarget === event.target) setDragActive(false);
     };
     const handleDomDrop = (event: DragEvent) => {
-      if (!event.dataTransfer?.files.length) return;
+      const files = Array.from(event.dataTransfer?.files ?? []);
+      if (files.length === 0) return;
       event.preventDefault();
       setDragActive(false);
       const currentEditor = vditorRef.current;
       if (!currentEditor) return;
-      const bookmark = getEditorSelectionBookmark(currentEditor);
-      for (const file of Array.from(event.dataTransfer.files)) {
-        void addAttachmentFromFile(file, bookmark).catch(() => {});
-      }
+      void (async () => {
+        const insertionBookmark = getEditorSelectionBookmark(currentEditor);
+        const pending: AttachmentInsertItem[] = [];
+        for (const file of files) {
+          const attachment = await addAttachmentFromFile(file, null, false);
+          if (attachment) pending.push({ attachment, asImage: true });
+        }
+        if (pending.length > 0) {
+          insertAttachmentBatch(pending, insertionBookmark);
+        }
+      })().catch(() => {});
     };
 
     container.addEventListener("dragover", handleDomDragOver);
