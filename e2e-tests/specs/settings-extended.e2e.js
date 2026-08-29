@@ -41,6 +41,13 @@ describe("Settings extended coverage", () => {
         expect(await btn.isDisplayed()).toBe(true);
     });
 
+    it("displays attachment storage consistency controls", async () => {
+        const section = await $("[data-testid='storage-consistency-section']");
+        expect(await section.isDisplayed()).toBe(true);
+        const scanButton = await $("[data-testid='storage-consistency-scan-btn']");
+        expect(await scanButton.isDisplayed()).toBe(true);
+    });
+
     // --- SQL Diagnostics ---
     it("displays SQL logging section in diagnostics", async () => {
         // Scroll down to diagnostics section

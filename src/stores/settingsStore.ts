@@ -35,6 +35,9 @@ import {
     type AutoBackupConfig,
     type BackupFileInfo,
     type SqlLogConfig,
+    type StorageConsistencyReport,
+    getStorageConsistencyReport,
+    repairStorageConsistency,
 } from "../services/tauriCommands";
 
 export interface CustomColor {
@@ -322,6 +325,8 @@ interface SettingsState {
     backupFiles: BackupFileInfo[];
     logDir: string;
     sqlLogPath: string;
+    storageReport: StorageConsistencyReport | null;
+    storageScanLoading: boolean;
     init: () => Promise<void>;
     completeLanguageSetup: (locale: "zh-CN" | "en") => Promise<void>;
     updateSetting: <K extends keyof AppSettings>(
@@ -344,6 +349,8 @@ interface SettingsState {
     fetchBackups: () => Promise<void>;
     deleteBackup: (filename: string) => Promise<void>;
     fetchDiagnosticsPaths: () => Promise<void>;
+    fetchStorageConsistency: () => Promise<void>;
+    repairStorageConsistency: () => Promise<void>;
     updateSqlLogging: (partial: Partial<SqlLogSettings>) => Promise<void>;
     clearSqlLogFile: () => Promise<void>;
 }
@@ -359,6 +366,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     backupFiles: [],
     logDir: "",
     sqlLogPath: "",
+    storageReport: null,
+    storageScanLoading: false,
 
     init: async () => {
         // 从 SQLite 加载设置
@@ -735,6 +744,35 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             set({ logDir, sqlLogPath });
         } catch {
             set({ logDir: "", sqlLogPath: "" });
+        }
+    },
+
+    fetchStorageConsistency: async () => {
+        set({ storageScanLoading: true });
+        try {
+            const storageReport = await getStorageConsistencyReport();
+            set({ storageReport });
+        } catch {
+            set({ storageReport: null });
+        } finally {
+            set({ storageScanLoading: false });
+        }
+    },
+
+    repairStorageConsistency: async () => {
+        set({ storageScanLoading: true });
+        try {
+            const storageReport = await repairStorageConsistency();
+            set({ storageReport });
+            useToastStore
+                .getState()
+                .addToast("success", i18n.t("common:toast.storageRepaired"));
+        } catch {
+            useToastStore
+                .getState()
+                .addToast("error", i18n.t("common:toast.storageRepairFailed"));
+        } finally {
+            set({ storageScanLoading: false });
         }
     },
 

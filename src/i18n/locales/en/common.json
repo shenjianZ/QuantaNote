@@ -62,6 +62,8 @@
     "sqlLogCleared": "SQL log cleared",
     "sqlLogClearFailed": "Failed to clear SQL log",
     "sqlLogPathCopied": "SQL log path copied",
+    "storageRepaired": "Orphan attachment files removed",
+    "storageRepairFailed": "Failed to remove orphan attachment files",
     "tagCreateFailed": "Failed to create tag",
     "tagSaveFailed": "Failed to save tag",
     "tagDeleteFailed": "Failed to delete tag",

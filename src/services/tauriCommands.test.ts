@@ -8,6 +8,8 @@ import {
   deleteItem,
   searchItems,
   addAttachment,
+  getStorageConsistencyReport,
+  repairStorageConsistency,
   getVersions,
   getAllItemTagMappings,
 } from "./tauriCommands";
@@ -63,6 +65,14 @@ describe("tauriCommands", () => {
     await getVersions("item-1");
     expect(captured?.cmd).toBe("get_versions");
     expect(captured?.args).toMatchObject({ itemId: "item-1" });
+  });
+
+  it("calls storage consistency commands", async () => {
+    await getStorageConsistencyReport();
+    expect(captured?.cmd).toBe("get_storage_consistency_report");
+
+    await repairStorageConsistency();
+    expect(captured?.cmd).toBe("repair_storage_consistency");
   });
 
   it("getAllItemTagMappings returns tuple array", async () => {

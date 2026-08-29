@@ -11,6 +11,23 @@ export interface AttachmentResult {
     created_at: string;
 }
 
+export interface StorageIssue {
+    path: string;
+    attachmentId?: string;
+    itemId?: string;
+    filename?: string;
+    sizeBytes: number;
+    reason: string;
+}
+
+export interface StorageConsistencyReport {
+    missingFiles: StorageIssue[];
+    orphanFiles: StorageIssue[];
+    brokenReferences: StorageIssue[];
+    scannedFiles: number;
+    storageBytes: number;
+}
+
 // Item commands
 export async function createItem(
     title: string,
@@ -78,6 +95,14 @@ export async function getAttachments(itemId: string) {
 
 export async function deleteAttachment(id: string) {
     return invoke("delete_attachment", { id });
+}
+
+export async function getStorageConsistencyReport() {
+    return invoke<StorageConsistencyReport>("get_storage_consistency_report");
+}
+
+export async function repairStorageConsistency() {
+    return invoke<StorageConsistencyReport>("repair_storage_consistency");
 }
 
 // Version commands

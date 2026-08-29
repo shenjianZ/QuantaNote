@@ -1,4 +1,5 @@
 use crate::error::AppError;
+use crate::services::storage_service::{self, StorageConsistencyReport};
 use crate::utils::logging::{self, SqlLogConfig};
 
 #[tauri::command]
@@ -24,4 +25,18 @@ pub fn get_log_dir() -> Result<String, AppError> {
 #[tauri::command]
 pub fn get_sql_log_path() -> Result<String, AppError> {
     Ok(logging::sql_log_path().to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub fn get_storage_consistency_report(
+    db: tauri::State<'_, crate::db::DbState>,
+) -> Result<StorageConsistencyReport, AppError> {
+    storage_service::scan_storage_consistency(&db)
+}
+
+#[tauri::command]
+pub fn repair_storage_consistency(
+    db: tauri::State<'_, crate::db::DbState>,
+) -> Result<StorageConsistencyReport, AppError> {
+    storage_service::repair_storage_consistency(&db)
 }

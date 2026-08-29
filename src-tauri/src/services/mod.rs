@@ -4,6 +4,7 @@ pub mod data_io_service;
 pub mod item_service;
 pub mod search_service;
 pub mod settings_service;
+pub mod storage_service;
 pub mod sync_service;
 pub mod tag_service;
 pub mod version_service;

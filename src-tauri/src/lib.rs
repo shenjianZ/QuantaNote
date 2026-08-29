@@ -293,6 +293,8 @@ pub fn run() {
             diagnostics::clear_sql_log,
             diagnostics::get_log_dir,
             diagnostics::get_sql_log_path,
+            diagnostics::get_storage_consistency_report,
+            diagnostics::repair_storage_consistency,
             auto_backup::get_auto_backup_config,
             auto_backup::update_auto_backup_config,
             auto_backup::trigger_backup_now,

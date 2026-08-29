@@ -70,6 +70,13 @@ interface SettingsPageProps {
 const rowClass =
     "flex min-h-12 items-center justify-between gap-4 border-b border-[var(--line)] py-2 last:border-b-0";
 
+function formatStorageBytes(bytes: number) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
 export function SettingsPage({
     theme = "system",
     onThemeChange,
@@ -90,6 +97,8 @@ export function SettingsPage({
     const backupDirPath = useSettingsStore((s) => s.backupDirPath);
     const logDir = useSettingsStore((s) => s.logDir);
     const sqlLogPath = useSettingsStore((s) => s.sqlLogPath);
+    const storageReport = useSettingsStore((s) => s.storageReport);
+    const storageScanLoading = useSettingsStore((s) => s.storageScanLoading);
     const init = useSettingsStore((s) => s.init);
     const updateSetting = useSettingsStore((s) => s.updateSetting);
     const addCustomColor = useSettingsStore((s) => s.addCustomColor);
@@ -103,6 +112,8 @@ export function SettingsPage({
     const fetchBackupDirPath = useSettingsStore((s) => s.fetchBackupDirPath);
     const fetchBackups = useSettingsStore((s) => s.fetchBackups);
     const fetchDiagnosticsPaths = useSettingsStore((s) => s.fetchDiagnosticsPaths);
+    const fetchStorageConsistency = useSettingsStore((s) => s.fetchStorageConsistency);
+    const repairStorageConsistency = useSettingsStore((s) => s.repairStorageConsistency);
     const updateSqlLogging = useSettingsStore((s) => s.updateSqlLogging);
     const clearSqlLogFile = useSettingsStore((s) => s.clearSqlLogFile);
     const updateState = useUpdaterStore((s) => s.updateState);
@@ -118,7 +129,8 @@ export function SettingsPage({
         fetchBackupDirPath();
         fetchBackups();
         fetchDiagnosticsPaths();
-    }, [init, refreshDbSize, fetchDbPath, fetchAutoBackupConfig, fetchBackupDirPath, fetchBackups, fetchDiagnosticsPaths]);
+        fetchStorageConsistency();
+    }, [init, refreshDbSize, fetchDbPath, fetchAutoBackupConfig, fetchBackupDirPath, fetchBackups, fetchDiagnosticsPaths, fetchStorageConsistency]);
 
     useEffect(() => {
         if (settingsSection != null) {
@@ -724,6 +736,88 @@ export function SettingsPage({
                                 {t("settings:data.optimizeBtn")}
                             </button>
                         </div>
+                    </section>
+                    <section className="mt-6" data-testid="storage-consistency-section">
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                            <div>
+                                <h2 className="text-sm font-semibold text-[var(--text)]">
+                                    {t("settings:data.storageConsistency")}
+                                </h2>
+                                <p className="mt-1 text-xs text-[var(--muted)]">
+                                    {t("settings:data.storageConsistencyDesc")}
+                                </p>
+                            </div>
+                            <button
+                                className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--field)] px-3 py-1.5 text-sm hover:bg-[var(--hover)] disabled:cursor-wait disabled:opacity-60"
+                                type="button"
+                                data-testid="storage-consistency-scan-btn"
+                                disabled={storageScanLoading}
+                                onClick={() => void fetchStorageConsistency()}
+                            >
+                                <RefreshCw className={`h-4 w-4 ${storageScanLoading ? "animate-spin" : ""}`} />
+                                {t("settings:data.storageScan")}
+                            </button>
+                        </div>
+                        {storageReport ? (
+                            <>
+                                <div className={rowClass}>
+                                    <span className="text-sm text-[var(--text)]">
+                                        {t("settings:data.storageMissingFiles")}
+                                    </span>
+                                    <span className="text-sm text-[var(--muted)]" data-testid="storage-missing-count">
+                                        {storageReport.missingFiles.length}
+                                    </span>
+                                </div>
+                                <div className={rowClass}>
+                                    <span className="text-sm text-[var(--text)]">
+                                        {t("settings:data.storageOrphanFiles")}
+                                    </span>
+                                    <span className="text-sm text-[var(--muted)]" data-testid="storage-orphan-count">
+                                        {storageReport.orphanFiles.length}
+                                    </span>
+                                </div>
+                                <div className={rowClass}>
+                                    <span className="text-sm text-[var(--text)]">
+                                        {t("settings:data.storageBrokenReferences")}
+                                    </span>
+                                    <span className="text-sm text-[var(--muted)]" data-testid="storage-broken-reference-count">
+                                        {storageReport.brokenReferences.length}
+                                    </span>
+                                </div>
+                                <div className={rowClass}>
+                                    <span className="text-sm text-[var(--text)]">
+                                        {t("settings:data.storageUsage")}
+                                    </span>
+                                    <span className="text-sm text-[var(--muted)]">
+                                        {formatStorageBytes(storageReport.storageBytes)} · {t("settings:data.storageScannedFiles", { count: storageReport.scannedFiles })}
+                                    </span>
+                                </div>
+                                {storageReport.orphanFiles.length > 0 && (
+                                    <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-[var(--line)] bg-[var(--field)] p-3">
+                                        <span className="text-xs text-[var(--muted)]">
+                                            {t("settings:data.storageRepairDesc")}
+                                        </span>
+                                        <button
+                                            className="shrink-0 rounded-full bg-[var(--danger)]/10 px-3 py-1.5 text-sm text-[var(--danger)] hover:bg-[var(--danger)]/20 disabled:opacity-60"
+                                            type="button"
+                                            data-testid="storage-consistency-repair-btn"
+                                            disabled={storageScanLoading}
+                                            onClick={() => {
+                                                if (window.confirm(t("settings:data.storageRepairConfirm"))) {
+                                                    void repairStorageConsistency();
+                                                }
+                                            }}
+                                        >
+                                            {t("settings:data.storageRepair")}
+                                        </button>
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            <p className="py-3 text-sm text-[var(--muted)]">
+                                {storageScanLoading ? t("settings:data.storageScanning") : t("settings:data.storageUnavailable")}
+                            </p>
+                        )}
                     </section>
                     <section className="mt-6">
                         <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">
