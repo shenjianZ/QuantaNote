@@ -82,10 +82,15 @@ export async function getRecentItems(limit?: number) {
 }
 
 // Search commands
+export type SearchMode = "normal" | "advanced";
+export type SearchScope = "content" | "tags" | "attachments" | "versions";
+
 export interface SearchPageOptions {
     tab?: "recent" | "pinned" | "favorite";
     tag?: string;
     sort?: "updated" | "created" | "title";
+    mode?: SearchMode;
+    scopes?: SearchScope[];
     limit?: number;
     offset?: number;
 }
@@ -99,6 +104,9 @@ export interface SearchResultDto {
     updated_at?: string;
     pinned?: boolean;
     favorite?: boolean;
+    matched_fields?: string[];
+    context?: string;
+    highlight_terms?: string[];
 }
 
 export interface SearchPageDto {
@@ -117,6 +125,8 @@ export async function searchItems(
         tab: options.tab ?? null,
         tag: options.tag ?? null,
         sort: options.sort ?? null,
+        mode: options.mode ?? "normal",
+        scopes: options.scopes ?? ["content"],
         limit: options.limit ?? 50,
         offset: options.offset ?? 0,
     });

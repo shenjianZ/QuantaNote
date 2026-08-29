@@ -1,4 +1,15 @@
-import { cleanupAll, seedItem, getItemById, notifyDataChanged, tauriInvoke } from "../helpers/commands.js";
+import {
+  cleanupAll,
+  seedItem,
+  getItemById,
+  notifyDataChanged,
+  tauriInvoke,
+  seedTag,
+  setItemTags,
+  seedVersion,
+  createTestFile,
+  seedAttachment,
+} from "../helpers/commands.js";
 import { pause, observePause } from "../helpers/config.js";
 import TopBar from "../helpers/page-objects/TopBar.js";
 import LibraryPage from "../helpers/page-objects/LibraryPage.js";
@@ -38,6 +49,11 @@ describe("Library reader and item actions", () => {
     await completeInitialLanguageSetup();
     await cleanupAll();
     normalItem = await seedItem({ title: "普通笔记", content: "普通内容" });
+    await seedTag("项目");
+    await setItemTags(normalItem.id, ["项目"]);
+    await seedVersion(normalItem.id, "旧版本合同内容", "历史版本");
+    const attachmentPath = await createTestFile("invoice-search.txt");
+    await seedAttachment(normalItem.id, attachmentPath);
     await seedItem({
       title: "表格笔记",
       content: "| 列 1 | 列 2 | 列 3 |\n| --- | --- | --- |\n|     |     | 01   |\n|     |     | 01   |",
@@ -226,6 +242,31 @@ describe("Library reader and item actions", () => {
     await expect($("//*[@role='dialog'][@aria-label='回收站']//*[contains(., '回收站是空的')]")).toBeDisplayed();
     await $("[data-testid='modal-close-btn']").click();
     await LibraryPage.expectItemVisible("收藏笔记");
+  });
+
+  it("supports advanced search, highlights matches, and searches attachment names", async () => {
+    await LibraryPage.selectSearchMode("advanced");
+    await LibraryPage.search("普通 OR 收藏");
+
+    await browser.waitUntil(
+      async () => (await LibraryPage.getSearchHighlightCount()) > 0,
+      { timeout: 10000, timeoutMsg: "Advanced search did not render highlighted matches" },
+    );
+    expect(await LibraryPage.getMatchedFieldText()).toContain("正文");
+    await LibraryPage.expectItemVisible("普通笔记");
+    await LibraryPage.expectItemVisible("收藏笔记");
+
+    await LibraryPage.setSearchScope("content", false);
+    await LibraryPage.setSearchScope("attachments", true);
+    await LibraryPage.search("invoice");
+    await LibraryPage.expectItemVisible("普通笔记");
+    expect(await LibraryPage.getMatchedFieldText()).toContain("附件");
+
+    // 恢复默认搜索状态，避免影响后续分页场景。
+    await LibraryPage.setSearchScope("attachments", false);
+    await LibraryPage.setSearchScope("content", true);
+    await LibraryPage.selectSearchMode("normal");
+    await LibraryPage.search("");
   });
 
   it("loads additional library pages while keeping the rendered window virtualized", async () => {

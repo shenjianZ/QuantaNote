@@ -69,7 +69,7 @@ Stores communicate with the backend indirectly through the service layer, ensuri
 
 | Command | Parameters | Returns | Description |
 |---------|------------|---------|-------------|
-| `search_items` | query, itemType? | SearchResultDto[] | FTS5 full-text search |
+| `search_items` | query, itemType?, tab?, tag?, sort?, mode?, scopes?, limit?, offset? | SearchPageDto | Normal/advanced search with total, matched fields, context, and highlight terms |
 
 ### Tag Commands
 

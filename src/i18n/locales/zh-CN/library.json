@@ -16,13 +16,25 @@
     "sortCreated": "创建时间",
     "sortTitle": "标题排序",
     "tag": "标签",
-    "allTags": "全部标签"
+    "allTags": "全部标签",
+    "searchMode": "搜索模式",
+    "normalMode": "普通搜索",
+    "advancedMode": "高级搜索",
+    "searchScope": "搜索范围"
   },
   "empty": {
     "title": "还没有可显示的记录",
     "subtitle": "写下第一条，或者换个关键词搜索。"
   },
   "searchResult": "搜索结果",
+  "searchFields": {
+    "title": "标题",
+    "summary": "摘要",
+    "content": "正文",
+    "tags": "标签",
+    "attachments": "附件",
+    "versions": "版本"
+  },
   "unnamed": "未命名",
   "noPreview": "无正文预览",
   "toast": {

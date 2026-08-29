@@ -71,8 +71,8 @@ describe("CommandPalette", () => {
       />,
     );
 
-    expect(screen.getByText("React 表单")).toBeInTheDocument();
-    expect(screen.queryByText("Rust 笔记")).not.toBeInTheDocument();
+    expect(screen.getByRole("option")).toHaveTextContent("React 表单");
+    expect(screen.getByRole("option")).not.toHaveTextContent("Rust 笔记");
   });
 
   it("closes on Escape", () => {

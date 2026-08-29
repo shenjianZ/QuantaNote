@@ -24,6 +24,7 @@ import { TagManagerModal } from "../components/common/TagManagerModal";
 import { AttachmentManagerModal } from "../components/common/AttachmentManagerModal";
 import { TrashModal } from "../components/common/TrashModal";
 import { VirtualItemList } from "../components/common/VirtualItemList";
+import { SearchHighlight } from "../components/common/SearchHighlight";
 import { useAppStore } from "../stores/appStore";
 import { useAttachmentStore } from "../stores/attachmentStore";
 import { useItemStore } from "../stores/itemStore";
@@ -40,6 +41,7 @@ import { copyTextToSystemClipboard } from "../utils/clipboard";
 import { removeAttachmentReferences } from "../utils/markdownAttachments";
 import type { Item } from "../types";
 import type { AttachmentDto } from "../stores/attachmentStore";
+import type { SearchMode, SearchScope } from "../services/tauriCommands";
 
 type TabKey = "recent" | "pinned" | "favorite";
 type SortOption = "updated" | "created" | "title";
@@ -87,6 +89,8 @@ export function LibraryPage({
   const [activeTab, setActiveTab] = useState<TabKey>("recent");
   const [activeTag, setActiveTag] = useState("all");
   const [sortOrder, setSortOrder] = useState<SortOption>("updated");
+  const [searchMode, setSearchMode] = useState<SearchMode>("normal");
+  const [searchScopes, setSearchScopes] = useState<SearchScope[]>(["content"]);
   const [readerOpen, setReaderOpen] = useState(false);
   const [tagModalOpen, setTagModalOpen] = useState(false);
   const [tagManagerOpen, setTagManagerOpen] = useState(false);
@@ -126,6 +130,10 @@ export function LibraryPage({
   const listOptions = useMemo(
     () => ({ tab: activeTab, tag: activeTag, sort: sortOrder }),
     [activeTab, activeTag, sortOrder],
+  );
+  const searchOptions = useMemo(
+    () => ({ ...listOptions, mode: searchMode, scopes: searchScopes }),
+    [listOptions, searchMode, searchScopes],
   );
 
   const loadLibraryData = useCallback((append = false) => {
@@ -220,10 +228,15 @@ export function LibraryPage({
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      search(query, "note", listOptions).catch(() => {});
+      search(query, "note", searchOptions).catch(() => {});
     }, 180);
     return () => clearTimeout(timer);
-  }, [listOptions, query, search]);
+  }, [query, search, searchOptions]);
+
+  const searchMetadataById = useMemo(
+    () => new Map(searchResults.map((result) => [result.id, result])),
+    [searchResults],
+  );
 
   const visibleItems = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -269,10 +282,19 @@ export function LibraryPage({
   const hasMore = normalizedQuery ? searchHasMore : items.length < libraryTotal;
   const handleLoadMore = useCallback(() => {
     if (normalizedQuery) {
-      return loadMoreSearch("note", listOptions);
+      return loadMoreSearch("note", searchOptions);
     }
     return loadLibraryData(true);
-  }, [listOptions, loadLibraryData, loadMoreSearch, normalizedQuery]);
+  }, [loadLibraryData, loadMoreSearch, normalizedQuery, searchOptions]);
+
+  function toggleSearchScope(scope: SearchScope) {
+    setSearchScopes((current) => {
+      if (current.includes(scope)) {
+        return current.length === 1 ? current : current.filter((item) => item !== scope);
+      }
+      return [...current, scope];
+    });
+  }
 
   async function handleCopy() {
     const selectedContent =
@@ -418,6 +440,17 @@ export function LibraryPage({
               <div className="absolute right-0 top-12 z-20 w-64 rounded-2xl border border-[var(--line)] bg-[var(--popover)] p-4 shadow-2xl" data-testid="library-filter-panel">
                 <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">{t("library:filter.title")}</div>
                 <label className="mb-4 block">
+                  <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.searchMode")}</span>
+                  <Select
+                    value={searchMode}
+                    onChange={(value) => setSearchMode(value as SearchMode)}
+                    options={[
+                      { value: "normal", label: t("library:filter.normalMode") },
+                      { value: "advanced", label: t("library:filter.advancedMode") },
+                    ]}
+                  />
+                </label>
+                <label className="mb-4 block">
                   <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.sort")}</span>
                   <Select
                     value={sortOrder}
@@ -440,6 +473,23 @@ export function LibraryPage({
                     ]}
                   />
                 </label>
+                <fieldset className="border-0 p-0">
+                  <legend className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.searchScope")}</legend>
+                  <div className="space-y-2">
+                    {(["content", "tags", "attachments", "versions"] as SearchScope[]).map((scope) => (
+                      <label key={scope} className="flex items-center gap-2 text-sm text-[var(--text)]">
+                        <input
+                          type="checkbox"
+                          checked={searchScopes.includes(scope)}
+                          onChange={() => toggleSearchScope(scope)}
+                          data-testid={`library-search-scope-${scope}`}
+                          className="accent-[var(--accent)]"
+                        />
+                        {t(`library:searchFields.${scope}`)}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
               </div>
             </details>
           </div>
@@ -493,10 +543,28 @@ export function LibraryPage({
                     })()}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <div className="truncate text-sm font-semibold text-[var(--text)]">{item.title || t("library:unnamed")}</div>
+                        <SearchHighlight
+                          text={item.title || t("library:unnamed")}
+                          terms={searchMetadataById.get(item.id)?.highlight_terms}
+                          className="truncate text-sm font-semibold text-[var(--text)]"
+                        />
                         {item.pinned && <Star className="h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />}
                       </div>
-                      <div className="mt-1 line-clamp-2 text-sm leading-relaxed text-[var(--muted)]">{item.summary || t("library:noPreview")}</div>
+                      <div className="mt-1 line-clamp-2 text-sm leading-relaxed text-[var(--muted)]">
+                        <SearchHighlight
+                          text={searchMetadataById.get(item.id)?.context || item.summary || t("library:noPreview")}
+                          terms={searchMetadataById.get(item.id)?.highlight_terms}
+                        />
+                      </div>
+                      {normalizedQuery && (searchMetadataById.get(item.id)?.matched_fields?.length ?? 0) > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1" data-testid="search-matched-fields">
+                          {searchMetadataById.get(item.id)?.matched_fields?.map((field) => (
+                            <span key={field} className="rounded-full bg-[var(--accent-soft)] px-1.5 py-0.5 text-[10px] text-[var(--accent)]">
+                              {t(`library:searchFields.${field}`, field)}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       <div className="mt-1.5 min-h-[1.25rem]">
                         {itemTagNames[item.id] && itemTagNames[item.id].length > 0 && (
                           <div className="flex flex-wrap items-center gap-1">

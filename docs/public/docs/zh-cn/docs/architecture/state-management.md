@@ -94,23 +94,27 @@ QuantaNote 使用 Zustand 5 作为前端状态管理方案。Zustand 是一个�
 |----------|------|------|
 | query | string | 搜索关键词 |
 | results | SearchResultDto[] | 搜索结果 |
+| total | number | 当前查询的完整匹配数量 |
 | searching | boolean | 是否正在搜索 |
+| loadingMore | boolean | 是否正在加载下一页 |
+| hasMore | boolean | 是否还有下一页 |
 
 | 关键操作 | 说明 |
 |----------|------|
 | setQuery(q) | 设置搜索关键词 |
-| search(q, itemType?) | 执行搜索（内置竞序保护） |
+| search(q, itemType?, options?) | 执行普通或高级搜索（内置竞序保护） |
+| loadMore(itemType?, options?) | 加载下一页结果 |
 
 搜索 Store 使用 `_searchSeq` 序列号机制防止旧请求覆盖新结果：
 
 ```typescript
 let _searchSeq = 0;
 
-search: async (q, itemType) => {
+search: async (q, itemType, options) => {
   const seq = ++_searchSeq;
-  const results = await invoke("search_items", { query: q });
+  const page = await invoke("search_items", { query: q, ...options });
   if (seq !== _searchSeq) return; // 丢弃过时的结果
-  set({ results });
+  set({ results: page.results, total: page.total });
 }
 ```
 

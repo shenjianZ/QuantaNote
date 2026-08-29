@@ -16,13 +16,25 @@
     "sortCreated": "Created",
     "sortTitle": "Title",
     "tag": "Tag",
-    "allTags": "All Tags"
+    "allTags": "All Tags",
+    "searchMode": "Search Mode",
+    "normalMode": "Normal Search",
+    "advancedMode": "Advanced Search",
+    "searchScope": "Search In"
   },
   "empty": {
     "title": "No notes to display",
     "subtitle": "Write your first note, or try a different search."
   },
   "searchResult": "Search Result",
+  "searchFields": {
+    "title": "Title",
+    "summary": "Summary",
+    "content": "Content",
+    "tags": "Tags",
+    "attachments": "Attachments",
+    "versions": "Versions"
+  },
   "unnamed": "Untitled",
   "noPreview": "No preview",
   "toast": {

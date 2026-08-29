@@ -96,6 +96,40 @@ class LibraryPage {
     await observePause();
   }
 
+  async selectSearchMode(mode) {
+    const labels = {
+      normal: "普通搜索",
+      advanced: "高级搜索",
+    };
+    await this.openFilterPanel();
+    const select = await $("//*[@data-testid='library-filter-panel']//label[.//span[contains(., '搜索模式')]]//button");
+    await clickByDom(select);
+    const option = await $(`//*[@data-testid='library-filter-panel']//button[normalize-space(.)='${labels[mode]}']`);
+    await clickByDom(option);
+    await observePause();
+  }
+
+  async setSearchScope(scope, enabled) {
+    await this.openFilterPanel();
+    const checkbox = await $(`[data-testid='library-search-scope-${scope}']`);
+    if ((await checkbox.isSelected()) !== enabled) {
+      await checkbox.click();
+      await observePause();
+    }
+  }
+
+  async getSearchHighlightCount() {
+    return (await $$("[data-testid='search-highlight']")).length;
+  }
+
+  async getMatchedFieldText() {
+    return browser.execute(() => {
+      return Array.from(document.querySelectorAll("[data-testid='search-matched-fields']"))
+        .map((node) => node.textContent || "")
+        .join(" ");
+    });
+  }
+
   // --- 列表项 ---
   async getItemCount() {
     const items = await $$(this.items);

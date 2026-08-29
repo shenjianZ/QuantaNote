@@ -69,7 +69,7 @@ Store 通过服务层间接调用后端，确保调用的一致性和可维护�
 
 | 命令名 | 参数 | 返回值 | 说明 |
 |--------|------|--------|------|
-| `search_items` | query, itemType? | SearchResultDto[] | FTS5 全文搜索 |
+| `search_items` | query, itemType?, tab?, tag?, sort?, mode?, scopes?, limit?, offset? | SearchPageDto | 普通/高级全文搜索，返回总数、匹配字段、上下文和高亮词 |
 
 ### Tag 命令
 

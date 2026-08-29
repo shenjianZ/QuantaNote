@@ -1,9 +1,9 @@
 ---
 title: Full-Text Search
-description: Dual-engine FTS5 search for fast, accurate text retrieval across all your notes in QuantaNote.
+description: QuantaNote search with normal and advanced modes, CJK substring matching, highlighting, and selectable search scopes.
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-29
 ---
 
 # Full-Text Search
@@ -41,20 +41,24 @@ To perform a search:
 1. Navigate to the **Library** page.
 2. Click the **search bar** at the top of the page.
 3. Type your search query. Results update in real time as you type.
-4. Press `Enter` or wait for the debounced results to load.
+4. Wait for the debounced results to load. Use the filter panel to switch between normal and advanced search.
 
 ### Query Syntax
 
-The search bar supports the following query features:
+Normal search is intended for everyday lookup. Multiple terms separated by spaces must all be present, and CJK text can be searched by typing any contiguous substring. Operators are treated as ordinary text in normal mode.
+
+Advanced search parses the following syntax and converts it into a safe query:
 
 | Syntax | Description | Example |
 |--------|-------------|---------|
-| Simple term | Match any item containing the term | `meeting` |
+| Simple term | Match items containing the term | `meeting` |
 | Multiple terms | Match items containing all terms (implicit AND) | `project status` |
-| Phrase search | Match exact phrase in quotes | `"project status"` |
-| Prefix search | Match terms starting with a prefix | `proj*` |
+| Phrase search | Match an exact phrase in quotes | `"project status"` |
+| Prefix search | Put an asterisk at the end of a term | `proj*` |
 | Boolean OR | Match items containing either term | `meeting OR call` |
-| Negation | Exclude items containing a term | `meeting -cancelled` |
+| Negation | Exclude a term with `-` or `NOT` | `meeting -cancelled` |
+
+In advanced mode, terms around `OR` form an optional group and spaces imply `AND`. Unclosed quotes and incomplete operators are rejected.
 
 For Chinese text, simply type any portion of the phrase. The trigram engine will find all items containing that substring.
 
@@ -62,10 +66,12 @@ For Chinese text, simply type any portion of the phrase. The trigram engine will
 
 Search results are displayed in the Library's item card layout with the following features:
 
-- **Summary Display** — Each result shows a content snippet with the matching terms highlighted.
+- **Matched fields** — Each result identifies whether the match is in the title, summary, content, tag, attachment, or version.
+- **Context snippet** — Each result shows text near the match, preferring note content or the related field.
+- **Keyword highlighting** — Matching terms are highlighted in the title and context.
 - **Type Icon** — An icon indicating the item type.
 - **Tags and Timestamps** — Standard metadata is shown on each result card.
-- **Relevance Ordering** — Results are ranked by relevance using FTS5's built-in ranking algorithm (`bm25`).
+- **Stable ordering** — Results default to last-updated order and can be switched to created-time or title order in the Library filter panel.
 - **Result Count** — The total number of matching items is displayed above the results.
 
 Click any result to open it in the Reader Drawer or Document Editor.
@@ -86,6 +92,14 @@ The index is kept in sync with the database through SQLite triggers. When an ite
 
 The following data is not included in the full-text search index:
 
-- Tag names (use tag filtering instead)
-- Attachment filenames (use the Attachment Manager)
-- Version history content (use version diff comparison)
+### Optional Search Scopes
+
+The Library filter panel can also search the following scopes:
+
+| Scope | Matched data |
+|-------|--------------|
+| Tags | Names of tags assigned to the note |
+| Attachments | Attachment filenames (file contents are not read) |
+| Versions | Version names, descriptions, change summaries, and version content |
+
+The `Ctrl+K` Command Palette always uses normal mode and the content scope for fast navigation. Use the Library search bar for advanced syntax or related-data searches.

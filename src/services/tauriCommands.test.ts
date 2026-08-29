@@ -61,6 +61,21 @@ describe("tauriCommands", () => {
     expect(captured?.args).toMatchObject({ query: "rust", itemType: "note" });
   });
 
+  it("searchItems passes advanced mode and selected scopes", async () => {
+    await searchItems("rust OR sqlite -draft", "note", {
+      mode: "advanced",
+      scopes: ["content", "tags", "versions"],
+      limit: 20,
+      offset: 40,
+    });
+    expect(captured?.args).toMatchObject({
+      mode: "advanced",
+      scopes: ["content", "tags", "versions"],
+      limit: 20,
+      offset: 40,
+    });
+  });
+
   it("addAttachment passes itemId and path", async () => {
     await addAttachment("item-1", "/file.txt");
     expect(captured?.cmd).toBe("add_attachment");

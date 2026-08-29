@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, FileText, Loader2, Search } from "lucide-react";
 import { Kbd } from "../common/Kbd";
+import { SearchHighlight } from "../common/SearchHighlight";
 import { useSearchStore } from "../../stores/searchStore";
 import type { SearchResultDto } from "../../stores/searchStore";
 import type { Item } from "../../types";
@@ -56,6 +57,9 @@ export function CommandPalette({
         title: item.title,
         item_type: item.type,
         summary: item.summary,
+        context: item.summary,
+        matched_fields: ["title", "summary"],
+        highlight_terms: [query],
       }));
   }, [results, query, items]);
 
@@ -180,11 +184,16 @@ export function CommandPalette({
                   <ResultIcon type={item.item_type} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-semibold text-[var(--text)]">
-                    {item.title}
-                  </div>
+                  <SearchHighlight
+                    text={item.title}
+                    terms={item.highlight_terms ?? [query]}
+                    className="truncate text-sm font-semibold text-[var(--text)]"
+                  />
                   <div className="truncate text-sm text-[var(--muted)]">
-                    {item.summary || item.item_type}
+                    <SearchHighlight
+                      text={item.context || item.summary || item.item_type}
+                      terms={item.highlight_terms ?? [query]}
+                    />
                   </div>
                 </div>
               </button>

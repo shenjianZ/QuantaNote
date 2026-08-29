@@ -94,23 +94,27 @@ Manages full-text search queries and results, with a built-in sequence-based deb
 |-----------|------|-------------|
 | query | string | Search keyword |
 | results | SearchResultDto[] | Search results |
+| total | number | Full number of matches for the current query |
 | searching | boolean | Whether currently searching |
+| loadingMore | boolean | Whether the next page is loading |
+| hasMore | boolean | Whether another page is available |
 
 | Key Operations | Description |
 |----------------|-------------|
 | setQuery(q) | Set search keyword |
-| search(q, itemType?) | Execute search (built-in race condition protection) |
+| search(q, itemType?, options?) | Execute normal or advanced search (built-in race condition protection) |
+| loadMore(itemType?, options?) | Load the next result page |
 
 The search Store uses a `_searchSeq` sequence number mechanism to prevent stale results from overwriting newer ones:
 
 ```typescript
 let _searchSeq = 0;
 
-search: async (q, itemType) => {
+search: async (q, itemType, options) => {
   const seq = ++_searchSeq;
-  const results = await invoke("search_items", { query: q });
+  const page = await invoke("search_items", { query: q, ...options });
   if (seq !== _searchSeq) return; // Discard stale results
-  set({ results });
+  set({ results: page.results, total: page.total });
 }
 ```
 
