@@ -77,6 +77,33 @@ function formatStorageBytes(bytes: number) {
     return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
+function StorageIssueDetails({
+    title,
+    issues,
+    testId,
+}: {
+    title: string;
+    issues: readonly { path: string; reason: string }[];
+    testId: string;
+}) {
+    if (issues.length === 0) return null;
+    return (
+        <details className="mt-2 rounded-2xl border border-[var(--line)] bg-[var(--field)] px-3 py-2" data-testid={testId}>
+            <summary className="cursor-pointer text-xs font-medium text-[var(--text)]">
+                {title} ({issues.length})
+            </summary>
+            <ul className="mt-2 space-y-1.5 text-xs text-[var(--muted)]">
+                {issues.map((issue) => (
+                    <li className="break-all" key={`${issue.path}-${issue.reason}`}>
+                        <code className="text-[var(--text)]">{issue.path}</code>
+                        <span className="ml-2">{issue.reason}</span>
+                    </li>
+                ))}
+            </ul>
+        </details>
+    );
+}
+
 export function SettingsPage({
     theme = "system",
     onThemeChange,
@@ -792,6 +819,21 @@ export function SettingsPage({
                                         {formatStorageBytes(storageReport.storageBytes)} · {t("settings:data.storageScannedFiles", { count: storageReport.scannedFiles })}
                                     </span>
                                 </div>
+                                <StorageIssueDetails
+                                    title={t("settings:data.storageMissingFiles")}
+                                    issues={storageReport.missingFiles}
+                                    testId="storage-missing-details"
+                                />
+                                <StorageIssueDetails
+                                    title={t("settings:data.storageOrphanFiles")}
+                                    issues={storageReport.orphanFiles}
+                                    testId="storage-orphan-details"
+                                />
+                                <StorageIssueDetails
+                                    title={t("settings:data.storageBrokenReferences")}
+                                    issues={storageReport.brokenReferences}
+                                    testId="storage-broken-reference-details"
+                                />
                                 {storageReport.orphanFiles.length > 0 && (
                                     <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-[var(--line)] bg-[var(--field)] p-3">
                                         <span className="text-xs text-[var(--muted)]">

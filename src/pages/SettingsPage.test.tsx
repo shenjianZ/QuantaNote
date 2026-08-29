@@ -70,6 +70,8 @@ describe("SettingsPage", () => {
             fetchBackups: vi.fn(),
             deleteBackup: vi.fn(),
             fetchDiagnosticsPaths: vi.fn(),
+            fetchStorageConsistency: vi.fn(),
+            repairStorageConsistency: vi.fn(),
             updateSqlLogging: updateSqlLoggingMock,
             clearSqlLogFile: vi.fn(),
         });
@@ -150,5 +152,29 @@ describe("SettingsPage", () => {
         expect(toggle).toBeTruthy();
         await user.click(toggle as HTMLButtonElement);
         expect(updateSqlLoggingMock).toHaveBeenCalledWith({ enabled: true });
+    });
+
+    it("shows storage consistency counts and file details", async () => {
+        useSettingsStore.setState({
+            storageReport: {
+                missingFiles: [{
+                    path: "attachments/item/missing.png",
+                    attachmentId: "att-missing",
+                    itemId: "item",
+                    filename: "missing.png",
+                    sizeBytes: 12,
+                    reason: "数据库记录存在，但附件文件不存在",
+                }],
+                orphanFiles: [],
+                brokenReferences: [],
+                scannedFiles: 1,
+                storageBytes: 12,
+            },
+        });
+        const { user } = setup(<SettingsPage />);
+
+        await user.click(screen.getByText("数据"));
+        expect(screen.getByTestId("storage-missing-count")).toHaveTextContent("1");
+        expect(screen.getByTestId("storage-missing-details")).toHaveTextContent("missing.png");
     });
 });
