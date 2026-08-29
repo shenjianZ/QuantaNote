@@ -9,6 +9,24 @@ pub struct SyncOutput {
     pub pending_state: Option<PendingSyncState>,
 }
 
+fn sanitize_sync_component(value: &str, fallback: &str) -> String {
+    let sanitized: String = value
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() || matches!(c, '-' | '_' | '.') {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    if sanitized.is_empty() || sanitized == "." || sanitized == ".." {
+        fallback.to_string()
+    } else {
+        sanitized
+    }
+}
+
 pub fn load_sync_config(db: &DbState) -> SyncConfig {
     let conn = match db.conn.lock() {
         Ok(c) => c,
@@ -245,6 +263,7 @@ pub async fn sync_attachments_download(
     db: &DbState,
     _snapshot_id: &str,
 ) -> Result<(), AppError> {
+    use crate::services::data_io_service::resolve_safe_attachment_path;
     use crate::sync::diff::compute_file_hash;
     use crate::utils::paths;
 
@@ -258,16 +277,21 @@ pub async fn sync_attachments_download(
                 .conn
                 .lock()
                 .map_err(|e| AppError::Database(e.to_string()))?;
-            conn.query_row(
-                "SELECT file_path FROM attachments WHERE id = ?1",
-                rusqlite::params![remote.attachment_id],
-                |row| {
-                    let fp: String = row.get(0)?;
-                    let full = paths::quantanote_dir().join(&fp);
-                    Ok((fp, full.exists()))
-                },
-            )
-            .ok()
+            let existing_path: Option<String> = conn
+                .query_row(
+                    "SELECT file_path FROM attachments WHERE id = ?1",
+                    rusqlite::params![remote.attachment_id],
+                    |row| row.get(0),
+                )
+                .ok();
+            match existing_path {
+                Some(file_path) => {
+                    let full_path =
+                        resolve_safe_attachment_path(&paths::quantanote_dir(), &file_path)?;
+                    Some((file_path, full_path.exists()))
+                }
+                None => None,
+            }
         };
 
         let (target_path, has_local_row) = match &local_info {
@@ -282,12 +306,28 @@ pub async fn sync_attachments_download(
             }
             Some((file_path, false)) => (file_path.clone(), true),
             None => (
-                format!("attachments/{}/{}", remote.item_id, remote.filename),
+                format!(
+                    "attachments/{}/{}-{}",
+                    sanitize_sync_component(&remote.item_id, "unknown-item"),
+                    sanitize_sync_component(&remote.attachment_id, "attachment"),
+                    sanitize_sync_component(&remote.filename, "attachment.bin")
+                ),
                 false,
             ),
         };
 
         let data = transport.download_attachment(&remote.attachment_id).await?;
+        if remote.file_size < 0
+            || remote.file_size as u64 > 512 * 1024 * 1024
+            || remote.file_size as usize != data.len()
+        {
+            return Err(AppError::SyncError(format!(
+                "附件大小校验失败: attachment_id={}, expected={}, actual={}",
+                remote.attachment_id,
+                remote.file_size,
+                data.len()
+            )));
+        }
         let downloaded_hash = compute_file_hash(&data);
         if downloaded_hash != remote.file_hash {
             return Err(AppError::SyncError(format!(
@@ -295,7 +335,7 @@ pub async fn sync_attachments_download(
                 remote.attachment_id, remote.file_hash, downloaded_hash
             )));
         }
-        let full_path = paths::quantanote_dir().join(&target_path);
+        let full_path = resolve_safe_attachment_path(&paths::quantanote_dir(), &target_path)?;
         if let Some(parent) = full_path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| AppError::Io(e.to_string()))?;
         }

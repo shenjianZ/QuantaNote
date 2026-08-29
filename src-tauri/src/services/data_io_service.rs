@@ -88,7 +88,7 @@ fn sanitize_path_component(s: &str) -> String {
         .collect()
 }
 
-fn validate_relative_path(path: &str, required_root: &str) -> Result<PathBuf, AppError> {
+pub(crate) fn validate_relative_path(path: &str, required_root: &str) -> Result<PathBuf, AppError> {
     if path.is_empty() || path.contains('\0') {
         return Err(AppError::Validation("附件路径无效".to_string()));
     }
@@ -118,6 +118,42 @@ fn validate_relative_path(path: &str, required_root: &str) -> Result<PathBuf, Ap
         return Err(AppError::Validation("附件路径缺少文件名".to_string()));
     }
     Ok(result)
+}
+
+pub(crate) fn resolve_safe_attachment_path(
+    data_dir: &Path,
+    path: &str,
+) -> Result<PathBuf, AppError> {
+    let relative_path = validate_relative_path(path, "attachments")?;
+    let data_root = std::fs::canonicalize(data_dir)
+        .map_err(|e| AppError::Io(format!("读取数据目录失败: {}", e)))?;
+    let mut current = data_dir.to_path_buf();
+
+    for component in relative_path.components() {
+        current.push(component.as_os_str());
+        match std::fs::symlink_metadata(&current) {
+            Ok(metadata) => {
+                if metadata.file_type().is_symlink() {
+                    return Err(AppError::Validation(format!(
+                        "附件路径不能经过符号链接: {}",
+                        path
+                    )));
+                }
+                let resolved = std::fs::canonicalize(&current)
+                    .map_err(|e| AppError::Io(format!("解析附件路径失败: {}", e)))?;
+                if !resolved.starts_with(&data_root) {
+                    return Err(AppError::Validation(format!(
+                        "附件路径逃逸数据目录: {}",
+                        path
+                    )));
+                }
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => break,
+            Err(error) => return Err(AppError::Io(error.to_string())),
+        }
+    }
+
+    Ok(data_dir.join(relative_path))
 }
 
 fn safe_archive_filename(filename: &str) -> String {
@@ -177,8 +213,7 @@ fn build_zip_attachment_manifest(
             return Err(AppError::Validation("附件元数据不完整".to_string()));
         }
 
-        let relative_path = validate_relative_path(&file_path, "attachments")?;
-        let source_path = data_dir.join(&relative_path);
+        let source_path = resolve_safe_attachment_path(data_dir, &file_path)?;
         let metadata = std::fs::metadata(&source_path)
             .map_err(|e| AppError::Io(format!("读取附件 {} 失败: {}", file_path, e)))?;
         if !metadata.is_file() {
@@ -228,8 +263,7 @@ fn write_zip_attachment_files(
     options: zip::write::SimpleFileOptions,
 ) -> Result<(), AppError> {
     for attachment in attachments {
-        let relative_path = validate_relative_path(&attachment.file_path, "attachments")?;
-        let source_path = data_dir.join(relative_path);
+        let source_path = resolve_safe_attachment_path(data_dir, &attachment.file_path)?;
         zip.start_file(&attachment.archive_path, options)
             .map_err(|e| AppError::Io(e.to_string()))?;
         let mut source = std::io::BufReader::new(
@@ -458,8 +492,7 @@ fn stage_and_install_zip_attachments(
 
     let mut installed = Vec::with_capacity(manifest.attachments.len());
     for (index, attachment) in manifest.attachments.iter().enumerate() {
-        let relative_path = validate_relative_path(&attachment.file_path, "attachments")?;
-        let target = data_dir.join(relative_path);
+        let target = resolve_safe_attachment_path(data_dir, &attachment.file_path)?;
         if target.exists() && !overwrite {
             continue;
         }
@@ -536,6 +569,9 @@ pub fn export_data(db: &DbState) -> Result<String, AppError> {
 pub fn import_data(db: &DbState, json: String) -> Result<(), AppError> {
     let data: ExportData =
         serde_json::from_str(&json).map_err(|e| AppError::Validation(e.to_string()))?;
+    if data.attachments.len() > MAX_ZIP_ENTRIES {
+        return Err(AppError::Validation("JSON 附件数量超过限制".to_string()));
+    }
     let mut conn = db
         .conn
         .lock()
@@ -551,6 +587,7 @@ pub fn import_data(db: &DbState, json: String) -> Result<(), AppError> {
     data_io_repository::import_item_tags(&tx, &data.item_tags)?;
 
     let data_dir = paths::quantanote_dir();
+    let mut total_attachment_size = 0_u64;
     for attachment in &data.attachments {
         let id = attachment["id"].as_str().unwrap_or_default().to_string();
         let item_id = sanitize_path_component(attachment["item_id"].as_str().unwrap_or_default());
@@ -562,9 +599,13 @@ pub fn import_data(db: &DbState, json: String) -> Result<(), AppError> {
             .as_str()
             .unwrap_or_default()
             .to_string();
-
-        if !file_path.is_empty() && (file_path.contains("..") || file_path.contains('\0')) {
-            file_path = String::new();
+        if id.is_empty() || item_id.is_empty() || filename.is_empty() {
+            return Err(AppError::Validation("附件元数据不完整".to_string()));
+        }
+        if !file_path.is_empty() {
+            let relative_path = validate_relative_path(&file_path, "attachments")?;
+            let _ = resolve_safe_attachment_path(&data_dir, &file_path)?;
+            file_path = relative_path.to_string_lossy().to_string();
         }
 
         if let Some(file_data) = attachment["file_data"].as_str() {
@@ -572,18 +613,31 @@ pub fn import_data(db: &DbState, json: String) -> Result<(), AppError> {
             use base64::Engine;
 
             if !file_data.is_empty() {
+                if file_data.len() as u64 > MAX_ZIP_ENTRY_SIZE.saturating_mul(4) / 3 + 4 {
+                    return Err(AppError::Validation(
+                        "JSON 附件数据超过大小限制".to_string(),
+                    ));
+                }
                 let bytes = BASE64
                     .decode(file_data)
                     .map_err(|e| AppError::Validation(format!("附件数据无效: {}", e)))?;
+                let attachment_size = bytes.len() as u64;
+                if attachment_size > MAX_ZIP_ENTRY_SIZE
+                    || total_attachment_size.saturating_add(attachment_size) > MAX_ZIP_TOTAL_SIZE
+                {
+                    return Err(AppError::Validation("JSON 附件总大小超过限制".to_string()));
+                }
+                total_attachment_size += attachment_size;
                 let relative_path =
                     std::path::PathBuf::from("attachments")
                         .join(&item_id)
                         .join(format!(
                             "{}-{}",
                             &id.chars().take(8).collect::<String>(),
-                            filename
+                            safe_archive_filename(&filename)
                         ));
-                let dest_path = data_dir.join(&relative_path);
+                let relative_path = relative_path.to_string_lossy().to_string();
+                let dest_path = resolve_safe_attachment_path(&data_dir, &relative_path)?;
                 std::fs::create_dir_all(
                     dest_path
                         .parent()
@@ -591,8 +645,15 @@ pub fn import_data(db: &DbState, json: String) -> Result<(), AppError> {
                 )
                 .map_err(|e| AppError::Io(e.to_string()))?;
                 std::fs::write(&dest_path, bytes).map_err(|e| AppError::Io(e.to_string()))?;
-                file_path = relative_path.to_string_lossy().to_string();
+                file_path = relative_path;
             }
+        }
+
+        if file_path.is_empty() {
+            return Err(AppError::Validation(format!(
+                "附件缺少安全文件路径: {}",
+                id
+            )));
         }
 
         let mut att = attachment.clone();
@@ -1138,5 +1199,45 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(data_dir);
         let _ = std::fs::remove_dir_all(zip_dir);
+    }
+
+    #[test]
+    fn import_json_rejects_attachment_path_traversal_without_committing_records() {
+        let data_dir = crate::test_support::unique_temp_dir("data-io-json-slip");
+        let _guard = crate::test_support::lock_test_data_dir(&data_dir);
+        let db = crate::test_support::test_db();
+        let json = serde_json::json!({
+            "items": [{
+                "id": "item-safe",
+                "title": "安全测试",
+                "item_type": "note",
+                "content": "内容",
+                "summary": "",
+                "pinned": false,
+                "favorite": false,
+                "encrypted": false,
+                "created_at": "2026-08-29T00:00:00Z",
+                "updated_at": "2026-08-29T00:00:00Z"
+            }],
+            "tags": [],
+            "item_tags": [],
+            "attachments": [{
+                "id": "att-unsafe",
+                "item_id": "item-safe",
+                "filename": "escape.png",
+                "file_path": "attachments/../../escape.png",
+                "mime_type": "image/png",
+                "file_size": 0,
+                "created_at": "2026-08-29T00:00:00Z",
+                "file_data": ""
+            }],
+            "versions": []
+        });
+
+        let error = import_data(&db, json.to_string()).expect_err("unsafe JSON path should fail");
+
+        assert!(matches!(error, AppError::Validation(_)));
+        assert!(crate::services::item_service::get_item(&db, "item-safe").is_err());
+        let _ = std::fs::remove_dir_all(data_dir);
     }
 }

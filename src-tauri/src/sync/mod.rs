@@ -207,6 +207,10 @@ pub fn apply_attachment(
     let mime_type = data["mime_type"].as_str().unwrap_or_default();
     let file_size = data["file_size"].as_i64().unwrap_or_default();
     let created_at = data["created_at"].as_str().unwrap_or_default();
+    crate::services::data_io_service::validate_relative_path(file_path, "attachments")?;
+    if file_size < 0 || file_size as u64 > 512 * 1024 * 1024 {
+        return Err(AppError::Validation("同步附件大小超过限制".to_string()));
+    }
 
     // 检查父记录 item 是否存在
     let item_exists: bool = conn
@@ -372,4 +376,49 @@ pub fn save_baseline_map(
         .map_err(|e| AppError::Database(format!("提交事务失败: {}", e)))?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn apply_attachment_rejects_unsafe_file_path() {
+        let data_dir = crate::test_support::unique_temp_dir("sync-unsafe-attachment-path");
+        let _guard = crate::test_support::lock_test_data_dir(&data_dir);
+        let db = crate::test_support::test_db();
+        let item = crate::services::item_service::create_item(
+            &db,
+            "同步路径安全".to_string(),
+            "note".to_string(),
+            None,
+        )
+        .expect("create item");
+        let conn = db.conn.lock().expect("lock db");
+
+        let error = apply_attachment(
+            &conn,
+            &serde_json::json!({
+                "id": "att-unsafe",
+                "item_id": item.id,
+                "filename": "escape.png",
+                "file_path": "attachments/../../escape.png",
+                "mime_type": "image/png",
+                "file_size": 1,
+                "created_at": "2026-08-29T00:00:00Z"
+            }),
+        )
+        .expect_err("unsafe sync path should fail");
+
+        assert!(matches!(error, AppError::Validation(_)));
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM attachments WHERE id = 'att-unsafe'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("count attachments");
+        assert_eq!(count, 0);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
 }
