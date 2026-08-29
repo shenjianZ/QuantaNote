@@ -82,8 +82,44 @@ export async function getRecentItems(limit?: number) {
 }
 
 // Search commands
-export async function searchItems(query: string, itemType?: string) {
-    return invoke("search_items", { query, itemType: itemType ?? null });
+export interface SearchPageOptions {
+    tab?: "recent" | "pinned" | "favorite";
+    tag?: string;
+    sort?: "updated" | "created" | "title";
+    limit?: number;
+    offset?: number;
+}
+
+export interface SearchResultDto {
+    id: string;
+    title: string;
+    item_type: string;
+    summary: string;
+    created_at?: string;
+    updated_at?: string;
+    pinned?: boolean;
+    favorite?: boolean;
+}
+
+export interface SearchPageDto {
+    results: SearchResultDto[];
+    total: number;
+}
+
+export async function searchItems(
+    query: string,
+    itemType?: string,
+    options: SearchPageOptions = {},
+) {
+    return invoke<SearchPageDto>("search_items", {
+        query,
+        itemType: itemType ?? null,
+        tab: options.tab ?? null,
+        tag: options.tag ?? null,
+        sort: options.sort ?? null,
+        limit: options.limit ?? 50,
+        offset: options.offset ?? 0,
+    });
 }
 
 // Attachment commands
@@ -102,6 +138,30 @@ export async function addAttachmentData(
         filename,
         mimeType,
         data,
+    });
+}
+
+export interface ItemPageDto {
+    items: ItemDto[];
+    total: number;
+}
+
+export interface ItemPageOptions {
+    tab?: "recent" | "pinned" | "favorite";
+    tag?: string;
+    sort?: "updated" | "created" | "title";
+    limit?: number;
+    offset?: number;
+}
+
+export async function getItemsPage(options: ItemPageOptions = {}) {
+    return invoke<ItemPageDto>("get_items_page", {
+        itemType: null,
+        tab: options.tab ?? "recent",
+        tag: options.tag ?? "all",
+        sort: options.sort ?? "updated",
+        limit: options.limit ?? 50,
+        offset: options.offset ?? 0,
     });
 }
 

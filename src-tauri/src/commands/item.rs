@@ -3,7 +3,7 @@ use tauri::State;
 
 use crate::db::DbState;
 use crate::error::AppError;
-use crate::models::item::{ItemDto, TagDto, TrashItemDto, UpdateItemPayload};
+use crate::models::item::{ItemDto, ItemPageDto, TagDto, TrashItemDto, UpdateItemPayload};
 use crate::services::{item_service, tag_service};
 
 #[derive(Serialize)]
@@ -33,6 +33,27 @@ pub fn get_items(
     item_service::get_items(
         &db,
         item_type.as_deref(),
+        limit.unwrap_or(50),
+        offset.unwrap_or(0),
+    )
+}
+
+#[tauri::command]
+pub fn get_items_page(
+    db: State<'_, DbState>,
+    item_type: Option<String>,
+    tab: Option<String>,
+    tag: Option<String>,
+    sort: Option<String>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+) -> Result<ItemPageDto, AppError> {
+    item_service::get_items_page(
+        &db,
+        item_type.as_deref(),
+        tab.as_deref(),
+        tag.as_deref(),
+        sort.as_deref(),
         limit.unwrap_or(50),
         offset.unwrap_or(0),
     )

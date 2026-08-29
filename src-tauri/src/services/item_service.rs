@@ -61,6 +61,26 @@ pub fn get_items(
     item_repository::get_items(db, item_type, limit, offset)
 }
 
+pub fn get_items_page(
+    db: &DbState,
+    item_type: Option<&str>,
+    tab: Option<&str>,
+    tag: Option<&str>,
+    sort: Option<&str>,
+    limit: i64,
+    offset: i64,
+) -> Result<ItemPageDto, AppError> {
+    if !(1..=200).contains(&limit) {
+        return Err(AppError::Validation(
+            "列表分页大小必须在 1 到 200 之间".to_string(),
+        ));
+    }
+    if offset < 0 {
+        return Err(AppError::Validation("列表偏移量不能为负数".to_string()));
+    }
+    item_repository::get_items_page(db, item_type, tab, tag, sort, limit, offset)
+}
+
 pub fn get_item(db: &DbState, id: &str) -> Result<ItemDto, AppError> {
     item_repository::get_item(db, id)
 }
@@ -185,6 +205,20 @@ mod tests {
 
         assert!(matches!(error, AppError::Validation(_)));
         assert!(error.to_string().contains("标题不能为空"));
+    }
+
+    #[test]
+    fn get_items_page_rejects_invalid_pagination() {
+        let db = crate::test_support::test_db();
+
+        assert!(matches!(
+            get_items_page(&db, None, None, None, None, 0, 0),
+            Err(AppError::Validation(_))
+        ));
+        assert!(matches!(
+            get_items_page(&db, None, None, None, None, 10, -1),
+            Err(AppError::Validation(_))
+        ));
     }
 
     #[test]

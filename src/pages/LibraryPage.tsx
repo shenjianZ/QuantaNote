@@ -23,6 +23,7 @@ import { TagPickerModal } from "../components/common/TagPickerModal";
 import { TagManagerModal } from "../components/common/TagManagerModal";
 import { AttachmentManagerModal } from "../components/common/AttachmentManagerModal";
 import { TrashModal } from "../components/common/TrashModal";
+import { VirtualItemList } from "../components/common/VirtualItemList";
 import { useAppStore } from "../stores/appStore";
 import { useAttachmentStore } from "../stores/attachmentStore";
 import { useItemStore } from "../stores/itemStore";
@@ -101,6 +102,8 @@ export function LibraryPage({
   const deleteItem = useItemStore((s) => s.deleteItem);
   const updateItem = useItemStore((s) => s.updateItem);
   const fetchLibraryData = useItemStore((s) => s.fetchLibraryData);
+  const libraryTotal = useItemStore((s) => s.libraryTotal);
+  const libraryLoadingMore = useItemStore((s) => s.libraryLoadingMore);
   const itemTagNames = useItemStore((s) => s.itemTagNames);
   const setItemTagNames = useItemStore((s) => s.setItemTagNames);
   const attachments = useAttachmentStore((s) => s.attachments);
@@ -113,14 +116,23 @@ export function LibraryPage({
   const fetchItemTags = useTagStore((s) => s.fetchItemTags);
   const updateItemTagsAction = useTagStore((s) => s.updateItemTags);
   const searchResults = useSearchStore((s) => s.results);
+  const searchTotal = useSearchStore((s) => s.total);
   const searching = useSearchStore((s) => s.searching);
+  const searchLoadingMore = useSearchStore((s) => s.loadingMore);
+  const searchHasMore = useSearchStore((s) => s.hasMore);
   const search = useSearchStore((s) => s.search);
+  const loadMoreSearch = useSearchStore((s) => s.loadMore);
 
-  const loadLibraryData = useCallback(() => {
-    fetchLibraryData().then((result) => {
-      setTags(result.tags);
+  const listOptions = useMemo(
+    () => ({ tab: activeTab, tag: activeTag, sort: sortOrder }),
+    [activeTab, activeTag, sortOrder],
+  );
+
+  const loadLibraryData = useCallback((append = false) => {
+    fetchLibraryData(listOptions, append).then((result) => {
+      if (!append) setTags(result.tags);
     });
-  }, [fetchLibraryData, setTags]);
+  }, [fetchLibraryData, listOptions, setTags]);
 
   useEffect(() => {
     loadLibraryData();
@@ -208,34 +220,31 @@ export function LibraryPage({
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      search(query).catch(() => {});
+      search(query, "note", listOptions).catch(() => {});
     }, 180);
     return () => clearTimeout(timer);
-  }, [query, search]);
+  }, [listOptions, query, search]);
 
   const visibleItems = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    let base = items;
+    let base: Item[] = items;
 
-    if (normalized && searchResults.length > 0) {
+    if (normalized) {
       const byId = new Map(items.map((item) => [item.id, item]));
       base = searchResults.map((result) => byId.get(result.id) ?? {
-        id: result.id,
-        type: "note" as const,
-        title: result.title,
-        summary: result.summary,
-        tags: [],
-        time: t("library:searchResult"),
-        icon: FileText,
-        accent: "cyan",
-        createdAt: "",
-        updatedAt: "",
-      });
-    } else if (normalized) {
-      base = items.filter((item) => {
-        const haystack = `${item.title} ${item.summary}`.toLowerCase();
-        return haystack.includes(normalized);
-      });
+          id: result.id,
+          type: (result.item_type || "note") as Item["type"],
+          title: result.title,
+          summary: result.summary,
+          tags: [],
+          time: t("library:searchResult"),
+          icon: FileText,
+          accent: "cyan",
+          pinned: result.pinned,
+          favorite: result.favorite,
+          createdAt: result.created_at ?? "",
+          updatedAt: result.updated_at ?? "",
+        });
     }
 
     if (activeTag !== "all") {
@@ -252,6 +261,18 @@ export function LibraryPage({
       return 0;
     });
   }, [activeTab, activeTag, itemTagNames, items, query, searchResults, sortOrder, t]);
+
+  const normalizedQuery = query.trim();
+  const resultTotal = normalizedQuery
+    ? searchTotal
+    : (libraryTotal > 0 || items.length === 0 ? libraryTotal : items.length);
+  const hasMore = normalizedQuery ? searchHasMore : items.length < libraryTotal;
+  const handleLoadMore = useCallback(() => {
+    if (normalizedQuery) {
+      return loadMoreSearch("note", listOptions);
+    }
+    return loadLibraryData(true);
+  }, [listOptions, loadLibraryData, loadMoreSearch, normalizedQuery]);
 
   async function handleCopy() {
     const selectedContent =
@@ -423,7 +444,15 @@ export function LibraryPage({
             </details>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--paper)]">
+          <div
+            className="mb-2 flex min-h-5 items-center justify-between px-1 text-xs text-[var(--muted)]"
+            data-testid="library-result-count"
+          >
+            <span>{t("library:resultCount", { count: resultTotal })}</span>
+            {normalizedQuery && searchLoadingMore && <span>{t("library:loadingMore")}</span>}
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--paper)]">
             {loading && visibleItems.length === 0 ? (
               <SkeletonList count={6} />
             ) : visibleItems.length === 0 ? (
@@ -437,11 +466,19 @@ export function LibraryPage({
                 </div>
               </div>
             ) : (
-              <div className="divide-y divide-[var(--line)]">
-                {visibleItems.map((item) => (
+              <VirtualItemList
+                items={visibleItems}
+                itemHeight={112}
+                itemKey={(item) => item.id}
+                hasMore={hasMore}
+                loadingMore={normalizedQuery ? searchLoadingMore : libraryLoadingMore}
+                onLoadMore={handleLoadMore}
+                loadingLabel={t("library:loadingMore")}
+                className="h-full overflow-auto"
+                renderItem={(item) => (
                   <button
                     key={item.id}
-                    className="group flex w-full items-start gap-3 px-3 py-3.5 text-left transition hover:bg-[var(--hover)] sm:px-4 sm:py-3"
+                    className="group flex h-full w-full items-start gap-3 border-b border-[var(--line)] px-3 py-3.5 text-left transition hover:bg-[var(--hover)] sm:px-4 sm:py-3"
                     type="button"
                     data-testid="library-item"
                     onClick={() => handleOpenItem(item.id)}
@@ -477,8 +514,8 @@ export function LibraryPage({
                     </div>
                     <span className="mt-1 shrink-0 text-xs text-[var(--muted)]">{item.time}</span>
                   </button>
-                ))}
-              </div>
+                )}
+              />
             )}
           </div>
       </section>

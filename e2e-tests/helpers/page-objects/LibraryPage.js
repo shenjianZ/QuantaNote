@@ -102,6 +102,19 @@ class LibraryPage {
     return items.length;
   }
 
+  async getLoadedItemCount() {
+    const list = await $("[data-testid='virtual-item-list']");
+    return Number(await list.getAttribute("data-loaded-count"));
+  }
+
+  async scrollListToEnd() {
+    const list = await $("[data-testid='virtual-item-list']");
+    await browser.execute((element) => {
+      element.scrollTop = element.scrollHeight;
+      element.dispatchEvent(new Event("scroll", { bubbles: true }));
+    }, list);
+  }
+
   async clickItem(title) {
     const item = await $(`//*[@data-testid='library-item'][contains(., '${title}')]`);
     await item.waitForDisplayed({ timeout: 10000 });

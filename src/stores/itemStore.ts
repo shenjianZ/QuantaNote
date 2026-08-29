@@ -2,11 +2,14 @@ import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import {
   cleanupTrash,
-  getLibraryData,
+  getAllItemTagMappings,
+  getAllTags,
+  getItemsPage,
   getTrashItems,
   permanentlyDeleteItem,
   restoreItem,
   type ItemDto,
+  type ItemPageOptions,
   type TagDto,
   type TrashItemDto,
 } from "../services/tauriCommands";
@@ -20,6 +23,7 @@ interface LibraryResult {
   items: ItemDto[];
   tags: TagDto[];
   mappings: Record<string, string[]>;
+  total: number;
 }
 
 interface ItemState {
@@ -29,10 +33,12 @@ interface ItemState {
   pinnedItems: ItemDto[];
   recentItems: ItemDto[];
   trashItems: TrashItemDto[];
+  libraryTotal: number;
+  libraryLoadingMore: boolean;
   loading: boolean;
   error: string | null;
   fetchItems: (itemType?: string) => Promise<void>;
-  fetchLibraryData: () => Promise<LibraryResult>;
+  fetchLibraryData: (options?: ItemPageOptions, append?: boolean) => Promise<LibraryResult>;
   setItemTagNames: (id: string, names: string[]) => void;
   getItem: (id: string) => Promise<void>;
   createItem: (title: string, itemType: string, content?: string) => Promise<ItemDto>;
@@ -46,13 +52,17 @@ interface ItemState {
   fetchRecent: (limit?: number) => Promise<void>;
 }
 
-export const useItemStore = create<ItemState>((set) => ({
+let _librarySeq = 0;
+
+export const useItemStore = create<ItemState>((set, get) => ({
   items: [],
   itemTagNames: {},
   selectedItem: null,
   pinnedItems: [],
   recentItems: [],
   trashItems: [],
+  libraryTotal: 0,
+  libraryLoadingMore: false,
   loading: false,
   error: null,
 
@@ -70,19 +80,43 @@ export const useItemStore = create<ItemState>((set) => ({
     }
   },
 
-  fetchLibraryData: async () => {
-    set({ loading: true });
+  fetchLibraryData: async (options = {}, append = false) => {
+    const seq = ++_librarySeq;
+    set(append ? { libraryLoadingMore: true } : { loading: true, libraryLoadingMore: false });
     try {
-      const data = await getLibraryData();
+      const pageOptions = append
+        ? { ...options, offset: options.offset ?? get().items.length }
+        : options;
+      const [page, tags, rawMappings] = await Promise.all([
+        getItemsPage(pageOptions),
+        getAllTags(),
+        getAllItemTagMappings(),
+      ]);
       const mappings: Record<string, string[]> = {};
-      for (const [itemId, tagName] of data.mappings) {
+      for (const [itemId, tagName] of rawMappings) {
         (mappings[itemId] ??= []).push(tagName);
       }
-      set({ items: data.items, itemTagNames: mappings, loading: false });
-      return { items: data.items, tags: data.tags, mappings };
+      if (seq !== _librarySeq) {
+        return { items: [], tags, mappings: {}, total: 0 };
+      }
+      set((state) => {
+        const nextItems = append
+          ? [...state.items, ...page.items.filter((item) => !state.items.some((existing) => existing.id === item.id))]
+          : page.items;
+        return {
+          items: nextItems,
+          itemTagNames: mappings,
+          libraryTotal: page.total,
+          loading: false,
+          libraryLoadingMore: false,
+        };
+      });
+      return { items: page.items, tags, mappings, total: page.total };
     } catch (e) {
-      set({ error: String(e), loading: false });
-      return { items: [], tags: [], mappings: {} };
+      if (seq === _librarySeq) {
+        set({ error: String(e), loading: false, libraryLoadingMore: false });
+      }
+      return { items: [], tags: [], mappings: {}, total: 0 };
     }
   },
 

@@ -1,4 +1,4 @@
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{params, params_from_iter, types::Value, OptionalExtension};
 
 use crate::db::DbState;
 use crate::error::AppError;
@@ -336,6 +336,89 @@ pub fn get_recent(db: &DbState, limit: i64) -> Result<Vec<ItemDto>, AppError> {
     Ok(items)
 }
 
+fn build_item_list_filter(
+    item_type: Option<&str>,
+    tab: Option<&str>,
+    tag: Option<&str>,
+) -> (String, Vec<Value>) {
+    let mut conditions = vec!["i.deleted_at IS NULL".to_string()];
+    let mut values = Vec::new();
+
+    if let Some(item_type) = item_type.filter(|value| !value.trim().is_empty()) {
+        conditions.push("i.item_type = ?".to_string());
+        values.push(Value::Text(item_type.to_string()));
+    }
+
+    match tab {
+        Some("pinned") => conditions.push("i.pinned = 1".to_string()),
+        Some("favorite") => conditions.push("i.favorite = 1".to_string()),
+        _ => {}
+    }
+
+    if let Some(tag) = tag.filter(|value| !value.trim().is_empty() && *value != "all") {
+        conditions.push(
+            "EXISTS (
+                SELECT 1 FROM item_tags it
+                JOIN tags t ON t.id = it.tag_id
+                WHERE it.item_id = i.id AND t.name = ?
+            )"
+            .to_string(),
+        );
+        values.push(Value::Text(tag.to_string()));
+    }
+
+    (conditions.join(" AND "), values)
+}
+
+pub fn get_items_page(
+    db: &DbState,
+    item_type: Option<&str>,
+    tab: Option<&str>,
+    tag: Option<&str>,
+    sort: Option<&str>,
+    limit: i64,
+    offset: i64,
+) -> Result<ItemPageDto, AppError> {
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    let (where_clause, values) = build_item_list_filter(item_type, tab, tag);
+    let order_clause = match sort {
+        Some("created") => "i.created_at DESC, i.id DESC",
+        Some("title") => "i.title COLLATE NOCASE ASC, i.id ASC",
+        _ => "i.updated_at DESC, i.id DESC",
+    };
+
+    let count_sql = format!("SELECT COUNT(*) FROM items i WHERE {}", where_clause);
+    let total = conn
+        .query_row(&count_sql, params_from_iter(values.iter()), |row| {
+            row.get(0)
+        })
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+    let page_limit = limit.clamp(1, 200);
+    let page_offset = offset.max(0);
+    let page_sql = format!(
+        "SELECT i.id, i.title, i.item_type, i.content, i.summary, i.pinned, i.favorite, i.encrypted, i.created_at, i.updated_at
+         FROM items i WHERE {} ORDER BY {} LIMIT ? OFFSET ?",
+        where_clause, order_clause
+    );
+    let mut page_values = values;
+    page_values.push(Value::Integer(page_limit));
+    page_values.push(Value::Integer(page_offset));
+    let mut stmt = conn
+        .prepare(&page_sql)
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    let items = stmt
+        .query_map(params_from_iter(page_values.iter()), row_to_item)
+        .map_err(|e| AppError::Database(e.to_string()))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+    Ok(ItemPageDto { items, total })
+}
+
 pub fn get_trash(db: &DbState) -> Result<Vec<TrashItemDto>, AppError> {
     let conn = db
         .conn
@@ -477,6 +560,28 @@ mod tests {
 
         let page2 = get_items(&db, None, 2, 2).unwrap();
         assert_eq!(page2.len(), 1);
+    }
+
+    #[test]
+    fn get_items_page_returns_total_and_applies_list_filters() {
+        let db = crate::test_support::test_db();
+        let pinned = create_test_item(&db, "Pinned", "note");
+        create_test_item(&db, "Normal", "note");
+        update(
+            &db,
+            UpdateItemPayload {
+                id: pinned.id,
+                pinned: Some(true),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let page = get_items_page(&db, None, Some("pinned"), None, Some("title"), 1, 0)
+            .expect("get filtered page");
+        assert_eq!(page.total, 1);
+        assert_eq!(page.items.len(), 1);
+        assert_eq!(page.items[0].title, "Pinned");
     }
 
     #[test]

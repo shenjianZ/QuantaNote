@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createItem,
   getItems,
+  getItemsPage,
   updateItem,
   deleteItem,
   getTrashItems,
@@ -70,6 +71,18 @@ describe("tauriCommands", () => {
     await getVersions("item-1");
     expect(captured?.cmd).toBe("get_versions");
     expect(captured?.args).toMatchObject({ itemId: "item-1" });
+  });
+
+  it("getItemsPage passes list filters and pagination", async () => {
+    await getItemsPage({ tab: "pinned", tag: "rust", sort: "title", limit: 20, offset: 40 });
+    expect(captured?.cmd).toBe("get_items_page");
+    expect(captured?.args).toMatchObject({
+      tab: "pinned",
+      tag: "rust",
+      sort: "title",
+      limit: 20,
+      offset: 40,
+    });
   });
 
   it("calls trash lifecycle commands with stable arguments", async () => {

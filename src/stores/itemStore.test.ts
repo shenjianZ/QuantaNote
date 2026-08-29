@@ -23,6 +23,9 @@ describe("itemStore", () => {
       pinnedItems: [],
       recentItems: [],
       trashItems: [],
+      itemTagNames: {},
+      libraryTotal: 0,
+      libraryLoadingMore: false,
       loading: false,
       error: null,
     });
@@ -69,6 +72,24 @@ describe("itemStore", () => {
     expect(useItemStore.getState().items).toEqual([]);
     expect(useItemStore.getState().error).toContain("database down");
     expect(useItemStore.getState().loading).toBe(false);
+  });
+
+  it("fetches a paged library result and preserves its total and tag mappings", async () => {
+    mockIPC((cmd, args) => {
+      if (cmd === "get_items_page") {
+        expect(args).toMatchObject({ tab: "recent", tag: "all", sort: "updated", limit: 50, offset: 0 });
+        return { items: [item], total: 75 };
+      }
+      if (cmd === "get_all_tags") return [{ name: "rust", color: "cyan" }];
+      if (cmd === "get_all_item_tag_mappings") return [[item.id, "rust"]];
+      return [];
+    });
+
+    await useItemStore.getState().fetchLibraryData();
+
+    expect(useItemStore.getState().items).toEqual([item]);
+    expect(useItemStore.getState().libraryTotal).toBe(75);
+    expect(useItemStore.getState().itemTagNames).toEqual({ [item.id]: ["rust"] });
   });
 
   it("loads, restores, and removes trash items through the Tauri commands", async () => {

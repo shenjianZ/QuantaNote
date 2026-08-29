@@ -1,6 +1,6 @@
 use crate::db::DbState;
 use crate::error::AppError;
-use crate::models::search::SearchResultDto;
+use crate::models::search::{SearchPageDto, SearchResultDto};
 use crate::repositories::search_repository;
 
 fn is_cjk(c: char) -> bool {
@@ -85,25 +85,51 @@ pub fn search_items(
     query: &str,
     item_type: Option<&str>,
 ) -> Result<Vec<SearchResultDto>, AppError> {
+    Ok(search_items_page(db, query, item_type, None, None, None, 50, 0)?.results)
+}
+
+pub fn search_items_page(
+    db: &DbState,
+    query: &str,
+    item_type: Option<&str>,
+    tab: Option<&str>,
+    tag: Option<&str>,
+    sort: Option<&str>,
+    limit: i64,
+    offset: i64,
+) -> Result<SearchPageDto, AppError> {
+    if !(1..=200).contains(&limit) {
+        return Err(AppError::Validation(
+            "搜索分页大小必须在 1 到 200 之间".to_string(),
+        ));
+    }
+    if offset < 0 {
+        return Err(AppError::Validation("搜索偏移量不能为负数".to_string()));
+    }
     let cleaned: String = query.chars().filter(|c| !c.is_control()).collect();
     let cleaned = cleaned.trim();
     if cleaned.is_empty() {
-        return Ok(vec![]);
+        return Ok(SearchPageDto {
+            results: vec![],
+            total: 0,
+        });
     }
 
     // trigram 可以让中文在 FTS5 内做子串检索，但 1~2 字查询仍然需要 LIKE。
     if contains_cjk(cleaned) {
         if cjk_char_count(cleaned) >= 3 {
             if let Some(fts_query) = build_quoted_fts_query(cleaned) {
-                match search_repository::search_trigram(db, &fts_query, item_type) {
-                    Ok(fts_results) if !fts_results.is_empty() => {
+                match search_repository::search_trigram_page(
+                    db, &fts_query, item_type, tab, tag, sort, limit, offset,
+                ) {
+                    Ok(fts_page) if fts_page.total > 0 => {
                         log::info!(
                             "[search] 中文 trigram FTS5 命中 | query=\"{}\" | fts_query=\"{}\" | results={}",
                             cleaned,
                             fts_query,
-                            fts_results.len()
+                            fts_page.results.len()
                         );
-                        return Ok(fts_results);
+                        return Ok(fts_page);
                     }
                     Ok(_) => {}
                     Err(error) => {
@@ -118,26 +144,30 @@ pub fn search_items(
         }
 
         log::info!("[search] 中文查询 fallback → LIKE | query=\"{}\"", cleaned);
-        let like_results = search_repository::search_like(db, cleaned, item_type)?;
+        let like_results = search_repository::search_like_page(
+            db, cleaned, item_type, tab, tag, sort, limit, offset,
+        )?;
         log::info!(
             "[search] LIKE 命中 | query=\"{}\" | results={}",
             cleaned,
-            like_results.len()
+            like_results.results.len()
         );
         return Ok(like_results);
     }
 
     // 其余：FTS5 → LIKE fallback
     if let Some(fts_query) = build_fts_query(cleaned) {
-        match search_repository::search(db, &fts_query, item_type) {
-            Ok(fts_results) if !fts_results.is_empty() => {
+        match search_repository::search_page(
+            db, &fts_query, item_type, tab, tag, sort, limit, offset,
+        ) {
+            Ok(fts_page) if fts_page.total > 0 => {
                 log::info!(
                     "[search] FTS5 命中 | query=\"{}\" | fts_query=\"{}\" | results={}",
                     cleaned,
                     fts_query,
-                    fts_results.len()
+                    fts_page.results.len()
                 );
-                return Ok(fts_results);
+                return Ok(fts_page);
             }
             Ok(_) => {}
             Err(error) => {
@@ -154,11 +184,12 @@ pub fn search_items(
         "[search] FTS5 无结果，fallback → LIKE | query=\"{}\"",
         cleaned
     );
-    let like_results = search_repository::search_like(db, cleaned, item_type)?;
+    let like_results =
+        search_repository::search_like_page(db, cleaned, item_type, tab, tag, sort, limit, offset)?;
     log::info!(
         "[search] LIKE 命中 | query=\"{}\" | results={}",
         cleaned,
-        like_results.len()
+        like_results.results.len()
     );
     Ok(like_results)
 }
@@ -220,6 +251,16 @@ mod tests {
         let results = search_items(&db, "rus", None).expect("search");
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].id, "1");
+    }
+
+    #[test]
+    fn search_items_page_returns_total_and_offset_page() {
+        let db = test_db();
+        let page =
+            search_items_page(&db, "rust", None, None, None, None, 1, 0).expect("search page");
+        assert_eq!(page.total, 1);
+        assert_eq!(page.results.len(), 1);
+        assert_eq!(page.results[0].created_at, "2026-01-01");
     }
 
     #[test]

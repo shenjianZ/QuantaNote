@@ -34,6 +34,12 @@ pub struct ItemDto {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct ItemPageDto {
+    pub items: Vec<ItemDto>,
+    pub total: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TrashItemDto {
     pub item: ItemDto,
     pub deleted_at: String,

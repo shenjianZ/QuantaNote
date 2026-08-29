@@ -15,6 +15,8 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 }));
 
 vi.mock("../services/tauriCommands", () => ({
+  getItemsPage: vi.fn(async () => ({ items: [], total: 0 })),
+  getAllTags: vi.fn(async () => []),
   getAllItemTagMappings: vi.fn(async () => []),
 }));
 
@@ -37,7 +39,12 @@ function setupStores() {
     settings: { ...state.settings, contentWidthProgress: 0, showDocumentOutline: true },
   }));
   useItemStore.setState({
+    items: [],
+    itemTagNames: {},
+    libraryTotal: 0,
+    libraryLoadingMore: false,
     selectedItem: null,
+    fetchLibraryData: vi.fn(async () => ({ items: [], tags: [], mappings: {}, total: 0 })),
     deleteItem: vi.fn(async () => {}),
     cleanupTrash: vi.fn(async () => 0),
     fetchTrashItems: vi.fn(async () => {}),
@@ -59,9 +66,14 @@ function setupStores() {
     updateItemTags: vi.fn(),
   });
   useSearchStore.setState({
+    query: "",
     results: [],
+    total: 0,
     searching: false,
+    loadingMore: false,
+    hasMore: false,
     search: vi.fn(async () => {}),
+    loadMore: vi.fn(async () => {}),
   });
 }
 

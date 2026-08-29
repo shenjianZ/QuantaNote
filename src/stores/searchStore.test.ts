@@ -4,7 +4,14 @@ import { useSearchStore } from "./searchStore";
 
 describe("searchStore", () => {
   beforeEach(() => {
-    useSearchStore.setState({ query: "", results: [], searching: false });
+    useSearchStore.setState({
+      query: "",
+      results: [],
+      total: 0,
+      searching: false,
+      loadingMore: false,
+      hasMore: false,
+    });
   });
 
   it("skips backend calls for blank queries", async () => {
@@ -24,8 +31,19 @@ describe("searchStore", () => {
   it("calls search_items with itemType and stores results", async () => {
     mockIPC((cmd, args) => {
       expect(cmd).toBe("search_items");
-      expect(args).toEqual({ query: "rust", itemType: "note" });
-      return [{ id: "item-1", title: "Rust", item_type: "note", summary: "FTS" }];
+      expect(args).toMatchObject({
+        query: "rust",
+        itemType: "note",
+        tab: null,
+        tag: null,
+        sort: null,
+        limit: 50,
+        offset: 0,
+      });
+      return {
+        results: [{ id: "item-1", title: "Rust", item_type: "note", summary: "FTS" }],
+        total: 1,
+      };
     });
 
     await useSearchStore.getState().search("rust", "note");
@@ -34,6 +52,25 @@ describe("searchStore", () => {
       { id: "item-1", title: "Rust", item_type: "note", summary: "FTS" },
     ]);
     expect(useSearchStore.getState().searching).toBe(false);
+    expect(useSearchStore.getState().total).toBe(1);
+  });
+
+  it("loads additional search pages and tracks whether more results exist", async () => {
+    mockIPC((cmd, args) => {
+      expect(cmd).toBe("search_items");
+      const offset = (args as { offset: number }).offset;
+      return offset === 0
+        ? { results: [{ id: "item-1", title: "One", item_type: "note", summary: "" }], total: 2 }
+        : { results: [{ id: "item-2", title: "Two", item_type: "note", summary: "" }], total: 2 };
+    });
+
+    await useSearchStore.getState().search("note", "note");
+    expect(useSearchStore.getState().hasMore).toBe(true);
+
+    await useSearchStore.getState().loadMore("note");
+
+    expect(useSearchStore.getState().results.map((result) => result.id)).toEqual(["item-1", "item-2"]);
+    expect(useSearchStore.getState().hasMore).toBe(false);
   });
 
   it("clears results when backend search fails", async () => {

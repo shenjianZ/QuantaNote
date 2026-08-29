@@ -4,6 +4,8 @@
   "newBtn": "New",
   "searchPlaceholder": "Search notes",
   "searching": "Searching",
+  "resultCount": "{{count}} notes",
+  "loadingMore": "Loading more…",
   "filter": {
     "title": "Filter",
     "all": "All",

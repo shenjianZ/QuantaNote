@@ -4,6 +4,8 @@
   "newBtn": "新建",
   "searchPlaceholder": "搜索记录",
   "searching": "搜索中",
+  "resultCount": "共 {{count}} 条记录",
+  "loadingMore": "加载更多…",
   "filter": {
     "title": "筛选",
     "all": "全部",

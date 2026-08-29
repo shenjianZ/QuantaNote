@@ -170,14 +170,18 @@ QuantaNote 已经具备比较完整的本地笔记软件基础：Markdown 编辑
 
 ### P1-04 优化列表性能和分页
 
-- [ ] 增加总记录数查询。
-- [ ] 笔记列表支持分页或无限滚动。
-- [ ] 使用虚拟列表应对大量笔记。
-- [ ] 搜索结果也支持分页。
+- [x] 增加总记录数查询。
+- [x] 笔记列表支持分页或无限滚动。
+- [x] 使用虚拟列表应对大量笔记。
+- [x] 搜索结果也支持分页。
 
 相关代码：`src/stores/itemStore.ts`、`src-tauri/src/commands/item.rs`。
 
 验收标准：拥有数百到数千条笔记时，列表不会静默截断，滚动和搜索仍然流畅。
+
+完成日期：2026-08-29
+修改范围：新增笔记列表分页和总数查询；服务端支持标签、置顶、收藏及排序过滤；记录库接入无限滚动和轻量虚拟列表；搜索接口返回分页结果与总数并支持继续加载；补充 Rust、前端单元和 Library Reader E2E 测试。
+验证结果：`cargo fmt --check`、`cargo check`、`cargo test` 通过，共 120 个 Rust 测试通过；`pnpm test:unit` 通过，共 141 个前端单元测试通过；`pnpm build` 和 `pnpm tauri build --debug --no-bundle` 通过；Library Reader E2E 通过，共 13 个场景通过，覆盖大量记录的虚拟列表和分页加载；`node --check e2e-tests/specs/library-reader.e2e.js` 通过。
 
 ### P1-05 改进搜索体验并统一文档
 

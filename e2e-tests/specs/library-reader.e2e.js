@@ -1,4 +1,4 @@
-import { cleanupAll, seedItem, getItemById } from "../helpers/commands.js";
+import { cleanupAll, seedItem, getItemById, notifyDataChanged, tauriInvoke } from "../helpers/commands.js";
 import { pause, observePause } from "../helpers/config.js";
 import TopBar from "../helpers/page-objects/TopBar.js";
 import LibraryPage from "../helpers/page-objects/LibraryPage.js";
@@ -226,5 +226,39 @@ describe("Library reader and item actions", () => {
     await expect($("//*[@role='dialog'][@aria-label='回收站']//*[contains(., '回收站是空的')]")).toBeDisplayed();
     await $("[data-testid='modal-close-btn']").click();
     await LibraryPage.expectItemVisible("收藏笔记");
+  });
+
+  it("loads additional library pages while keeping the rendered window virtualized", async () => {
+    const extraCount = 65;
+    for (let index = 0; index < extraCount; index += 1) {
+      await tauriInvoke("create_item", {
+        title: `分页测试笔记 ${index + 1}`,
+        itemType: "note",
+        content: `分页内容 ${index + 1}`,
+      });
+    }
+    await notifyDataChanged();
+
+    const expectedTotal = 5 + extraCount;
+    await browser.waitUntil(
+      async () => browser.execute((total) => {
+        const counter = document.querySelector("[data-testid='library-result-count']");
+        return counter?.textContent?.includes(String(total)) ?? false;
+      }, expectedTotal),
+      { timeout: 10000, timeoutMsg: "Library total count did not update" },
+    );
+
+    const loadedBefore = await LibraryPage.getLoadedItemCount();
+    expect(loadedBefore).toBeLessThan(expectedTotal);
+    expect(await LibraryPage.getItemCount()).toBeLessThan(expectedTotal);
+
+    await LibraryPage.scrollListToEnd();
+    await browser.waitUntil(
+      async () => (await LibraryPage.getLoadedItemCount()) === expectedTotal,
+      { timeout: 10000, timeoutMsg: "Library did not load the next page" },
+    );
+
+    // 页面只挂载可视窗口附近的行，即使数据全部加载也不会一次性渲染全部记录。
+    expect(await LibraryPage.getItemCount()).toBeLessThan(expectedTotal);
   });
 });
