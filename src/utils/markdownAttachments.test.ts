@@ -1,11 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   buildAttachmentMarkdown,
+  getAttachmentImageOptions,
   getAttachmentIdFromSource,
   getAttachmentReference,
+  getAttachmentImageStyle,
   normalizeAttachmentReferences,
   removeAttachmentReferences,
   resolveAttachmentReferences,
+  withAttachmentImageOptions,
 } from "./markdownAttachments";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -32,6 +35,29 @@ describe("markdownAttachments", () => {
     const resolved = resolveAttachmentReferences(source, [attachment]);
     expect(resolved).toContain("asset://C:/QuantaNote/attachments/att-1.png");
     expect(normalizeAttachmentReferences(resolved, [attachment])).toBe(source);
+  });
+
+  it("round-trips image presentation metadata without exposing the file path", () => {
+    const source = withAttachmentImageOptions(getAttachmentReference(attachment.id), {
+      width: 640,
+      align: "center",
+    });
+    expect(source).toBe("attachment://att-1#qn-width=640&qn-align=center");
+    expect(getAttachmentImageOptions(source)).toEqual({ width: 640, align: "center" });
+    expect(resolveAttachmentReferences(`![截图](${source})`, [attachment])).toContain(
+      "asset://C:/QuantaNote/attachments/att-1.png#qn-width=640&qn-align=center",
+    );
+    expect(normalizeAttachmentReferences(
+      `![截图](asset://C:/QuantaNote/attachments/att-1.png#qn-width=640&qn-align=center)`,
+      [attachment],
+    )).toBe(`![截图](${source})`);
+    expect(getAttachmentImageStyle({ width: 640, align: "center" })).toMatchObject({
+      width: "640px",
+      maxWidth: "100%",
+      display: "block",
+      marginLeft: "auto",
+      marginRight: "auto",
+    });
   });
 
   it("removes all image and link nodes for a deleted attachment", () => {

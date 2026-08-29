@@ -56,6 +56,10 @@ pub fn delete_attachment(db: &DbState, id: &str) -> Result<(), AppError> {
     attachment_repository::delete(db, id)
 }
 
+pub fn export_attachment(source_path: String, destination_path: String) -> Result<(), AppError> {
+    attachment_repository::export_file(&source_path, &destination_path)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

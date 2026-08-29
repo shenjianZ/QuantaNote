@@ -42,3 +42,8 @@ pub fn get_attachments(
 pub fn delete_attachment(db: State<'_, DbState>, id: String) -> Result<(), AppError> {
     attachment_service::delete_attachment(&db, &id)
 }
+
+#[tauri::command]
+pub fn export_attachment(source_path: String, destination_path: String) -> Result<(), AppError> {
+    attachment_service::export_attachment(source_path, destination_path)
+}

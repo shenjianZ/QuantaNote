@@ -146,6 +146,81 @@ describe("Document editor", () => {
     );
   });
 
+  it("edits image metadata and presentation without leaking the local file path", async () => {
+    const image = await $(".vditor-ir img[alt='quantanote-editor-reentry.svg']");
+    await image.click();
+    await browser.waitUntil(
+      async () => (await $("[data-testid='image-editor-popover']")).isDisplayed(),
+      { timeout: 3000, timeoutMsg: "Image editor popover did not open" },
+    );
+
+    const altInput = await $("[data-testid='image-editor-alt']");
+    await altInput.clearValue();
+    await altInput.setValue("正文截图");
+    const widthInput = await $("[data-testid='image-editor-width']");
+    await widthInput.clearValue();
+    await widthInput.setValue("640");
+    await $("[data-testid='image-editor-apply']").click();
+
+    let latestImageContent = "";
+    await browser.waitUntil(
+      async () => {
+        const updated = await getItemById(testItem.id);
+        latestImageContent = updated.content;
+        return updated.content.includes("正文截图") && updated.content.includes("qn-width=640");
+      },
+      { timeout: 5000, timeoutMsg: `Image metadata was not persisted: ${latestImageContent}` },
+    );
+    const updated = await getItemById(testItem.id);
+    expect(updated.content).not.toContain(".quantanote");
+    expect(updated.content).not.toMatch(/[A-Za-z]:[\\/].*attachments[\\/]/);
+
+    await DocumentEditorPage.clickBack();
+    await expect($("[data-testid='reader-drawer']")).toBeDisplayed();
+    await LibraryPage.clickEdit();
+    await browser.waitUntil(
+      async () => browser.execute(() => {
+        const imageNode = document.querySelector(".vditor-ir img[alt='正文截图']");
+        return imageNode?.style.width === "640px";
+      }),
+      { timeout: 5000, timeoutMsg: "Image presentation was not restored after reopening" },
+    );
+  });
+
+  it("shows a clear image load error and retries the failed source", async () => {
+    await browser.waitUntil(
+      async () => $(".vditor-ir img:not(.emoji)").isExisting(),
+      { timeout: 5000, timeoutMsg: "Image for retry test did not render" },
+    );
+    const failedSource = await browser.execute(() => {
+      const currentImage = document.querySelector(".vditor-ir img:not(.emoji)");
+      if (!currentImage) throw new Error("Image for retry test was not found");
+      const source = `http://asset.localhost/missing-image-${Date.now()}.png`;
+      currentImage.dataset.e2eRetryErrorCount = "0";
+      currentImage.addEventListener("error", () => {
+        currentImage.dataset.e2eRetryErrorCount = String(
+          Number(currentImage.dataset.e2eRetryErrorCount || "0") + 1,
+        );
+      });
+      currentImage.setAttribute("src", source);
+      return source;
+    });
+    await browser.waitUntil(
+      async () => (await $("[data-testid='image-load-error']")).isDisplayed(),
+      { timeout: 3000, timeoutMsg: "Image load error state did not appear" },
+    );
+    await $("[data-testid='image-retry']").click();
+    await browser.waitUntil(
+      async () => browser.execute((source) => {
+        const currentImage = document.querySelector(".vditor-ir img:not(.emoji)");
+        return currentImage?.getAttribute("src") === source
+          && Number(currentImage?.dataset.e2eRetryErrorCount || "0") >= 2;
+      }, failedSource),
+      { timeout: 5000, timeoutMsg: "Image retry did not issue a second request for the failed source" },
+    );
+    await $("[data-testid='image-error-close']").click();
+  });
+
   it("removes inserted image references when its attachment is deleted", async () => {
     await $("[data-testid='doc-attachments-btn']").click();
     await browser.waitUntil(

@@ -97,6 +97,10 @@ export async function deleteAttachment(id: string) {
     return invoke("delete_attachment", { id });
 }
 
+export async function exportAttachment(sourcePath: string, destinationPath: string) {
+    return invoke("export_attachment", { sourcePath, destinationPath });
+}
+
 export async function getStorageConsistencyReport() {
     return invoke<StorageConsistencyReport>("get_storage_consistency_report");
 }

@@ -7,6 +7,13 @@ export interface MarkdownAttachment {
   mime_type: string;
 }
 
+export type AttachmentImageAlignment = "left" | "center" | "right";
+
+export interface AttachmentImageOptions {
+  width?: number;
+  align?: AttachmentImageAlignment;
+}
+
 export const ATTACHMENT_PROTOCOL = "attachment://";
 
 export function isImageAttachment(attachment: Pick<MarkdownAttachment, "mime_type">) {
@@ -32,6 +39,57 @@ export function getAttachmentIdFromSource(source: string) {
   }
 }
 
+function getImageMetadata(source: string) {
+  const hashIndex = source.indexOf("#");
+  if (hashIndex < 0) return null;
+  const fragment = source.slice(hashIndex + 1);
+  const params = new URLSearchParams(fragment);
+  if (!params.has("qn-width") && !params.has("qn-align")) return null;
+  return params;
+}
+
+export function getAttachmentImageOptions(source: string): AttachmentImageOptions {
+  const params = getImageMetadata(source);
+  if (!params) return {};
+
+  const widthValue = Number(params.get("qn-width"));
+  const width = Number.isFinite(widthValue) && widthValue >= 40 && widthValue <= 4000
+    ? Math.round(widthValue)
+    : undefined;
+  const alignValue = params.get("qn-align");
+  const align = alignValue === "center" || alignValue === "right" || alignValue === "left"
+    ? alignValue
+    : undefined;
+  return { width, align };
+}
+
+export function withAttachmentImageOptions(source: string, options: AttachmentImageOptions) {
+  const baseSource = source.split("#", 1)[0];
+  const params = new URLSearchParams();
+  if (options.width && Number.isFinite(options.width)) {
+    params.set("qn-width", String(Math.round(options.width)));
+  }
+  if (options.align && options.align !== "left") {
+    params.set("qn-align", options.align);
+  }
+  const fragment = params.toString();
+  return fragment ? `${baseSource}#${fragment}` : baseSource;
+}
+
+export function getAttachmentImageStyle(options: AttachmentImageOptions): Record<string, string> {
+  const style: Record<string, string> = {};
+  if (options.width) {
+    style.width = `${options.width}px`;
+    style.maxWidth = "100%";
+  }
+  if (options.align) {
+    style.display = "block";
+    style.marginLeft = options.align === "right" ? "auto" : options.align === "center" ? "auto" : "0";
+    style.marginRight = options.align === "left" ? "auto" : options.align === "center" ? "auto" : "0";
+  }
+  return style;
+}
+
 export function getAttachmentAssetUrl(attachment: MarkdownAttachment) {
   try {
     return convertFileSrc(attachment.file_path);
@@ -48,7 +106,10 @@ export function resolveAttachmentSource(
   const id = getAttachmentIdFromSource(source);
   if (!id) return source;
   const attachment = attachments.find((candidate) => candidate.id === id);
-  return attachment ? getAttachmentAssetUrl(attachment) : source;
+  if (!attachment) return source;
+  const hashIndex = source.indexOf("#");
+  const suffix = hashIndex >= 0 ? source.slice(hashIndex) : "";
+  return `${getAttachmentAssetUrl(attachment)}${suffix}`;
 }
 
 export function resolveAttachmentReferences(

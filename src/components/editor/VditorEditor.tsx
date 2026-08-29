@@ -1,20 +1,29 @@
 import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import Vditor from "vditor";
 import "vditor/dist/index.css";
-import { openUrl } from "@tauri-apps/plugin-opener";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { AlignCenter, AlignLeft, AlignRight, Copy, Download, ExternalLink, RefreshCw, Replace, X } from "lucide-react";
+import { openPath, openUrl } from "@tauri-apps/plugin-opener";
+import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useTranslation } from "react-i18next";
 import { VDITOR_CDN, getVditorLang } from "../../utils/vditorConfig";
 import type { AttachmentDto } from "../../stores/attachmentStore";
+import { exportAttachment } from "../../services/tauriCommands";
 import {
   buildAttachmentMarkdown,
+  getAttachmentAssetUrl,
+  getAttachmentImageOptions,
+  getAttachmentImageStyle,
+  getAttachmentReference,
   isImageAttachment,
   isImagePath,
   normalizeAttachmentReferences,
   resolveAttachmentReferences,
+  type AttachmentImageAlignment,
+  withAttachmentImageOptions,
 } from "../../utils/markdownAttachments";
 import { SearchReplaceBar } from "./SearchReplaceBar";
+import { useToastStore } from "../../stores/toastStore";
 
 type VditorToolbarItem = string | {
   name: string;
@@ -39,6 +48,123 @@ interface VditorEditorProps {
 interface AttachmentInsertItem {
   attachment: AttachmentDto;
   asImage: boolean;
+}
+
+interface ImageEditorState {
+  attachmentId?: string;
+  sourceBase: string;
+  alt: string;
+  title: string;
+  width: string;
+  align: AttachmentImageAlignment;
+  left: number;
+  top: number;
+}
+
+interface ImageErrorState {
+  image: HTMLImageElement;
+  filename: string;
+  left: number;
+  top: number;
+}
+
+function imageSourceBase(source: string) {
+  return source.split("#", 1)[0].replace(/[\\]/g, "/").toLowerCase();
+}
+
+function findAttachmentForImage(
+  image: HTMLImageElement,
+  attachments: readonly AttachmentDto[],
+) {
+  const source = imageSourceBase(image.getAttribute("src") || "");
+  return attachments.find((attachment) => {
+    const assetSource = imageSourceBase(getAttachmentAssetUrl(attachment));
+    return source === assetSource || source.includes(attachment.id.toLowerCase());
+  });
+}
+
+function getImageOverlayPosition(image: HTMLImageElement, host: HTMLElement, width: number) {
+  const imageRect = image.getBoundingClientRect();
+  const hostRect = host.getBoundingClientRect();
+  const maxLeft = Math.max(8, hostRect.width - width - 8);
+  const left = Math.max(8, Math.min(imageRect.left - hostRect.left, maxLeft));
+  const top = imageRect.bottom - hostRect.top + 8;
+  return { left, top };
+}
+
+function getImageWidthValue(value: string) {
+  const width = Number(value);
+  return Number.isFinite(width) && width >= 40 && width <= 4000 ? Math.round(width) : undefined;
+}
+
+interface MarkdownImageMatch {
+  full: string;
+  alt: string;
+  source: string;
+  index: number;
+}
+
+function escapeMarkdownImageLabel(value: string) {
+  return value.replace(/[\\\[\]]/g, "\\$&");
+}
+
+function getMarkdownImageMatches(value: string): MarkdownImageMatch[] {
+  const pattern = /!\[((?:\\.|[^\]\\])*)\]\((?:<([^>\r\n]+)>|([^\s)\r\n]+))(?:\s+(?:"[^"]*"|'[^']*'))?\)/g;
+  return Array.from(value.matchAll(pattern)).map((match) => ({
+    full: match[0],
+    alt: match[1],
+    source: match[2] ?? match[3],
+    index: match.index ?? -1,
+  }));
+}
+
+function findMarkdownImageMatch(
+  value: string,
+  image: HTMLImageElement,
+  container: HTMLElement,
+) {
+  const matches = getMarkdownImageMatches(value);
+  const images = Array.from(container.querySelectorAll<HTMLImageElement>('.vditor-ir img:not(.emoji)'));
+  const imageIndex = images.indexOf(image);
+  const indexedMatch = imageIndex >= 0 ? matches[imageIndex] : undefined;
+  if (indexedMatch) return indexedMatch;
+
+  const sourceBase = imageSourceBase(image.getAttribute("src") || "");
+  const alt = image.getAttribute("alt") || "";
+  return matches.find((match) => {
+    return imageSourceBase(match.source) === sourceBase || match.alt === alt;
+  });
+}
+
+function updateMarkdownImage(
+  value: string,
+  image: HTMLImageElement,
+  container: HTMLElement,
+  source: string,
+  alt: string,
+  title: string,
+) {
+  const match = findMarkdownImageMatch(value, image, container);
+  if (!match || match.index < 0) return null;
+
+  const safeAlt = escapeMarkdownImageLabel(alt.trim());
+  const safeTitle = title.trim().replace(/[\\"]/g, "\\$&");
+  const nextImage = `![${safeAlt}](${source}${safeTitle ? ` "${safeTitle}"` : ""})`;
+  return `${value.slice(0, match.index)}${nextImage}${value.slice(match.index + match.full.length)}`;
+}
+
+function applyImagePresentation(image: HTMLImageElement, options: { width?: number; align?: AttachmentImageAlignment }) {
+  const style = getAttachmentImageStyle(options);
+  image.style.width = style.width ?? "";
+  image.style.maxWidth = style.maxWidth ?? "";
+  image.style.display = style.display ?? "";
+  image.style.marginLeft = style.marginLeft ?? "";
+  image.style.marginRight = style.marginRight ?? "";
+}
+
+function refreshImagePresentation(container: HTMLElement) {
+  container.querySelectorAll<HTMLImageElement>("img")
+    .forEach((image) => applyImagePresentation(image, getAttachmentImageOptions(image.getAttribute("src") || "")));
 }
 
 export interface VditorEditorHandle {
@@ -608,6 +734,25 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
   const searchQueryRef = useRef("");
   const searchCaseSensitiveRef = useRef(false);
   const [dragActive, setDragActive] = useState(false);
+  const selectedImageRef = useRef<HTMLImageElement | null>(null);
+  const imageErrorRef = useRef<ImageErrorState | null>(null);
+  const [imageEditor, setImageEditor] = useState<ImageEditorState | null>(null);
+  const [imageError, setImageError] = useState<ImageErrorState | null>(null);
+  imageErrorRef.current = imageError;
+
+  const getSelectedImage = useCallback((state: ImageEditorState | null = imageEditor) => {
+    const container = containerRef.current;
+    const selected = selectedImageRef.current;
+    if (container && selected && container.contains(selected)) return selected;
+    if (!container || !state) return null;
+    const candidates = Array.from(container.querySelectorAll<HTMLImageElement>("img"));
+    return candidates.find((image) => {
+      if (state.attachmentId) {
+        return findAttachmentForImage(image, attachmentsRef.current)?.id === state.attachmentId;
+      }
+      return imageSourceBase(image.getAttribute("src") || "") === state.sourceBase;
+    }) ?? null;
+  }, [imageEditor]);
 
   onChangeRef.current = onChange;
   initialValueRef.current = initialValue;
@@ -864,14 +1009,17 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
     }
   }, [insertAttachment]);
 
-  const commitEditorValue = useCallback((value: string) => {
+  const commitEditorValue = useCallback((value: string, extraAttachments: readonly AttachmentDto[] = []) => {
     const vditor = vditorRef.current;
     if (!vditor) return false;
 
-    const normalizedValue = normalizeAttachmentReferences(value, attachmentsRef.current);
+    const allAttachments = extraAttachments.length > 0
+      ? [...attachmentsRef.current, ...extraAttachments]
+      : attachmentsRef.current;
+    const normalizedValue = normalizeAttachmentReferences(value, allAttachments);
     skipNextValueRef.current = normalizedValue;
     try {
-      vditor.setValue(resolveAttachmentReferences(normalizedValue, attachmentsRef.current));
+      vditor.setValue(resolveAttachmentReferences(normalizedValue, allAttachments));
       lastEmittedRef.current = normalizedValue;
       onChangeRef.current(normalizedValue);
       return true;
@@ -879,6 +1027,157 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
       skipNextValueRef.current = null;
     }
   }, []);
+
+  const closeImageEditor = useCallback(() => {
+    selectedImageRef.current = null;
+    setImageEditor(null);
+  }, []);
+
+  const applyImageEditor = useCallback(() => {
+    const image = getSelectedImage(imageEditor);
+    const editor = containerRef.current;
+    const vditor = vditorRef.current;
+    const state = imageEditor;
+    if (!image || !editor?.contains(image) || !vditor || !state) {
+      closeImageEditor();
+      return;
+    }
+
+    const attachment = findAttachmentForImage(image, attachmentsRef.current);
+    const options = {
+      width: getImageWidthValue(state.width),
+      align: state.align === "left" ? undefined : state.align,
+    };
+    const stableSource = attachment
+      ? withAttachmentImageOptions(getAttachmentReference(attachment.id), options)
+      : withAttachmentImageOptions(image.getAttribute("src") || "", options);
+    const nextValue = updateMarkdownImage(
+      vditor.getValue(),
+      image,
+      editor,
+      stableSource,
+      state.alt,
+      state.title,
+    );
+    if (!nextValue || !commitEditorValue(nextValue, attachment ? [attachment] : [])) return;
+    closeImageEditor();
+  }, [closeImageEditor, commitEditorValue, getSelectedImage, imageEditor]);
+
+  const replaceSelectedImage = useCallback(async () => {
+    const image = getSelectedImage(imageEditor);
+    const editor = containerRef.current;
+    const add = onAddAttachmentRef.current;
+    const state = imageEditor;
+    if (!image || !editor?.contains(image) || !add || !state) return;
+
+    const selected = await openDialog({
+      multiple: false,
+      title: t("editor:imageEditor.replace"),
+      filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif", "tiff"] }],
+    });
+    if (!selected || Array.isArray(selected)) return;
+
+    const replacement = await add(selected);
+    const vditor = vditorRef.current;
+    const currentImage = getSelectedImage(state);
+    if (!replacement || !vditor || !currentImage || !editor.contains(currentImage)) return;
+
+    const previous = findAttachmentForImage(currentImage, attachmentsRef.current);
+    const options = {
+      width: getImageWidthValue(state.width),
+      align: state.align === "left" ? undefined : state.align,
+    };
+    const nextSource = withAttachmentImageOptions(getAttachmentReference(replacement.id), options);
+    const nextAlt = state.alt.trim() && state.alt !== previous?.filename ? state.alt : replacement.filename;
+    const nextValue = updateMarkdownImage(
+      vditor.getValue(),
+      currentImage,
+      editor,
+      nextSource,
+      nextAlt,
+      state.title,
+    );
+    if (!nextValue || !commitEditorValue(nextValue, [replacement])) return;
+    closeImageEditor();
+  }, [closeImageEditor, commitEditorValue, getSelectedImage, imageEditor, t]);
+
+  const copySelectedImage = useCallback(async () => {
+    const image = getSelectedImage();
+    if (!image) return;
+    try {
+      if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
+        throw new Error("当前环境不支持图片剪贴板");
+      }
+      const response = await fetch(image.currentSrc || image.src);
+      if (!response.ok) throw new Error(`图片读取失败: ${response.status}`);
+      const blob = await response.blob();
+      await navigator.clipboard.write([new ClipboardItem({ [blob.type || "image/png"]: blob })]);
+      useToastStore.getState().addToast("success", t("editor:imageEditor.copySuccess"));
+    } catch (error) {
+      console.error("Copy image failed:", error);
+      useToastStore.getState().addToast("error", t("editor:imageEditor.copyFailed"));
+    }
+  }, [getSelectedImage, t]);
+
+  const exportSelectedImage = useCallback(async () => {
+    const image = getSelectedImage();
+    if (!image) return;
+    const attachment = findAttachmentForImage(image, attachmentsRef.current);
+    if (!attachment) {
+      const source = image.getAttribute("src");
+      if (source) await openUrl(source).catch(() => {});
+      return;
+    }
+    try {
+      const destination = await saveDialog({
+        title: t("editor:imageEditor.export"),
+        defaultPath: attachment.filename,
+      });
+      if (!destination) return;
+      await exportAttachment(attachment.file_path, destination);
+      useToastStore.getState().addToast("success", t("editor:imageEditor.exportSuccess"));
+    } catch (error) {
+      console.error("Export image failed:", error);
+      useToastStore.getState().addToast("error", t("editor:imageEditor.exportFailed"));
+    }
+  }, [getSelectedImage, t]);
+
+  const openSelectedImage = useCallback(async () => {
+    const image = getSelectedImage();
+    if (!image) return;
+    const attachment = findAttachmentForImage(image, attachmentsRef.current);
+    if (attachment) {
+      await openPath(attachment.file_path).catch(() => {});
+      return;
+    }
+    const source = image.getAttribute("src");
+    if (source) await openUrl(source).catch(() => {});
+  }, [getSelectedImage]);
+
+  const retryFailedImage = useCallback(() => {
+    const errorState = imageError;
+    const container = containerRef.current;
+    if (!errorState || !container) {
+      setImageError(null);
+      return;
+    }
+    const failedImage = container.contains(errorState.image)
+      ? errorState.image
+      : Array.from(container.querySelectorAll<HTMLImageElement>(".vditor-ir img:not(.emoji)")).find(
+        (image) => (image.getAttribute("alt") || "") === errorState.filename,
+    );
+    if (!failedImage) {
+      setImageError(null);
+      return;
+    }
+    const source = failedImage.getAttribute("src") || "";
+    if (!source) return;
+    setImageError(null);
+    failedImage.removeAttribute("src");
+    window.setTimeout(() => {
+      if (container.contains(failedImage)) failedImage.setAttribute("src", source);
+    });
+  }, [imageError]);
 
   const handleSearch = useCallback((query: string, caseSensitive: boolean) => {
     searchQueryRef.current = query;
@@ -1059,6 +1358,65 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
     },
     insertAttachment,
   }), [insertAttachment, saveSelection]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const host = container.parentElement ?? container;
+
+    const handleImageClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof HTMLImageElement) || target.classList.contains("emoji")) return;
+      const options = getAttachmentImageOptions(target.getAttribute("src") || "");
+      const attachment = findAttachmentForImage(target, attachmentsRef.current);
+      const position = getImageOverlayPosition(target, host, 380);
+      selectedImageRef.current = target;
+      setImageError(null);
+      setImageEditor({
+        attachmentId: attachment?.id,
+        sourceBase: imageSourceBase(target.getAttribute("src") || ""),
+        alt: target.getAttribute("alt") || "",
+        title: target.getAttribute("title") || "",
+        width: options.width ? String(options.width) : "",
+        align: options.align ?? "left",
+        ...position,
+      });
+    };
+
+    const handleImageLoad = (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLImageElement)) return;
+      if (imageErrorRef.current?.image === target) setImageError(null);
+    };
+
+    const handleImageError = (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLImageElement) || target.classList.contains("emoji")) return;
+      const position = getImageOverlayPosition(target, host, 320);
+      setImageEditor(null);
+      setImageError({
+        image: target,
+        filename: target.getAttribute("alt") || t("editor:imageEditor.unknownImage"),
+        ...position,
+      });
+    };
+
+    container.addEventListener("click", handleImageClick);
+    container.addEventListener("load", handleImageLoad, true);
+    container.addEventListener("error", handleImageError, true);
+    refreshImagePresentation(container);
+    const observer = typeof MutationObserver === "undefined" ? null : new MutationObserver(() => {
+      refreshImagePresentation(container);
+    });
+    observer?.observe(container, { childList: true, subtree: true });
+    return () => {
+      observer?.disconnect();
+      container.removeEventListener("click", handleImageClick);
+      container.removeEventListener("load", handleImageLoad, true);
+      container.removeEventListener("error", handleImageError, true);
+      selectedImageRef.current = null;
+    };
+  }, [lang, t]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -1412,6 +1770,116 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
   return (
     <div className="relative h-full">
       <div ref={containerRef} className="vditor-container" />
+      {imageEditor && (
+        <div
+          className="quantanote-image-editor-popover"
+          data-testid="image-editor-popover"
+          style={{ left: imageEditor.left, top: imageEditor.top }}
+          onMouseDown={(event) => event.stopPropagation()}
+        >
+          <div className="quantanote-image-editor-popover__header">
+            <span>{t("editor:imageEditor.title")}</span>
+            <button type="button" onClick={closeImageEditor} aria-label={t("editor:imageEditor.close")} title={t("editor:imageEditor.close")}>
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <label className="quantanote-image-editor-popover__field">
+            <span>{t("editor:imageEditor.alt")}</span>
+            <input
+              value={imageEditor.alt}
+              onChange={(event) => setImageEditor((current) => current ? { ...current, alt: event.target.value } : current)}
+              placeholder={t("editor:imageEditor.altPlaceholder")}
+              data-testid="image-editor-alt"
+            />
+          </label>
+          <label className="quantanote-image-editor-popover__field">
+            <span>{t("editor:imageEditor.imageTitle")}</span>
+            <input
+              value={imageEditor.title}
+              onChange={(event) => setImageEditor((current) => current ? { ...current, title: event.target.value } : current)}
+              placeholder={t("editor:imageEditor.titlePlaceholder")}
+              data-testid="image-editor-title"
+            />
+          </label>
+          <div className="quantanote-image-editor-popover__row">
+            <label className="quantanote-image-editor-popover__field flex-1">
+              <span>{t("editor:imageEditor.width")}</span>
+              <input
+                type="number"
+                min="40"
+                max="4000"
+                step="1"
+                value={imageEditor.width}
+                onChange={(event) => setImageEditor((current) => current ? { ...current, width: event.target.value } : current)}
+                placeholder={t("editor:imageEditor.autoSize")}
+                data-testid="image-editor-width"
+              />
+            </label>
+            <button
+              className="quantanote-image-editor-popover__auto"
+              type="button"
+              onClick={() => setImageEditor((current) => current ? { ...current, width: "" } : current)}
+            >
+              {t("editor:imageEditor.autoSize")}
+            </button>
+          </div>
+          <div className="quantanote-image-editor-popover__alignment">
+            <span>{t("editor:imageEditor.alignment")}</span>
+            <div className="flex items-center gap-1">
+              {([
+                ["left", AlignLeft, "editor:imageEditor.left"],
+                ["center", AlignCenter, "editor:imageEditor.center"],
+                ["right", AlignRight, "editor:imageEditor.right"],
+              ] as const).map(([align, Icon, label]) => (
+                <button
+                  key={align}
+                  className={imageEditor.align === align ? "is-active" : ""}
+                  type="button"
+                  aria-label={t(label)}
+                  aria-pressed={imageEditor.align === align}
+                  title={t(label)}
+                  onClick={() => setImageEditor((current) => current ? { ...current, align } : current)}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="quantanote-image-editor-popover__actions">
+            <button type="button" onClick={() => void replaceSelectedImage()} disabled={!onAddAttachment}>
+              <Replace className="h-3.5 w-3.5" />{t("editor:imageEditor.replace")}
+            </button>
+            <button type="button" onClick={() => void copySelectedImage()}>
+              <Copy className="h-3.5 w-3.5" />{t("editor:imageEditor.copy")}
+            </button>
+            <button type="button" onClick={() => void exportSelectedImage()}>
+              <Download className="h-3.5 w-3.5" />{t("editor:imageEditor.export")}
+            </button>
+            <button type="button" onClick={() => void openSelectedImage()}>
+              <ExternalLink className="h-3.5 w-3.5" />{t("editor:imageEditor.openOriginal")}
+            </button>
+            <button className="is-primary" type="button" onClick={applyImageEditor} data-testid="image-editor-apply">
+              {t("editor:imageEditor.apply")}
+            </button>
+          </div>
+        </div>
+      )}
+      {imageError && (
+        <div
+          className="quantanote-image-error-popover"
+          data-testid="image-load-error"
+          style={{ left: imageError.left, top: imageError.top }}
+          onMouseDown={(event) => event.stopPropagation()}
+        >
+          <span>{t("editor:imageEditor.loadFailed", { name: imageError.filename })}</span>
+          <button type="button" onClick={retryFailedImage} data-testid="image-retry">
+            <RefreshCw className="h-3.5 w-3.5" />{t("editor:imageEditor.retry")}
+          </button>
+          <button type="button" onClick={() => setImageError(null)} aria-label={t("editor:imageEditor.close")} data-testid="image-error-close">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
       {dragActive && (
         <div className="quantanote-editor-drop-overlay" data-testid="editor-drop-overlay" aria-hidden="true">
           <div className="quantanote-editor-drop-overlay__content">

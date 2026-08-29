@@ -203,6 +203,33 @@ pub(crate) fn copy_file_atomically(source: &Path, dest: &Path) -> Result<(), App
     replace_file_with_temp(&temp, dest)
 }
 
+/// 将附件复制到用户选择的导出位置。源文件必须来自 QuantaNote 附件目录，
+/// 防止前端传入任意路径后借此命令读取或复制其他文件。
+pub fn export_file(source_path: &str, destination_path: &str) -> Result<(), AppError> {
+    let source = Path::new(source_path);
+    if !source.exists() {
+        return Err(AppError::NotFound(format!(
+            "附件文件不存在: {}",
+            source_path
+        )));
+    }
+    let attachment_root = std::fs::canonicalize(paths::quantanote_dir().join("attachments"))
+        .map_err(|error| AppError::Io(format!("附件目录不可用: {}", error)))?;
+    let source = std::fs::canonicalize(source)
+        .map_err(|error| AppError::Io(format!("读取附件失败: {}", error)))?;
+    if !source.starts_with(&attachment_root) {
+        return Err(AppError::Validation(
+            "只能导出 QuantaNote 附件目录中的文件".to_string(),
+        ));
+    }
+
+    let destination = Path::new(destination_path);
+    if destination.as_os_str().is_empty() || destination.is_dir() {
+        return Err(AppError::Validation("导出目标文件无效".to_string()));
+    }
+    copy_file_atomically(&source, destination)
+}
+
 pub fn add(db: &DbState, item_id: String, source_path: String) -> Result<AttachmentDto, AppError> {
     let id = ids::new_id("att");
     let now = chrono::Utc::now().to_rfc3339();
@@ -559,6 +586,41 @@ mod tests {
 
         let list = get_by_item(&db, &item_id).unwrap();
         assert!(list.is_empty());
+    }
+
+    #[test]
+    fn export_file_copies_attachment_and_rejects_external_source() {
+        let (db, item_id, _guard) = setup();
+        let attachment = add_bytes(
+            &db,
+            item_id,
+            "export.png".to_string(),
+            "image/png".to_string(),
+            b"image bytes".to_vec(),
+        )
+        .expect("create export attachment");
+        let export_dir = crate::test_support::unique_temp_dir("att-export");
+        let destination = export_dir.join("nested").join("copy.png");
+
+        export_file(
+            &attachment.file_path,
+            destination.to_string_lossy().as_ref(),
+        )
+        .expect("export attachment");
+        assert_eq!(std::fs::read(&destination).unwrap(), b"image bytes");
+
+        let external_dir = crate::test_support::unique_temp_dir("att-export-external");
+        let external_source = external_dir.join("outside.png");
+        std::fs::write(&external_source, b"outside").expect("write external source");
+        let error = export_file(
+            external_source.to_string_lossy().as_ref(),
+            destination.to_string_lossy().as_ref(),
+        )
+        .expect_err("external source must be rejected");
+        assert!(matches!(error, AppError::Validation(_)));
+
+        let _ = std::fs::remove_dir_all(export_dir);
+        let _ = std::fs::remove_dir_all(external_dir);
     }
 
     #[test]

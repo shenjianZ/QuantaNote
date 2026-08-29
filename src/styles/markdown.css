@@ -971,6 +971,148 @@
     stroke-width: 1.9 !important;
 }
 
+.quantanote-image-editor-popover,
+.quantanote-image-error-popover {
+    position: absolute;
+    z-index: 40;
+    width: min(380px, calc(100% - 16px));
+    padding: 0.7rem;
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    background: var(--popover);
+    color: var(--text);
+    box-shadow: 0 12px 32px rgb(0 0 0 / 25%);
+}
+
+.quantanote-image-editor-popover__header,
+.quantanote-image-editor-popover__row,
+.quantanote-image-editor-popover__alignment,
+.quantanote-image-editor-popover__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.quantanote-image-editor-popover__header {
+    justify-content: space-between;
+    margin-bottom: 0.55rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.quantanote-image-editor-popover__header button,
+.quantanote-image-error-popover > button:last-child {
+    display: grid;
+    place-items: center;
+    border-radius: 0.4rem;
+    padding: 0.2rem;
+    color: var(--muted);
+}
+
+.quantanote-image-editor-popover__header button:hover,
+.quantanote-image-error-popover > button:last-child:hover {
+    background: var(--hover);
+    color: var(--text);
+}
+
+.quantanote-image-editor-popover__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-bottom: 0.45rem;
+    color: var(--muted);
+    font-size: 0.68rem;
+}
+
+.quantanote-image-editor-popover__field input {
+    min-width: 0;
+    border: 1px solid var(--line);
+    border-radius: 0.45rem;
+    background: var(--field);
+    padding: 0.35rem 0.45rem;
+    color: var(--text);
+    font-size: 0.75rem;
+    outline: none;
+}
+
+.quantanote-image-editor-popover__field input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.quantanote-image-editor-popover__auto,
+.quantanote-image-editor-popover__alignment button,
+.quantanote-image-editor-popover__actions button,
+.quantanote-image-error-popover button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    border-radius: 0.45rem;
+    padding: 0.32rem 0.45rem;
+    color: var(--muted);
+    font-size: 0.68rem;
+    white-space: nowrap;
+}
+
+.quantanote-image-editor-popover__auto,
+.quantanote-image-editor-popover__alignment button {
+    border: 1px solid var(--line);
+}
+
+.quantanote-image-editor-popover__auto:hover,
+.quantanote-image-editor-popover__alignment button:hover,
+.quantanote-image-editor-popover__alignment button.is-active,
+.quantanote-image-editor-popover__actions button:hover,
+.quantanote-image-error-popover button:hover {
+    background: var(--hover);
+    color: var(--text);
+}
+
+.quantanote-image-editor-popover__alignment {
+    justify-content: space-between;
+    margin: 0.15rem 0 0.65rem;
+    color: var(--muted);
+    font-size: 0.68rem;
+}
+
+.quantanote-image-editor-popover__actions {
+    flex-wrap: wrap;
+}
+
+.quantanote-image-editor-popover__actions button.is-primary {
+    margin-left: auto;
+    background: var(--accent);
+    color: white;
+}
+
+.quantanote-image-editor-popover__actions button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+.quantanote-image-error-popover {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    width: min(320px, calc(100% - 16px));
+    font-size: 0.72rem;
+}
+
+.quantanote-image-error-popover > span {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.quantanote-image-error-popover button {
+    flex-shrink: 0;
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
 /* IR 源码标记(**、## 等): 极淡灰, Notion 式不喧宾夺主 */
 .vditor-ir .vditor-ir__marker {
     color: var(--md-secondary) !important;

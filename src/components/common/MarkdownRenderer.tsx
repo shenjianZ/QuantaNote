@@ -27,7 +27,12 @@ import { VDITOR_CDN } from "../../utils/vditorConfig";
 import { copyTextToSystemClipboard } from "../../utils/clipboard";
 import { useToastStore } from "../../stores/toastStore";
 import type { MarkdownAttachment } from "../../utils/markdownAttachments";
-import { getAttachmentIdFromSource, resolveAttachmentSource } from "../../utils/markdownAttachments";
+import {
+  getAttachmentIdFromSource,
+  getAttachmentImageOptions,
+  getAttachmentImageStyle,
+  resolveAttachmentSource,
+} from "../../utils/markdownAttachments";
 import "katex/dist/katex.min.css";
 
 hljs.registerLanguage("bash", bash);
@@ -386,9 +391,17 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme 
     ),
     img: ({ src, alt, title }) => {
       if (!src) return null;
+      const imageOptions = getAttachmentImageOptions(src);
       return (
         <span className="markdown-image-frame">
-          <img src={resolveAttachmentSource(src, attachments)} alt={alt || ""} title={title} loading="eager" decoding="async" />
+          <img
+            src={resolveAttachmentSource(src, attachments)}
+            alt={alt || ""}
+            title={title}
+            style={getAttachmentImageStyle(imageOptions)}
+            loading="eager"
+            decoding="async"
+          />
           {alt && <span className="markdown-image-caption">{alt}</span>}
         </span>
       );

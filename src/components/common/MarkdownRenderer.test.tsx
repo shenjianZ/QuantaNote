@@ -194,4 +194,26 @@ graph TD
       "asset://C:/attachments/att-1.png",
     );
   });
+
+  it("restores local image width and alignment in the reader", () => {
+    setup(
+      <MarkdownRenderer
+        content="![本地截图](attachment://att-1#qn-width=640&qn-align=right)"
+        attachments={[{
+          id: "att-1",
+          filename: "截图.png",
+          file_path: "C:/attachments/att-1.png",
+          mime_type: "image/png",
+        }]}
+      />,
+    );
+
+    expect(document.querySelector(".markdown-image-frame img")).toHaveStyle({
+      width: "640px",
+      maxWidth: "100%",
+      display: "block",
+      marginLeft: "auto",
+      marginRight: "0px",
+    });
+  });
 });

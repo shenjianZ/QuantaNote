@@ -8,6 +8,7 @@ import {
   deleteItem,
   searchItems,
   addAttachment,
+  exportAttachment,
   getStorageConsistencyReport,
   repairStorageConsistency,
   getVersions,
@@ -65,6 +66,15 @@ describe("tauriCommands", () => {
     await getVersions("item-1");
     expect(captured?.cmd).toBe("get_versions");
     expect(captured?.args).toMatchObject({ itemId: "item-1" });
+  });
+
+  it("exportAttachment passes source and destination paths", async () => {
+    await exportAttachment("C:/data/image.png", "D:/export/image.png");
+    expect(captured?.cmd).toBe("export_attachment");
+    expect(captured?.args).toMatchObject({
+      sourcePath: "C:/data/image.png",
+      destinationPath: "D:/export/image.png",
+    });
   });
 
   it("calls storage consistency commands", async () => {

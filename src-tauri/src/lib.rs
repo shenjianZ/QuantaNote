@@ -272,6 +272,7 @@ pub fn run() {
             attachment::add_attachment_data,
             attachment::get_attachments,
             attachment::delete_attachment,
+            attachment::export_attachment,
             version::get_versions,
             version::create_version,
             version::update_version,
