@@ -263,6 +263,7 @@ pub async fn sync_attachments_download(
     db: &DbState,
     _snapshot_id: &str,
 ) -> Result<(), AppError> {
+    use crate::repositories::attachment_repository;
     use crate::services::data_io_service::resolve_safe_attachment_path;
     use crate::sync::diff::compute_file_hash;
     use crate::utils::paths;
@@ -296,7 +297,7 @@ pub async fn sync_attachments_download(
 
         let (target_path, has_local_row) = match &local_info {
             Some((file_path, true)) => {
-                let full_path = paths::quantanote_dir().join(file_path);
+                let full_path = resolve_safe_attachment_path(&paths::quantanote_dir(), file_path)?;
                 let local_data = std::fs::read(&full_path).unwrap_or_default();
                 let local_hash = compute_file_hash(&local_data);
                 if local_hash == remote.file_hash {
@@ -336,18 +337,15 @@ pub async fn sync_attachments_download(
             )));
         }
         let full_path = resolve_safe_attachment_path(&paths::quantanote_dir(), &target_path)?;
-        if let Some(parent) = full_path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| AppError::Io(e.to_string()))?;
-        }
-        std::fs::write(&full_path, &data).map_err(|e| AppError::Io(e.to_string()))?;
+        attachment_repository::write_file_atomically(&full_path, &data)?;
 
         if !has_local_row {
-            let conn = db
-                .conn
-                .lock()
-                .map_err(|e| AppError::Database(e.to_string()))?;
+            let conn = db.conn.lock().map_err(|e| {
+                let _ = std::fs::remove_file(&full_path);
+                AppError::Database(e.to_string())
+            })?;
             let now = chrono::Utc::now().to_rfc3339();
-            conn.execute(
+            if let Err(error) = conn.execute(
                 "INSERT OR IGNORE INTO attachments (id, item_id, filename, file_path, mime_type, file_size, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 rusqlite::params![
                     remote.attachment_id,
@@ -358,8 +356,10 @@ pub async fn sync_attachments_download(
                     remote.file_size,
                     now
                 ],
-            )
-            .map_err(|e| AppError::Database(e.to_string()))?;
+            ) {
+                let _ = std::fs::remove_file(&full_path);
+                return Err(AppError::Database(error.to_string()));
+            }
         }
         result.attachments_downloaded += 1;
     }

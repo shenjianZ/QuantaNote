@@ -153,6 +153,56 @@ fn sanitize_path_component(s: &str) -> String {
         .collect()
 }
 
+fn temporary_file_path(dest: &Path) -> Result<PathBuf, AppError> {
+    let parent = dest
+        .parent()
+        .ok_or_else(|| AppError::Validation("附件路径无效".to_string()))?;
+    let name = dest
+        .file_name()
+        .ok_or_else(|| AppError::Validation("附件文件名无效".to_string()))?
+        .to_string_lossy();
+    Ok(parent.join(format!(".{}.tmp-{}", name, ids::new_id("tmp"))))
+}
+
+fn replace_file_with_temp(temp: &Path, dest: &Path) -> Result<(), AppError> {
+    let result = match std::fs::rename(temp, dest) {
+        Ok(()) => Ok(()),
+        Err(_rename_error) if dest.exists() => {
+            std::fs::remove_file(dest).map_err(|e| AppError::Io(e.to_string()))?;
+            std::fs::rename(temp, dest).map_err(|e| AppError::Io(format!("替换附件失败: {}", e)))
+        }
+        Err(error) => Err(AppError::Io(format!("写入附件失败: {}", error))),
+    };
+    if result.is_err() {
+        let _ = std::fs::remove_file(temp);
+    }
+    result
+}
+
+pub(crate) fn write_file_atomically(dest: &Path, bytes: &[u8]) -> Result<(), AppError> {
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| AppError::Io(e.to_string()))?;
+    }
+    let temp = temporary_file_path(dest)?;
+    if let Err(error) = std::fs::write(&temp, bytes) {
+        let _ = std::fs::remove_file(&temp);
+        return Err(AppError::Io(error.to_string()));
+    }
+    replace_file_with_temp(&temp, dest)
+}
+
+pub(crate) fn copy_file_atomically(source: &Path, dest: &Path) -> Result<(), AppError> {
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| AppError::Io(e.to_string()))?;
+    }
+    let temp = temporary_file_path(dest)?;
+    if let Err(error) = std::fs::copy(source, &temp) {
+        let _ = std::fs::remove_file(&temp);
+        return Err(AppError::Io(error.to_string()));
+    }
+    replace_file_with_temp(&temp, dest)
+}
+
 pub fn add(db: &DbState, item_id: String, source_path: String) -> Result<AttachmentDto, AppError> {
     let id = ids::new_id("att");
     let now = chrono::Utc::now().to_rfc3339();
@@ -168,13 +218,7 @@ pub fn add(db: &DbState, item_id: String, source_path: String) -> Result<Attachm
         .join(&safe_item_id)
         .join(format!("{}-{}", &id[..8], filename));
     let dest_path = paths::quantanote_dir().join(&relative_path);
-    std::fs::create_dir_all(
-        dest_path
-            .parent()
-            .ok_or_else(|| AppError::Validation("附件路径无效".to_string()))?,
-    )
-    .map_err(|e| AppError::Io(e.to_string()))?;
-    std::fs::copy(&source_path, &dest_path).map_err(|e| AppError::Io(e.to_string()))?;
+    copy_file_atomically(source, &dest_path)?;
 
     let file_size = std::fs::metadata(&dest_path)
         .map(|m| m.len() as i64)
@@ -268,16 +312,21 @@ pub fn add(db: &DbState, item_id: String, source_path: String) -> Result<Attachm
 
     let relative_str = relative_path.to_string_lossy().to_string();
 
-    let conn = db
-        .conn
-        .lock()
-        .map_err(|e| AppError::Database(e.to_string()))?;
-    conn.execute(
+    let conn = match db.conn.lock() {
+        Ok(conn) => conn,
+        Err(error) => {
+            let _ = std::fs::remove_file(&dest_path);
+            return Err(AppError::Database(error.to_string()));
+        }
+    };
+    if let Err(error) = conn.execute(
         "INSERT INTO attachments (id, item_id, filename, file_path, mime_type, file_size, created_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         params![id, item_id, filename, relative_str, mime_type, file_size, now],
-    )
-    .map_err(|e| AppError::Database(e.to_string()))?;
+    ) {
+        let _ = std::fs::remove_file(&dest_path);
+        return Err(AppError::Database(error.to_string()));
+    }
 
     Ok(AttachmentDto {
         id,
@@ -309,28 +358,27 @@ pub fn add_bytes(
         .join(&safe_item_id)
         .join(format!("{}-{}", &id[..8], filename));
     let dest_path = paths::quantanote_dir().join(&relative_path);
-    std::fs::create_dir_all(
-        dest_path
-            .parent()
-            .ok_or_else(|| AppError::Validation("附件路径无效".to_string()))?,
-    )
-    .map_err(|e| AppError::Io(e.to_string()))?;
-    std::fs::write(&dest_path, bytes).map_err(|e| AppError::Io(e.to_string()))?;
+    write_file_atomically(&dest_path, &bytes)?;
 
     let file_size = std::fs::metadata(&dest_path)
         .map(|metadata| metadata.len() as i64)
         .unwrap_or(0);
     let relative_str = relative_path.to_string_lossy().to_string();
-    let conn = db
-        .conn
-        .lock()
-        .map_err(|e| AppError::Database(e.to_string()))?;
-    conn.execute(
+    let conn = match db.conn.lock() {
+        Ok(conn) => conn,
+        Err(error) => {
+            let _ = std::fs::remove_file(&dest_path);
+            return Err(AppError::Database(error.to_string()));
+        }
+    };
+    if let Err(error) = conn.execute(
         "INSERT INTO attachments (id, item_id, filename, file_path, mime_type, file_size, created_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         params![id, item_id, filename, relative_str, mime_type, file_size, now],
-    )
-    .map_err(|e| AppError::Database(e.to_string()))?;
+    ) {
+        let _ = std::fs::remove_file(&dest_path);
+        return Err(AppError::Database(error.to_string()));
+    }
 
     Ok(AttachmentDto {
         id,
@@ -455,6 +503,48 @@ mod tests {
 
         let list = get_by_item(&db, &item_id).unwrap();
         assert_eq!(list.len(), 1);
+    }
+
+    #[test]
+    fn write_file_atomically_replaces_existing_file() {
+        let temp_dir = crate::test_support::unique_temp_dir("att-atomic");
+        let dest = temp_dir.join("nested").join("file.bin");
+
+        write_file_atomically(&dest, b"before").expect("write initial file");
+        write_file_atomically(&dest, b"after").expect("replace file atomically");
+
+        assert_eq!(std::fs::read(&dest).unwrap(), b"after");
+        let temp_entries = std::fs::read_dir(dest.parent().unwrap())
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|entry| entry.file_name().to_string_lossy().contains(".tmp-"))
+            .count();
+        assert_eq!(temp_entries, 0);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn add_bytes_removes_file_when_database_insert_fails() {
+        let data_dir = crate::test_support::unique_temp_dir("att-db-failure");
+        let _guard = crate::test_support::lock_test_data_dir(&data_dir);
+        let db = crate::test_support::test_db();
+
+        let result = add_bytes(
+            &db,
+            "missing-item".to_string(),
+            "failed.bin".to_string(),
+            "application/octet-stream".to_string(),
+            b"orphan me".to_vec(),
+        );
+
+        assert!(result.is_err());
+        let attachment_dir = paths::quantanote_dir().join("attachments/missing-item");
+        let files = std::fs::read_dir(attachment_dir)
+            .unwrap()
+            .filter_map(Result::ok)
+            .count();
+        assert_eq!(files, 0);
     }
 
     #[test]

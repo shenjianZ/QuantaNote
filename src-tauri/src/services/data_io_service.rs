@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use crate::db::DbState;
 use crate::error::AppError;
-use crate::repositories::data_io_repository;
+use crate::repositories::{attachment_repository, data_io_repository};
 use crate::utils::paths;
 
 #[derive(Serialize, Deserialize)]
@@ -572,99 +572,124 @@ pub fn import_data(db: &DbState, json: String) -> Result<(), AppError> {
     if data.attachments.len() > MAX_ZIP_ENTRIES {
         return Err(AppError::Validation("JSON 附件数量超过限制".to_string()));
     }
-    let mut conn = db
-        .conn
-        .lock()
-        .map_err(|e| AppError::Database(e.to_string()))?;
-
-    let tx = conn
-        .transaction()
-        .map_err(|e| AppError::Database(e.to_string()))?;
-
-    data_io_repository::import_items(&tx, &data.items, false)?;
-
-    data_io_repository::import_tags(&tx, &data.tags, false)?;
-    data_io_repository::import_item_tags(&tx, &data.item_tags)?;
-
     let data_dir = paths::quantanote_dir();
-    let mut total_attachment_size = 0_u64;
-    for attachment in &data.attachments {
-        let id = attachment["id"].as_str().unwrap_or_default().to_string();
-        let item_id = sanitize_path_component(attachment["item_id"].as_str().unwrap_or_default());
-        let filename = attachment["filename"]
-            .as_str()
-            .unwrap_or_default()
-            .to_string();
-        let mut file_path = attachment["file_path"]
-            .as_str()
-            .unwrap_or_default()
-            .to_string();
-        if id.is_empty() || item_id.is_empty() || filename.is_empty() {
-            return Err(AppError::Validation("附件元数据不完整".to_string()));
-        }
-        if !file_path.is_empty() {
-            let relative_path = validate_relative_path(&file_path, "attachments")?;
-            let _ = resolve_safe_attachment_path(&data_dir, &file_path)?;
-            file_path = relative_path.to_string_lossy().to_string();
-        }
+    let staging_dir = data_dir
+        .join("imports")
+        .join(format!(".json-staging-{}", uuid::Uuid::new_v4()));
+    let mut installed = Vec::new();
+    let result = (|| {
+        std::fs::create_dir_all(&staging_dir).map_err(|e| AppError::Io(e.to_string()))?;
+        let mut conn = db
+            .conn
+            .lock()
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        let tx = conn
+            .transaction()
+            .map_err(|e| AppError::Database(e.to_string()))?;
 
-        if let Some(file_data) = attachment["file_data"].as_str() {
-            use base64::engine::general_purpose::STANDARD as BASE64;
-            use base64::Engine;
+        data_io_repository::import_items(&tx, &data.items, false)?;
+        data_io_repository::import_tags(&tx, &data.tags, false)?;
+        data_io_repository::import_item_tags(&tx, &data.item_tags)?;
 
-            if !file_data.is_empty() {
-                if file_data.len() as u64 > MAX_ZIP_ENTRY_SIZE.saturating_mul(4) / 3 + 4 {
-                    return Err(AppError::Validation(
-                        "JSON 附件数据超过大小限制".to_string(),
-                    ));
-                }
-                let bytes = BASE64
-                    .decode(file_data)
-                    .map_err(|e| AppError::Validation(format!("附件数据无效: {}", e)))?;
-                let attachment_size = bytes.len() as u64;
-                if attachment_size > MAX_ZIP_ENTRY_SIZE
-                    || total_attachment_size.saturating_add(attachment_size) > MAX_ZIP_TOTAL_SIZE
-                {
-                    return Err(AppError::Validation("JSON 附件总大小超过限制".to_string()));
-                }
-                total_attachment_size += attachment_size;
-                let relative_path =
-                    std::path::PathBuf::from("attachments")
-                        .join(&item_id)
-                        .join(format!(
-                            "{}-{}",
-                            &id.chars().take(8).collect::<String>(),
-                            safe_archive_filename(&filename)
-                        ));
-                let relative_path = relative_path.to_string_lossy().to_string();
-                let dest_path = resolve_safe_attachment_path(&data_dir, &relative_path)?;
-                std::fs::create_dir_all(
-                    dest_path
-                        .parent()
-                        .ok_or_else(|| AppError::Validation("附件路径无效".to_string()))?,
-                )
-                .map_err(|e| AppError::Io(e.to_string()))?;
-                std::fs::write(&dest_path, bytes).map_err(|e| AppError::Io(e.to_string()))?;
-                file_path = relative_path;
+        let mut total_attachment_size = 0_u64;
+        for (index, attachment) in data.attachments.iter().enumerate() {
+            let id = attachment["id"].as_str().unwrap_or_default().to_string();
+            let item_id =
+                sanitize_path_component(attachment["item_id"].as_str().unwrap_or_default());
+            let filename = attachment["filename"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string();
+            let mut file_path = attachment["file_path"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string();
+            let safe_id = sanitize_path_component(&id);
+            if id.is_empty() || safe_id.is_empty() || item_id.is_empty() || filename.is_empty() {
+                return Err(AppError::Validation("附件元数据不完整".to_string()));
             }
+            if !file_path.is_empty() {
+                let relative_path = validate_relative_path(&file_path, "attachments")?;
+                let _ = resolve_safe_attachment_path(&data_dir, &file_path)?;
+                file_path = relative_path.to_string_lossy().to_string();
+            }
+
+            if let Some(file_data) = attachment["file_data"].as_str() {
+                use base64::engine::general_purpose::STANDARD as BASE64;
+                use base64::Engine;
+
+                if !file_data.is_empty() {
+                    if file_data.len() as u64 > MAX_ZIP_ENTRY_SIZE.saturating_mul(4) / 3 + 4 {
+                        return Err(AppError::Validation(
+                            "JSON 附件数据超过大小限制".to_string(),
+                        ));
+                    }
+                    let bytes = BASE64
+                        .decode(file_data)
+                        .map_err(|e| AppError::Validation(format!("附件数据无效: {}", e)))?;
+                    let attachment_size = bytes.len() as u64;
+                    if attachment_size > MAX_ZIP_ENTRY_SIZE
+                        || total_attachment_size.saturating_add(attachment_size)
+                            > MAX_ZIP_TOTAL_SIZE
+                    {
+                        return Err(AppError::Validation("JSON 附件总大小超过限制".to_string()));
+                    }
+                    total_attachment_size += attachment_size;
+                    let relative_path = PathBuf::from("attachments").join(&item_id).join(format!(
+                        "{}-{}",
+                        safe_id.chars().take(8).collect::<String>(),
+                        safe_archive_filename(&filename)
+                    ));
+                    let relative_path = relative_path.to_string_lossy().to_string();
+                    let dest_path = resolve_safe_attachment_path(&data_dir, &relative_path)?;
+                    let backup = if dest_path.exists() {
+                        let backup = staging_dir.join(format!("backup-{}.bin", index));
+                        std::fs::rename(&dest_path, &backup)
+                            .map_err(|e| AppError::Io(e.to_string()))?;
+                        Some(backup)
+                    } else {
+                        None
+                    };
+                    if let Err(error) =
+                        attachment_repository::write_file_atomically(&dest_path, &bytes)
+                    {
+                        if let Some(backup_path) = &backup {
+                            let _ = std::fs::rename(backup_path, &dest_path);
+                        }
+                        return Err(error);
+                    }
+                    installed.push(InstalledAttachment {
+                        target: dest_path,
+                        backup,
+                    });
+                    file_path = relative_path;
+                }
+            }
+
+            if file_path.is_empty() {
+                return Err(AppError::Validation(format!(
+                    "附件缺少安全文件路径: {}",
+                    id
+                )));
+            }
+
+            let mut record = attachment.clone();
+            record["file_path"] = serde_json::Value::String(file_path);
+            data_io_repository::import_attachment_record(&tx, &record)?;
         }
 
-        if file_path.is_empty() {
-            return Err(AppError::Validation(format!(
-                "附件缺少安全文件路径: {}",
-                id
-            )));
-        }
+        data_io_repository::import_versions(&tx, &data.versions, false)?;
+        tx.commit().map_err(|e| AppError::Database(e.to_string()))?;
+        Ok(())
+    })();
 
-        let mut att = attachment.clone();
-        att["file_path"] = serde_json::Value::String(file_path);
-        data_io_repository::import_attachment_record(&tx, &att)?;
+    if result.is_err() {
+        restore_installed_attachments(&installed);
+    } else {
+        remove_attachment_backups(&installed);
     }
-
-    data_io_repository::import_versions(&tx, &data.versions, false)?;
-
-    tx.commit().map_err(|e| AppError::Database(e.to_string()))?;
-    Ok(())
+    let _ = std::fs::remove_dir_all(&staging_dir);
+    result
 }
 
 pub fn save_to_file(path: String, content: String) -> Result<(), AppError> {
