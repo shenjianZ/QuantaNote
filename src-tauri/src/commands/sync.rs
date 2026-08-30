@@ -636,8 +636,8 @@ pub async fn resolve_sync_conflicts(
         }
     }
 
+    let dummy_sm = SyncStateManager::new();
     if config.sync_attachments {
-        let dummy_sm = SyncStateManager::new();
         sync_service::sync_attachments_upload(&transport, &dummy_sm, &mut result, &db).await?;
     }
 
@@ -658,7 +658,8 @@ pub async fn resolve_sync_conflicts(
 
     if config.sync_attachments {
         let sid = result.snapshot_id.clone();
-        sync_service::sync_attachments_download(&transport, &mut result, &db, &sid).await?;
+        sync_service::sync_attachments_download(&transport, &dummy_sm, &mut result, &db, &sid)
+            .await?;
     }
 
     let final_records = collect_local_records(&db)?;

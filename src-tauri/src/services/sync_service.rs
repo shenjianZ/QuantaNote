@@ -445,7 +445,7 @@ pub async fn run_sync_with_transport(
 
     if config.sync_attachments {
         let sid = result.snapshot_id.clone();
-        sync_attachments_download(transport, &mut result, db, &sid).await?;
+        sync_attachments_download(transport, state_manager, &mut result, db, &sid).await?;
     }
 
     let final_records = collect_local_records(db)?;
@@ -460,7 +460,7 @@ pub async fn run_sync_with_transport(
 
 pub async fn sync_attachments_upload(
     transport: &SyncTransport,
-    _state_manager: &SyncStateManager,
+    state_manager: &SyncStateManager,
     result: &mut SyncResult,
     db: &DbState,
 ) -> Result<(), AppError> {
@@ -473,6 +473,21 @@ pub async fn sync_attachments_upload(
         .iter()
         .map(|a| a.attachment_id.as_str())
         .collect();
+
+    let total = attachments
+        .iter()
+        .filter(|(_, hash, _, attachment_id, _, _, _)| {
+            diff.missing.contains(hash) || !remote_attachment_ids.contains(attachment_id.as_str())
+        })
+        .count() as u32;
+
+    if total == 0 {
+        return Ok(());
+    }
+
+    let _ = state_manager.set_status(SyncStatus::SyncingAttachments);
+    let _ = state_manager.set_progress("上传附件", 0, total);
+    let mut completed = 0;
 
     for (_path, hash, data, attachment_id, item_id, filename, mime_type) in &attachments {
         if diff.missing.contains(hash) || !remote_attachment_ids.contains(attachment_id.as_str()) {
@@ -490,6 +505,8 @@ pub async fn sync_attachments_upload(
                 )
                 .await?;
             result.attachments_uploaded += 1;
+            completed += 1;
+            let _ = state_manager.set_progress("上传附件", completed, total);
         }
     }
 
@@ -498,6 +515,7 @@ pub async fn sync_attachments_upload(
 
 pub async fn sync_attachments_download(
     transport: &SyncTransport,
+    state_manager: &SyncStateManager,
     result: &mut SyncResult,
     db: &DbState,
     _snapshot_id: &str,
@@ -510,6 +528,13 @@ pub async fn sync_attachments_download(
     let attachments = collect_local_attachments(db)?;
     let local_hashes: Vec<String> = attachments.iter().map(|a| a.1.clone()).collect();
     let diff = transport.diff_attachments(local_hashes).await?;
+    let total = diff.remote_attachments.len() as u32;
+    let mut completed = 0;
+
+    if total > 0 {
+        let _ = state_manager.set_status(SyncStatus::SyncingAttachments);
+        let _ = state_manager.set_progress("下载附件", 0, total);
+    }
 
     for remote in &diff.remote_attachments {
         let local_info: Option<(String, bool)> = {
@@ -540,6 +565,8 @@ pub async fn sync_attachments_download(
                 let local_data = std::fs::read(&full_path).unwrap_or_default();
                 let local_hash = compute_file_hash(&local_data);
                 if local_hash == remote.file_hash {
+                    completed += 1;
+                    let _ = state_manager.set_progress("下载附件", completed, total);
                     continue;
                 }
                 (file_path.clone(), true)
@@ -604,6 +631,8 @@ pub async fn sync_attachments_download(
             }
         }
         result.attachments_downloaded += 1;
+        completed += 1;
+        let _ = state_manager.set_progress("下载附件", completed, total);
     }
 
     Ok(())
