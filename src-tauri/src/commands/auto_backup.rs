@@ -15,6 +15,21 @@ pub fn update_auto_backup_config(config: AutoBackupConfig) -> Result<(), AppErro
 }
 
 #[tauri::command]
+pub fn save_remote_backup_password(password: String) -> Result<(), AppError> {
+    backup_service::save_remote_backup_password(password)
+}
+
+#[tauri::command]
+pub fn clear_remote_backup_password() -> Result<(), AppError> {
+    backup_service::clear_remote_backup_password()
+}
+
+#[tauri::command]
+pub fn test_remote_backup() -> Result<bool, AppError> {
+    backup_service::test_remote_backup()
+}
+
+#[tauri::command]
 pub fn trigger_backup_now(db: State<'_, DbState>) -> Result<String, AppError> {
     backup_service::trigger_backup_now(&db)
 }

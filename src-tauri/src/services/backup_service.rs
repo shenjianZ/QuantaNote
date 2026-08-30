@@ -21,6 +21,49 @@ pub struct AutoBackupConfig {
     pub last_backup_size: Option<u64>,
     #[serde(default)]
     pub last_backup_error: Option<String>,
+    #[serde(default)]
+    pub remote: RemoteBackupConfig,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(default)]
+pub struct RemoteBackupConfig {
+    pub enabled: bool,
+    pub endpoint: String,
+    pub remote_path: String,
+    pub username: String,
+    pub password_configured: bool,
+    pub last_upload_at: Option<String>,
+    pub last_upload_filename: Option<String>,
+    pub last_upload_error: Option<String>,
+}
+
+impl Default for RemoteBackupConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            endpoint: String::new(),
+            remote_path: "quantanote/backups".to_string(),
+            username: String::new(),
+            password_configured: false,
+            last_upload_at: None,
+            last_upload_filename: None,
+            last_upload_error: None,
+        }
+    }
+}
+
+impl std::fmt::Debug for RemoteBackupConfig {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("RemoteBackupConfig")
+            .field("enabled", &self.enabled)
+            .field("endpoint", &self.endpoint)
+            .field("remote_path", &self.remote_path)
+            .field("username", &self.username)
+            .field("password_configured", &self.password_configured)
+            .finish()
+    }
 }
 
 #[derive(Serialize, Clone)]
@@ -53,6 +96,7 @@ impl Default for AutoBackupConfig {
             last_backup_filename: None,
             last_backup_size: None,
             last_backup_error: None,
+            remote: RemoteBackupConfig::default(),
         }
     }
 }
@@ -92,21 +136,189 @@ fn config_path() -> PathBuf {
     backups_dir().join("auto_backup.json")
 }
 
+const REMOTE_BACKUP_CREDENTIAL_SERVICE: &str = "QuantaNote/remote-backup";
+const REMOTE_BACKUP_CREDENTIAL_ACCOUNT: &str = "webdav";
+
+fn remote_backup_credential_entry() -> Result<keyring::Entry, AppError> {
+    keyring::Entry::new(
+        REMOTE_BACKUP_CREDENTIAL_SERVICE,
+        REMOTE_BACKUP_CREDENTIAL_ACCOUNT,
+    )
+    .map_err(|error| AppError::Io(format!("创建 WebDAV 凭据项失败: {}", error)))
+}
+
+fn remote_password_configured() -> bool {
+    remote_backup_credential_entry()
+        .and_then(|entry| {
+            entry
+                .get_password()
+                .map_err(|error| AppError::Io(error.to_string()))
+        })
+        .map(|password| !password.is_empty())
+        .unwrap_or(false)
+}
+
+pub fn save_remote_backup_password(password: String) -> Result<(), AppError> {
+    if password.is_empty() {
+        return Err(AppError::Validation("WebDAV 密码不能为空".to_string()));
+    }
+    remote_backup_credential_entry()?
+        .set_password(&password)
+        .map_err(|error| AppError::Io(format!("写入 WebDAV 凭据库失败: {}", error)))
+}
+
+pub fn clear_remote_backup_password() -> Result<(), AppError> {
+    let entry = remote_backup_credential_entry()?;
+    match entry.delete_credential() {
+        Ok(()) => Ok(()),
+        Err(error) => {
+            log::debug!("WebDAV 凭据不存在或已清除: {}", error);
+            Ok(())
+        }
+    }
+}
+
+fn load_remote_backup_password() -> Result<String, AppError> {
+    let password = remote_backup_credential_entry()?
+        .get_password()
+        .map_err(|_| AppError::Validation("尚未配置 WebDAV 密码".to_string()))?;
+    if password.is_empty() {
+        return Err(AppError::Validation("尚未配置 WebDAV 密码".to_string()));
+    }
+    Ok(password)
+}
+
+fn validate_remote_config(config: &RemoteBackupConfig) -> Result<(), AppError> {
+    if !config.enabled {
+        return Ok(());
+    }
+    let url = reqwest::Url::parse(config.endpoint.trim())
+        .map_err(|_| AppError::Validation("WebDAV 地址无效".to_string()))?;
+    if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() {
+        return Err(AppError::Validation(
+            "WebDAV 地址必须使用 HTTP 或 HTTPS".to_string(),
+        ));
+    }
+    if url.query().is_some() || url.fragment().is_some() {
+        return Err(AppError::Validation(
+            "WebDAV 地址不能包含查询参数或片段".to_string(),
+        ));
+    }
+    if config.remote_path.split('/').any(|segment| {
+        segment == ".." || segment.contains('\\') || segment.chars().any(char::is_control)
+    }) {
+        return Err(AppError::Validation("WebDAV 远端目录无效".to_string()));
+    }
+    Ok(())
+}
+
+fn remote_backup_url(
+    config: &RemoteBackupConfig,
+    filename: Option<&str>,
+) -> Result<reqwest::Url, AppError> {
+    validate_remote_config(config)?;
+    let mut url = reqwest::Url::parse(config.endpoint.trim())
+        .map_err(|_| AppError::Validation("WebDAV 地址无效".to_string()))?;
+    {
+        let mut segments = url
+            .path_segments_mut()
+            .map_err(|_| AppError::Validation("WebDAV 地址路径无效".to_string()))?;
+        for segment in config
+            .remote_path
+            .split('/')
+            .filter(|segment| !segment.is_empty())
+        {
+            segments.push(segment);
+        }
+        if let Some(filename) = filename {
+            segments.push(filename);
+        }
+    }
+    Ok(url)
+}
+
+fn remote_client() -> Result<reqwest::blocking::Client, AppError> {
+    reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(120))
+        .build()
+        .map_err(|error| AppError::Io(format!("创建 WebDAV 客户端失败: {}", error)))
+}
+
+fn with_remote_auth(
+    request: reqwest::blocking::RequestBuilder,
+    config: &RemoteBackupConfig,
+) -> Result<reqwest::blocking::RequestBuilder, AppError> {
+    if config.username.trim().is_empty() {
+        return Ok(request);
+    }
+    let password = load_remote_backup_password()?;
+    Ok(request.basic_auth(&config.username, Some(password)))
+}
+
+fn upload_backup_to_remote(
+    config: &RemoteBackupConfig,
+    artifact: &BackupArtifact,
+) -> Result<(), AppError> {
+    validate_remote_config(config)?;
+    let path = backups_dir().join(&artifact.filename);
+    let file = std::fs::File::open(&path)
+        .map_err(|error| AppError::Io(format!("读取本地备份失败: {}", error)))?;
+    let client = remote_client()?;
+    let request = client
+        .put(remote_backup_url(config, Some(&artifact.filename))?)
+        .header(reqwest::header::CONTENT_TYPE, "application/zip")
+        .body(reqwest::blocking::Body::new(file));
+    let response = with_remote_auth(request, config)?
+        .send()
+        .map_err(|error| AppError::SyncError(format!("上传 WebDAV 备份失败: {}", error)))?;
+    if !response.status().is_success() {
+        return Err(AppError::SyncError(format!(
+            "上传 WebDAV 备份失败: HTTP {}",
+            response.status().as_u16()
+        )));
+    }
+    Ok(())
+}
+
+pub fn test_remote_backup() -> Result<bool, AppError> {
+    let config = load_config();
+    if !config.remote.enabled {
+        return Ok(false);
+    }
+    validate_remote_config(&config.remote)?;
+    let client = remote_client()?;
+    let request = client.request(
+        reqwest::Method::OPTIONS,
+        remote_backup_url(&config.remote, None)?,
+    );
+    let response = with_remote_auth(request, &config.remote)?
+        .send()
+        .map_err(|error| AppError::SyncError(format!("连接 WebDAV 失败: {}", error)))?;
+    Ok(response.status().is_success()
+        || response.status() == reqwest::StatusCode::METHOD_NOT_ALLOWED)
+}
+
 pub fn load_config() -> AutoBackupConfig {
     let path = config_path();
-    if !path.exists() {
-        return AutoBackupConfig::default();
-    }
-    std::fs::read_to_string(&path)
-        .ok()
-        .and_then(|s| serde_json::from_str(&s).ok())
-        .unwrap_or_default()
+    let mut config = if !path.exists() {
+        AutoBackupConfig::default()
+    } else {
+        std::fs::read_to_string(&path)
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default()
+    };
+    config.remote.password_configured = remote_password_configured();
+    config
 }
 
 pub fn save_config(config: &AutoBackupConfig) -> Result<(), AppError> {
+    validate_remote_config(&config.remote)?;
     let dir = backups_dir();
     std::fs::create_dir_all(&dir).map_err(|e| AppError::Io(e.to_string()))?;
-    let json = serde_json::to_string_pretty(config).map_err(|e| AppError::Io(e.to_string()))?;
+    let mut persisted = config.clone();
+    persisted.remote.password_configured = remote_password_configured();
+    let json = serde_json::to_string_pretty(&persisted).map_err(|e| AppError::Io(e.to_string()))?;
     std::fs::write(config_path(), json).map_err(|e| AppError::Io(e.to_string()))?;
     Ok(())
 }
@@ -232,6 +444,16 @@ fn mark_backup_failure(config: &mut AutoBackupConfig, error: &AppError) {
     config.last_backup_error = Some(error.to_string());
 }
 
+fn mark_remote_success(config: &mut AutoBackupConfig, artifact: &BackupArtifact) {
+    config.remote.last_upload_at = Some(chrono::Utc::now().to_rfc3339());
+    config.remote.last_upload_filename = Some(artifact.filename.clone());
+    config.remote.last_upload_error = None;
+}
+
+fn mark_remote_failure(config: &mut AutoBackupConfig, error: &AppError) {
+    config.remote.last_upload_error = Some(error.to_string());
+}
+
 pub fn run_auto_backup(db: &DbState) {
     let mut config = load_config();
     if !should_backup(&config) {
@@ -241,6 +463,15 @@ pub fn run_auto_backup(db: &DbState) {
     match do_backup(db, BackupKind::Automatic) {
         Ok(artifact) => {
             mark_backup_success(&mut config, &artifact);
+            if config.remote.enabled {
+                match upload_backup_to_remote(&config.remote, &artifact) {
+                    Ok(()) => mark_remote_success(&mut config, &artifact),
+                    Err(error) => {
+                        mark_remote_failure(&mut config, &error);
+                        log::warn!("自动备份远端上传失败: {}", error);
+                    }
+                }
+            }
             let _ = save_config(&config);
             cleanup_old_backups(&config);
             log::info!("自动备份完成");
@@ -275,6 +506,14 @@ pub fn trigger_backup_now(db: &DbState) -> Result<String, AppError> {
     match do_backup(db, BackupKind::Manual) {
         Ok(artifact) => {
             mark_backup_success(&mut config, &artifact);
+            if config.remote.enabled {
+                if let Err(error) = upload_backup_to_remote(&config.remote, &artifact) {
+                    mark_remote_failure(&mut config, &error);
+                    let _ = save_config(&config);
+                    return Err(error);
+                }
+                mark_remote_success(&mut config, &artifact);
+            }
             save_config(&config)?;
             Ok(artifact.filename)
         }
