@@ -8,11 +8,19 @@ use axum::{
 use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::Deserialize;
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 pub struct Claims {
     pub sub: String, // user_id
+    #[serde(default)]
+    pub device_id: String,
     #[allow(dead_code)]
     pub exp: usize,
+}
+
+/// 已通过 JWT 校验的用户和设备上下文。
+#[derive(Clone)]
+pub struct AuthContext {
+    pub device_id: String,
 }
 
 /// JWT 认证中间件
@@ -44,8 +52,12 @@ pub async fn auth_middleware(
     )
     .map_err(|_| StatusCode::UNAUTHORIZED)?;
 
-    // 3. 将 user_id 添加到请求扩展
-    req.extensions_mut().insert(token_data.claims.sub);
+    // 3. 将用户和设备上下文添加到请求扩展。
+    let claims = token_data.claims;
+    req.extensions_mut().insert(claims.sub.clone());
+    req.extensions_mut().insert(AuthContext {
+        device_id: claims.device_id,
+    });
 
     Ok(next.run(req).await)
 }

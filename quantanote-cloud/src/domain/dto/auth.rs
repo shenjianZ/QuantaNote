@@ -90,6 +90,12 @@ pub struct RefreshRequest {
     pub refresh_token: String,
 }
 
+/// 撤销设备会话请求
+#[derive(Debug, Deserialize)]
+pub struct RevokeDeviceRequest {
+    pub device_id: String,
+}
+
 // RefreshRequest 的 refresh_token 是敏感字段，需要脱敏
 impl fmt::Debug for RefreshRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

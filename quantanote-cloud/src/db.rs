@@ -320,10 +320,13 @@ async fn create_tables(db: &DatabaseConnection) -> anyhow::Result<()> {
     let schema = Schema::new(builder);
 
     // 导入所有 entities
-    use crate::domain::entities::{sync_attachments, sync_records, sync_snapshots, users};
+    use crate::domain::entities::{
+        device_sessions, sync_attachments, sync_records, sync_snapshots, users,
+    };
 
     // 创建所有表（添加新表只需一行！）
     create_single_table(db, &schema, &builder, users::Entity, "用户表").await?;
+    create_single_table(db, &schema, &builder, device_sessions::Entity, "设备会话表").await?;
     create_single_table(db, &schema, &builder, sync_snapshots::Entity, "同步快照表").await?;
     create_single_table(db, &schema, &builder, sync_records::Entity, "同步记录表").await?;
     create_single_table(

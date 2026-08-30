@@ -1,13 +1,16 @@
 use crate::domain::dto::auth::{
     DeleteUserRequest, ForgotPasswordRequest, LoginRequest, RefreshRequest, RegisterRequest,
-    ResetPasswordRequest, SendVerifyCodeRequest,
+    ResetPasswordRequest, RevokeDeviceRequest, SendVerifyCodeRequest,
 };
 use crate::domain::vo::auth::{
-    ForgotPasswordResult, LoginResult, RefreshResult, RegisterResult, ResetPasswordResult,
+    DeviceSessionResult, ForgotPasswordResult, LoginResult, RefreshResult, RegisterResult,
+    ResetPasswordResult,
 };
 use crate::domain::vo::ApiResponse;
 use crate::error::ErrorResponse;
+use crate::infra::middleware::auth::AuthContext;
 use crate::infra::middleware::logging::{log_info, RequestId};
+use crate::repositories::device_session_repository::DeviceSessionRepository;
 use crate::repositories::user_repository::UserRepository;
 use crate::services::auth_service::AuthService;
 use crate::services::email_service::EmailService;
@@ -17,7 +20,26 @@ use axum::{
     extract::{Extension, State},
     Json,
 };
+use chrono::{Duration, Utc};
 use serde_json::json;
+
+async fn track_device_session(state: &AppState, user_id: &str, device_id: &str) {
+    if device_id.is_empty() {
+        return;
+    }
+
+    let expires_at =
+        Utc::now().naive_utc() + Duration::days(state.config.auth.refresh_token_expiration_days);
+    let repository = DeviceSessionRepository::new(state.pool.clone());
+    if let Err(error) = repository.upsert(user_id, device_id, expires_at).await {
+        tracing::warn!(
+            user_id = %user_id,
+            device_id = %device_id,
+            error = %error,
+            "记录设备会话失败"
+        );
+    }
+}
 
 /// 注册
 pub async fn register(
@@ -34,9 +56,11 @@ pub async fn register(
         state.config.auth.clone(),
         state.config.email.clone(),
     );
+    let device_id = payload.device_id.clone();
 
     match service.register(payload).await {
         Ok((user_model, access_token, refresh_token)) => {
+            track_device_session(&state, &user_model.id, &device_id).await;
             let data = RegisterResult::from((user_model, access_token, refresh_token));
             let response = ApiResponse::success(data);
             log_info(&request_id, "注册成功", &response);
@@ -64,9 +88,11 @@ pub async fn login(
         state.config.auth.clone(),
         state.config.email.clone(),
     );
+    let device_id = payload.device_id.clone();
 
     match service.login(payload).await {
         Ok((user_model, access_token, refresh_token)) => {
+            track_device_session(&state, &user_model.id, &device_id).await;
             let data = LoginResult::from((user_model, access_token, refresh_token));
             let response = ApiResponse::success(data);
             log_info(&request_id, "登录成功", &response);
@@ -105,6 +131,11 @@ pub async fn refresh(
 
     match service.refresh_access_token(&payload.refresh_token).await {
         Ok((access_token, refresh_token)) => {
+            if let Ok(user_id) =
+                TokenService::decode_user_id(&payload.refresh_token, &state.config.auth.jwt_secret)
+            {
+                track_device_session(&state, &user_id, &device_id).await;
+            }
             let data = RefreshResult {
                 access_token,
                 refresh_token,
@@ -132,6 +163,7 @@ pub async fn delete_account(
 
     let user_repo = UserRepository::new(state.pool.clone());
     let sync_repo = crate::repositories::sync_repository::SyncRepository::new(state.pool.clone());
+    let device_repo = DeviceSessionRepository::new(state.pool.clone());
     let service = AuthService::new(
         user_repo,
         state.redis_client.clone(),
@@ -162,6 +194,9 @@ pub async fn delete_account(
     }
     if let Err(e) = sync_repo.delete_all_snapshots(&user_id).await {
         log_info(&request_id, "清理同步快照失败", &e.to_string());
+    }
+    if let Err(e) = device_repo.delete_all(&user_id).await {
+        log_info(&request_id, "清理设备会话失败", &e.to_string());
     }
 
     // 最后删除用户
@@ -205,6 +240,10 @@ pub async fn delete_refresh_token(
 
     match service.delete_refresh_token(&user_id, &device_id).await {
         Ok(_) => {
+            let device_repo = DeviceSessionRepository::new(state.pool.clone());
+            if let Err(error) = device_repo.delete(&user_id, &device_id).await {
+                log_info(&request_id, "清理设备会话失败", &error.to_string());
+            }
             log_info(
                 &request_id,
                 "刷新令牌删除成功",
@@ -218,6 +257,98 @@ pub async fn delete_refresh_token(
             Err(ErrorResponse::new(e.to_string()))
         }
     }
+}
+
+/// 获取当前账号的有效设备会话列表
+pub async fn list_devices(
+    Extension(request_id): Extension<RequestId>,
+    State(state): State<AppState>,
+    Extension(user_id): Extension<String>,
+    Extension(auth_context): Extension<AuthContext>,
+) -> Result<Json<ApiResponse<Vec<DeviceSessionResult>>>, ErrorResponse> {
+    let repository = DeviceSessionRepository::new(state.pool.clone());
+    let sessions = repository.list_active(&user_id).await.map_err(|error| {
+        log_info(&request_id, "获取设备列表失败", &error.to_string());
+        ErrorResponse::new(error.to_string())
+    })?;
+
+    let devices: Vec<DeviceSessionResult> = sessions
+        .into_iter()
+        .map(|session| DeviceSessionResult {
+            is_current: session.device_id == auth_context.device_id,
+            device_id: session.device_id,
+            created_at: session
+                .created_at
+                .format("%Y-%m-%dT%H:%M:%S%.3fZ")
+                .to_string(),
+            last_seen_at: session
+                .last_seen_at
+                .format("%Y-%m-%dT%H:%M:%S%.3fZ")
+                .to_string(),
+            expires_at: session
+                .expires_at
+                .format("%Y-%m-%dT%H:%M:%S%.3fZ")
+                .to_string(),
+        })
+        .collect();
+
+    log_info(
+        &request_id,
+        "获取设备列表成功",
+        &json!({"count": devices.len()}),
+    );
+    Ok(Json(ApiResponse::success(devices)))
+}
+
+/// 撤销指定的其他设备会话
+pub async fn revoke_device(
+    Extension(request_id): Extension<RequestId>,
+    State(state): State<AppState>,
+    Extension(user_id): Extension<String>,
+    Extension(auth_context): Extension<AuthContext>,
+    Json(payload): Json<RevokeDeviceRequest>,
+) -> Result<Json<ApiResponse<()>>, ErrorResponse> {
+    let device_id = payload.device_id.trim();
+    if device_id.is_empty() {
+        return Err(ErrorResponse::new("设备 ID 不能为空"));
+    }
+    if device_id == auth_context.device_id {
+        return Err(ErrorResponse::new("不能从当前设备撤销当前设备会话"));
+    }
+
+    let user_repo = UserRepository::new(state.pool.clone());
+    let service = AuthService::new(
+        user_repo,
+        state.redis_client.clone(),
+        state.config.auth.clone(),
+        state.config.email.clone(),
+    );
+    service
+        .delete_refresh_token(&user_id, device_id)
+        .await
+        .map_err(|error| {
+            log_info(&request_id, "撤销设备会话失败", &error.to_string());
+            ErrorResponse::new(error.to_string())
+        })?;
+
+    let repository = DeviceSessionRepository::new(state.pool.clone());
+    repository
+        .delete(&user_id, device_id)
+        .await
+        .map_err(|error| {
+            log_info(&request_id, "清理设备会话失败", &error.to_string());
+            ErrorResponse::new(error.to_string())
+        })?;
+
+    log_info(
+        &request_id,
+        "撤销设备会话成功",
+        &format!("user_id={}, device_id={}", user_id, device_id),
+    );
+    Ok(Json(ApiResponse::success_with_message(
+        (),
+        "设备会话已撤销",
+    )))
 }
 
 /// 忘记密码

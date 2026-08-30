@@ -113,6 +113,8 @@ async fn main() -> anyhow::Result<()> {
             "/auth/delete-refresh-token",
             post(handlers::auth::delete_refresh_token),
         )
+        .route("/auth/devices", get(handlers::auth::list_devices))
+        .route("/auth/devices/revoke", post(handlers::auth::revoke_device))
         // 同步端点
         .route(
             "/sync/snapshot/latest",

@@ -1,5 +1,15 @@
 use serde::Serialize;
 
+/// 设备会话信息，不包含任何令牌或凭据。
+#[derive(Debug, Serialize)]
+pub struct DeviceSessionResult {
+    pub device_id: String,
+    pub created_at: String,
+    pub last_seen_at: String,
+    pub expires_at: String,
+    pub is_current: bool,
+}
+
 /// 注册结果
 #[derive(Debug, Serialize)]
 pub struct RegisterResult {
