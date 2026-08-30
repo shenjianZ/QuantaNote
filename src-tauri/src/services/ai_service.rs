@@ -138,6 +138,21 @@ fn validate_config(config: &AiConfig) -> Result<(), AppError> {
     Ok(())
 }
 
+fn chat_completions_endpoint(endpoint: &str) -> Result<String, AppError> {
+    let mut url = reqwest::Url::parse(endpoint.trim())
+        .map_err(|_| AppError::Validation("AI 接口地址无效".to_string()))?;
+    let path = url.path().trim_end_matches('/');
+    if !path.ends_with("/chat/completions") {
+        let completion_path = if path.is_empty() {
+            "/chat/completions".to_string()
+        } else {
+            format!("{}/chat/completions", path)
+        };
+        url.set_path(&completion_path);
+    }
+    Ok(url.to_string())
+}
+
 pub fn load_config() -> AiConfig {
     let mut config: AiConfig = std::fs::read_to_string(config_path())
         .ok()
@@ -180,6 +195,7 @@ pub async fn generate_summary(title: &str, content: &str) -> Result<String, AppE
     }
 
     let api_key = load_api_key()?;
+    let endpoint = chat_completions_endpoint(&config.endpoint)?;
     let title = truncate_for_prompt(title, 500);
     let content = truncate_for_prompt(content, MAX_PROMPT_CONTENT_CHARS);
     let user_prompt = format!(
@@ -207,7 +223,7 @@ pub async fn generate_summary(title: &str, content: &str) -> Result<String, AppE
         .build()
         .map_err(|error| AppError::Io(format!("创建 AI 客户端失败: {}", error)))?;
     let mut request = client
-        .post(config.endpoint.trim())
+        .post(endpoint)
         .header(reqwest::header::CONTENT_TYPE, "application/json")
         .json(&request_body);
     if let Some(api_key) = api_key {
@@ -290,6 +306,7 @@ pub async fn generate_tag_suggestions(title: &str, content: &str) -> Result<Vec<
     }
 
     let api_key = load_api_key()?;
+    let endpoint = chat_completions_endpoint(&config.endpoint)?;
     let title = truncate_for_prompt(title, 500);
     let content = truncate_for_prompt(content, MAX_PROMPT_CONTENT_CHARS);
     let user_prompt = format!(
@@ -317,7 +334,7 @@ pub async fn generate_tag_suggestions(title: &str, content: &str) -> Result<Vec<
         .build()
         .map_err(|error| AppError::Io(format!("创建 AI 客户端失败: {}", error)))?;
     let mut request = client
-        .post(config.endpoint.trim())
+        .post(endpoint)
         .header(reqwest::header::CONTENT_TYPE, "application/json")
         .json(&request_body);
     if let Some(api_key) = api_key {
@@ -372,6 +389,7 @@ pub async fn answer_question(
     }
 
     let api_key = load_api_key()?;
+    let endpoint = chat_completions_endpoint(&config.endpoint)?;
     let title = truncate_for_prompt(title, 500);
     let content = truncate_for_prompt(content, MAX_PROMPT_CONTENT_CHARS);
     let question = truncate_for_prompt(question, MAX_QUESTION_CHARS);
@@ -410,7 +428,7 @@ pub async fn answer_question(
         .build()
         .map_err(|error| AppError::Io(format!("创建 AI 客户端失败: {}", error)))?;
     let mut request = client
-        .post(config.endpoint.trim())
+        .post(endpoint)
         .header(reqwest::header::CONTENT_TYPE, "application/json")
         .json(&request_body);
     if let Some(api_key) = api_key {
@@ -466,6 +484,21 @@ mod tests {
         config.endpoint = "https://example.com/chat".to_string();
         config.model = "".to_string();
         assert!(validate_config(&config).is_err());
+    }
+
+    #[test]
+    fn appends_chat_completions_to_a_base_url() {
+        assert_eq!(
+            chat_completions_endpoint("https://open.bigmodel.cn/api/coding/paas/v4/").unwrap(),
+            "https://open.bigmodel.cn/api/coding/paas/v4/chat/completions"
+        );
+        assert_eq!(
+            chat_completions_endpoint(
+                "https://open.bigmodel.cn/api/coding/paas/v4/chat/completions"
+            )
+            .unwrap(),
+            "https://open.bigmodel.cn/api/coding/paas/v4/chat/completions"
+        );
     }
 
     #[test]
