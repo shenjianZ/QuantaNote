@@ -45,7 +45,7 @@ During sync, the status bar shows real-time progress:
 - During attachment sync, "Uploading attachments" or "Downloading attachments" and processed attachments / total attachments
 - Estimated time remaining (optional)
 
-Attachment progress is currently counted by number of attachments, not bytes. For one large attachment, the counter may not advance until the request finishes; an interrupted sync retransmits unfinished attachments because resumable transfer is not supported yet.
+Attachment progress is still counted by number of attachments, not bytes. For one large attachment, the counter may not advance until the whole attachment finishes; the attachment transfer itself now supports resuming. Interrupted syncs reuse chunks already accepted by the server, and downloads keep a local partial file.
 
 ## Auto Sync
 
@@ -133,12 +133,11 @@ The sync engine handles the following five data types:
 
 The built-in cloud sync currently handles attachments as follows:
 
-1. The client submits local attachment content hashes, and the server returns missing attachments and remote metadata
-2. Uploads use one complete request body, and downloads use one complete response body
-3. The server currently has no `Range`, `Content-Range`, upload-session, or chunk-offset protocol
-4. Progress is therefore attachment-level rather than byte-level; a failed request cannot resume from its interrupted offset
-
-True resumable transfer requires coordinated support in the client, HTTP API, and storage backend for upload sessions, chunk checksums, idempotent finalization, failed-chunk cleanup, and ranged download responses. Until that protocol is upgraded, the client does not claim to support resumable transfer.
+1. The client submits local attachment content hashes, and the server returns missing attachments and remote metadata.
+2. New clients upload 4 MiB chunks. The server identifies an upload by user and file hash, reports received chunks, skips them on retry, and verifies the complete SHA-256 before finalizing.
+3. Downloads use HTTP `Range` requests. The client stores incomplete content in a same-name `.qnpart` file, resumes from existing bytes after interruption, and atomically replaces the final file after the size and hash checks pass.
+4. If an older server does not recognize the chunk endpoints, the client falls back to the original complete-upload API. A complete `200` download response from an older server is also accepted.
+5. Progress remains attachment-level rather than byte-level. The current storage abstraction reads complete objects, so the server assembles the final object in memory during completion; streaming assembly and native object-storage multipart uploads remain future optimizations.
 
 ### Versions (Version History)
 
