@@ -255,23 +255,131 @@ pub async fn generate_summary(title: &str, content: &str) -> Result<String, AppE
     Ok(summary.chars().take(MAX_SUMMARY_CHARS).collect())
 }
 
+fn find_balanced_json<'a>(value: &'a str, open: char, close: char) -> Option<&'a str> {
+    let start = value.find(open)?;
+    let mut depth = 0;
+    let mut in_string = false;
+    let mut escaped = false;
+
+    for (offset, character) in value[start..].char_indices() {
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if character == '\\' {
+                escaped = true;
+            } else if character == '"' {
+                in_string = false;
+            }
+            continue;
+        }
+        if character == '"' {
+            in_string = true;
+        } else if character == open {
+            depth += 1;
+        } else if character == close {
+            depth -= 1;
+            if depth == 0 {
+                let end = start + offset + character.len_utf8();
+                return Some(&value[start..end]);
+            }
+        }
+    }
+    None
+}
+
+fn parse_json_tag_candidates(value: &str) -> Option<Vec<String>> {
+    let payload = serde_json::from_str::<serde_json::Value>(value).ok()?;
+    let values = match payload {
+        serde_json::Value::Array(values) => values,
+        serde_json::Value::Object(object) => ["tags", "keywords", "labels", "suggestions"]
+            .into_iter()
+            .find_map(|key| {
+                object
+                    .get(key)
+                    .and_then(serde_json::Value::as_array)
+                    .cloned()
+            })?,
+        _ => return None,
+    };
+    Some(
+        values
+            .into_iter()
+            .filter_map(|value| value.as_str().map(ToOwned::to_owned))
+            .collect(),
+    )
+}
+
+fn clean_tag_candidate(value: &str) -> String {
+    value
+        .trim()
+        .trim_start_matches(['-', '*', '•'])
+        .trim_start_matches(|character: char| {
+            character.is_ascii_digit() || matches!(character, '.' | ')' | '、')
+        })
+        .trim_matches(|character: char| {
+            character.is_whitespace()
+                || matches!(
+                    character,
+                    '"' | '\'' | '`' | '[' | ']' | '(' | ')' | '{' | '}' | ':' | '：'
+                )
+        })
+        .trim_start_matches('#')
+        .trim()
+        .to_string()
+}
+
 fn parse_tag_suggestions(value: &str) -> Vec<String> {
     let trimmed = value.trim();
-    let unfenced = trimmed
-        .strip_prefix("```json")
-        .or_else(|| trimmed.strip_prefix("```JSON"))
-        .or_else(|| trimmed.strip_prefix("```"))
-        .and_then(|content| content.strip_suffix("```"))
-        .map(str::trim)
-        .unwrap_or(trimmed);
+    let mut candidates = [
+        parse_json_tag_candidates(trimmed),
+        trimmed
+            .strip_prefix("```json")
+            .or_else(|| trimmed.strip_prefix("```JSON"))
+            .or_else(|| trimmed.strip_prefix("```"))
+            .and_then(|content| content.strip_suffix("```"))
+            .and_then(parse_json_tag_candidates),
+    ]
+    .into_iter()
+    .flatten()
+    .next();
 
-    let candidates = serde_json::from_str::<Vec<String>>(unfenced).unwrap_or_else(|_| {
-        unfenced
+    if candidates.is_none() {
+        for fragment in [
+            find_balanced_json(trimmed, '{', '}'),
+            find_balanced_json(trimmed, '[', ']'),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            if let Some(parsed) = parse_json_tag_candidates(fragment) {
+                candidates = Some(parsed);
+                break;
+            }
+        }
+    }
+
+    let candidates = candidates.unwrap_or_else(|| {
+        trimmed
+            .replace("```", "")
             .lines()
-            .flat_map(|line| line.split([',', '，', ';', '；']))
-            .map(|candidate| candidate.trim().trim_start_matches(['-', '*', '•']).trim())
-            .filter(|candidate| !candidate.is_empty())
-            .map(ToOwned::to_owned)
+            .flat_map(|line| {
+                let line = line
+                    .trim()
+                    .strip_prefix("标签:")
+                    .or_else(|| line.trim().strip_prefix("标签："))
+                    .unwrap_or(line.trim());
+                if line.contains('#') {
+                    line.split('#')
+                        .skip(1)
+                        .filter_map(|part| part.split_whitespace().next())
+                        .map(|candidate| format!("#{candidate}"))
+                        .collect::<Vec<_>>()
+                } else {
+                    line.split([',', '，', ';', '；', '、', '|'])
+                        .map(ToOwned::to_owned)
+                        .collect::<Vec<_>>()
+                }
+            })
             .collect()
     });
 
@@ -279,7 +387,7 @@ fn parse_tag_suggestions(value: &str) -> Vec<String> {
     candidates
         .into_iter()
         .filter_map(|candidate| {
-            let tag = candidate.trim().trim_start_matches('#').trim().to_string();
+            let tag = clean_tag_candidate(&candidate);
             if tag.is_empty()
                 || tag.chars().count() > MAX_TAG_CHARS
                 || tag.chars().any(char::is_control)
@@ -530,6 +638,32 @@ mod tests {
         assert_eq!(
             tags,
             vec!["rust".to_string(), "tauri".to_string(), "同步".to_string()]
+        );
+    }
+
+    #[test]
+    fn parses_tag_payloads_wrapped_in_json_or_markdown() {
+        assert_eq!(
+            parse_tag_suggestions(r#"{"tags":["Rust","Tauri"]}"#),
+            vec!["Rust".to_string(), "Tauri".to_string()]
+        );
+        assert_eq!(
+            parse_tag_suggestions(
+                "这里是标签建议：\n```json\n{\"keywords\":[\"同步\",\"搜索\"]}\n```"
+            ),
+            vec!["同步".to_string(), "搜索".to_string()]
+        );
+    }
+
+    #[test]
+    fn parses_hash_tags_from_a_single_line() {
+        assert_eq!(
+            parse_tag_suggestions("推荐标签：#Rust #Tauri #知识管理"),
+            vec![
+                "Rust".to_string(),
+                "Tauri".to_string(),
+                "知识管理".to_string()
+            ]
         );
     }
 }
