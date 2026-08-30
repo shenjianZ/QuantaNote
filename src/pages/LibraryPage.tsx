@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Copy,
+  Bookmark,
   Edit3,
   FileText,
   MoreHorizontal,
@@ -41,13 +42,31 @@ import { nativeLog } from "../utils/nativeLog";
 import { getVditorLang } from "../utils/vditorConfig";
 import { copyTextToSystemClipboard } from "../utils/clipboard";
 import { removeAttachmentReferences } from "../utils/markdownAttachments";
-import type { Item } from "../types";
+import type { Item, ItemType } from "../types";
 import type { AttachmentDto } from "../stores/attachmentStore";
-import { getNoteLinks, type NoteLinkDto, type SearchMode, type SearchScope } from "../services/tauriCommands";
+import { getAttachmentItemIds, getNoteLinks, type NoteLinkDto, type SearchMode, type SearchScope } from "../services/tauriCommands";
 import { DEFAULT_NOTE_PROPERTIES } from "../utils/frontmatter";
+import { createSavedSearchId, DEFAULT_SMART_COLLECTIONS, type SavedSearchCriteria, type SavedSearchItemType, type SavedSearchTimeRange } from "../utils/savedSearches";
 
 type TabKey = "recent" | "pinned" | "favorite";
 type SortOption = "updated" | "created" | "title" | "priority" | "due";
+
+function isWithinTimeRange(timestamp: string, range: SavedSearchTimeRange): boolean {
+  if (range === "all") return true;
+  const time = Date.parse(timestamp);
+  if (!Number.isFinite(time)) return false;
+  const now = new Date();
+  if (range === "today") {
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    return time >= startOfDay;
+  }
+  const days = range === "7d" ? 7 : 30;
+  return time >= Date.now() - days * 24 * 60 * 60 * 1000;
+}
+
+function isIncompleteStatus(status: string): boolean {
+  return !["done", "completed", "archived"].includes(status.toLowerCase());
+}
 
 interface LibraryPageProps {
   items: Item[];
@@ -82,6 +101,7 @@ export function LibraryPage({
   const { t } = useTranslation(["library", "common"]);
   const contentWidthProgress = useSettingsStore((s) => s.settings.contentWidthProgress);
   const showDocumentOutline = useSettingsStore((s) => s.settings.showDocumentOutline);
+  const savedSearches = useSettingsStore((s) => s.settings.savedSearches);
   const updateSetting = useSettingsStore((s) => s.updateSetting);
 
   const FILTERS: Array<{ key: TabKey; label: string }> = [
@@ -96,6 +116,12 @@ export function LibraryPage({
   const [sortOrder, setSortOrder] = useState<SortOption>("updated");
   const [propertyStatus, setPropertyStatus] = useState("all");
   const [propertyPriority, setPropertyPriority] = useState("all");
+  const [itemTypeFilter, setItemTypeFilter] = useState<SavedSearchItemType>("all");
+  const [timeRange, setTimeRange] = useState<SavedSearchTimeRange>("all");
+  const [untaggedOnly, setUntaggedOnly] = useState(false);
+  const [hasAttachmentsOnly, setHasAttachmentsOnly] = useState(false);
+  const [savedSearchName, setSavedSearchName] = useState("");
+  const [attachmentItemIds, setAttachmentItemIds] = useState<Set<string>>(new Set());
   const [searchMode, setSearchMode] = useState<SearchMode>("normal");
   const [searchScopes, setSearchScopes] = useState<SearchScope[]>(["content"]);
   const [readerOpen, setReaderOpen] = useState(false);
@@ -135,13 +161,14 @@ export function LibraryPage({
   const loadMoreSearch = useSearchStore((s) => s.loadMore);
 
   const propertyStatusOptions = useMemo(() => {
-    const values = Array.from(new Set(["all", ...items.map((item) => item.properties.status)]));
+    const values = Array.from(new Set(["all", "incomplete", ...items.map((item) => item.properties.status)]));
     const labels: Record<string, string> = {
       all: t("library:filter.allStatuses"),
       inbox: t("common:noteProperties.statuses.inbox"),
       "in-progress": t("common:noteProperties.statuses.inProgress"),
       done: t("common:noteProperties.statuses.done"),
       archived: t("common:noteProperties.statuses.archived"),
+      incomplete: t("library:filter.incomplete"),
     };
     return values.map((value) => ({ value, label: labels[value] ?? value }));
   }, [items, t]);
@@ -158,13 +185,28 @@ export function LibraryPage({
       tab: activeTab,
       tag: activeTag,
       sort: sortOrder === "priority" || sortOrder === "due" ? "updated" : sortOrder,
+      itemType: itemTypeFilter === "all" ? undefined : itemTypeFilter,
     }),
-    [activeTab, activeTag, sortOrder],
+    [activeTab, activeTag, itemTypeFilter, sortOrder],
   );
   const searchOptions = useMemo(
     () => ({ ...listOptions, mode: searchMode, scopes: searchScopes }),
     [listOptions, searchMode, searchScopes],
   );
+  const currentSearchCriteria = useMemo<SavedSearchCriteria>(() => ({
+    query,
+    activeTab,
+    tag: activeTag,
+    sort: sortOrder,
+    searchMode,
+    searchScopes,
+    status: propertyStatus,
+    priority: propertyPriority as SavedSearchCriteria["priority"],
+    type: itemTypeFilter,
+    timeRange,
+    untagged: untaggedOnly,
+    hasAttachments: hasAttachmentsOnly,
+  }), [activeTab, activeTag, hasAttachmentsOnly, itemTypeFilter, propertyPriority, propertyStatus, query, searchMode, searchScopes, sortOrder, timeRange, untaggedOnly]);
 
   const loadLibraryData = useCallback((append = false) => {
     fetchLibraryData(listOptions, append).then((result) => {
@@ -172,9 +214,22 @@ export function LibraryPage({
     });
   }, [fetchLibraryData, listOptions, setTags]);
 
+  const refreshAttachmentItemIds = useCallback(async () => {
+    try {
+      const ids = await getAttachmentItemIds();
+      setAttachmentItemIds(new Set(ids));
+    } catch {
+      setAttachmentItemIds(new Set());
+    }
+  }, []);
+
   useEffect(() => {
     loadLibraryData();
   }, [loadLibraryData]);
+
+  useEffect(() => {
+    refreshAttachmentItemIds();
+  }, [refreshAttachmentItemIds]);
 
   // 点击外部关闭下拉菜单
   useEffect(() => {
@@ -196,6 +251,7 @@ export function LibraryPage({
   useEffect(() => {
     function handleE2eDataChanged() {
       loadLibraryData();
+      refreshAttachmentItemIds();
       if (selectedItem.id) {
         fetchAttachments(selectedItem.id);
         fetchItemTags(selectedItem.id);
@@ -204,7 +260,7 @@ export function LibraryPage({
 
     window.addEventListener("quantanote:e2e-data-changed", handleE2eDataChanged);
     return () => window.removeEventListener("quantanote:e2e-data-changed", handleE2eDataChanged);
-  }, [fetchAttachments, fetchItemTags, loadLibraryData, selectedItem.id]);
+  }, [fetchAttachments, fetchItemTags, loadLibraryData, refreshAttachmentItemIds, selectedItem.id]);
 
   useEffect(() => {
     if (!selectedItem.id) return;
@@ -258,10 +314,10 @@ export function LibraryPage({
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      search(query, "note", searchOptions).catch(() => {});
+      search(query, itemTypeFilter === "all" ? undefined : itemTypeFilter, searchOptions).catch(() => {});
     }, 180);
     return () => clearTimeout(timer);
-  }, [query, search, searchOptions]);
+  }, [itemTypeFilter, query, search, searchOptions]);
 
   const searchMetadataById = useMemo(
     () => new Map(searchResults.map((result) => [result.id, result])),
@@ -297,8 +353,16 @@ export function LibraryPage({
 
     if (activeTab === "pinned") base = base.filter((item) => item.pinned);
     if (activeTab === "favorite") base = base.filter((item) => item.favorite);
-    if (propertyStatus !== "all") base = base.filter((item) => item.properties.status === propertyStatus);
+    if (itemTypeFilter !== "all") base = base.filter((item) => item.type === itemTypeFilter);
+    if (propertyStatus !== "all") {
+      base = propertyStatus === "incomplete"
+        ? base.filter((item) => isIncompleteStatus(item.properties.status))
+        : base.filter((item) => item.properties.status === propertyStatus);
+    }
     if (propertyPriority !== "all") base = base.filter((item) => item.properties.priority === propertyPriority);
+    if (timeRange !== "all") base = base.filter((item) => isWithinTimeRange(item.updatedAt, timeRange));
+    if (untaggedOnly) base = base.filter((item) => (itemTagNames[item.id] ?? []).length === 0);
+    if (hasAttachmentsOnly) base = base.filter((item) => attachmentItemIds.has(item.id));
 
     return [...base].sort((a, b) => {
       if (sortOrder === "title") return a.title.localeCompare(b.title);
@@ -316,11 +380,16 @@ export function LibraryPage({
       }
       return 0;
     });
-  }, [activeTab, activeTag, itemTagNames, items, propertyPriority, propertyStatus, query, searchResults, sortOrder, t]);
+  }, [activeTab, activeTag, attachmentItemIds, hasAttachmentsOnly, itemTagNames, itemTypeFilter, items, propertyPriority, propertyStatus, query, searchResults, sortOrder, t, timeRange, untaggedOnly]);
 
   const normalizedQuery = query.trim();
-  const hasPropertyFilter = propertyStatus !== "all" || propertyPriority !== "all";
-  const resultTotal = hasPropertyFilter
+  const hasLocalFilter = propertyStatus !== "all"
+    || propertyPriority !== "all"
+    || itemTypeFilter !== "all"
+    || timeRange !== "all"
+    || untaggedOnly
+    || hasAttachmentsOnly;
+  const resultTotal = hasLocalFilter
     ? visibleItems.length
     : normalizedQuery
     ? searchTotal
@@ -328,7 +397,7 @@ export function LibraryPage({
   const hasMore = normalizedQuery ? searchHasMore : items.length < libraryTotal;
   const handleLoadMore = useCallback(() => {
     if (normalizedQuery) {
-      return loadMoreSearch("note", searchOptions);
+      return loadMoreSearch(itemTypeFilter === "all" ? undefined : itemTypeFilter, searchOptions);
     }
     return loadLibraryData(true);
   }, [loadLibraryData, loadMoreSearch, normalizedQuery, searchOptions]);
@@ -340,6 +409,38 @@ export function LibraryPage({
       }
       return [...current, scope];
     });
+  }
+
+  function applySearchCriteria(criteria: SavedSearchCriteria) {
+    setQuery(criteria.query);
+    setActiveTab(criteria.activeTab);
+    setActiveTag(criteria.tag);
+    setSortOrder(criteria.sort);
+    setSearchMode(criteria.searchMode);
+    setSearchScopes(criteria.searchScopes);
+    setPropertyStatus(criteria.status);
+    setPropertyPriority(criteria.priority);
+    setItemTypeFilter(criteria.type);
+    setTimeRange(criteria.timeRange);
+    setUntaggedOnly(criteria.untagged);
+    setHasAttachmentsOnly(criteria.hasAttachments);
+    if (filterDetailsRef.current) filterDetailsRef.current.open = false;
+  }
+
+  function handleSaveSearch() {
+    const name = savedSearchName.trim();
+    if (!name) return;
+    updateSetting("savedSearches", [
+      ...savedSearches,
+      { id: createSavedSearchId(), name, ...currentSearchCriteria },
+    ]);
+    setSavedSearchName("");
+    useToastStore.getState().addToast("success", t("library:savedSearch.saved"));
+  }
+
+  function handleDeleteSavedSearch(id: string) {
+    updateSetting("savedSearches", savedSearches.filter((searchItem) => searchItem.id !== id));
+    useToastStore.getState().addToast("success", t("library:savedSearch.deleted"));
   }
 
   async function handleCopy() {
@@ -506,7 +607,7 @@ export function LibraryPage({
               <summary className="grid h-10 w-10 cursor-pointer list-none place-items-center rounded-full border border-[var(--line)] text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)] [&::-webkit-details-marker]:hidden" data-testid="library-filter-btn" aria-label={t("library:filter.title")}>
                 <ListFilter className="h-4 w-4" />
               </summary>
-              <div className="absolute right-0 top-12 z-20 w-64 rounded-2xl border border-[var(--line)] bg-[var(--popover)] p-4 shadow-2xl" data-testid="library-filter-panel">
+              <div className="absolute right-0 top-12 z-20 max-h-[min(70vh,42rem)] w-72 overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--popover)] p-4 shadow-2xl" data-testid="library-filter-panel">
                 <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">{t("library:filter.title")}</div>
                 <label className="mb-4 block">
                   <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.searchMode")}</span>
@@ -553,6 +654,37 @@ export function LibraryPage({
                     />
                   </span>
                 </label>
+                <label className="mb-4 block">
+                  <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.type")}</span>
+                  <span data-testid="library-item-type-filter">
+                    <Select
+                      value={itemTypeFilter}
+                      onChange={(value) => setItemTypeFilter(value as SavedSearchItemType)}
+                      options={[
+                        { value: "all", label: t("library:filter.allTypes") },
+                        ...(["note", "link", "file", "image", "code", "task"] as ItemType[]).map((type) => ({
+                          value: type,
+                          label: t(`library:filter.types.${type}`),
+                        })),
+                      ]}
+                    />
+                  </span>
+                </label>
+                <label className="mb-4 block">
+                  <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.timeRange")}</span>
+                  <span data-testid="library-time-range-filter">
+                    <Select
+                      value={timeRange}
+                      onChange={(value) => setTimeRange(value as SavedSearchTimeRange)}
+                      options={[
+                        { value: "all", label: t("library:filter.allTime") },
+                        { value: "today", label: t("library:filter.today") },
+                        { value: "7d", label: t("library:filter.last7Days") },
+                        { value: "30d", label: t("library:filter.last30Days") },
+                      ]}
+                    />
+                  </span>
+                </label>
                 <label className="block">
                   <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.tag")}</span>
                   <Select
@@ -564,6 +696,29 @@ export function LibraryPage({
                     ]}
                   />
                 </label>
+                <fieldset className="mt-4 space-y-2 border-0 border-t border-[var(--line)] p-0 pt-4">
+                  <legend className="mb-2 text-xs font-medium text-[var(--muted)]">{t("library:filter.flags")}</legend>
+                  <label className="flex items-center gap-2 text-sm text-[var(--text)]">
+                    <input
+                      type="checkbox"
+                      checked={untaggedOnly}
+                      onChange={(event) => setUntaggedOnly(event.currentTarget.checked)}
+                      data-testid="library-untagged-filter"
+                      className="accent-[var(--accent)]"
+                    />
+                    {t("library:filter.untagged")}
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-[var(--text)]">
+                    <input
+                      type="checkbox"
+                      checked={hasAttachmentsOnly}
+                      onChange={(event) => setHasAttachmentsOnly(event.currentTarget.checked)}
+                      data-testid="library-has-attachments-filter"
+                      className="accent-[var(--accent)]"
+                    />
+                    {t("library:filter.hasAttachments")}
+                  </label>
+                </fieldset>
                 <fieldset className="border-0 p-0">
                   <legend className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.searchScope")}</legend>
                   <div className="space-y-2">
@@ -581,8 +736,70 @@ export function LibraryPage({
                     ))}
                   </div>
                 </fieldset>
+                <div className="mt-4 border-t border-[var(--line)] pt-4" data-testid="library-save-search-form">
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:savedSearch.name")}</span>
+                    <input
+                      className="h-9 w-full rounded-lg border border-[var(--line)] bg-[var(--field)] px-2.5 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                      value={savedSearchName}
+                      placeholder={t("library:savedSearch.namePlaceholder")}
+                      data-testid="library-save-search-name"
+                      onChange={(event) => setSavedSearchName(event.currentTarget.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") handleSaveSearch();
+                      }}
+                    />
+                  </label>
+                  <button
+                    className="mt-2 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-[var(--accent)] px-3 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                    type="button"
+                    data-testid="library-save-search-btn"
+                    disabled={!savedSearchName.trim()}
+                    onClick={handleSaveSearch}
+                  >
+                    <Bookmark className="h-4 w-4" />
+                    {t("library:savedSearch.save")}
+                  </button>
+                </div>
               </div>
             </details>
+          </div>
+
+          <div className="mb-2 flex flex-wrap items-center gap-1.5" data-testid="library-smart-collections">
+            <span className="mr-1 text-xs font-medium text-[var(--muted)]">{t("library:collections.title")}</span>
+            {DEFAULT_SMART_COLLECTIONS.map((collection) => (
+              <button
+                key={collection.id}
+                className="inline-flex h-7 items-center gap-1 rounded-full border border-[var(--line)] px-2.5 text-xs text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                type="button"
+                data-testid={`library-smart-collection-${collection.id}`}
+                onClick={() => applySearchCriteria(collection)}
+              >
+                <Bookmark className="h-3.5 w-3.5" />
+                {t(collection.labelKey)}
+              </button>
+            ))}
+            {savedSearches.map((savedSearch) => (
+              <span key={savedSearch.id} className="inline-flex items-center rounded-full border border-[var(--accent)]/50 text-xs text-[var(--accent)]" data-testid={`library-saved-search-${savedSearch.id}`}>
+                <button
+                  className="inline-flex h-7 items-center gap-1 px-2.5 hover:opacity-80"
+                  type="button"
+                  onClick={() => applySearchCriteria(savedSearch)}
+                >
+                  <Bookmark className="h-3.5 w-3.5" />
+                  {savedSearch.name}
+                </button>
+                <button
+                  className="grid h-7 w-7 place-items-center border-l border-[var(--accent)]/30 hover:opacity-80"
+                  type="button"
+                  aria-label={t("library:savedSearch.delete", { name: savedSearch.name })}
+                  data-testid={`library-delete-saved-search-${savedSearch.id}`}
+                  onClick={() => handleDeleteSavedSearch(savedSearch.id)}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </span>
+            ))}
           </div>
 
           <div

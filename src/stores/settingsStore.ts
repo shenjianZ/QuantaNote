@@ -7,6 +7,7 @@ import { useItemStore } from "./itemStore";
 import { useToastStore } from "./toastStore";
 import { isMobile } from "../utils/platform";
 import { clampContentWidthProgress } from "../utils/contentWidth";
+import { normalizeSavedSearches, type SavedSearch } from "../utils/savedSearches";
 import {
     DEFAULT_SHORTCUTS,
     normalizeShortcutBindings,
@@ -75,6 +76,7 @@ export interface AppSettings {
     sqlLogging: SqlLogSettings;
     shortcuts: ShortcutBindings;
     locale: "zh-CN" | "en";
+    savedSearches: SavedSearch[];
 }
 
 export interface SqlLogSettings {
@@ -109,6 +111,7 @@ const DEFAULTS: AppSettings = {
     },
     shortcuts: DEFAULT_SHORTCUTS,
     locale: "en",
+    savedSearches: [],
 };
 
 const AVAILABLE_FONT_FAMILIES = new Set(["Noto Sans SC", "system-ui"]);
@@ -146,6 +149,7 @@ export function normalizeSettings(settings: AppSettings): AppSettings {
         sqlLogging: normalizeSqlLogSettings(settings.sqlLogging),
         shortcuts: normalizeShortcutBindings(settings.shortcuts),
         locale,
+        savedSearches: normalizeSavedSearches(settings.savedSearches),
     };
 }
 

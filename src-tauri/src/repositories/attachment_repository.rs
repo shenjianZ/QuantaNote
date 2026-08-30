@@ -452,6 +452,23 @@ pub fn get_by_item(db: &DbState, item_id: &str) -> Result<Vec<AttachmentDto>, Ap
     Ok(items)
 }
 
+pub fn get_item_ids_with_attachments(db: &DbState) -> Result<Vec<String>, AppError> {
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    let mut stmt = conn
+        .prepare("SELECT DISTINCT item_id FROM attachments ORDER BY item_id")
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+    let ids = stmt
+        .query_map([], |row| row.get(0))
+        .map_err(|e| AppError::Database(e.to_string()))?
+        .collect::<Result<Vec<String>, _>>()
+        .map_err(|e| AppError::Database(e.to_string()));
+    ids
+}
+
 pub fn delete(db: &DbState, id: &str) -> Result<(), AppError> {
     let conn = db
         .conn
@@ -646,5 +663,50 @@ mod tests {
         let (db, _item_id, _guard) = setup();
         let list = get_by_item(&db, "nonexistent-item").unwrap();
         assert!(list.is_empty());
+    }
+
+    #[test]
+    fn get_item_ids_with_attachments_returns_distinct_item_ids() {
+        let (db, item_id, _guard) = setup();
+        let second = item_repository::create(
+            &db,
+            CreateItemPayload {
+                title: "Second".to_string(),
+                item_type: "note".to_string(),
+                content: None,
+                summary: String::new(),
+            },
+        )
+        .unwrap();
+
+        add_bytes(
+            &db,
+            item_id.clone(),
+            "one.png".to_string(),
+            "image/png".to_string(),
+            b"one".to_vec(),
+        )
+        .unwrap();
+        add_bytes(
+            &db,
+            item_id.clone(),
+            "two.png".to_string(),
+            "image/png".to_string(),
+            b"two".to_vec(),
+        )
+        .unwrap();
+        add_bytes(
+            &db,
+            second.id.clone(),
+            "three.png".to_string(),
+            "image/png".to_string(),
+            b"three".to_vec(),
+        )
+        .unwrap();
+
+        let ids = get_item_ids_with_attachments(&db).unwrap();
+        assert_eq!(ids.len(), 2);
+        assert!(ids.contains(&item_id));
+        assert!(ids.contains(&second.id));
     }
 }

@@ -3,7 +3,7 @@ title: Library
 description: Browse, filter, and manage all your notes and items in the QuantaNote Library.
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-08-19
+lastUpdated: 2026-08-30
 ---
 
 # Library
@@ -45,6 +45,14 @@ In addition to the filter tabs, you can filter items by a specific tag. When a t
 ## Note Property Filters
 
 When a note has Frontmatter properties, the filter panel can also filter by status and priority. Property filters can be combined with the All, Pinned, Favorites, tag, and search conditions.
+
+The filter panel also supports item type, updated-time, untagged, and attachment conditions. The **Incomplete** status excludes items marked as done or archived.
+
+## Smart Collections and Saved Searches
+
+The Library provides four built-in smart collections: Recently modified, Unclassified, Favorites, and Incomplete. These are dynamic conditions and are recalculated from the current items whenever applied.
+
+Enter a name in the filter panel and choose **Save search** to persist the current query, tag, type, time, status, priority, attachment, and search-scope conditions. Saved searches are stored in app settings and remain available after restarting the app. Click a saved search to apply it again, or use its close button to delete it.
 
 To activate tag filtering, click on any tag badge on an item card, or use the tag filter dropdown in the Library toolbar.
 

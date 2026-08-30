@@ -42,6 +42,7 @@ describe("settingsStore", () => {
         },
         shortcuts: { ...DEFAULT_SHORTCUTS },
         locale: "zh-CN",
+        savedSearches: [],
       },
       dbSize: "计算中...",
     });

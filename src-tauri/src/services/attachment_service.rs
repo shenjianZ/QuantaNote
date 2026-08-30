@@ -52,6 +52,10 @@ pub fn get_attachments(db: &DbState, item_id: &str) -> Result<Vec<AttachmentDto>
     attachment_repository::get_by_item(db, item_id)
 }
 
+pub fn get_item_ids_with_attachments(db: &DbState) -> Result<Vec<String>, AppError> {
+    attachment_repository::get_item_ids_with_attachments(db)
+}
+
 pub fn delete_attachment(db: &DbState, id: &str) -> Result<(), AppError> {
     attachment_repository::delete(db, id)
 }

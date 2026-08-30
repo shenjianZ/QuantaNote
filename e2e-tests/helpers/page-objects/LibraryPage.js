@@ -15,6 +15,9 @@ class LibraryPage {
   get trashBtn() { return "[data-testid='library-trash-btn']"; }
   get searchInput() { return "[data-testid='library-search-input']"; }
   get filterBtn() { return "[data-testid='library-filter-btn']"; }
+  get smartCollections() { return "[data-testid='library-smart-collections']"; }
+  get saveSearchNameInput() { return "[data-testid='library-save-search-name']"; }
+  get saveSearchBtn() { return "[data-testid='library-save-search-btn']"; }
   get items() { return "[data-testid='library-item']"; }
   get readerDrawer() { return "[data-testid='reader-drawer']"; }
   get readerCloseBtn() { return "[data-testid='reader-close-btn']"; }
@@ -126,6 +129,70 @@ class LibraryPage {
 
   async selectPropertyPriority(label) {
     await this.selectPropertyFilter("priority", label);
+  }
+
+  async selectItemType(label) {
+    await this.openFilterPanel();
+    const select = await $("[data-testid='library-item-type-filter']");
+    await select.$("button").click();
+    const options = await select.$$("button");
+    for (const option of options) {
+      if ((await option.getText()).trim() === label) {
+        await option.click();
+        await observePause();
+        return;
+      }
+    }
+    throw new Error(`Library item type option not found: ${label}`);
+  }
+
+  async selectTimeRange(label) {
+    await this.openFilterPanel();
+    const select = await $("[data-testid='library-time-range-filter']");
+    await select.$("button").click();
+    const options = await select.$$("button");
+    for (const option of options) {
+      if ((await option.getText()).trim() === label) {
+        await option.click();
+        await observePause();
+        return;
+      }
+    }
+    throw new Error(`Library time range option not found: ${label}`);
+  }
+
+  async setLibraryFilterCheckbox(testId, enabled) {
+    await this.openFilterPanel();
+    const checkbox = await $(`[data-testid='${testId}']`);
+    if ((await checkbox.isSelected()) !== enabled) {
+      await checkbox.click();
+      await observePause();
+    }
+  }
+
+  async clickSmartCollection(id) {
+    await $(`[data-testid='library-smart-collection-${id}']`).click();
+    await observePause();
+  }
+
+  async saveCurrentSearch(name) {
+    await this.openFilterPanel();
+    const input = await $(this.saveSearchNameInput);
+    await input.setValue(name);
+    await $(this.saveSearchBtn).click();
+    await waitForDisplayed(`//*[contains(@data-testid, 'library-saved-search-')][contains(., '${name}')]`);
+  }
+
+  async deleteSavedSearch(name) {
+    const entry = await $(`//*[contains(@data-testid, 'library-saved-search-')][contains(., '${name}')]`);
+    await entry.$("button[data-testid^='library-delete-saved-search-']").click();
+    await expect(entry).not.toBeDisplayed();
+  }
+
+  async clickSavedSearch(name) {
+    const entry = await $(`//*[contains(@data-testid, 'library-saved-search-')][contains(., '${name}')]`);
+    await entry.$("button:not([data-testid^='library-delete-saved-search-'])").click();
+    await observePause();
   }
 
   async selectSearchMode(mode) {

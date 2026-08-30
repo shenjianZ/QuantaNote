@@ -39,6 +39,11 @@ pub fn get_attachments(
 }
 
 #[tauri::command]
+pub fn get_attachment_item_ids(db: State<'_, DbState>) -> Result<Vec<String>, AppError> {
+    attachment_service::get_item_ids_with_attachments(&db)
+}
+
+#[tauri::command]
 pub fn delete_attachment(db: State<'_, DbState>, id: String) -> Result<(), AppError> {
     attachment_service::delete_attachment(&db, &id)
 }

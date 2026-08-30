@@ -23,6 +23,25 @@
     "allStatuses": "全部状态",
     "priority": "优先级",
     "allPriorities": "全部优先级",
+    "incomplete": "未完成",
+    "type": "类型",
+    "allTypes": "全部类型",
+    "types": {
+      "note": "笔记",
+      "link": "链接",
+      "file": "文件",
+      "image": "图片",
+      "code": "代码",
+      "task": "任务"
+    },
+    "timeRange": "更新时间",
+    "allTime": "不限时间",
+    "today": "今天",
+    "last7Days": "最近 7 天",
+    "last30Days": "最近 30 天",
+    "flags": "附加条件",
+    "untagged": "未分类（无标签）",
+    "hasAttachments": "包含附件",
     "searchMode": "搜索模式",
     "normalMode": "普通搜索",
     "advancedMode": "高级搜索",
@@ -43,6 +62,21 @@
   },
   "unnamed": "未命名",
   "noPreview": "无正文预览",
+  "collections": {
+    "title": "智能集合",
+    "recentlyModified": "最近修改",
+    "unclassified": "未分类",
+    "favorites": "收藏",
+    "incomplete": "未完成"
+  },
+  "savedSearch": {
+    "name": "保存当前搜索",
+    "namePlaceholder": "例如：本周待处理",
+    "save": "保存搜索",
+    "saved": "搜索条件已保存",
+    "deleted": "已删除保存的搜索",
+    "delete": "删除“{{name}}”"
+  },
   "toast": {
     "movedToTrash": "记录已移入回收站"
   },

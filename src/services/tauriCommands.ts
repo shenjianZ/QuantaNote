@@ -194,6 +194,7 @@ export interface ItemPageDto {
 }
 
 export interface ItemPageOptions {
+    itemType?: string;
     tab?: "recent" | "pinned" | "favorite";
     tag?: string;
     sort?: "updated" | "created" | "title";
@@ -203,7 +204,7 @@ export interface ItemPageOptions {
 
 export async function getItemsPage(options: ItemPageOptions = {}) {
     return invoke<ItemPageDto>("get_items_page", {
-        itemType: null,
+        itemType: options.itemType ?? null,
         tab: options.tab ?? "recent",
         tag: options.tag ?? "all",
         sort: options.sort ?? "updated",
@@ -214,6 +215,10 @@ export async function getItemsPage(options: ItemPageOptions = {}) {
 
 export async function getAttachments(itemId: string) {
     return invoke("get_attachments", { itemId });
+}
+
+export async function getAttachmentItemIds() {
+    return invoke<string[]>("get_attachment_item_ids");
 }
 
 export async function deleteAttachment(id: string) {
