@@ -358,10 +358,16 @@ QuantaNote 已经具备比较完整的本地笔记软件基础：Markdown 编辑
 
 ### P3-03 AI 辅助
 
-- [ ] AI 摘要。
+- [x] AI 摘要。
 - [ ] 自动标签建议。
 - [ ] 笔记问答和关联推荐。
 - [ ] 所有云端处理都必须经过用户明确授权。
+
+当前已完成的 AI 摘要仅支持用户在编辑器中主动点击生成；不会自动上传笔记，也不会读取或上传附件、PDF 文本或 OCR 内容。API Key 仅保存到系统凭据管理器，其他 AI 能力仍需按“明确授权后再处理”的原则单独设计。
+
+已完成子任务：P3-03-01 用户触发的 AI 摘要（2026-08-30）
+修改范围：新增 OpenAI 兼容 Chat Completions 配置、系统凭据库中的 API Key 保存、编辑器显式生成摘要入口、手动摘要回写与中英文文案；补充 Rust/前端单元测试和桌面 E2E 入口回归。当前请求只发送笔记标题和正文，不处理附件、PDF 文本或图片 OCR。
+验证结果：`cargo fmt`、`cargo check`、`cargo test` 通过，共 156 个 Rust 测试；`pnpm exec tsc --noEmit`、`pnpm test:unit -- --run` 通过，共 35 个前端测试文件、176 个测试；`pnpm build` 和相关 E2E JavaScript `node --check` 通过；后端提交 `ff26dc9`，前端提交 `0cbc783`。
 
 ### P3-04 插件和扩展系统
 

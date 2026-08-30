@@ -3,7 +3,7 @@ title: Markdown Editor
 description: Use the QuantaNote Markdown editor with GFM, tables, charts, formulas, search and replace, and cross-platform shortcuts
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-08-29
+lastUpdated: 2026-08-30
 ---
 
 # Markdown Editor
@@ -89,6 +89,12 @@ Reducing the table size removes rows or columns from the end. Check the trailing
 ```
 
 The image button creates the attachment automatically. You can also drop an image into the editor or paste a screenshot from the clipboard. The Attachment Manager's insert action can place an existing attachment at the current caret.
+
+### AI Summary
+
+The editor sidebar provides an “AI Summary” button. Before using it, enable the feature under “Settings → Data → AI Summary” and enter an OpenAI-compatible Chat Completions endpoint and model. The API key is stored separately in the system credential manager rather than the configuration file. A local compatible service may be used without an API key.
+
+AI generation runs only after the user explicitly clicks the button. The request contains only the current note title and body; QuantaNote does not upload automatically and does not read or upload attachments, PDF text, or image OCR content. The result is written back as a manual summary. If the endpoint is unavailable or the configuration is incomplete, the existing body and summary are not overwritten.
 
 ### Note Links
 
