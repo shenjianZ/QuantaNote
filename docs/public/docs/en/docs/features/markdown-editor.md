@@ -100,6 +100,12 @@ AI generation runs only after the user explicitly clicks the button. The request
 
 The editor sidebar also provides a “Get AI tag suggestions” button, which calls the AI only after an explicit user click. Suggestions appear in a selectable preview list with new suggestions selected by default. Existing tags are not replaced; only after unchecking unwanted entries and clicking “Apply selected tags” are the chosen tags appended to the note. The request contains only the title and body, not attachments, PDF text, or image OCR content.
 
+### AI Q&A and Related Notes
+
+The editor sidebar's “AI Q&A and Related Notes” entry does not send requests automatically. After the user submits a question, the AI service receives only the current note's title, body, and that question; attachments, PDF text, and image OCR content are not read or uploaded. AI must be enabled in Settings, and each question requires an explicit submit action.
+
+“Find related notes” uses local search only. It searches note titles, summaries, and bodies without uploading candidate notes to the AI service; the current note is excluded and duplicate results are removed before display. This local search also runs only after the user clicks the button.
+
 ### Note Links
 
 Use `[[Note title]]` in the body to create a note link, or `[[Note title|Display label]]` to customize the visible text. Links can be clicked in the Library reader to navigate; clicking an unresolved target creates an empty note with that title. Examples inside fenced or inline code do not create relationships.
