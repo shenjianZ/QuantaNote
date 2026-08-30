@@ -96,6 +96,10 @@ The editor sidebar provides an “AI Summary” button. Before using it, enable 
 
 AI generation runs only after the user explicitly clicks the button. The request contains only the current note title and body; QuantaNote does not upload automatically and does not read or upload attachments, PDF text, or image OCR content. The result is written back as a manual summary. If the endpoint is unavailable or the configuration is incomplete, the existing body and summary are not overwritten.
 
+### AI Tag Suggestions
+
+The editor sidebar also provides a “Get AI tag suggestions” button, which calls the AI only after an explicit user click. Suggestions appear in a selectable preview list with new suggestions selected by default. Existing tags are not replaced; only after unchecking unwanted entries and clicking “Apply selected tags” are the chosen tags appended to the note. The request contains only the title and body, not attachments, PDF text, or image OCR content.
+
 ### Note Links
 
 Use `[[Note title]]` in the body to create a note link, or `[[Note title|Display label]]` to customize the visible text. Links can be clicked in the Library reader to navigate; clicking an unresolved target creates an empty note with that title. Examples inside fenced or inline code do not create relationships.
