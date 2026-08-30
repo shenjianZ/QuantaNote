@@ -514,6 +514,17 @@ export async function importDataZipBytes(data: number[], options: ImportOptions)
 }
 
 // Auto backup
+export interface RemoteBackupConfig {
+    enabled: boolean;
+    endpoint: string;
+    remote_path: string;
+    username: string;
+    password_configured: boolean;
+    last_upload_at: string | null;
+    last_upload_filename: string | null;
+    last_upload_error: string | null;
+}
+
 export interface AutoBackupConfig {
     enabled: boolean;
     interval_days: number;
@@ -523,6 +534,7 @@ export interface AutoBackupConfig {
     last_backup_filename?: string | null;
     last_backup_size?: number | null;
     last_backup_error?: string | null;
+    remote: RemoteBackupConfig;
 }
 
 export interface BackupFileInfo {
@@ -548,6 +560,18 @@ export async function getAutoBackupConfig() {
 
 export async function updateAutoBackupConfig(config: AutoBackupConfig) {
     return invoke("update_auto_backup_config", { config });
+}
+
+export async function saveRemoteBackupPassword(password: string) {
+    return invoke("save_remote_backup_password", { password });
+}
+
+export async function clearRemoteBackupPassword() {
+    return invoke("clear_remote_backup_password");
+}
+
+export async function testRemoteBackup() {
+    return invoke<boolean>("test_remote_backup");
 }
 
 export async function triggerBackupNow() {

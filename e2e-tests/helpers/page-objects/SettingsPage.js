@@ -156,6 +156,19 @@ class SettingsPage {
     await observePause();
   }
 
+  async toggleRemoteBackup(enabled = true) {
+    const toggle = await $("[data-testid='remote-backup-toggle']");
+    const current = (await toggle.getAttribute("aria-checked")) === "true";
+    if (current !== enabled) {
+      await toggle.click();
+      await observePause();
+    }
+  }
+
+  async getRemoteBackupSection() {
+    return $("[data-testid='remote-backup-settings']");
+  }
+
   async clickClearSqlLog() {
     await $("[data-testid='settings-clear-sql-log-btn']").then(b => b.click());
     await observePause();

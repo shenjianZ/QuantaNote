@@ -50,6 +50,22 @@ describe("Settings extended coverage", () => {
         expect(await btn.isDisplayed()).toBe(true);
     });
 
+    it("displays optional WebDAV remote backup controls", async () => {
+        const section = await SettingsPage.getRemoteBackupSection();
+        expect(await section.isDisplayed()).toBe(true);
+
+        await SettingsPage.toggleRemoteBackup(true);
+        expect(await $("[data-testid='remote-backup-endpoint']").isDisplayed()).toBe(true);
+        expect(await $("[data-testid='remote-backup-path']").isDisplayed()).toBe(true);
+        expect(await $("[data-testid='remote-backup-username']").isDisplayed()).toBe(true);
+        expect(await $("[data-testid='remote-backup-password']").isDisplayed()).toBe(true);
+        expect(await $("[data-testid='remote-backup-save-config-btn']").isDisplayed()).toBe(true);
+        expect(await $("[data-testid='remote-backup-save-password-btn']").isDisplayed()).toBe(true);
+        expect(await $("[data-testid='remote-backup-test-btn']").isDisplayed()).toBe(true);
+
+        await SettingsPage.toggleRemoteBackup(false);
+    });
+
     it("displays attachment storage consistency controls", async () => {
         const section = await $("[data-testid='storage-consistency-section']");
         expect(await section.isDisplayed()).toBe(true);

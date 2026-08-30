@@ -25,6 +25,9 @@ import {
     importDataZipBytes,
     getAutoBackupConfig,
     updateAutoBackupConfig as updateAutoBackupConfigCmd,
+    saveRemoteBackupPassword as saveRemoteBackupPasswordCmd,
+    clearRemoteBackupPassword as clearRemoteBackupPasswordCmd,
+    testRemoteBackup as testRemoteBackupCmd,
     triggerBackupNow as triggerBackupNowCmd,
     getBackupDirPath as getBackupDirPathCmd,
     listBackups as listBackupsCmd,
@@ -358,6 +361,9 @@ interface SettingsState {
     importDataWithOptions: (options: ImportOptions) => Promise<void>;
     fetchAutoBackupConfig: () => Promise<void>;
     updateAutoBackupConfig: (config: AutoBackupConfig) => Promise<void>;
+    saveRemoteBackupPassword: (password: string) => Promise<void>;
+    clearRemoteBackupPassword: () => Promise<void>;
+    testRemoteBackup: () => Promise<boolean>;
     triggerBackupNow: () => Promise<void>;
     fetchBackupDirPath: () => Promise<void>;
     fetchBackups: () => Promise<void>;
@@ -765,6 +771,40 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             set({ logDir, sqlLogPath });
         } catch {
             set({ logDir: "", sqlLogPath: "" });
+        }
+    },
+
+    saveRemoteBackupPassword: async (password: string) => {
+        try {
+            await saveRemoteBackupPasswordCmd(password);
+            await get().fetchAutoBackupConfig();
+            useToastStore.getState().addToast("success", i18n.t("common:toast.remoteBackupPasswordSaved"));
+        } catch {
+            useToastStore.getState().addToast("error", i18n.t("common:toast.remoteBackupPasswordSaveFailed"));
+        }
+    },
+
+    clearRemoteBackupPassword: async () => {
+        try {
+            await clearRemoteBackupPasswordCmd();
+            await get().fetchAutoBackupConfig();
+            useToastStore.getState().addToast("success", i18n.t("common:toast.remoteBackupPasswordCleared"));
+        } catch {
+            useToastStore.getState().addToast("error", i18n.t("common:toast.remoteBackupPasswordClearFailed"));
+        }
+    },
+
+    testRemoteBackup: async () => {
+        try {
+            const connected = await testRemoteBackupCmd();
+            useToastStore.getState().addToast(
+                connected ? "success" : "error",
+                i18n.t(connected ? "common:toast.remoteBackupTestSuccess" : "common:toast.remoteBackupTestFailed"),
+            );
+            return connected;
+        } catch {
+            useToastStore.getState().addToast("error", i18n.t("common:toast.remoteBackupTestFailed"));
+            return false;
         }
     },
 

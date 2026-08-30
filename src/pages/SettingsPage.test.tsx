@@ -12,6 +12,10 @@ vi.mock("@tauri-apps/plugin-opener", () => ({
 describe("SettingsPage", () => {
     const updateSettingMock = vi.fn();
     const updateSqlLoggingMock = vi.fn();
+    const updateAutoBackupConfigMock = vi.fn();
+    const saveRemoteBackupPasswordMock = vi.fn();
+    const clearRemoteBackupPasswordMock = vi.fn();
+    const testRemoteBackupMock = vi.fn();
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -49,6 +53,16 @@ describe("SettingsPage", () => {
                 max_backups: 10,
                 expire_days: 90,
                 last_backup_at: null,
+                remote: {
+                    enabled: false,
+                    endpoint: "",
+                    remote_path: "quantanote/backups",
+                    username: "",
+                    password_configured: false,
+                    last_upload_at: null,
+                    last_upload_filename: null,
+                    last_upload_error: null,
+                },
             },
             backupDirPath: "D:\\data\\backups",
             backupFiles: [],
@@ -66,7 +80,10 @@ describe("SettingsPage", () => {
             exportDataWithOptions: vi.fn(),
             importDataWithOptions: vi.fn(),
             fetchAutoBackupConfig: vi.fn(),
-            updateAutoBackupConfig: vi.fn(),
+            updateAutoBackupConfig: updateAutoBackupConfigMock,
+            saveRemoteBackupPassword: saveRemoteBackupPasswordMock,
+            clearRemoteBackupPassword: clearRemoteBackupPasswordMock,
+            testRemoteBackup: testRemoteBackupMock,
             triggerBackupNow: vi.fn(),
             fetchBackupDirPath: vi.fn(),
             fetchBackups: vi.fn(),
@@ -210,6 +227,16 @@ describe("SettingsPage", () => {
                 last_backup_filename: "manual-backup-2026-08-30T08-30-00-ab12cd34.zip",
                 last_backup_size: 2048,
                 last_backup_error: "附件哈希校验失败: image.png",
+                remote: {
+                    enabled: false,
+                    endpoint: "",
+                    remote_path: "quantanote/backups",
+                    username: "",
+                    password_configured: false,
+                    last_upload_at: null,
+                    last_upload_filename: null,
+                    last_upload_error: null,
+                },
             },
         });
         const { user } = setup(<SettingsPage />);
@@ -218,5 +245,28 @@ describe("SettingsPage", () => {
         expect(screen.getByTestId("backup-last-success")).toHaveTextContent("manual-backup-");
         expect(screen.getByTestId("backup-last-success")).toHaveTextContent("2.0 KB");
         expect(screen.getByTestId("backup-last-error")).toHaveTextContent("附件哈希校验失败");
+    });
+
+    it("saves WebDAV config and password separately", async () => {
+        const { user } = setup(<SettingsPage />);
+
+        await user.click(screen.getByText("数据"));
+        await user.click(screen.getByTestId("remote-backup-toggle"));
+        await user.type(screen.getByTestId("remote-backup-endpoint"), "https://dav.example.com/dav");
+        await user.type(screen.getByTestId("remote-backup-password"), "secret");
+
+        await user.click(screen.getByTestId("remote-backup-save-config-btn"));
+        expect(updateAutoBackupConfigMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                remote: expect.objectContaining({
+                    enabled: true,
+                    endpoint: "https://dav.example.com/dav",
+                }),
+            }),
+        );
+        expect(saveRemoteBackupPasswordMock).not.toHaveBeenCalled();
+
+        await user.click(screen.getByTestId("remote-backup-save-password-btn"));
+        expect(saveRemoteBackupPasswordMock).toHaveBeenCalledWith("secret");
     });
 });

@@ -33,6 +33,7 @@ import { useSettingsStore } from "../stores/settingsStore";
 import { useAppStore } from "../stores/appStore";
 import { useToastStore } from "../stores/toastStore";
 import { useUpdaterStore } from "../stores/updaterStore";
+import type { RemoteBackupConfig } from "../services/tauriCommands";
 import { isMobile } from "../utils/platform";
 import { copyTextToSystemClipboard } from "../utils/clipboard";
 import {
@@ -77,6 +78,19 @@ interface SettingsPageProps {
 
 const rowClass =
     "flex min-h-12 items-center justify-between gap-4 border-b border-[var(--line)] py-2 last:border-b-0";
+const inputClass =
+    "w-full rounded-xl border border-[var(--line)] bg-[var(--field)] px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]";
+
+const DEFAULT_REMOTE_BACKUP: RemoteBackupConfig = {
+    enabled: false,
+    endpoint: "",
+    remote_path: "quantanote/backups",
+    username: "",
+    password_configured: false,
+    last_upload_at: null,
+    last_upload_filename: null,
+    last_upload_error: null,
+};
 
 function formatStorageBytes(bytes: number) {
     if (bytes < 1024) return `${bytes} B`;
@@ -124,6 +138,9 @@ export function SettingsPage({
     const [exportModalOpen, setExportModalOpen] = useState(false);
     const [importModalOpen, setImportModalOpen] = useState(false);
     const [backupManagerOpen, setBackupManagerOpen] = useState(false);
+    const [remotePassword, setRemotePassword] = useState("");
+    const [remoteTesting, setRemoteTesting] = useState(false);
+    const [remoteDraft, setRemoteDraft] = useState<RemoteBackupConfig>(DEFAULT_REMOTE_BACKUP);
     const [recordingShortcutId, setRecordingShortcutId] = useState<ShortcutId | null>(null);
     const settings = useSettingsStore((s) => s.settings);
     const [shortcutDraft, setShortcutDraft] = useState(settings.shortcuts);
@@ -145,6 +162,9 @@ export function SettingsPage({
     const optimizeDb = useSettingsStore((s) => s.optimizeDb);
     const fetchAutoBackupConfig = useSettingsStore((s) => s.fetchAutoBackupConfig);
     const updateAutoBackupConfig = useSettingsStore((s) => s.updateAutoBackupConfig);
+    const saveRemoteBackupPassword = useSettingsStore((s) => s.saveRemoteBackupPassword);
+    const clearRemoteBackupPassword = useSettingsStore((s) => s.clearRemoteBackupPassword);
+    const testRemoteBackup = useSettingsStore((s) => s.testRemoteBackup);
     const triggerBackupNow = useSettingsStore((s) => s.triggerBackupNow);
     const fetchBackupDirPath = useSettingsStore((s) => s.fetchBackupDirPath);
     const fetchBackups = useSettingsStore((s) => s.fetchBackups);
@@ -157,6 +177,12 @@ export function SettingsPage({
     const checkForUpdates = useUpdaterStore((s) => s.checkForUpdates);
     const downloadUpdate = useUpdaterStore((s) => s.downloadUpdate);
     const installUpdate = useUpdaterStore((s) => s.installUpdate);
+
+    useEffect(() => {
+        if (autoBackupConfig?.remote) {
+            setRemoteDraft(autoBackupConfig.remote);
+        }
+    }, [autoBackupConfig?.remote]);
 
     useEffect(() => {
         setShortcutDraft(settings.shortcuts);
@@ -230,6 +256,33 @@ export function SettingsPage({
         const next = { ...shortcutDraft, [id]: value };
         setShortcutDraft(next);
         updateSetting("shortcuts", next);
+    }
+
+    function updateRemoteDraft<K extends keyof RemoteBackupConfig>(
+        field: K,
+        value: RemoteBackupConfig[K],
+    ) {
+        setRemoteDraft((current) => ({ ...current, [field]: value }));
+    }
+
+    function saveRemoteConfig() {
+        if (!autoBackupConfig) return;
+        void updateAutoBackupConfig({ ...autoBackupConfig, remote: remoteDraft });
+    }
+
+    async function handleRemotePasswordSave() {
+        if (!remotePassword) return;
+        await saveRemoteBackupPassword(remotePassword);
+        setRemotePassword("");
+    }
+
+    async function handleRemoteTest() {
+        setRemoteTesting(true);
+        try {
+            await testRemoteBackup();
+        } finally {
+            setRemoteTesting(false);
+        }
     }
 
     function handleShortcutKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, id: ShortcutId) {
@@ -810,6 +863,132 @@ export function SettingsPage({
                                 onClose={() => setBackupManagerOpen(false)}
                             />
                         </div>
+                    </section>
+                    <section className="mb-6" data-testid="remote-backup-settings">
+                        <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">
+                            {t("settings:data.remoteBackup")}
+                        </h2>
+                        <div className="mb-3 text-xs text-[var(--muted)]">
+                            {t("settings:data.remoteBackupDesc")}
+                        </div>
+                        <div className={rowClass}>
+                            <span className="text-sm text-[var(--text)]">
+                                {t("settings:data.enableRemoteBackup")}
+                            </span>
+                            {renderToggle(
+                                remoteDraft.enabled,
+                                (value) => updateRemoteDraft("enabled", value),
+                                "remote-backup-toggle",
+                            )}
+                        </div>
+                        {remoteDraft.enabled && (
+                            <div className="mt-3 space-y-3 rounded-2xl border border-[var(--line)] bg-[var(--field)] p-4">
+                                <label className="block text-xs text-[var(--muted)]">
+                                    {t("settings:data.webdavEndpoint")}
+                                    <input
+                                        className={`${inputClass} mt-1`}
+                                        data-testid="remote-backup-endpoint"
+                                        type="url"
+                                        value={remoteDraft.endpoint}
+                                        onChange={(event) => updateRemoteDraft("endpoint", event.target.value)}
+                                        placeholder="https://dav.example.com/remote.php/dav/files/user"
+                                    />
+                                </label>
+                                <label className="block text-xs text-[var(--muted)]">
+                                    {t("settings:data.webdavPath")}
+                                    <input
+                                        className={`${inputClass} mt-1`}
+                                        data-testid="remote-backup-path"
+                                        value={remoteDraft.remote_path}
+                                        onChange={(event) => updateRemoteDraft("remote_path", event.target.value)}
+                                        placeholder="quantanote/backups"
+                                    />
+                                </label>
+                                <label className="block text-xs text-[var(--muted)]">
+                                    {t("settings:data.webdavUsername")}
+                                    <input
+                                        className={`${inputClass} mt-1`}
+                                        data-testid="remote-backup-username"
+                                        value={remoteDraft.username}
+                                        onChange={(event) => updateRemoteDraft("username", event.target.value)}
+                                    />
+                                </label>
+                                <label className="block text-xs text-[var(--muted)]">
+                                    {t("settings:data.webdavPassword")}
+                                    <input
+                                        className={`${inputClass} mt-1`}
+                                        data-testid="remote-backup-password"
+                                        type="password"
+                                        value={remotePassword}
+                                        onChange={(event) => setRemotePassword(event.target.value)}
+                                        placeholder={t("settings:data.webdavPasswordPlaceholder")}
+                                    />
+                                </label>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <button
+                                        className="rounded-full bg-[var(--accent)] px-3 py-2 text-xs text-white hover:opacity-90"
+                                        data-testid="remote-backup-save-config-btn"
+                                        type="button"
+                                        onClick={saveRemoteConfig}
+                                    >
+                                        {t("settings:data.saveWebdavConfig")}
+                                    </button>
+                                    <button
+                                        className="rounded-full bg-[var(--field)] px-3 py-2 text-xs text-[var(--text)] hover:bg-[var(--hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                                        data-testid="remote-backup-save-password-btn"
+                                        type="button"
+                                        disabled={!remotePassword}
+                                        onClick={() => void handleRemotePasswordSave()}
+                                    >
+                                        {t("settings:data.saveWebdavPassword")}
+                                    </button>
+                                    <button
+                                        className="rounded-full bg-[var(--field)] px-3 py-2 text-xs text-[var(--text)] hover:bg-[var(--hover)]"
+                                        data-testid="remote-backup-test-btn"
+                                        type="button"
+                                        disabled={remoteTesting}
+                                        onClick={() => void handleRemoteTest()}
+                                    >
+                                        {t("settings:data.testWebdav")}
+                                    </button>
+                                    {remoteDraft.password_configured && (
+                                        <button
+                                            className="rounded-full px-3 py-2 text-xs text-red-300 hover:bg-red-400/10"
+                                            data-testid="remote-backup-clear-password-btn"
+                                            type="button"
+                                            onClick={() => void clearRemoteBackupPassword()}
+                                        >
+                                            {t("settings:data.clearWebdavPassword")}
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="text-xs text-[var(--muted)]">
+                                    {remoteDraft.password_configured
+                                        ? t("settings:data.webdavPasswordConfigured")
+                                        : t("settings:data.webdavPasswordPlaceholder")}
+                                </div>
+                                <div className="border-t border-[var(--line)] pt-3 text-xs text-[var(--muted)]">
+                                    <span className="text-[var(--text)]">
+                                        {t("settings:data.remoteBackupLastUpload")}：
+                                    </span>{" "}
+                                    {remoteDraft.last_upload_at
+                                        ? new Date(remoteDraft.last_upload_at).toLocaleString()
+                                        : t("settings:data.remoteBackupNeverUploaded")}
+                                    {remoteDraft.last_upload_filename && (
+                                        <span className="ml-2 break-all">{remoteDraft.last_upload_filename}</span>
+                                    )}
+                                </div>
+                                {remoteDraft.last_upload_error && (
+                                    <div
+                                        className="rounded-xl border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-xs text-amber-300"
+                                        data-testid="remote-backup-last-error"
+                                    >
+                                        <div className="font-medium">{t("settings:data.remoteBackupLastError")}</div>
+                                        <div className="mt-1 break-all">{remoteDraft.last_upload_error}</div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </section>
                     <section className="mb-6">
                         <h2 className="mb-2 text-sm font-semibold text-[var(--text)]">
