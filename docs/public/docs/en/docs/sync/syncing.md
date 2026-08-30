@@ -42,7 +42,10 @@ QuantaNote's sync process consists of the following stages:
 During sync, the status bar shows real-time progress:
 - Current sync stage name (e.g., "Pushing", "Pulling")
 - Records processed / total records
+- During attachment sync, "Uploading attachments" or "Downloading attachments" and processed attachments / total attachments
 - Estimated time remaining (optional)
+
+Attachment progress is currently counted by number of attachments, not bytes. For one large attachment, the counter may not advance until the request finishes; an interrupted sync retransmits unfinished attachments because resumable transfer is not supported yet.
 
 ## Auto Sync
 
@@ -122,7 +125,18 @@ The sync engine handles the following five data types:
 ### Attachments
 
 - Attachment metadata (filename, size, MIME type)
-- Attachment file content (transferred in chunks)
+- Attachment file content (uploaded and downloaded per attachment, with content-hash deduplication)
+
+### Attachment Transfer Status
+
+The built-in cloud sync currently handles attachments as follows:
+
+1. The client submits local attachment content hashes, and the server returns missing attachments and remote metadata
+2. Uploads use one complete request body, and downloads use one complete response body
+3. The server currently has no `Range`, `Content-Range`, upload-session, or chunk-offset protocol
+4. Progress is therefore attachment-level rather than byte-level; a failed request cannot resume from its interrupted offset
+
+True resumable transfer requires coordinated support in the client, HTTP API, and storage backend for upload sessions, chunk checksums, idempotent finalization, failed-chunk cleanup, and ranged download responses. Until that protocol is upgraded, the client does not claim to support resumable transfer.
 
 ### Versions (Version History)
 
