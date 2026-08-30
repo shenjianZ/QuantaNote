@@ -6,6 +6,26 @@
   "searching": "搜索中",
   "resultCount": "共 {{count}} 条记录",
   "loadingMore": "加载更多…",
+  "calendar": {
+    "open": "日历视图",
+    "listView": "列表视图",
+    "previousMonth": "上个月",
+    "nextMonth": "下个月",
+    "loading": "加载日期记录…",
+    "weekdays": {
+      "sun": "日",
+      "mon": "一",
+      "tue": "二",
+      "wed": "三",
+      "thu": "四",
+      "fri": "五",
+      "sat": "六"
+    },
+    "dayLabel": "{{date}}，{{count}} 条记录",
+    "selectedCount": "{{count}} 条记录",
+    "selectHint": "选择一个日期查看或创建每日笔记",
+    "openDailyNote": "打开每日笔记"
+  },
   "filter": {
     "title": "筛选",
     "all": "全部",

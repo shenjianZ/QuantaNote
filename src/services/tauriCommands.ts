@@ -84,6 +84,19 @@ export async function getItem(id: string) {
     return invoke("get_item", { id });
 }
 
+export interface DailyRecordCountDto {
+    date: string;
+    count: number;
+}
+
+export async function getDailyNote(date: string) {
+    return invoke<ItemDto | null>("get_daily_note", { date });
+}
+
+export async function getRecordDateCounts(startDate: string, endDate: string) {
+    return invoke<DailyRecordCountDto[]>("get_record_date_counts", { startDate, endDate });
+}
+
 export async function updateItem(id: string, updates: Record<string, unknown>) {
     return invoke("update_item", { id, ...updates });
 }

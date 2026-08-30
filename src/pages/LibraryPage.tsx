@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Copy,
   Bookmark,
+  CalendarDays,
   Edit3,
   FileText,
   MoreHorizontal,
@@ -27,6 +28,7 @@ import { AttachmentManagerModal } from "../components/common/AttachmentManagerMo
 import { TrashModal } from "../components/common/TrashModal";
 import { VirtualItemList } from "../components/common/VirtualItemList";
 import { SearchHighlight } from "../components/common/SearchHighlight";
+import { CalendarView } from "../components/common/CalendarView";
 import { useAppStore } from "../stores/appStore";
 import { APP_COMMAND_EVENT, getAppCommandId } from "../utils/appCommands";
 import { useAttachmentStore } from "../stores/attachmentStore";
@@ -44,9 +46,10 @@ import { copyTextToSystemClipboard } from "../utils/clipboard";
 import { removeAttachmentReferences } from "../utils/markdownAttachments";
 import type { Item, ItemType } from "../types";
 import type { AttachmentDto } from "../stores/attachmentStore";
-import { getAttachmentItemIds, getNoteLinks, type NoteLinkDto, type SearchMode, type SearchScope } from "../services/tauriCommands";
+import { getAttachmentItemIds, getNoteLinks, getRecordDateCounts, type NoteLinkDto, type SearchMode, type SearchScope } from "../services/tauriCommands";
 import { DEFAULT_NOTE_PROPERTIES } from "../utils/frontmatter";
 import { createSavedSearchId, DEFAULT_SMART_COLLECTIONS, type SavedSearchCriteria, type SavedSearchItemType, type SavedSearchTimeRange } from "../utils/savedSearches";
+import { getMonthRange, shiftMonth } from "../utils/dailyNotes";
 
 type TabKey = "recent" | "pinned" | "favorite";
 type SortOption = "updated" | "created" | "title" | "priority" | "due";
@@ -75,6 +78,7 @@ interface LibraryPageProps {
   onOpenLinkedNote?: (title: string, targetId: string | null) => void;
   onCreateItem: () => void;
   onOpenDocument: () => void;
+  onOpenDailyNote?: (dateKey: string) => void;
   previewRequest?: {
     itemId: string;
     requestId: number;
@@ -92,6 +96,7 @@ export function LibraryPage({
   onOpenLinkedNote,
   onCreateItem,
   onOpenDocument,
+  onOpenDailyNote,
   previewRequest,
   onPreviewItemOpen,
   onPreviewRequestClear,
@@ -130,6 +135,12 @@ export function LibraryPage({
   const [attachmentModalOpen, setAttachmentModalOpen] = useState(false);
   const [trashModalOpen, setTrashModalOpen] = useState(false);
   const [deleteConfirming, setDeleteConfirming] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [calendarSelectedDate, setCalendarSelectedDate] = useState<string | null>(null);
+  const [calendarCounts, setCalendarCounts] = useState<Record<string, number>>({});
+  const [calendarLoading, setCalendarLoading] = useState(false);
+  const [calendarRefreshToken, setCalendarRefreshToken] = useState(0);
   const filterDetailsRef = useRef<HTMLDetailsElement>(null);
   const menuDetailsRef = useRef<HTMLDetailsElement>(null);
 
@@ -228,6 +239,27 @@ export function LibraryPage({
   }, [loadLibraryData]);
 
   useEffect(() => {
+    if (!calendarOpen) return;
+    let active = true;
+    const { startDate, endDate } = getMonthRange(calendarMonth);
+    setCalendarLoading(true);
+    getRecordDateCounts(startDate, endDate)
+      .then((rows) => {
+        if (!active) return;
+        setCalendarCounts(Object.fromEntries(rows.map((row) => [row.date, row.count])));
+      })
+      .catch(() => {
+        if (active) setCalendarCounts({});
+      })
+      .finally(() => {
+        if (active) setCalendarLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [calendarMonth, calendarOpen, calendarRefreshToken]);
+
+  useEffect(() => {
     refreshAttachmentItemIds();
   }, [refreshAttachmentItemIds]);
 
@@ -252,6 +284,7 @@ export function LibraryPage({
     function handleE2eDataChanged() {
       loadLibraryData();
       refreshAttachmentItemIds();
+      setCalendarRefreshToken((token) => token + 1);
       if (selectedItem.id) {
         fetchAttachments(selectedItem.id);
         fetchItemTags(selectedItem.id);
@@ -763,6 +796,20 @@ export function LibraryPage({
                 </div>
               </div>
             </details>
+            <button
+              className={`grid h-10 w-10 place-items-center rounded-full border border-[var(--line)] ${calendarOpen ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"}`}
+              type="button"
+              data-testid="library-calendar-toggle"
+              aria-label={calendarOpen ? t("library:calendar.listView") : t("library:calendar.open")}
+              aria-pressed={calendarOpen}
+              onClick={() => {
+                setCalendarOpen((open) => !open);
+                setCalendarSelectedDate(null);
+                if (filterDetailsRef.current) filterDetailsRef.current.open = false;
+              }}
+            >
+              <CalendarDays className="h-4 w-4" />
+            </button>
           </div>
 
           <div className="mb-2 flex flex-wrap items-center gap-1.5" data-testid="library-smart-collections">
@@ -811,7 +858,21 @@ export function LibraryPage({
           </div>
 
           <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--paper)]">
-            {loading && visibleItems.length === 0 ? (
+            {calendarOpen ? (
+              <CalendarView
+                month={calendarMonth}
+                counts={calendarCounts}
+                selectedDate={calendarSelectedDate}
+                loading={calendarLoading}
+                onMonthChange={(offset) => {
+                  setCalendarMonth((current) => shiftMonth(current, offset));
+                  setCalendarSelectedDate(null);
+                }}
+                onSelectDate={setCalendarSelectedDate}
+                onOpenDailyNote={onOpenDailyNote}
+                onBackToList={() => setCalendarOpen(false)}
+              />
+            ) : loading && visibleItems.length === 0 ? (
               <SkeletonList count={6} />
             ) : visibleItems.length === 0 ? (
               <div className="grid h-full place-items-center px-8 text-center">

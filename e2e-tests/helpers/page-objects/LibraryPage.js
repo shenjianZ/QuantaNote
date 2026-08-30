@@ -15,6 +15,9 @@ class LibraryPage {
   get trashBtn() { return "[data-testid='library-trash-btn']"; }
   get searchInput() { return "[data-testid='library-search-input']"; }
   get filterBtn() { return "[data-testid='library-filter-btn']"; }
+  get calendarToggle() { return "[data-testid='library-calendar-toggle']"; }
+  get calendarView() { return "[data-testid='library-calendar-view']"; }
+  get calendarOpenDailyBtn() { return "[data-testid='library-calendar-open-daily']"; }
   get smartCollections() { return "[data-testid='library-smart-collections']"; }
   get saveSearchNameInput() { return "[data-testid='library-save-search-name']"; }
   get saveSearchBtn() { return "[data-testid='library-save-search-btn']"; }
@@ -44,6 +47,28 @@ class LibraryPage {
       await blankButton.click();
     }
     await waitForDisplayed("input[placeholder='文档标题']");
+  }
+
+  async openCalendar() {
+    const readerClose = await $(this.readerCloseBtn);
+    if (await readerClose.isDisplayed()) {
+      await clickByDom(readerClose);
+    }
+    const toggle = await $(this.calendarToggle);
+    if ((await toggle.getAttribute("aria-pressed")) !== "true") {
+      await toggle.click();
+    }
+    await waitForDisplayed(this.calendarView);
+  }
+
+  async selectCalendarDate(dateKey) {
+    await $(`[data-testid='library-calendar-day-${dateKey}']`).click();
+    await observePause();
+  }
+
+  async openSelectedDailyNote() {
+    await $(this.calendarOpenDailyBtn).click();
+    await observePause();
   }
 
   // --- 搜索 ---

@@ -19,6 +19,7 @@ import { ProfilePage } from "../pages/ProfilePage";
 import { LanguageSetupPage } from "../pages/LanguageSetupPage";
 import { useAppStore } from "../stores/appStore";
 import { useItemStore } from "../stores/itemStore";
+import { useTagStore } from "../stores/tagStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useSyncStore } from "../stores/syncStore";
 import { useToastStore } from "../stores/toastStore";
@@ -32,9 +33,11 @@ import { getSelectedText, shouldPreventGlobalShortcut } from "../utils/keyboardS
 import { copyTextToSystemClipboard } from "../utils/clipboard";
 import { dispatchAppCommand } from "../utils/appCommands";
 import { getShortcutLabel, shortcutMatches } from "../utils/shortcutRegistry";
-import { materializeTemplateContent } from "../templates/builtInTemplates";
+import { getBuiltInTemplates, materializeTemplateContent } from "../templates/builtInTemplates";
+import { getDailyNote } from "../services/tauriCommands";
 import type { TemplateDto } from "../services/tauriCommands";
 import type { AppPage, Item } from "../types";
+import { parseDateKey } from "../utils/dailyNotes";
 import i18n from "../i18n";
 import { DEFAULT_NOTE_PROPERTIES } from "../utils/frontmatter";
 import "../styles/themes.css";
@@ -220,6 +223,7 @@ export function QuantaNoteApp() {
         createItem,
         cleanupTrash,
     } = useItemStore();
+    const updateItemTags = useTagStore((s) => s.updateItemTags);
     const hasSelectedLanguage = useSettingsStore((s) => s.hasSelectedLanguage);
     const shortcutBindings = useSettingsStore((s) => s.settings.shortcuts);
     const [initDone, setInitDone] = useState(false);
@@ -368,6 +372,32 @@ export function QuantaNoteApp() {
         setTemplatePickerOpen(false);
         navigate("document");
     }, [createItem, getItem, navigate, selectItem]);
+
+    const handleOpenDailyNote = useCallback(async (dateKey: string) => {
+        try {
+            const existing = await getDailyNote(dateKey);
+            if (existing) {
+                selectItem(existing.id);
+                await getItem(existing.id);
+                navigate("document");
+                return;
+            }
+
+            const dailyTemplate = getBuiltInTemplates(i18n.t).find((template) => template.id === "builtin-daily");
+            const templateContent = dailyTemplate
+                ? materializeTemplateContent(dailyTemplate, parseDateKey(dateKey))
+                : `# ${dateKey}`;
+            const content = `---\ndaily_date: ${dateKey}\n---\n${templateContent}`;
+            const title = `${i18n.t("templates:builtin.daily.name")} - ${dateKey}`;
+            const item = await createItem(title, "note", content);
+            await updateItemTags(item.id, ["daily"]);
+            selectItem(item.id);
+            await getItem(item.id);
+            navigate("document");
+        } catch {
+            useToastStore.getState().addToast("error", i18n.t("common:toast.itemCreateFailed"));
+        }
+    }, [createItem, getItem, navigate, selectItem, updateItemTags]);
 
     const handleCopyCurrentNote = useCallback(async () => {
         if (currentPage === "document") {
@@ -964,6 +994,7 @@ export function QuantaNoteApp() {
                     onOpenLinkedNote={handleOpenLinkedNote}
                     onCreateItem={handleCreateNote}
                     onOpenDocument={() => navigate("document")}
+                    onOpenDailyNote={handleOpenDailyNote}
                     previewRequest={previewRequest}
                     onPreviewItemOpen={handlePreviewItemOpen}
                     onPreviewRequestClear={handlePreviewRequestClear}

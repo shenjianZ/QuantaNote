@@ -54,6 +54,19 @@ The Library provides four built-in smart collections: Recently modified, Unclass
 
 Enter a name in the filter panel and choose **Save search** to persist the current query, tag, type, time, status, priority, attachment, and search-scope conditions. Saved searches are stored in app settings and remain available after restarting the app. Click a saved search to apply it again, or use its close button to delete it.
 
+## Daily Notes and Calendar
+
+Click the calendar icon in the Library toolbar to switch to the calendar view. The calendar counts active, non-deleted records by creation date and shows the count on dates that contain records. Use the arrow buttons to move between months.
+
+Select a date and choose **Open daily note**. If that date already has a daily note, QuantaNote opens it; otherwise it creates one. The new note:
+
+- Uses the built-in **Daily log** template, with the selected date materialized in the template
+- Stores `daily_date: YYYY-MM-DD` in Frontmatter so it can be found reliably without creating duplicates
+- Receives the `daily` tag automatically for quick filtering
+- Remains a regular Markdown note, so it can use `[[Note title]]` links and participate in backlinks
+
+Use the **List view** button to return to the regular Library list. Changing months does not alter the active search or filter conditions.
+
 To activate tag filtering, click on any tag badge on an item card, or use the tag filter dropdown in the Library toolbar.
 
 ## Sorting

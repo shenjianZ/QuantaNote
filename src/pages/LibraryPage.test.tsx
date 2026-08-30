@@ -9,7 +9,8 @@ import { useTagStore } from "../stores/tagStore";
 import { useSearchStore } from "../stores/searchStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { MOBILE_BACK_EVENT } from "../utils/platform";
-import { getNoteBacklinks, getNoteLinks } from "../services/tauriCommands";
+import { formatDateKey } from "../utils/dailyNotes";
+import { getNoteBacklinks, getNoteLinks, getRecordDateCounts } from "../services/tauriCommands";
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({
   open: vi.fn(),
@@ -22,6 +23,7 @@ vi.mock("../services/tauriCommands", () => ({
   getNoteLinks: vi.fn(async () => []),
   getNoteBacklinks: vi.fn(async () => []),
   getNoteLinkGraph: vi.fn(async () => ({ nodes: [], edges: [] })),
+  getRecordDateCounts: vi.fn(async () => []),
 }));
 
 const defaultSelectedItem = createMockItem();
@@ -206,6 +208,23 @@ describe("LibraryPage", () => {
 
     await user.click(screen.getByText("新建"));
     expect(props.onCreateItem).toHaveBeenCalled();
+  });
+
+  it("loads calendar activity and opens the selected daily note", async () => {
+    const today = formatDateKey(new Date());
+    vi.mocked(getRecordDateCounts).mockResolvedValue([{ date: today, count: 2 }]);
+    const onOpenDailyNote = vi.fn();
+    const props = makeProps({ onOpenDailyNote });
+    const { user } = setup(<LibraryPage {...props} />);
+
+    await user.click(screen.getByTestId("library-calendar-toggle"));
+    await waitFor(() => expect(getRecordDateCounts).toHaveBeenCalled());
+    await user.click(screen.getByTestId(`library-calendar-day-${today}`));
+    expect(screen.getByTestId("library-calendar-selection")).toHaveTextContent(today);
+    expect(screen.getByTestId(`library-calendar-count-${today}`)).toHaveTextContent("2");
+
+    await user.click(screen.getByTestId("library-calendar-open-daily"));
+    expect(onOpenDailyNote).toHaveBeenCalledWith(today);
   });
 
   it("shows empty state when no items match", () => {

@@ -6,6 +6,26 @@
   "searching": "Searching",
   "resultCount": "{{count}} notes",
   "loadingMore": "Loading more…",
+  "calendar": {
+    "open": "Calendar view",
+    "listView": "List view",
+    "previousMonth": "Previous month",
+    "nextMonth": "Next month",
+    "loading": "Loading date activity…",
+    "weekdays": {
+      "sun": "Sun",
+      "mon": "Mon",
+      "tue": "Tue",
+      "wed": "Wed",
+      "thu": "Thu",
+      "fri": "Fri",
+      "sat": "Sat"
+    },
+    "dayLabel": "{{date}}, {{count}} records",
+    "selectedCount": "{{count}} records",
+    "selectHint": "Select a date to view or create its daily note",
+    "openDailyNote": "Open daily note"
+  },
   "filter": {
     "title": "Filter",
     "all": "All",
