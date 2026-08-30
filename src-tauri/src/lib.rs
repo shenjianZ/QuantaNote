@@ -8,8 +8,8 @@ mod sync;
 mod utils;
 
 use commands::{
-    attachment, auto_backup, clipboard, data_io, diagnostics, item, search, settings, tag, user,
-    version,
+    attachment, auto_backup, clipboard, data_io, diagnostics, item, search, settings, tag,
+    template, user, version,
 };
 use db::DbState;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -318,6 +318,10 @@ pub fn run() {
             tag::rename_tag,
             tag::update_tag_color,
             tag::get_tag_item_counts,
+            template::get_templates,
+            template::create_template,
+            template::update_template,
+            template::delete_template,
             item::get_db_path,
             item::get_library_data,
             settings::load_all_settings,

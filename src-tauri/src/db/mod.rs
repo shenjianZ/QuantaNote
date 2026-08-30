@@ -121,10 +121,19 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS templates (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    content TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
 INSERT OR IGNORE INTO schema_version (version) VALUES (1);
 ";
 
-const SCHEMA_VERSION: i64 = 9;
+const SCHEMA_VERSION: i64 = 10;
 
 impl DbState {
     pub fn open(db_path: &str) -> Result<Self, AppError> {
@@ -297,6 +306,21 @@ impl DbState {
             .map_err(|e| AppError::Database(e.to_string()))?;
         }
 
+        if current_version < 10 {
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS templates (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    description TEXT NOT NULL DEFAULT '',
+                    content TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                 );
+                 INSERT OR IGNORE INTO schema_version (version) VALUES (10);",
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+
         Ok(())
     }
 
@@ -375,6 +399,29 @@ mod tests {
             )
             .expect("settings table count");
         assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn templates_table_exists_after_init() {
+        let db = DbState::open(":memory:").expect("open db");
+        db.initialize_schema().expect("initialize schema");
+        let conn = db.conn.lock().expect("lock db");
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'templates'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("templates table count");
+        assert_eq!(count, 1);
+
+        let version: i64 = conn
+            .query_row("SELECT MAX(version) FROM schema_version", [], |row| {
+                row.get(0)
+            })
+            .expect("schema version");
+        assert_eq!(version, SCHEMA_VERSION);
     }
 
     #[test]
