@@ -1,5 +1,5 @@
 use crate::error::AppError;
-use crate::models::sync::{SyncProgress, SyncState, SyncStatus};
+use crate::models::sync::{SyncProgress, SyncQueueStatus, SyncState, SyncStatus};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 
@@ -68,6 +68,23 @@ impl SyncStateManager {
                 .map_err(|e| AppError::Database(e.to_string()))?;
             state.status = SyncStatus::Error;
             state.last_error = Some(error);
+            state.clone()
+        };
+        self.emit_state(&snapshot);
+        Ok(())
+    }
+
+    pub fn set_queue_status(&self, queue: &SyncQueueStatus) -> Result<(), AppError> {
+        let snapshot = {
+            let mut state = self
+                .state
+                .lock()
+                .map_err(|e| AppError::Database(e.to_string()))?;
+            state.queued = queue.queued;
+            state.retry_count = queue.retry_count;
+            state.next_retry_at = queue.next_retry_at.clone();
+            state.paused = queue.paused;
+            state.last_error = queue.last_error.clone();
             state.clone()
         };
         self.emit_state(&snapshot);

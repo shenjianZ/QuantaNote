@@ -49,6 +49,8 @@ pub fn init_sync_engine(app: &AppHandle, db: &DbState) {
     let config = sync_service::load_sync_config(db);
     let mut engine = crate::sync::SyncEngine::new(&config);
     engine.set_app_handle(app.clone());
+    let queue = sync_service::load_sync_queue_status(db);
+    let _ = engine.state_manager().set_queue_status(&queue);
     let state = SyncEngineState::new(engine, config);
     app.manage(state);
 }
@@ -128,6 +130,24 @@ pub async fn trigger_sync(
         return Err(AppError::SyncError("未登录".to_string()));
     }
 
+    let queue = sync_service::load_sync_queue_status(&db);
+    if queue.paused {
+        let _ = sync_state
+            .engine
+            .lock()
+            .map_err(|e| AppError::Database(e.to_string()))?
+            .state_manager()
+            .set_queue_status(&queue);
+        return Err(AppError::SyncError("同步已暂停，请先继续同步".to_string()));
+    }
+    let queue = sync_service::enqueue_sync(&db)?;
+    let _ = sync_state
+        .engine
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?
+        .state_manager()
+        .set_queue_status(&queue);
+
     let state_cfg_clone = sync_state.config.clone();
     let (transport, state_manager, _shared_config) = {
         let engine = sync_state
@@ -167,6 +187,9 @@ pub async fn trigger_sync(
             Ok(r) => r,
             Err(e) => {
                 let _ = state_manager.set_error(e.to_string());
+                if let Ok(queue) = sync_service::record_sync_failure(&db, e.to_string()) {
+                    let _ = state_manager.set_queue_status(&queue);
+                }
                 let (new_access, new_refresh) = transport.get_tokens().await;
                 let mut updated_config = config;
                 updated_config.access_token = new_access;
@@ -205,7 +228,44 @@ pub async fn trigger_sync(
         *cfg = updated_config;
     }
 
+    if let Ok(queue) = sync_service::clear_sync_queue(&db) {
+        let _ = state_manager.set_queue_status(&queue);
+    }
+
     Ok(sync_output.result)
+}
+
+#[tauri::command]
+pub fn get_sync_queue_status(db: State<'_, DbState>) -> Result<SyncQueueStatus, AppError> {
+    Ok(sync_service::load_sync_queue_status(&db))
+}
+
+#[tauri::command]
+pub fn pause_sync(
+    db: State<'_, DbState>,
+    sync_state: State<'_, SyncEngineState>,
+) -> Result<SyncQueueStatus, AppError> {
+    let queue = sync_service::set_sync_paused(&db, true)?;
+    let engine = sync_state
+        .engine
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    engine.state_manager().set_queue_status(&queue)?;
+    Ok(queue)
+}
+
+#[tauri::command]
+pub fn resume_sync(
+    db: State<'_, DbState>,
+    sync_state: State<'_, SyncEngineState>,
+) -> Result<SyncQueueStatus, AppError> {
+    let queue = sync_service::set_sync_paused(&db, false)?;
+    let engine = sync_state
+        .engine
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    engine.state_manager().set_queue_status(&queue)?;
+    Ok(queue)
 }
 
 #[tauri::command]
@@ -289,9 +349,13 @@ pub fn sync_logout(
     config.authenticated = false;
     config.last_snapshot_id = None;
     sync_service::save_sync_config(&db, &config)?;
+    let queue = sync_service::clear_sync_queue(&db)?;
 
     if let Ok(mut cfg) = sync_state.config.lock() {
         *cfg = config;
+    }
+    if let Ok(engine) = sync_state.engine.lock() {
+        let _ = engine.state_manager().set_queue_status(&queue);
     }
 
     Ok(())

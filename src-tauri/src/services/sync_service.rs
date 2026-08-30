@@ -6,6 +6,7 @@ use crate::sync::transport::SyncTransport;
 use sha2::{Digest, Sha256};
 
 const SYNC_CONFIG_KEY: &str = "quantanote-sync-config";
+const SYNC_QUEUE_STATUS_KEY: &str = "quantanote-sync-queue-status";
 const SYNC_CREDENTIAL_SERVICE: &str = "com.quantanote.sync";
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -200,6 +201,85 @@ pub fn save_sync_config(db: &DbState, config: &SyncConfig) -> Result<(), AppErro
         store_sync_credentials(config, &config.access_token, &config.refresh_token)?;
     }
     persist_sync_config_without_tokens(db, config)
+}
+
+pub fn load_sync_queue_status(db: &DbState) -> SyncQueueStatus {
+    let Ok(conn) = db.conn.lock() else {
+        return SyncQueueStatus::default();
+    };
+    let value: String = match conn.query_row(
+        "SELECT value FROM settings WHERE key = ?1",
+        rusqlite::params![SYNC_QUEUE_STATUS_KEY],
+        |row| row.get(0),
+    ) {
+        Ok(value) => value,
+        Err(rusqlite::Error::QueryReturnedNoRows) => return SyncQueueStatus::default(),
+        Err(error) => {
+            log::warn!("读取同步队列状态失败: {}", error);
+            return SyncQueueStatus::default();
+        }
+    };
+    serde_json::from_str(&value).unwrap_or_else(|error| {
+        log::warn!("解析同步队列状态失败: {}", error);
+        SyncQueueStatus::default()
+    })
+}
+
+pub fn save_sync_queue_status(db: &DbState, queue: &SyncQueueStatus) -> Result<(), AppError> {
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    let value = serde_json::to_string(queue).map_err(|e| AppError::Io(e.to_string()))?;
+    conn.execute(
+        "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
+        rusqlite::params![SYNC_QUEUE_STATUS_KEY, value],
+    )
+    .map_err(|e| AppError::Database(e.to_string()))?;
+    Ok(())
+}
+
+pub fn enqueue_sync(db: &DbState) -> Result<SyncQueueStatus, AppError> {
+    let mut queue = load_sync_queue_status(db);
+    queue.queued = true;
+    queue.next_retry_at = None;
+    queue.last_error = None;
+    save_sync_queue_status(db, &queue)?;
+    Ok(queue)
+}
+
+pub fn record_sync_failure(db: &DbState, error: String) -> Result<SyncQueueStatus, AppError> {
+    let mut queue = load_sync_queue_status(db);
+    queue.queued = true;
+    queue.retry_count = queue.retry_count.saturating_add(1);
+    let exponent = queue.retry_count.saturating_sub(1).min(5);
+    let delay_minutes = 1u64 << exponent;
+    queue.next_retry_at =
+        Some((chrono::Utc::now() + chrono::Duration::minutes(delay_minutes as i64)).to_rfc3339());
+    queue.last_error = Some(error);
+    save_sync_queue_status(db, &queue)?;
+    Ok(queue)
+}
+
+pub fn clear_sync_queue(db: &DbState) -> Result<SyncQueueStatus, AppError> {
+    let mut queue = load_sync_queue_status(db);
+    queue.queued = false;
+    queue.retry_count = 0;
+    queue.next_retry_at = None;
+    queue.last_error = None;
+    save_sync_queue_status(db, &queue)?;
+    Ok(queue)
+}
+
+pub fn set_sync_paused(db: &DbState, paused: bool) -> Result<SyncQueueStatus, AppError> {
+    let mut queue = load_sync_queue_status(db);
+    queue.paused = paused;
+    if !paused {
+        queue.next_retry_at = None;
+        queue.last_error = None;
+    }
+    save_sync_queue_status(db, &queue)?;
+    Ok(queue)
 }
 
 pub async fn run_sync_with_transport(
@@ -736,6 +816,36 @@ mod tests {
             .expect("read persisted sync config");
         assert!(!json.contains("access-secret"));
         assert!(!json.contains("refresh-secret"));
+    }
+
+    #[test]
+    fn sync_queue_status_persists_retry_and_pause_state() {
+        let db = crate::test_support::test_db();
+
+        let queued = enqueue_sync(&db).expect("enqueue sync");
+        assert!(queued.queued);
+        assert_eq!(queued.retry_count, 0);
+        assert!(queued.next_retry_at.is_none());
+
+        let failed = record_sync_failure(&db, "network unavailable".to_string())
+            .expect("record sync failure");
+        assert!(failed.queued);
+        assert_eq!(failed.retry_count, 1);
+        assert!(failed.next_retry_at.is_some());
+        assert_eq!(failed.last_error.as_deref(), Some("network unavailable"));
+
+        let paused = set_sync_paused(&db, true).expect("pause sync");
+        assert!(paused.paused);
+        assert!(load_sync_queue_status(&db).paused);
+
+        let resumed = set_sync_paused(&db, false).expect("resume sync");
+        assert!(!resumed.paused);
+        assert!(resumed.next_retry_at.is_none());
+        assert!(resumed.last_error.is_none());
+
+        let cleared = clear_sync_queue(&db).expect("clear sync queue");
+        assert!(!cleared.queued);
+        assert_eq!(cleared.retry_count, 0);
     }
 
     fn deleted_record(

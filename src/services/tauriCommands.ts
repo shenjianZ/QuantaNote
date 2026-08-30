@@ -517,6 +517,18 @@ export interface SyncState {
     progress: { phase: string; current: number; total: number } | null;
     last_error: string | null;
     last_sync_at: string | null;
+    queued: boolean;
+    retry_count: number;
+    next_retry_at: string | null;
+    paused: boolean;
+}
+
+export interface SyncQueueStatus {
+    queued: boolean;
+    retry_count: number;
+    next_retry_at: string | null;
+    last_error: string | null;
+    paused: boolean;
 }
 
 export interface ConflictInfo {
@@ -579,8 +591,20 @@ export async function getSyncState() {
     return invoke<SyncState>("get_sync_state");
 }
 
+export async function getSyncQueueStatus() {
+    return invoke<SyncQueueStatus>("get_sync_queue_status");
+}
+
 export async function triggerSync() {
     return invoke<SyncResult>("trigger_sync");
+}
+
+export async function pauseSync() {
+    return invoke<SyncQueueStatus>("pause_sync");
+}
+
+export async function resumeSync() {
+    return invoke<SyncQueueStatus>("resume_sync");
 }
 
 export async function syncLogin(

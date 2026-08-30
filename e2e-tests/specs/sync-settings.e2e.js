@@ -1,4 +1,12 @@
-import { cleanupAll, resetAppState, saveSyncConfig } from "../helpers/commands.js";
+import {
+    cleanupAll,
+    getSyncConfig,
+    getSyncQueueStatus,
+    pauseSync,
+    resetAppState,
+    resumeSync,
+    saveSyncConfig,
+} from "../helpers/commands.js";
 import { observePause } from "../helpers/config.js";
 import TopBar from "../helpers/page-objects/TopBar.js";
 import SettingsPage from "../helpers/page-objects/SettingsPage.js";
@@ -71,8 +79,7 @@ describe("Sync settings panel", () => {
         await observePause();
     });
 
-    it("sync strategy section appears after simulated login", async () => {
-        // Simulate logged-in state by saving sync config with access_token
+    it("does not persist plaintext tokens submitted by the frontend", async () => {
         await saveSyncConfig({
             enabled: true,
             server_url: "https://test-server.example.com",
@@ -87,33 +94,18 @@ describe("Sync settings panel", () => {
             last_sync_at: null,
             last_snapshot_id: null,
         });
-        await browser.refresh();
-        await observePause();
-        // Navigate back to sync section
-        await TopBar.openSettings();
-        await SettingsPage.selectSectionByIndex(3);
-        // 账号操作位于顶部账号入口，设置页继续显示已登录后的同步策略。
-        expect(await SyncSettingsPanel.isLoginBtnVisible()).toBe(false);
-        expect(await SyncSettingsPanel.isAutoSyncToggleVisible()).toBe(true);
+        const config = await getSyncConfig();
+        expect(config.access_token).toBeUndefined();
+        expect(config.refresh_token).toBeUndefined();
+        expect(config.authenticated).toBe(false);
     });
 
-    it("auto-sync toggle is visible after login", async () => {
-        expect(await SyncSettingsPanel.isAutoSyncToggleVisible()).toBe(true);
-    });
-
-    it("conflict resolution dropdown exists", async () => {
-        const select = await $("//span[contains(normalize-space(.), '冲突解决')]/following-sibling::div//button");
-        expect(await select.isDisplayed()).toBe(true);
-        // 自定义 Select 使用按钮呈现当前选项，不能通过原生 getValue 读取。
-        const text = await select.getText();
-        expect(text).toContain("自动");
-    });
-
-    it("sync now button is visible after login", async () => {
-        expect(await SyncSettingsPanel.isSyncNowBtnVisible()).toBe(true);
-    });
-
-    it("sync attachments toggle is visible after login", async () => {
-        expect(await SyncSettingsPanel.isAttachmentsToggleVisible()).toBe(true);
+    it("persists pause and resume state for the offline queue", async () => {
+        await pauseSync();
+        expect((await getSyncQueueStatus()).paused).toBe(true);
+        await resumeSync();
+        const queue = await getSyncQueueStatus();
+        expect(queue.paused).toBe(false);
+        expect(queue.next_retry_at).toBe(null);
     });
 });

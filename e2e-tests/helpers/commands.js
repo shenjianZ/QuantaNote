@@ -303,8 +303,20 @@ export async function getSyncConfig() {
   return tauriInvoke("get_sync_config");
 }
 
+export async function getSyncQueueStatus() {
+  return tauriInvoke("get_sync_queue_status");
+}
+
 export async function saveSyncConfig(config) {
   return tauriInvoke("save_sync_config_cmd", { config });
+}
+
+export async function pauseSync() {
+  return tauriInvoke("pause_sync");
+}
+
+export async function resumeSync() {
+  return tauriInvoke("resume_sync");
 }
 
 // --- 备份 ---

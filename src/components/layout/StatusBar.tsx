@@ -72,7 +72,12 @@ export const StatusBar = memo(function StatusBar({ currentPage, itemCount }: Sta
         <span>·</span>
         <span className="inline-flex items-center gap-1">
           {syncActive ? (
-            isSyncing ? (
+            state.paused ? (
+              <>
+                <CloudOff className="h-3 w-3 text-amber-300" />
+                {t("sync:paused")}
+              </>
+            ) : isSyncing ? (
               <>
                 <Loader2 className="h-3 w-3 animate-spin text-blue-400" />
                 {t("sync:syncing")}

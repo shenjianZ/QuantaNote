@@ -52,6 +52,14 @@ pub struct SyncState {
     pub progress: Option<SyncProgress>,
     pub last_error: Option<String>,
     pub last_sync_at: Option<String>,
+    #[serde(default)]
+    pub queued: bool,
+    #[serde(default)]
+    pub retry_count: u32,
+    #[serde(default)]
+    pub next_retry_at: Option<String>,
+    #[serde(default)]
+    pub paused: bool,
 }
 
 impl Default for SyncState {
@@ -61,6 +69,35 @@ impl Default for SyncState {
             progress: None,
             last_error: None,
             last_sync_at: None,
+            queued: false,
+            retry_count: 0,
+            next_retry_at: None,
+            paused: false,
+        }
+    }
+}
+
+/// 持久化的同步队列状态。
+///
+/// 笔记数据本身已经在 SQLite 中保存，因此队列只需要记录“有一项完整同步待执行”
+/// 以及失败重试信息即可，应用重启后仍能继续处理本地数据。
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SyncQueueStatus {
+    pub queued: bool,
+    pub retry_count: u32,
+    pub next_retry_at: Option<String>,
+    pub last_error: Option<String>,
+    pub paused: bool,
+}
+
+impl Default for SyncQueueStatus {
+    fn default() -> Self {
+        Self {
+            queued: false,
+            retry_count: 0,
+            next_retry_at: None,
+            last_error: None,
+            paused: false,
         }
     }
 }

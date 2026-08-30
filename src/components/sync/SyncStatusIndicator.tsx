@@ -1,4 +1,4 @@
-import { Cloud, CloudOff, Loader2 } from "lucide-react";
+import { Cloud, CloudOff, Loader2, PauseCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSyncStore } from "../../stores/syncStore";
 
@@ -20,7 +20,9 @@ export function SyncStatusIndicator({ onClick }: SyncStatusIndicatorProps) {
         state.status === "pulling" ||
         state.status === "syncing_attachments";
 
-    const statusIcon = isSyncing ? (
+    const statusIcon = state.paused ? (
+        <PauseCircle className="h-4 w-4 text-amber-300" />
+    ) : isSyncing ? (
         <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
     ) : state.status === "completed" ? (
         <Cloud className="h-4 w-4 text-green-400" />
@@ -30,7 +32,9 @@ export function SyncStatusIndicator({ onClick }: SyncStatusIndicatorProps) {
         <Cloud className="h-4 w-4 text-[var(--muted)]" />
     );
 
-    const tooltip = isSyncing
+    const tooltip = state.paused
+        ? t("statusTooltip.paused")
+        : isSyncing
         ? `${t("statusTooltip.syncing")}${state.progress ? `: ${state.progress.phase}` : ""}`
         : state.status === "completed"
           ? t("statusTooltip.completed", { time: state.last_sync_at ? new Date(state.last_sync_at).toLocaleString() : t("statusTooltip.justNow") })

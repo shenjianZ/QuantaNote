@@ -15,6 +15,8 @@ import {
     getPendingConflicts,
     resolveSyncConflicts,
     cancelSyncConflicts,
+    pauseSync as pauseSyncCommand,
+    resumeSync as resumeSyncCommand,
     type SyncConfig,
     type SyncState,
     type SyncResult,
@@ -27,6 +29,7 @@ import i18n from "../i18n";
 import { useTagStore } from "./tagStore";
 
 let _autoSyncTimer: ReturnType<typeof setInterval> | null = null;
+let _retryTimer: ReturnType<typeof setTimeout> | null = null;
 let _initialized = false;
 
 function startAutoSync(intervalMinutes: number, triggerFn: () => Promise<void>) {
@@ -42,6 +45,21 @@ function stopAutoSync() {
         clearInterval(_autoSyncTimer);
         _autoSyncTimer = null;
     }
+    if (_retryTimer) {
+        clearTimeout(_retryTimer);
+        _retryTimer = null;
+    }
+}
+
+function scheduleQueueRetry(nextRetryAt: string, triggerFn: () => Promise<void>) {
+    if (_retryTimer) {
+        clearTimeout(_retryTimer);
+    }
+    const delay = Math.max(0, new Date(nextRetryAt).getTime() - Date.now());
+    _retryTimer = setTimeout(() => {
+        _retryTimer = null;
+        triggerFn().catch(() => {});
+    }, delay);
 }
 
 interface SyncStore {
@@ -67,6 +85,8 @@ interface SyncStore {
 
     // 同步操作
     triggerSync: () => Promise<SyncResult>;
+    pauseSync: () => Promise<void>;
+    resumeSync: () => Promise<void>;
     testConnection: (serverUrl: string) => Promise<boolean>;
     refreshHistory: (page?: number, pageSize?: number) => Promise<void>;
 
@@ -99,7 +119,16 @@ const DEFAULT_CONFIG: SyncConfig = {
 
 export const useSyncStore = create<SyncStore>((set, get) => ({
     config: { ...DEFAULT_CONFIG },
-    state: { status: "idle", progress: null, last_error: null, last_sync_at: null },
+    state: {
+        status: "idle",
+        progress: null,
+        last_error: null,
+        last_sync_at: null,
+        queued: false,
+        retry_count: 0,
+        next_retry_at: null,
+        paused: false,
+    },
     history: [],
     historyTotal: 0,
     historyPage: 1,
@@ -113,6 +142,12 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
             const config = await getSyncConfig();
             const state = await getSyncState();
             set({ config, state });
+
+            if (state.queued && !state.paused && state.next_retry_at) {
+                scheduleQueueRetry(state.next_retry_at, async () => {
+                    await get().triggerSync();
+                });
+            }
 
             // 检查是否有待解决的冲突（应用重启后恢复）
             try {
@@ -211,6 +246,12 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
         set({ isLoading: true, error: null });
         try {
             const result = await triggerSync();
+            if (result.pending_conflicts == null) {
+                if (_retryTimer) {
+                    clearTimeout(_retryTimer);
+                    _retryTimer = null;
+                }
+            }
             const config = await getSyncConfig();
             const state = await getSyncState();
             set({ config, state, isLoading: false });
@@ -240,7 +281,54 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
                 set({ isLoading: false, error: i18n.t("sync:sessionExpired") });
                 throw new Error(i18n.t("sync:sessionExpired"));
             }
+            try {
+                const state = await getSyncState();
+                set({ state });
+                if (state.queued && !state.paused && state.next_retry_at) {
+                    scheduleQueueRetry(state.next_retry_at, async () => {
+                        await get().triggerSync();
+                    });
+                }
+            } catch {
+                // 忽略状态刷新失败，保留原始同步错误
+            }
             set({ isLoading: false, error: msg });
+            throw e;
+        }
+    },
+
+    pauseSync: async () => {
+        set({ error: null });
+        try {
+            await pauseSyncCommand();
+            stopAutoSync();
+            const state = await getSyncState();
+            set({ state });
+        } catch (e) {
+            set({ error: String(e) });
+            throw e;
+        }
+    },
+
+    resumeSync: async () => {
+        set({ error: null });
+        try {
+            await resumeSyncCommand();
+            const state = await getSyncState();
+            set({ state });
+            const config = get().config;
+            if (config.enabled && config.authenticated && config.auto_sync) {
+                startAutoSync(config.sync_interval_minutes, async () => {
+                    try {
+                        await get().triggerSync();
+                    } catch (e) {
+                        console.warn("Auto sync failed:", e);
+                    }
+                });
+            }
+            await get().triggerSync();
+        } catch (e) {
+            set({ error: String(e) });
             throw e;
         }
     },

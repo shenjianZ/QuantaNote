@@ -11,6 +11,8 @@ import {
     History,
     CheckCircle,
     AlertCircle,
+    Pause,
+    Play,
     ChevronLeft,
     ChevronRight,
 } from "lucide-react";
@@ -42,6 +44,8 @@ export function SyncSettingsPanel({ showAccount = true }: SyncSettingsPanelProps
         pendingConflicts,
         updateConfig,
         triggerSync,
+        pauseSync,
+        resumeSync,
         logout,
         testConnection,
         refreshHistory,
@@ -88,6 +92,22 @@ export function SyncSettingsPanel({ showAccount = true }: SyncSettingsPanelProps
         }
     }
 
+    async function handlePause() {
+        try {
+            await pauseSync();
+        } catch {
+            // error handled in store
+        }
+    }
+
+    async function handleResume() {
+        try {
+            await resumeSync();
+        } catch {
+            // error handled in store
+        }
+    }
+
     function handleServerUrlBlur() {
         if (serverUrlInput !== config.server_url) {
             updateConfig({ server_url: serverUrlInput });
@@ -99,6 +119,7 @@ export function SyncSettingsPanel({ showAccount = true }: SyncSettingsPanelProps
         state.status === "pushing" ||
         state.status === "pulling" ||
         state.status === "syncing_attachments";
+    const isPaused = state.paused;
 
     return (
         <div className="space-y-6">
@@ -323,13 +344,17 @@ export function SyncSettingsPanel({ showAccount = true }: SyncSettingsPanelProps
                                 <div className="flex items-center gap-2">
                                     {isSyncing ? (
                                         <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
+                                    ) : isPaused ? (
+                                        <Pause className="h-4 w-4 text-amber-300" />
                                     ) : state.status === "error" ? (
                                         <CloudOff className="h-4 w-4 text-red-400" />
                                     ) : (
                                         <Cloud className="h-4 w-4 text-[var(--muted)]" />
                                     )}
                                     <span className="text-sm text-[var(--text)]">
-                                        {isSyncing
+                                        {isPaused
+                                            ? t("paused")
+                                            : isSyncing
                                             ? `${t("syncing")}${state.progress ? `: ${state.progress.phase}` : ""}`
                                             : state.status === "completed"
                                               ? t("syncCompleted")
@@ -341,7 +366,7 @@ export function SyncSettingsPanel({ showAccount = true }: SyncSettingsPanelProps
                                 <button
                                     data-testid="sync-now-btn"
                                     onClick={handleSync}
-                                    disabled={isSyncing || isLoading}
+                                    disabled={isSyncing || isLoading || isPaused}
                                     className="flex items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
                                 >
                                     {isSyncing ? (
@@ -351,6 +376,27 @@ export function SyncSettingsPanel({ showAccount = true }: SyncSettingsPanelProps
                                     )}
                                     {isSyncing ? t("syncingBtn") : t("syncNow")}
                                 </button>
+                                {isPaused ? (
+                                    <button
+                                        data-testid="sync-resume-btn"
+                                        onClick={handleResume}
+                                        disabled={isLoading}
+                                        className="flex items-center gap-1.5 rounded-lg border border-[var(--line)] px-3 py-1.5 text-xs text-[var(--text)] hover:bg-[var(--hover)] disabled:opacity-50"
+                                    >
+                                        <Play className="h-3.5 w-3.5" />
+                                        {t("resumeSync")}
+                                    </button>
+                                ) : (
+                                    <button
+                                        data-testid="sync-pause-btn"
+                                        onClick={handlePause}
+                                        disabled={isSyncing || isLoading}
+                                        className="flex items-center gap-1.5 rounded-lg border border-[var(--line)] px-3 py-1.5 text-xs text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)] disabled:opacity-50"
+                                    >
+                                        <Pause className="h-3.5 w-3.5" />
+                                        {t("pauseSync")}
+                                    </button>
+                                )}
                             </div>
                             {state.progress && isSyncing && (
                                 <div data-testid="sync-progress" className="mt-2">
@@ -378,6 +424,18 @@ export function SyncSettingsPanel({ showAccount = true }: SyncSettingsPanelProps
                             {state.last_error && state.status === "error" && (
                                 <div className="mt-1.5 text-xs text-red-400">
                                     {state.last_error}
+                                </div>
+                            )}
+                            {state.queued && (
+                                <div data-testid="sync-queue-status" className="mt-1.5 text-xs text-amber-300">
+                                    {state.retry_count > 0
+                                        ? t("retryScheduled", { count: state.retry_count })
+                                        : t("syncQueued")}
+                                    {state.next_retry_at && (
+                                        <span className="ml-1 text-[var(--muted)]">
+                                            {t("retryAt", { time: new Date(state.next_retry_at).toLocaleString() })}
+                                        </span>
+                                    )}
                                 </div>
                             )}
                         </div>

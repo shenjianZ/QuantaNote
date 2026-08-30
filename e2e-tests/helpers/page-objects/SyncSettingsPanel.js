@@ -18,6 +18,9 @@ class SyncSettingsPanel {
   get attachmentsToggle() { return "[data-testid='sync-attachments-toggle']"; }
   get conflictSelect() { return "[data-testid='sync-conflict-select']"; }
   get syncNowBtn() { return "[data-testid='sync-now-btn']"; }
+  get syncPauseBtn() { return "[data-testid='sync-pause-btn']"; }
+  get syncResumeBtn() { return "[data-testid='sync-resume-btn']"; }
+  get syncQueueStatus() { return "[data-testid='sync-queue-status']"; }
   get syncStatus() { return "[data-testid='sync-status']"; }
   get syncError() { return "[data-testid='sync-error']"; }
 
