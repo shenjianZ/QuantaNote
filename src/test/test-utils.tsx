@@ -3,6 +3,7 @@ import { render } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import type { Item } from "../types";
+import { DEFAULT_NOTE_PROPERTIES } from "../utils/frontmatter";
 import "../i18n";
 
 export * from "@testing-library/react";
@@ -26,6 +27,7 @@ export function createMockItem(overrides?: Partial<Item>): Item {
     accent: "cyan",
     pinned: false,
     favorite: false,
+    properties: { ...DEFAULT_NOTE_PROPERTIES, aliases: [] },
     ...overrides,
   };
 }

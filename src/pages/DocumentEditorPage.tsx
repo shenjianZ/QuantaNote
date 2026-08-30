@@ -20,6 +20,8 @@ import { isImageAttachment, removeAttachmentReferences } from "../utils/markdown
 import { Select } from "../components/common/Select";
 import { getAppCommandId, APP_COMMAND_EVENT } from "../utils/appCommands";
 import { copyTextToSystemClipboard } from "../utils/clipboard";
+import { NotePropertiesPanel } from "../components/editor/NotePropertiesPanel";
+import { parseNoteProperties, updateNoteProperties, type NotePropertyUpdates } from "../utils/frontmatter";
 
 const VditorEditor = lazy(() => import("../components/editor/VditorEditor").then((m) => ({ default: m.VditorEditor })));
 
@@ -93,6 +95,7 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
   const activeHeadingUpdateRef = useRef<(() => void) | null>(null);
   const deferredContent = useDeferredValue(content);
   const outline = useMemo(() => parseMarkdownOutline(deferredContent), [deferredContent]);
+  const properties = useMemo(() => parseNoteProperties(content), [content]);
 
   useEffect(() => {
     const viewport = editorViewportRef.current;
@@ -300,6 +303,15 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
     latestContent.current = value;
     setContent(value);
     scheduleSave(latestTitle.current, latestSummary.current, value);
+  }, [scheduleSave]);
+
+  const handlePropertiesChange = useCallback((updates: NotePropertyUpdates) => {
+    const nextContent = updateNoteProperties(latestContent.current, updates);
+    if (nextContent === latestContent.current) return;
+    latestContent.current = nextContent;
+    setContent(nextContent);
+    editorRef.current?.setValue(nextContent);
+    scheduleSave(latestTitle.current, latestSummary.current, nextContent);
   }, [scheduleSave]);
 
   async function handleRegenerateSummary() {
@@ -554,9 +566,11 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
           </div>
         </article>
 
-        {/* Summary and outline */}
-        {showDocumentOutline && <aside className="flex min-h-0 min-w-0 flex-col gap-3 lg:sticky lg:top-0 lg:h-full lg:w-[18rem] lg:shrink-0" data-testid="document-editor-sidebar">
-          <section className="shrink-0 rounded-2xl border border-[var(--line)] bg-transparent p-3">
+        {/* Note properties, summary and outline */}
+        <aside className="flex min-h-0 min-w-0 flex-col gap-3 lg:sticky lg:top-0 lg:h-full lg:w-[18rem] lg:shrink-0" data-testid="document-editor-sidebar">
+          <NotePropertiesPanel properties={properties} onChange={handlePropertiesChange} />
+          {showDocumentOutline && <>
+            <section className="shrink-0 rounded-2xl border border-[var(--line)] bg-transparent p-3">
             <div className="mb-2 flex items-center justify-between gap-2">
               <label className="block text-sm font-semibold text-[var(--text)]" htmlFor="doc-summary-input">
                 {t("document:summaryLabel")}
@@ -601,8 +615,8 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
                 {t(summaryMode === "auto" ? "document:summaryAutoHint" : "document:summaryManualHint")}
               </p>
             </div>
-          </section>
-          <DocumentOutline
+            </section>
+            <DocumentOutline
             headings={outline}
             visible
             onToggle={() => updateSetting("showDocumentOutline", false)}
@@ -613,8 +627,9 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
             }}
             showToggle={false}
             className="lg:min-h-0 lg:flex-1"
-          />
-        </aside>}
+            />
+          </>}
+        </aside>
       </div>
 
       {/* Bottom status bar */}

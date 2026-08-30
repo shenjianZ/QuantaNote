@@ -22,6 +22,11 @@ class DocumentEditorPage {
   get contentWidthTarget() { return "[data-testid='document-editor-content']"; }
   get outline() { return "[data-testid='document-outline']"; }
   get outlineToggle() { return "[data-testid='document-outline-toggle']"; }
+  get noteProperties() { return "[data-testid='doc-note-properties']"; }
+  get propertyStatus() { return "[data-testid='doc-property-status']"; }
+  get propertyPriority() { return "[data-testid='doc-property-priority']"; }
+  get propertyDueDate() { return "[data-testid='doc-property-due-date']"; }
+  get propertyAliases() { return "[data-testid='doc-property-aliases']"; }
   get versionToggle() { return "[data-testid='doc-version-toggle']"; }
   get versionPanel() { return "[data-testid='version-panel']"; }
 
@@ -65,6 +70,43 @@ class DocumentEditorPage {
       }
     }
     throw new Error(`Summary mode option not found: ${label}`);
+  }
+
+  async selectProperty(selector, label) {
+    const select = await $(selector);
+    await select.$("button").click();
+    const options = await select.$$("button");
+    for (const option of options) {
+      if ((await option.getText()).trim() === label) {
+        await option.click();
+        await observePause();
+        return;
+      }
+    }
+    throw new Error(`Note property option not found: ${label}`);
+  }
+
+  async setPropertyStatus(label) {
+    await this.selectProperty(this.propertyStatus, label);
+  }
+
+  async setPropertyPriority(label) {
+    await this.selectProperty(this.propertyPriority, label);
+  }
+
+  async setPropertyDueDate(value) {
+    const input = await $(this.propertyDueDate);
+    await input.setValue(value);
+    await browser.keys("Tab");
+    await observePause();
+  }
+
+  async setPropertyAliases(value) {
+    const input = await $(this.propertyAliases);
+    await input.clearValue();
+    await input.setValue(value);
+    await browser.keys("Tab");
+    await observePause();
   }
 
   async regenerateSummary() {

@@ -10,6 +10,24 @@ lastUpdated: 2026-08-29
 
 QuantaNote uses Vditor's IR (Instant Rendering) mode. Markdown is rendered as you type while the source remains editable.
 
+## Frontmatter and Note Properties
+
+The Document Editor sidebar lets you maintain a note status, priority, due date, and aliases. These properties are written to Frontmatter at the top of the Markdown body, so they travel with export, backup, sync, and version history without creating a second source of truth.
+
+```markdown
+---
+status: done
+priority: high
+due: 2026-09-12
+aliases:
+  - Search
+  - Recherche
+---
+# Note body
+```
+
+Statuses include Inbox, In progress, Done, and Archived; priorities include Low, Medium, and High. The Reader Drawer hides the raw Frontmatter block and shows readable property badges above the body. The Library filter panel can filter by status and priority, and sort by priority or due date.
+
 ## Toolbar
 
 | Button | Function | Description |

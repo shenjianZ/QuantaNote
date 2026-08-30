@@ -80,11 +80,13 @@ class LibraryPage {
   }
 
   async selectSortOrder(value) {
-    // value: "updated" / "created" / "title"
+    // value: "updated" / "created" / "title" / "priority" / "due"
     const labels = {
       updated: "最近更新",
       created: "创建时间",
       title: "标题排序",
+      priority: "优先级",
+      due: "截止日期",
     };
     const select = await $("//*[@data-testid='library-filter-panel']//label[.//span[contains(., '排序')]]//button");
     await clickByDom(select);
@@ -101,6 +103,29 @@ class LibraryPage {
     const option = await $(`//*[@data-testid='library-filter-panel']//button[normalize-space(.)='${label}']`);
     await clickByDom(option);
     await observePause();
+  }
+
+  async selectPropertyFilter(kind, label) {
+    const testId = kind === "status" ? "library-property-status" : "library-property-priority";
+    const select = await $(`[data-testid='${testId}']`);
+    await select.$("button").click();
+    const options = await select.$$("button");
+    for (const option of options) {
+      if ((await option.getText()).trim() === label) {
+        await option.click();
+        await observePause();
+        return;
+      }
+    }
+    throw new Error(`Library property option not found: ${label}`);
+  }
+
+  async selectPropertyStatus(label) {
+    await this.selectPropertyFilter("status", label);
+  }
+
+  async selectPropertyPriority(label) {
+    await this.selectPropertyFilter("priority", label);
   }
 
   async selectSearchMode(mode) {

@@ -110,5 +110,26 @@
     "minutesAgo": "{{count}} 分钟前",
     "hoursAgo": "{{count}} 小时前",
     "daysAgo": "{{count}} 天前"
+  },
+  "noteProperties": {
+    "title": "笔记属性",
+    "hint": "属性会保存到正文顶部的 Frontmatter 中，也可以直接编辑原始 Markdown。",
+    "status": "状态",
+    "priority": "优先级",
+    "due": "截止日期",
+    "aliases": "别名",
+    "aliasesPlaceholder": "用逗号分隔多个别名",
+    "statuses": {
+      "inbox": "收件箱",
+      "inProgress": "进行中",
+      "done": "已完成",
+      "archived": "已归档"
+    },
+    "priorities": {
+      "none": "无优先级",
+      "low": "低",
+      "medium": "中",
+      "high": "高"
+    }
   }
 }

@@ -10,6 +10,24 @@ lastUpdated: 2026-08-29
 
 QuantaNote 使用基于 Vditor 的 IR（Instant Rendering，即时渲染）模式。输入 Markdown 后，编辑区域会即时显示格式化结果，同时保留语法的可编辑性。
 
+## Frontmatter 和笔记属性
+
+文档编辑器侧栏支持维护状态、优先级、截止日期和别名。属性会写入正文顶部的 Frontmatter，因此会随 Markdown 正文一起保存、导出、备份、同步和进入版本历史，不会产生独立字段和正文不一致的问题。
+
+```markdown
+---
+status: done
+priority: high
+due: 2026-09-12
+aliases:
+  - 搜索
+  - Search
+---
+# 正文标题
+```
+
+状态支持收件箱、进行中、已完成和已归档；优先级支持低、中、高。阅读抽屉会隐藏 Frontmatter 原始区块，只在正文上方显示易读的属性徽章。记录库筛选面板可以按状态和优先级过滤，也可以按优先级或截止日期排序。
+
 ## 工具栏
 
 | 按钮 | 功能 | 说明 |

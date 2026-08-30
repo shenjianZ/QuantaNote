@@ -27,6 +27,8 @@ import { VDITOR_CDN } from "../../utils/vditorConfig";
 import { copyTextToSystemClipboard } from "../../utils/clipboard";
 import { useToastStore } from "../../stores/toastStore";
 import type { MarkdownAttachment } from "../../utils/markdownAttachments";
+import { NotePropertiesBadges } from "./NotePropertiesBadges";
+import { hasNoteProperties, parseNoteProperties, stripFrontmatter } from "../../utils/frontmatter";
 import {
   getAttachmentIdFromSource,
   getAttachmentImageOptions,
@@ -364,6 +366,8 @@ function CalloutIcon({ kind }: { kind: CalloutKind }) {
 export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme = "dark", lang, emptyText, attachments = [], onNoteLinkClick }: MarkdownRendererProps) {
   const { t } = useTranslation();
   const resolvedEmptyText = emptyText ?? t("common:emptyItem.noContent");
+  const properties = parseNoteProperties(content);
+  const bodyContent = stripFrontmatter(content);
   const headingCounts = new Map<string, number>();
 
   const handleClick = useCallback((e: React.MouseEvent<HTMLElement>) => {
@@ -396,7 +400,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme 
     }
   }, [attachments, onNoteLinkClick]);
 
-  if (!content.trim()) {
+  if (!bodyContent.trim() && !hasNoteProperties(properties)) {
     return <div className="markdown-empty">{resolvedEmptyText}</div>;
   }
 
@@ -528,6 +532,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme 
       data-testid="markdown-preview"
       onClick={handleClick}
     >
+      <NotePropertiesBadges properties={properties} testId="markdown-properties" />
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks, remarkMath, remarkDefinitionList, remarkWikiLinks]}
         remarkRehypeOptions={{ handlers: defListHastHandlers }}
@@ -540,7 +545,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme 
         }}
         components={components}
       >
-        {content}
+        {bodyContent}
       </ReactMarkdown>
     </article>
   );

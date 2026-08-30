@@ -110,5 +110,26 @@
     "minutesAgo": "{{count}} min ago",
     "hoursAgo": "{{count}} hours ago",
     "daysAgo": "{{count}} days ago"
+  },
+  "noteProperties": {
+    "title": "Note properties",
+    "hint": "Properties are saved in Frontmatter at the top of the note and can also be edited as raw Markdown.",
+    "status": "Status",
+    "priority": "Priority",
+    "due": "Due date",
+    "aliases": "Aliases",
+    "aliasesPlaceholder": "Separate multiple aliases with commas",
+    "statuses": {
+      "inbox": "Inbox",
+      "inProgress": "In progress",
+      "done": "Done",
+      "archived": "Archived"
+    },
+    "priorities": {
+      "none": "No priority",
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
+    }
   }
 }

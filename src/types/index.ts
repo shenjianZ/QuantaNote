@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import type { NoteProperties } from "../utils/frontmatter";
 
 export type AppPage =
   | "workspace"
@@ -34,6 +35,7 @@ export interface Item {
   favorite?: boolean;
   createdAt: string;
   updatedAt: string;
+  properties: NoteProperties;
 }
 
 export interface VersionDto {

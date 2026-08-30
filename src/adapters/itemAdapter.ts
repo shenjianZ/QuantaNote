@@ -9,6 +9,7 @@ import {
 import i18n from "../i18n";
 import type { Item, ItemType } from "../types";
 import type { ItemDto } from "../stores/itemStore";
+import { parseNoteProperties } from "../utils/frontmatter";
 
 const TYPE_TO_ICON: Record<string, typeof FileText> = {
   note: FileText,
@@ -65,5 +66,6 @@ export function adaptItem(dto: ItemDto): Item {
     favorite: dto.favorite,
     createdAt: dto.created_at,
     updatedAt: dto.updated_at,
+    properties: parseNoteProperties(dto.content || ""),
   };
 }

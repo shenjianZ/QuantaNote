@@ -36,6 +36,7 @@ import { materializeTemplateContent } from "../templates/builtInTemplates";
 import type { TemplateDto } from "../services/tauriCommands";
 import type { AppPage, Item } from "../types";
 import i18n from "../i18n";
+import { DEFAULT_NOTE_PROPERTIES } from "../utils/frontmatter";
 import "../styles/themes.css";
 import "../styles/global.css";
 import "../styles/markdown.css";
@@ -52,6 +53,7 @@ function getEmptyItem(): Item {
         accent: "cyan",
         createdAt: "",
         updatedAt: "",
+        properties: { ...DEFAULT_NOTE_PROPERTIES, aliases: [] },
     };
 }
 

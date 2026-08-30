@@ -42,6 +42,10 @@ In addition to the filter tabs, you can filter items by a specific tag. When a t
 - A clear button appears next to the active tag filter so you can remove it.
 - Tag filtering works in combination with the filter tabs (e.g., you can view "Pinned" items filtered by a specific tag).
 
+## Note Property Filters
+
+When a note has Frontmatter properties, the filter panel can also filter by status and priority. Property filters can be combined with the All, Pinned, Favorites, tag, and search conditions.
+
 To activate tag filtering, click on any tag badge on an item card, or use the tag filter dropdown in the Library toolbar.
 
 ## Sorting
@@ -53,6 +57,8 @@ The Library supports three sorting modes to help you find items quickly:
 | **Updated** | Items sorted by last updated time, most recent first. This is the default sort. |
 | **Created** | Items sorted by creation time, newest first. |
 | **Title** | Items sorted alphabetically by title (A-Z). |
+| **Priority** | High-priority items appear first. |
+| **Due date** | Items with due dates are sorted from earliest to latest; items without a due date appear last. |
 
 Change the sort mode using the sort dropdown in the Library toolbar.
 

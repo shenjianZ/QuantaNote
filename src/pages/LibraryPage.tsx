@@ -44,9 +44,10 @@ import { removeAttachmentReferences } from "../utils/markdownAttachments";
 import type { Item } from "../types";
 import type { AttachmentDto } from "../stores/attachmentStore";
 import { getNoteLinks, type NoteLinkDto, type SearchMode, type SearchScope } from "../services/tauriCommands";
+import { DEFAULT_NOTE_PROPERTIES } from "../utils/frontmatter";
 
 type TabKey = "recent" | "pinned" | "favorite";
-type SortOption = "updated" | "created" | "title";
+type SortOption = "updated" | "created" | "title" | "priority" | "due";
 
 interface LibraryPageProps {
   items: Item[];
@@ -93,6 +94,8 @@ export function LibraryPage({
   const [activeTab, setActiveTab] = useState<TabKey>("recent");
   const [activeTag, setActiveTag] = useState("all");
   const [sortOrder, setSortOrder] = useState<SortOption>("updated");
+  const [propertyStatus, setPropertyStatus] = useState("all");
+  const [propertyPriority, setPropertyPriority] = useState("all");
   const [searchMode, setSearchMode] = useState<SearchMode>("normal");
   const [searchScopes, setSearchScopes] = useState<SearchScope[]>(["content"]);
   const [readerOpen, setReaderOpen] = useState(false);
@@ -131,8 +134,31 @@ export function LibraryPage({
   const search = useSearchStore((s) => s.search);
   const loadMoreSearch = useSearchStore((s) => s.loadMore);
 
+  const propertyStatusOptions = useMemo(() => {
+    const values = Array.from(new Set(["all", ...items.map((item) => item.properties.status)]));
+    const labels: Record<string, string> = {
+      all: t("library:filter.allStatuses"),
+      inbox: t("common:noteProperties.statuses.inbox"),
+      "in-progress": t("common:noteProperties.statuses.inProgress"),
+      done: t("common:noteProperties.statuses.done"),
+      archived: t("common:noteProperties.statuses.archived"),
+    };
+    return values.map((value) => ({ value, label: labels[value] ?? value }));
+  }, [items, t]);
+  const propertyPriorityOptions = useMemo(() => [
+    { value: "all", label: t("library:filter.allPriorities") },
+    { value: "none", label: t("common:noteProperties.priorities.none") },
+    { value: "low", label: t("common:noteProperties.priorities.low") },
+    { value: "medium", label: t("common:noteProperties.priorities.medium") },
+    { value: "high", label: t("common:noteProperties.priorities.high") },
+  ], [t]);
+
   const listOptions = useMemo(
-    () => ({ tab: activeTab, tag: activeTag, sort: sortOrder }),
+    () => ({
+      tab: activeTab,
+      tag: activeTag,
+      sort: sortOrder === "priority" || sortOrder === "due" ? "updated" : sortOrder,
+    }),
     [activeTab, activeTag, sortOrder],
   );
   const searchOptions = useMemo(
@@ -259,9 +285,10 @@ export function LibraryPage({
           accent: "cyan",
           pinned: result.pinned,
           favorite: result.favorite,
-          createdAt: result.created_at ?? "",
-          updatedAt: result.updated_at ?? "",
-        });
+           createdAt: result.created_at ?? "",
+           updatedAt: result.updated_at ?? "",
+           properties: byId.get(result.id)?.properties ?? { ...DEFAULT_NOTE_PROPERTIES, aliases: [] },
+         });
     }
 
     if (activeTag !== "all") {
@@ -270,17 +297,32 @@ export function LibraryPage({
 
     if (activeTab === "pinned") base = base.filter((item) => item.pinned);
     if (activeTab === "favorite") base = base.filter((item) => item.favorite);
+    if (propertyStatus !== "all") base = base.filter((item) => item.properties.status === propertyStatus);
+    if (propertyPriority !== "all") base = base.filter((item) => item.properties.priority === propertyPriority);
 
     return [...base].sort((a, b) => {
       if (sortOrder === "title") return a.title.localeCompare(b.title);
       if (sortOrder === "updated") return (b.updatedAt || "").localeCompare(a.updatedAt || "");
       if (sortOrder === "created") return (b.createdAt || "").localeCompare(a.createdAt || "");
+      if (sortOrder === "priority") {
+        const priorityRank = { none: 0, low: 1, medium: 2, high: 3 };
+        return (priorityRank[b.properties.priority] ?? 0) - (priorityRank[a.properties.priority] ?? 0)
+          || (b.updatedAt || "").localeCompare(a.updatedAt || "");
+      }
+      if (sortOrder === "due") {
+        const aDue = a.properties.dueDate ?? "9999-12-31";
+        const bDue = b.properties.dueDate ?? "9999-12-31";
+        return aDue.localeCompare(bDue) || (b.updatedAt || "").localeCompare(a.updatedAt || "");
+      }
       return 0;
     });
-  }, [activeTab, activeTag, itemTagNames, items, query, searchResults, sortOrder, t]);
+  }, [activeTab, activeTag, itemTagNames, items, propertyPriority, propertyStatus, query, searchResults, sortOrder, t]);
 
   const normalizedQuery = query.trim();
-  const resultTotal = normalizedQuery
+  const hasPropertyFilter = propertyStatus !== "all" || propertyPriority !== "all";
+  const resultTotal = hasPropertyFilter
+    ? visibleItems.length
+    : normalizedQuery
     ? searchTotal
     : (libraryTotal > 0 || items.length === 0 ? libraryTotal : items.length);
   const hasMore = normalizedQuery ? searchHasMore : items.length < libraryTotal;
@@ -486,8 +528,30 @@ export function LibraryPage({
                       { value: "updated", label: t("library:filter.sortUpdated") },
                       { value: "created", label: t("library:filter.sortCreated") },
                       { value: "title", label: t("library:filter.sortTitle") },
+                      { value: "priority", label: t("library:filter.sortPriority") },
+                      { value: "due", label: t("library:filter.sortDue") },
                     ]}
                   />
+                </label>
+                <label className="mb-4 block">
+                  <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.status")}</span>
+                  <span data-testid="library-property-status">
+                    <Select
+                      value={propertyStatus}
+                      onChange={setPropertyStatus}
+                      options={propertyStatusOptions}
+                    />
+                  </span>
+                </label>
+                <label className="mb-4 block">
+                  <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.priority")}</span>
+                  <span data-testid="library-property-priority">
+                    <Select
+                      value={propertyPriority}
+                      onChange={setPropertyPriority}
+                      options={propertyPriorityOptions}
+                    />
+                  </span>
                 </label>
                 <label className="block">
                   <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.tag")}</span>
