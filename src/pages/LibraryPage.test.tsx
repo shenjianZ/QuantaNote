@@ -9,6 +9,7 @@ import { useTagStore } from "../stores/tagStore";
 import { useSearchStore } from "../stores/searchStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { MOBILE_BACK_EVENT } from "../utils/platform";
+import { getNoteBacklinks, getNoteLinks } from "../services/tauriCommands";
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({
   open: vi.fn(),
@@ -18,6 +19,9 @@ vi.mock("../services/tauriCommands", () => ({
   getItemsPage: vi.fn(async () => ({ items: [], total: 0 })),
   getAllTags: vi.fn(async () => []),
   getAllItemTagMappings: vi.fn(async () => []),
+  getNoteLinks: vi.fn(async () => []),
+  getNoteBacklinks: vi.fn(async () => []),
+  getNoteLinkGraph: vi.fn(async () => ({ nodes: [], edges: [] })),
 }));
 
 const defaultSelectedItem = createMockItem();
@@ -164,6 +168,36 @@ describe("LibraryPage", () => {
     });
     expect(event.defaultPrevented).toBe(true);
     expect(props.onPreviewRequestClear).toHaveBeenCalled();
+  });
+
+  it("shows forward links and opens the resolved target", async () => {
+    vi.mocked(getNoteLinks).mockResolvedValue([{
+      source_id: "item-1",
+      source_title: "Note A",
+      target_title: "Note B",
+      target_id: "item-2",
+    }]);
+    vi.mocked(getNoteBacklinks).mockResolvedValue([]);
+    useItemStore.setState({
+      selectedItem: {
+        ...defaultSelectedItem,
+        id: "item-1",
+        title: "Note A",
+        content: "[[Note B]]",
+      },
+    });
+    const onOpenLinkedNote = vi.fn();
+    const props = makeProps({
+      selectedItem: createMockItem({ id: "item-1", title: "Note A" }),
+      onOpenLinkedNote,
+    });
+    const { user } = setup(<LibraryPage {...props} />);
+
+    await user.click(screen.getByText("Note A"));
+    await waitFor(() => expect(screen.getByTestId("reader-forward-link")).toBeInTheDocument());
+    await user.click(screen.getByTestId("reader-forward-link"));
+
+    expect(onOpenLinkedNote).toHaveBeenCalledWith("Note B", "item-2");
   });
 
   it("calls onCreateItem when new button clicked", async () => {

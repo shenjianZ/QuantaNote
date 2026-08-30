@@ -22,6 +22,9 @@ class LibraryPage {
   get readerMenuBtn() { return "[data-testid='reader-menu-btn']"; }
   get readerTagsBtn() { return "[data-testid='reader-tags-btn']"; }
   get readerAttachmentsBtn() { return "[data-testid='reader-attachments-btn']"; }
+  get noteLinksPanel() { return "[data-testid='reader-note-links']"; }
+  get noteGraphBtn() { return "[data-testid='reader-note-graph-btn']"; }
+  get noteGraphModal() { return "[data-testid='note-link-graph']"; }
   get contentWidthControl() { return "[data-testid='reader-content-width-control']"; }
   get contentWidthTarget() { return "[data-testid='reader-drawer']"; }
 
@@ -189,6 +192,20 @@ class LibraryPage {
 
   async clickEdit() {
     await $(this.readerEditBtn).then(b => b.click());
+  }
+
+  async clickForwardLink(title) {
+    const link = await $(`[data-testid='reader-forward-link'][data-note-target='${title}']`);
+    await link.click();
+  }
+
+  async openNoteGraph() {
+    await $(this.noteGraphBtn).click();
+    await waitForDisplayed(this.noteGraphModal);
+  }
+
+  async getReaderTitle() {
+    return browser.execute(() => document.querySelector("[data-testid='reader-drawer'] h2")?.textContent || "");
   }
 
   async openTrash() {

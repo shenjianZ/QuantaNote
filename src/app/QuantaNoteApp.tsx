@@ -290,6 +290,25 @@ export function QuantaNoteApp() {
         [getItem, selectItem],
     );
 
+    const handleOpenLinkedNote = useCallback(async (title: string, targetId: string | null) => {
+        const normalizedTitle = title.trim().toLocaleLowerCase();
+        const existing = targetId
+            ? dbItems.find((item) => item.id === targetId)
+            : dbItems.find((item) => item.title.trim().toLocaleLowerCase() === normalizedTitle);
+        if (existing || targetId) {
+            handleSelectItem(existing?.id ?? targetId!);
+            return;
+        }
+
+        try {
+            const created = await createItem(title.trim(), "note", "");
+            selectItem(created.id);
+            await getItem(created.id);
+        } catch {
+            // createItem already reports the failure to the user.
+        }
+    }, [createItem, dbItems, getItem, handleSelectItem, selectItem]);
+
     const handlePaletteSelectItem = useCallback(
         (id: string) => {
             selectItem(id);
@@ -940,6 +959,7 @@ export function QuantaNoteApp() {
                     items={displayItems}
                     selectedItem={selectedItem}
                     onSelectItem={handleSelectItem}
+                    onOpenLinkedNote={handleOpenLinkedNote}
                     onCreateItem={handleCreateNote}
                     onOpenDocument={() => navigate("document")}
                     previewRequest={previewRequest}

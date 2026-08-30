@@ -22,6 +22,9 @@ import {
   createTemplate,
   updateTemplate,
   deleteTemplate,
+  getNoteLinks,
+  getNoteBacklinks,
+  getNoteLinkGraph,
 } from "./tauriCommands";
 
 describe("tauriCommands", () => {
@@ -80,6 +83,19 @@ describe("tauriCommands", () => {
     await deleteTemplate("tpl-1");
     expect(captured?.cmd).toBe("delete_template");
     expect(captured?.args).toMatchObject({ id: "tpl-1" });
+  });
+
+  it("calls note link commands with stable arguments", async () => {
+    await getNoteLinks("item-1");
+    expect(captured?.cmd).toBe("get_note_links");
+    expect(captured?.args).toMatchObject({ itemId: "item-1" });
+
+    await getNoteBacklinks("item-1");
+    expect(captured?.cmd).toBe("get_note_backlinks");
+    expect(captured?.args).toMatchObject({ itemId: "item-1" });
+
+    await getNoteLinkGraph();
+    expect(captured?.cmd).toBe("get_note_link_graph");
   });
 
   it("searchItems passes advanced mode and selected scopes", async () => {

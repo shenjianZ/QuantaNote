@@ -65,5 +65,18 @@
     "attachments": "Attachments",
     "editCurrent": "Edit Current Note",
     "moreActions": "More Actions"
+  },
+  "links": {
+    "title": "Note Links",
+    "forward": "Forward Links",
+    "backlinks": "Backlinks",
+    "none": "No links yet",
+    "loading": "Loading links…",
+    "graph": "Graph",
+    "graphTitle": "Note Relationship Graph",
+    "graphEmpty": "There are no note relationships yet",
+    "unresolved": "Target note does not exist; click to create",
+    "unresolvedCount": "{{count}} unresolved links",
+    "loadFailed": "Failed to load links"
   }
 }

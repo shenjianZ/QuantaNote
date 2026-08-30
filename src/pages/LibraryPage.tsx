@@ -15,6 +15,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { open } from "@tauri-apps/plugin-dialog";
 import { MarkdownPreviewWithOutline } from "../components/common/MarkdownPreviewWithOutline";
+import { NoteLinksPanel } from "../components/links/NoteLinksPanel";
 import { DocumentOutlineToggle } from "../components/editor/DocumentOutline";
 import { ContentWidthControl } from "../components/common/ContentWidthControl";
 import { Select } from "../components/common/Select";
@@ -42,7 +43,7 @@ import { copyTextToSystemClipboard } from "../utils/clipboard";
 import { removeAttachmentReferences } from "../utils/markdownAttachments";
 import type { Item } from "../types";
 import type { AttachmentDto } from "../stores/attachmentStore";
-import type { SearchMode, SearchScope } from "../services/tauriCommands";
+import { getNoteLinks, type NoteLinkDto, type SearchMode, type SearchScope } from "../services/tauriCommands";
 
 type TabKey = "recent" | "pinned" | "favorite";
 type SortOption = "updated" | "created" | "title";
@@ -51,6 +52,7 @@ interface LibraryPageProps {
   items: Item[];
   selectedItem: Item;
   onSelectItem: (id: string) => void;
+  onOpenLinkedNote?: (title: string, targetId: string | null) => void;
   onCreateItem: () => void;
   onOpenDocument: () => void;
   previewRequest?: {
@@ -67,6 +69,7 @@ export function LibraryPage({
   items,
   selectedItem,
   onSelectItem,
+  onOpenLinkedNote,
   onCreateItem,
   onOpenDocument,
   previewRequest,
@@ -370,6 +373,18 @@ export function LibraryPage({
     setReaderOpen(true);
   }
 
+  const handleMarkdownNoteLink = useCallback(async (targetTitle: string) => {
+    if (!selectedItem.id || !onOpenLinkedNote) return;
+    try {
+      const links = await getNoteLinks(selectedItem.id);
+      const normalizedTarget = targetTitle.trim().toLocaleLowerCase();
+      const link = links.find((candidate: NoteLinkDto) => candidate.target_title.trim().toLocaleLowerCase() === normalizedTarget);
+      if (link) onOpenLinkedNote(targetTitle, link.target_id);
+    } catch {
+      // The links panel displays the load error; a failed click should not create a duplicate note.
+    }
+  }, [onOpenLinkedNote, selectedItem.id]);
+
   function handleCloseReader() {
     setReaderOpen(false);
     setDeleteConfirming(false);
@@ -672,7 +687,9 @@ export function LibraryPage({
                 lang={getVditorLang()}
                 testId="reader-preview-layout"
                 attachments={attachments}
+                onNoteLinkClick={handleMarkdownNoteLink}
               />
+              <NoteLinksPanel itemId={selectedItem.id} onOpenNote={onOpenLinkedNote} />
             </div>
 
             <footer className="shrink-0 border-t border-[var(--line)] bg-[var(--paper)] px-3 py-3 safe-area-inset-bottom sm:px-4">

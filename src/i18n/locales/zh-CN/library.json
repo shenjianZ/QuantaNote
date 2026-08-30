@@ -65,5 +65,18 @@
     "attachments": "附件",
     "editCurrent": "编辑当前笔记",
     "moreActions": "更多操作"
+  },
+  "links": {
+    "title": "笔记链接",
+    "forward": "正向链接",
+    "backlinks": "反向链接",
+    "none": "暂无链接",
+    "loading": "加载链接中…",
+    "graph": "关系图",
+    "graphTitle": "笔记关系图",
+    "graphEmpty": "还没有笔记关系",
+    "unresolved": "目标笔记不存在，点击创建",
+    "unresolvedCount": "{{count}} 个链接尚未解析",
+    "loadFailed": "链接加载失败"
   }
 }
