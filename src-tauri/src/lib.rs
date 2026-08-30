@@ -9,8 +9,8 @@ mod sync;
 mod utils;
 
 use commands::{
-    attachment, auto_backup, clipboard, data_io, diagnostics, item, note_link, search, settings,
-    tag, template, user, version,
+    ai, attachment, auto_backup, clipboard, data_io, diagnostics, item, note_link, search,
+    settings, tag, template, user, version,
 };
 use db::DbState;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -336,6 +336,11 @@ pub fn run() {
             item::get_library_data,
             settings::load_all_settings,
             settings::save_settings,
+            ai::get_ai_config,
+            ai::update_ai_config,
+            ai::save_ai_api_key,
+            ai::clear_ai_api_key,
+            ai::generate_ai_summary,
             commands::sync::get_sync_config,
             commands::sync::save_sync_config_cmd,
             commands::sync::get_sync_state,

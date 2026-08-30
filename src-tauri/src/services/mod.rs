@@ -1,3 +1,4 @@
+pub mod ai_service;
 pub mod attachment_service;
 pub mod backup_service;
 pub mod data_io_service;

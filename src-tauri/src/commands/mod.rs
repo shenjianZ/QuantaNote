@@ -1,3 +1,4 @@
+pub mod ai;
 pub mod attachment;
 pub mod auto_backup;
 pub mod clipboard;
