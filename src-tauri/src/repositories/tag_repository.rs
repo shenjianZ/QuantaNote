@@ -33,9 +33,10 @@ pub fn create_tag(db: &DbState, name: &str, color: &str) -> Result<TagDto, AppEr
         .lock()
         .map_err(|e| AppError::Database(e.to_string()))?;
     let uuid = uuid::Uuid::new_v4().to_string();
+    let now = chrono::Utc::now().to_rfc3339();
     conn.execute(
-        "INSERT INTO tags (uuid, name, color) VALUES (?1, ?2, ?3)",
-        params![uuid, name, color],
+        "INSERT INTO tags (uuid, name, color, updated_at) VALUES (?1, ?2, ?3, ?4)",
+        params![uuid, name, color, now],
     )
     .map_err(|e| AppError::Database(e.to_string()))?;
 
@@ -195,15 +196,21 @@ pub fn set_item_tags(db: &DbState, item_id: &str, tag_names: Vec<String>) -> Res
     };
 
     // 查询当前关联的 tag uuid，为被移除的写入 tombstone
-    let old_mappings: Vec<(String, String)> = {
+    let old_mappings: Vec<(String, String, i64)> = {
         let mut stmt = conn
             .prepare(
-                "SELECT it.item_id, t.uuid FROM item_tags it JOIN tags t ON t.id = it.tag_id WHERE it.item_id = ?1",
+                "SELECT it.item_id, t.uuid, it.tag_id
+                 FROM item_tags it JOIN tags t ON t.id = it.tag_id
+                 WHERE it.item_id = ?1",
             )
             .map_err(|e| AppError::Database(e.to_string()))?;
         let rows = stmt
             .query_map(params![item_id], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i64>(2)?,
+                ))
             })
             .map_err(|e| AppError::Database(e.to_string()))?;
         let mut result = Vec::new();
@@ -213,25 +220,26 @@ pub fn set_item_tags(db: &DbState, item_id: &str, tag_names: Vec<String>) -> Res
         result
     };
 
-    let now = chrono::Utc::now().to_rfc3339();
-    for (iid, tag_uuid) in &old_mappings {
-        if !new_tag_uuids.contains(tag_uuid) {
-            let tombstone_id = format!("{}_{}", iid, tag_uuid);
-            conn.execute(
-                "INSERT OR IGNORE INTO sync_tombstones (record_id, table_name, deleted_at) VALUES (?1, 'item_tags', ?2)",
-                params![tombstone_id, now],
-            )
-            .map_err(|e| AppError::Database(e.to_string()))?;
-        }
-    }
-
     let tx = conn
         .transaction()
         .map_err(|e| AppError::Database(e.to_string()))?;
 
-    // 清除现有关联
-    tx.execute("DELETE FROM item_tags WHERE item_id = ?1", params![item_id])
-        .map_err(|e| AppError::Database(e.to_string()))?;
+    let now = chrono::Utc::now().to_rfc3339();
+    for (iid, tag_uuid, tag_id) in &old_mappings {
+        if !new_tag_uuids.contains(tag_uuid) {
+            let tombstone_id = format!("{}_{}", iid, tag_uuid);
+            tx.execute(
+                "INSERT OR IGNORE INTO sync_tombstones (record_id, table_name, deleted_at) VALUES (?1, 'item_tags', ?2)",
+                params![tombstone_id, now],
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+            tx.execute(
+                "DELETE FROM item_tags WHERE item_id = ?1 AND tag_id = ?2",
+                params![item_id, tag_id],
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+    }
 
     // 添加新关联
     for name in &tag_names {
@@ -244,8 +252,8 @@ pub fn set_item_tags(db: &DbState, item_id: &str, tag_names: Vec<String>) -> Res
             .map_err(|e| AppError::Database(e.to_string()))?;
 
         tx.execute(
-            "INSERT OR IGNORE INTO item_tags (item_id, tag_id) VALUES (?1, ?2)",
-            params![item_id, tag_id],
+            "INSERT OR IGNORE INTO item_tags (item_id, tag_id, updated_at) VALUES (?1, ?2, ?3)",
+            params![item_id, tag_id, now],
         )
         .map_err(|e| AppError::Database(e.to_string()))?;
 
@@ -289,8 +297,8 @@ pub fn rename_tag(db: &DbState, old_name: &str, new_name: &str) -> Result<TagDto
     }
 
     conn.execute(
-        "UPDATE tags SET name = ?1 WHERE name = ?2",
-        params![new_name, old_name],
+        "UPDATE tags SET name = ?1, updated_at = ?2 WHERE name = ?3",
+        params![new_name, chrono::Utc::now().to_rfc3339(), old_name],
     )
     .map_err(|e| AppError::Database(e.to_string()))?;
 
@@ -313,8 +321,8 @@ pub fn update_tag_color(db: &DbState, name: &str, color: &str) -> Result<TagDto,
         .map_err(|e| AppError::Database(e.to_string()))?;
 
     conn.execute(
-        "UPDATE tags SET color = ?1 WHERE name = ?2",
-        params![color, name],
+        "UPDATE tags SET color = ?1, updated_at = ?2 WHERE name = ?3",
+        params![color, chrono::Utc::now().to_rfc3339(), name],
     )
     .map_err(|e| AppError::Database(e.to_string()))?;
 

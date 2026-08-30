@@ -36,7 +36,7 @@ pub fn query_items_json(conn: &Connection) -> Result<Vec<serde_json::Value>, App
 
 pub fn query_tags_json(conn: &Connection) -> Result<Vec<serde_json::Value>, AppError> {
     let mut stmt = conn
-        .prepare("SELECT uuid, name, color FROM tags")
+        .prepare("SELECT uuid, name, color, updated_at FROM tags")
         .map_err(db_err)?;
     let rows = stmt
         .query_map([], |row| {
@@ -44,6 +44,7 @@ pub fn query_tags_json(conn: &Connection) -> Result<Vec<serde_json::Value>, AppE
                 "uuid": row.get::<_, String>(0)?,
                 "name": row.get::<_, String>(1)?,
                 "color": row.get::<_, String>(2)?,
+                "updated_at": row.get::<_, String>(3)?,
             }))
         })
         .map_err(db_err)?;
@@ -52,13 +53,14 @@ pub fn query_tags_json(conn: &Connection) -> Result<Vec<serde_json::Value>, AppE
 
 pub fn query_item_tags_json(conn: &Connection) -> Result<Vec<serde_json::Value>, AppError> {
     let mut stmt = conn
-        .prepare("SELECT it.item_id, t.uuid FROM item_tags it JOIN tags t ON t.id = it.tag_id")
+        .prepare("SELECT it.item_id, t.uuid, it.updated_at FROM item_tags it JOIN tags t ON t.id = it.tag_id")
         .map_err(db_err)?;
     let rows = stmt
         .query_map([], |row| {
             Ok(serde_json::json!({
                 "item_id": row.get::<_, String>(0)?,
                 "tag_uuid": row.get::<_, String>(1)?,
+                "updated_at": row.get::<_, String>(2)?,
             }))
         })
         .map_err(db_err)?;
@@ -149,17 +151,23 @@ pub fn import_tags(
     overwrite: bool,
 ) -> Result<(), AppError> {
     let sql = if overwrite {
-        "INSERT OR REPLACE INTO tags (uuid, name, color) VALUES (?1, ?2, ?3)"
+        "INSERT OR REPLACE INTO tags (uuid, name, color, updated_at) VALUES (?1, ?2, ?3, ?4)"
     } else {
-        "INSERT OR IGNORE INTO tags (uuid, name, color) VALUES (?1, ?2, ?3)"
+        "INSERT OR IGNORE INTO tags (uuid, name, color, updated_at) VALUES (?1, ?2, ?3, ?4)"
     };
     for tag in tags {
+        let updated_at = tag["updated_at"]
+            .as_str()
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned)
+            .unwrap_or_else(|| chrono::Utc::now().to_rfc3339());
         tx.execute(
             sql,
             params![
                 val_str(tag, "uuid"),
                 val_str(tag, "name"),
-                tag["color"].as_str().unwrap_or("cyan")
+                tag["color"].as_str().unwrap_or("cyan"),
+                updated_at,
             ],
         )
         .map_err(db_err)?;
@@ -173,6 +181,11 @@ pub fn import_item_tags(
 ) -> Result<(), AppError> {
     for it in item_tags {
         let tag_uuid = val_str(it, "tag_uuid");
+        let updated_at = it["updated_at"]
+            .as_str()
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned)
+            .unwrap_or_else(|| chrono::Utc::now().to_rfc3339());
         let tag_id: i64 = match tx.query_row(
             "SELECT id FROM tags WHERE uuid = ?1",
             params![tag_uuid],
@@ -182,8 +195,8 @@ pub fn import_item_tags(
             Err(_) => continue,
         };
         tx.execute(
-            "INSERT OR IGNORE INTO item_tags (item_id, tag_id) VALUES (?1, ?2)",
-            params![val_str(it, "item_id"), tag_id],
+            "INSERT OR IGNORE INTO item_tags (item_id, tag_id, updated_at) VALUES (?1, ?2, ?3)",
+            params![val_str(it, "item_id"), tag_id, updated_at],
         )
         .map_err(db_err)?;
     }

@@ -32,12 +32,14 @@ CREATE TABLE IF NOT EXISTS tags (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     uuid TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL UNIQUE,
-    color TEXT NOT NULL DEFAULT 'cyan'
+    color TEXT NOT NULL DEFAULT 'cyan',
+    updated_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'
 );
 
 CREATE TABLE IF NOT EXISTS item_tags (
     item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
     tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+    updated_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z',
     PRIMARY KEY (item_id, tag_id)
 );
 
@@ -122,7 +124,7 @@ CREATE TABLE IF NOT EXISTS settings (
 INSERT OR IGNORE INTO schema_version (version) VALUES (1);
 ";
 
-const SCHEMA_VERSION: i64 = 8;
+const SCHEMA_VERSION: i64 = 9;
 
 impl DbState {
     pub fn open(db_path: &str) -> Result<Self, AppError> {
@@ -242,6 +244,55 @@ impl DbState {
                  WHERE length(trim(summary)) > 0
                    AND summary != substr(content, 1, 10);
                  INSERT OR IGNORE INTO schema_version (version) VALUES (8);",
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+
+        if current_version < 9 {
+            let has_tag_updated_at = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM pragma_table_info('tags') WHERE name = 'updated_at'",
+                    [],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map_err(|e| AppError::Database(e.to_string()))?
+                > 0;
+            if !has_tag_updated_at {
+                conn.execute_batch(
+                    "ALTER TABLE tags ADD COLUMN updated_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z';",
+                )
+                .map_err(|e| AppError::Database(e.to_string()))?;
+            }
+
+            let has_item_tag_updated_at = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM pragma_table_info('item_tags') WHERE name = 'updated_at'",
+                    [],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map_err(|e| AppError::Database(e.to_string()))?
+                > 0;
+            if !has_item_tag_updated_at {
+                conn.execute_batch(
+                    "ALTER TABLE item_tags ADD COLUMN updated_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z';",
+                )
+                .map_err(|e| AppError::Database(e.to_string()))?;
+            }
+
+            let now = chrono::Utc::now().to_rfc3339();
+            conn.execute(
+                "UPDATE tags SET updated_at = ?1 WHERE updated_at = '1970-01-01T00:00:00Z'",
+                [&now],
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+            conn.execute(
+                "UPDATE item_tags SET updated_at = ?1 WHERE updated_at = '1970-01-01T00:00:00Z'",
+                [&now],
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+            conn.execute(
+                "INSERT OR IGNORE INTO schema_version (version) VALUES (9)",
+                [],
             )
             .map_err(|e| AppError::Database(e.to_string()))?;
         }

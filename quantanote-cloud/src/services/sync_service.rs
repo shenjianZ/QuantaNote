@@ -105,11 +105,15 @@ impl SyncService {
                     table_name: Set(r.table_name.clone()),
                     record_id: Set(r.record_id.clone()),
                     content_hash: Set(r.content_hash.clone()),
-                    updated_at: Set(chrono::NaiveDateTime::parse_from_str(
-                        &r.updated_at,
-                        "%Y-%m-%dT%H:%M:%S%.3fZ",
-                    )
-                    .unwrap_or_else(|_| chrono::Utc::now().naive_utc())),
+                    updated_at: Set(chrono::DateTime::parse_from_rfc3339(&r.updated_at)
+                        .map(|value| value.naive_utc())
+                        .or_else(|_| {
+                            chrono::NaiveDateTime::parse_from_str(
+                                &r.updated_at,
+                                "%Y-%m-%dT%H:%M:%S%.3fZ",
+                            )
+                        })
+                        .unwrap_or_else(|_| chrono::Utc::now().naive_utc())),
                     snapshot_id: Set(snapshot_id.to_string()),
                     storage_key: Set(storage_key),
                     created_at: NotSet,

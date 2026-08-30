@@ -96,30 +96,30 @@ pub fn collect_local_records(db: &DbState) -> Result<Vec<SyncRecordPayload>, App
     )?;
 
     // tags 表（使用 uuid 作为同步标识，避免自增 ID 跨设备冲突）
-    let tags_fallback_time = chrono::Utc::now().to_rfc3339();
     collect_table_records(
         &conn,
         "tags",
-        "SELECT uuid, name, color FROM tags",
+        "SELECT uuid, name, color, updated_at FROM tags",
         |row| {
             let uuid: String = row.get(0)?;
             let data = serde_json::json!({
                 "uuid": uuid,
                 "name": row.get::<_, String>(1)?,
                 "color": row.get::<_, String>(2)?,
+                "updated_at": row.get::<_, String>(3)?,
             });
-            // tags 表无 updated_at，使用当前时间（每次同步时重新生成，确保可解析）
-            Ok((uuid, data, tags_fallback_time.clone()))
+            let updated_at = row.get::<_, String>(3)?;
+            Ok((uuid, data, updated_at))
         },
         &mut all_records,
     )?;
 
     // item_tags 表（使用 tag uuid 作为同步标识）
-    let item_tags_fallback_time = chrono::Utc::now().to_rfc3339();
     collect_table_records(
         &conn,
         "item_tags",
-        "SELECT it.item_id, t.uuid FROM item_tags it JOIN tags t ON t.id = it.tag_id",
+        "SELECT it.item_id, t.uuid, it.updated_at
+         FROM item_tags it JOIN tags t ON t.id = it.tag_id",
         |row| {
             let item_id: String = row.get(0)?;
             let tag_uuid: String = row.get(1)?;
@@ -127,9 +127,10 @@ pub fn collect_local_records(db: &DbState) -> Result<Vec<SyncRecordPayload>, App
             let data = serde_json::json!({
                 "item_id": item_id,
                 "tag_uuid": tag_uuid,
+                "updated_at": row.get::<_, String>(2)?,
             });
-            // item_tags 表无 updated_at，使用当前时间
-            Ok((id, data, item_tags_fallback_time.clone()))
+            let updated_at = row.get::<_, String>(2)?;
+            Ok((id, data, updated_at))
         },
         &mut all_records,
     )?;

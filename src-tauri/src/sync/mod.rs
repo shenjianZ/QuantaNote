@@ -96,12 +96,16 @@ pub fn apply_tag(conn: &rusqlite::Connection, data: &serde_json::Value) -> Resul
 
     let name = data["name"].as_str().unwrap_or_default();
     let color = data["color"].as_str().unwrap_or_default();
+    let updated_at = data["updated_at"]
+        .as_str()
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "1970-01-01T00:00:00Z");
 
     // 使用 uuid 做冲突判断，避免自增 ID 跨设备冲突
     conn.execute(
-        "INSERT INTO tags (uuid, name, color) VALUES (?1, ?2, ?3)
-         ON CONFLICT(uuid) DO UPDATE SET name=excluded.name, color=excluded.color",
-        rusqlite::params![uuid, name, color],
+        "INSERT INTO tags (uuid, name, color, updated_at) VALUES (?1, ?2, ?3, ?4)
+         ON CONFLICT(uuid) DO UPDATE SET name=excluded.name, color=excluded.color, updated_at=excluded.updated_at",
+        rusqlite::params![uuid, name, color, updated_at],
     )
     .map_err(|e| AppError::Database(e.to_string()))?;
 
@@ -121,6 +125,10 @@ pub fn apply_item_tag(
 ) -> Result<(), AppError> {
     let item_id = data["item_id"].as_str().unwrap_or_default();
     let tag_uuid = data["tag_uuid"].as_str().unwrap_or_default();
+    let updated_at = data["updated_at"]
+        .as_str()
+        .filter(|value| !value.is_empty())
+        .unwrap_or("1970-01-01T00:00:00Z");
 
     // 处理删除标记
     if data["_deleted"].as_bool().unwrap_or(false) {
@@ -168,8 +176,9 @@ pub fn apply_item_tag(
     }
 
     conn.execute(
-        "INSERT OR REPLACE INTO item_tags (item_id, tag_id) VALUES (?1, ?2)",
-        rusqlite::params![item_id, tag_id],
+        "INSERT INTO item_tags (item_id, tag_id, updated_at) VALUES (?1, ?2, ?3)
+         ON CONFLICT(item_id, tag_id) DO UPDATE SET updated_at=excluded.updated_at",
+        rusqlite::params![item_id, tag_id, updated_at],
     )
     .map_err(|e| AppError::Database(e.to_string()))?;
 

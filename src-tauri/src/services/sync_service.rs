@@ -615,10 +615,21 @@ pub fn apply_pulled_records(records: &[SyncRecordPayload], db: &DbState) -> Resu
     let mut attachment_cleanup_paths = Vec::new();
 
     for record in sorted_records {
-        if record.data["_deleted"].as_bool().unwrap_or(false) {
+        // 兼容旧客户端：旧版本把记录时间放在 payload 外层，没有写入标签数据本身。
+        // 应用前补回元信息，避免迁移后的标签被写成默认时间。
+        let mut data = record.data.clone();
+        if matches!(record.table_name.as_str(), "tags" | "item_tags") {
+            if let Some(object) = data.as_object_mut() {
+                object
+                    .entry("updated_at")
+                    .or_insert_with(|| serde_json::json!(record.updated_at));
+            }
+        }
+
+        if data["_deleted"].as_bool().unwrap_or(false) {
             match record.table_name.as_str() {
                 "items" => {
-                    let item_id = record.data["id"].as_str().unwrap_or_default();
+                    let item_id = data["id"].as_str().unwrap_or_default();
                     let mut stmt = tx
                         .prepare("SELECT file_path FROM attachments WHERE item_id = ?1")
                         .map_err(|e| AppError::Database(e.to_string()))?;
@@ -630,7 +641,7 @@ pub fn apply_pulled_records(records: &[SyncRecordPayload], db: &DbState) -> Resu
                     attachment_cleanup_paths.extend(paths);
                 }
                 "attachments" => {
-                    let attachment_id = record.data["id"].as_str().unwrap_or_default();
+                    let attachment_id = data["id"].as_str().unwrap_or_default();
                     if let Ok(file_path) = tx.query_row(
                         "SELECT file_path FROM attachments WHERE id = ?1",
                         rusqlite::params![attachment_id],
@@ -644,11 +655,11 @@ pub fn apply_pulled_records(records: &[SyncRecordPayload], db: &DbState) -> Resu
         }
 
         let result = match record.table_name.as_str() {
-            "items" => apply_item(&tx, &record.data),
-            "tags" => apply_tag(&tx, &record.data),
-            "item_tags" => apply_item_tag(&tx, &record.data),
-            "versions" => apply_version(&tx, &record.data),
-            "attachments" => apply_attachment(&tx, &record.data),
+            "items" => apply_item(&tx, &data),
+            "tags" => apply_tag(&tx, &data),
+            "item_tags" => apply_item_tag(&tx, &data),
+            "versions" => apply_version(&tx, &data),
+            "attachments" => apply_attachment(&tx, &data),
             _ => Ok(()),
         };
         if let Err(e) = result {

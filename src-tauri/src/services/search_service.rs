@@ -533,7 +533,7 @@ mod tests {
             )
             .expect("insert related item");
             conn.execute(
-                "INSERT INTO tags (uuid, name) VALUES ('tag-4', 'project')",
+                "INSERT INTO tags (uuid, name, updated_at) VALUES ('tag-4', 'project', '2026-01-01')",
                 [],
             )
             .expect("insert tag");
@@ -543,7 +543,7 @@ mod tests {
                 })
                 .expect("tag id");
             conn.execute(
-                "INSERT INTO item_tags (item_id, tag_id) VALUES ('4', ?1)",
+                "INSERT INTO item_tags (item_id, tag_id, updated_at) VALUES ('4', ?1, '2026-01-01')",
                 [tag_id],
             )
             .expect("link tag");
