@@ -2,6 +2,7 @@ pub mod attachment_service;
 pub mod backup_service;
 pub mod data_io_service;
 pub mod item_service;
+pub mod note_link_service;
 pub mod search_service;
 pub mod settings_service;
 pub mod storage_service;

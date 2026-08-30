@@ -1,6 +1,7 @@
 pub mod attachment_repository;
 pub mod data_io_repository;
 pub mod item_repository;
+pub mod note_link_repository;
 pub mod search_repository;
 pub mod settings_repository;
 pub mod tag_repository;

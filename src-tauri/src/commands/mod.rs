@@ -4,6 +4,7 @@ pub mod clipboard;
 pub mod data_io;
 pub mod diagnostics;
 pub mod item;
+pub mod note_link;
 pub mod search;
 pub mod settings;
 pub mod sync;

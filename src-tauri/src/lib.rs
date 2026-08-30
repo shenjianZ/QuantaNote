@@ -8,8 +8,8 @@ mod sync;
 mod utils;
 
 use commands::{
-    attachment, auto_backup, clipboard, data_io, diagnostics, item, search, settings, tag,
-    template, user, version,
+    attachment, auto_backup, clipboard, data_io, diagnostics, item, note_link, search, settings,
+    tag, template, user, version,
 };
 use db::DbState;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -273,6 +273,9 @@ pub fn run() {
             item::cleanup_trash,
             item::get_pinned_items,
             item::get_recent_items,
+            note_link::get_note_links,
+            note_link::get_note_backlinks,
+            note_link::get_note_link_graph,
             search::search_items,
             attachment::add_attachment,
             attachment::add_attachment_data,
