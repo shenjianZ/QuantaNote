@@ -535,15 +535,18 @@ export interface ConflictInfo {
     record_id: string;
     table_name: string;
     local_data: Record<string, unknown>;
+    remote_data: Record<string, unknown>;
     local_updated_at: string;
     remote_updated_at: string;
     content_hash: string;
+    remote_content_hash: string;
 }
 
 export interface ConflictResolutionChoice {
     table_name: string;
     record_id: string;
-    choice: "local" | "remote";
+    choice: "local" | "remote" | "merged";
+    merged_data?: Record<string, unknown>;
 }
 
 export interface SyncResult {

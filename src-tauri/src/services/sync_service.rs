@@ -316,6 +316,13 @@ pub async fn run_sync_with_transport(
         &config.conflict_resolution,
     );
 
+    let remote_records =
+        if config.conflict_resolution == "manual" && !diff_result.conflicts.is_empty() {
+            Some(transport.pull_records(None).await?.records)
+        } else {
+            None
+        };
+
     if !diff_result.conflicts.is_empty() {
         log::warn!(
             "检测到 {} 条冲突记录，策略: {}",
@@ -347,15 +354,32 @@ pub async fn run_sync_with_transport(
         let conflict_infos: Vec<ConflictInfo> = diff_result
             .conflicts
             .iter()
-            .map(|c| ConflictInfo {
-                record_id: c.record_id.clone(),
-                table_name: c.table_name.clone(),
-                local_data: c.local_record.data.clone(),
-                local_updated_at: c.local_record.updated_at.clone(),
-                remote_updated_at: c.remote_meta.updated_at.clone(),
-                content_hash: c.local_record.content_hash.clone(),
+            .map(|c| {
+                let remote = remote_records
+                    .as_ref()
+                    .and_then(|records| {
+                        records.iter().find(|record| {
+                            record.table_name == c.table_name && record.record_id == c.record_id
+                        })
+                    })
+                    .ok_or_else(|| {
+                        AppError::SyncError(format!(
+                            "无法读取远端冲突记录: {}:{}",
+                            c.table_name, c.record_id
+                        ))
+                    })?;
+                Ok(ConflictInfo {
+                    record_id: c.record_id.clone(),
+                    table_name: c.table_name.clone(),
+                    local_data: c.local_record.data.clone(),
+                    remote_data: remote.data.clone(),
+                    local_updated_at: c.local_record.updated_at.clone(),
+                    remote_updated_at: remote.updated_at.clone(),
+                    content_hash: c.local_record.content_hash.clone(),
+                    remote_content_hash: remote.content_hash.clone(),
+                })
             })
-            .collect();
+            .collect::<Result<_, AppError>>()?;
 
         result.pending_conflicts = Some(conflict_infos.clone());
         result.skipped = diff_result.unchanged;

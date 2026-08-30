@@ -139,9 +139,13 @@ pub struct ConflictInfo {
     pub record_id: String,
     pub table_name: String,
     pub local_data: serde_json::Value,
+    #[serde(default)]
+    pub remote_data: serde_json::Value,
     pub local_updated_at: String,
     pub remote_updated_at: String,
     pub content_hash: String,
+    #[serde(default)]
+    pub remote_content_hash: String,
 }
 
 /// 前端提交的单条冲突解决选择
@@ -150,6 +154,9 @@ pub struct ConflictResolutionChoice {
     pub table_name: String,
     pub record_id: String,
     pub choice: String,
+    /// choice 为 merged 时提交的完整合并结果。
+    #[serde(default)]
+    pub merged_data: Option<serde_json::Value>,
 }
 
 /// 待解决的同步状态（manual 模式暂停时保存）

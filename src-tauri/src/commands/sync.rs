@@ -459,7 +459,7 @@ pub async fn resolve_sync_conflicts(
     sync_state: State<'_, SyncEngineState>,
     resolutions: Vec<ConflictResolutionChoice>,
 ) -> Result<SyncResult, AppError> {
-    use crate::sync::diff::collect_local_records;
+    use crate::sync::diff::{collect_local_records, compute_record_hash};
     use crate::sync::save_baseline_map;
 
     if sync_state
@@ -581,6 +581,34 @@ pub async fn resolve_sync_conflicts(
                 });
                 result.pushed += 1;
             }
+            "merged" => {
+                let mut data = resolution.merged_data.clone().ok_or_else(|| {
+                    AppError::SyncError(format!(
+                        "冲突 {}:{} 缺少合并结果",
+                        conflict.table_name, conflict.record_id
+                    ))
+                })?;
+                validate_merged_record(&conflict.table_name, &conflict.record_id, &data)?;
+                let updated_at = chrono::Utc::now().to_rfc3339();
+                if matches!(conflict.table_name.as_str(), "items" | "tags" | "item_tags") {
+                    if let Some(object) = data.as_object_mut() {
+                        object.insert("updated_at".to_string(), serde_json::json!(updated_at));
+                    }
+                }
+                let payload = SyncRecordPayload {
+                    table_name: conflict.table_name.clone(),
+                    record_id: conflict.record_id.clone(),
+                    content_hash: compute_record_hash(&data),
+                    updated_at,
+                    data,
+                };
+                transport.push_records(vec![payload]).await?;
+                all_pushed_records.push(PushedRecord {
+                    record_id: conflict.record_id.clone(),
+                    table_name: conflict.table_name.clone(),
+                });
+                result.pushed += 1;
+            }
             "remote" => {
                 let pull_result = transport.pull_records(None).await?;
                 let matching: Vec<_> = pull_result
@@ -652,6 +680,39 @@ pub async fn resolve_sync_conflicts(
     }
 
     Ok(result)
+}
+
+fn validate_merged_record(
+    table_name: &str,
+    record_id: &str,
+    data: &serde_json::Value,
+) -> Result<(), AppError> {
+    let object = data
+        .as_object()
+        .ok_or_else(|| AppError::Validation("合并结果必须是 JSON 对象".to_string()))?;
+    if object.get("_deleted").and_then(|value| value.as_bool()) == Some(true) {
+        return Err(AppError::Validation("合并结果不能是删除标记".to_string()));
+    }
+
+    let valid_identity = match table_name {
+        "items" | "versions" | "attachments" => {
+            object.get("id").and_then(|value| value.as_str()) == Some(record_id)
+        }
+        "tags" => object.get("uuid").and_then(|value| value.as_str()) == Some(record_id),
+        "item_tags" => {
+            let mut parts = record_id.splitn(2, '_');
+            object.get("item_id").and_then(|value| value.as_str()) == parts.next()
+                && object.get("tag_uuid").and_then(|value| value.as_str()) == parts.next()
+        }
+        _ => false,
+    };
+    if !valid_identity {
+        return Err(AppError::Validation(format!(
+            "合并结果的标识与冲突记录不一致: {}:{}",
+            table_name, record_id
+        )));
+    }
+    Ok(())
 }
 
 #[tauri::command]
