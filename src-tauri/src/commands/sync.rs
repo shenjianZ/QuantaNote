@@ -66,6 +66,17 @@ pub fn save_sync_config_cmd(
     sync_state: State<'_, SyncEngineState>,
     config: SyncConfig,
 ) -> Result<(), AppError> {
+    let mut config = config;
+    if let Ok(current) = sync_state.config.lock() {
+        // 前端只接收脱敏后的配置，保存偏好时沿用进程内凭据。
+        if config.access_token.is_empty() {
+            config.access_token = current.access_token.clone();
+        }
+        if config.refresh_token.is_empty() {
+            config.refresh_token = current.refresh_token.clone();
+        }
+    }
+    config.authenticated = !config.access_token.is_empty();
     sync_service::save_sync_config(&db, &config)?;
     if let Ok(mut cfg) = sync_state.config.lock() {
         *cfg = config;
@@ -219,6 +230,7 @@ pub async fn sync_login(
     config.access_token = login_result.access_token.clone();
     config.refresh_token = login_result.refresh_token.clone();
     config.user_id = login_result.user_id.clone();
+    config.authenticated = true;
     sync_service::save_sync_config(&db, &config)?;
 
     if let Ok(mut cfg) = sync_state.config.lock() {
@@ -253,6 +265,7 @@ pub async fn sync_register(
     config.access_token = register_result.access_token.clone();
     config.refresh_token = register_result.refresh_token.clone();
     config.user_id = register_result.user_id.clone();
+    config.authenticated = true;
     sync_service::save_sync_config(&db, &config)?;
 
     if let Ok(mut cfg) = sync_state.config.lock() {
@@ -268,10 +281,12 @@ pub fn sync_logout(
     sync_state: State<'_, SyncEngineState>,
 ) -> Result<(), AppError> {
     let mut config = sync_service::load_sync_config(&db);
+    sync_service::clear_sync_credentials(&config)?;
     config.access_token = String::new();
     config.refresh_token = String::new();
     config.user_id = String::new();
     config.enabled = false;
+    config.authenticated = false;
     config.last_snapshot_id = None;
     sync_service::save_sync_config(&db, &config)?;
 

@@ -59,12 +59,12 @@ export function SyncSettingsPanel({ showAccount = true }: SyncSettingsPanelProps
     }, [config.server_url]);
 
     useEffect(() => {
-        if (config.access_token) {
+        if (config.authenticated) {
             refreshHistory();
         }
-    }, [config.access_token, refreshHistory]);
+    }, [config.authenticated, refreshHistory]);
 
-    const isLoggedIn = Boolean(config.access_token && config.user_id);
+    const isLoggedIn = Boolean(config.authenticated && config.user_id);
 
     async function handleTestConnection() {
         if (!serverUrlInput.trim()) return;

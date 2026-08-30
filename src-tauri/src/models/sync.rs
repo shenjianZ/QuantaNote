@@ -5,9 +5,16 @@ use serde::{Deserialize, Serialize};
 pub struct SyncConfig {
     pub enabled: bool,
     pub server_url: String,
+    /// 仅保存在进程内，永不写入 SQLite 或发送给前端。
+    #[serde(skip)]
     pub access_token: String,
+    /// 仅保存在进程内，永不写入 SQLite 或发送给前端。
+    #[serde(skip)]
     pub refresh_token: String,
     pub user_id: String,
+    /// 是否已从系统凭据库加载到有效 token。
+    #[serde(default)]
+    pub authenticated: bool,
     #[serde(default)]
     pub device_id: String,
     pub auto_sync: bool,
@@ -26,6 +33,7 @@ impl Default for SyncConfig {
             access_token: String::new(),
             refresh_token: String::new(),
             user_id: String::new(),
+            authenticated: false,
             device_id: String::new(),
             auto_sync: false,
             sync_interval_minutes: 15,
@@ -143,7 +151,9 @@ pub struct SyncResult {
 pub struct SyncLoginResult {
     pub user_id: String,
     pub email: String,
+    #[serde(skip_serializing)]
     pub access_token: String,
+    #[serde(skip_serializing)]
     pub refresh_token: String,
 }
 

@@ -10,7 +10,7 @@ export function SyncStatusIndicator({ onClick }: SyncStatusIndicatorProps) {
     const { t } = useTranslation(["sync", "common"]);
     const { config, state, triggerSync } = useSyncStore();
 
-    if (!config.enabled || !config.access_token) {
+    if (!config.enabled || !config.authenticated) {
         return null;
     }
 

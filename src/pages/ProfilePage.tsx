@@ -19,7 +19,7 @@ export function ProfilePage({ onNavigate }: { onNavigate: (page: AppPage) => voi
   const { profile, loading, fetchProfile, updateProfile, changePassword, uploadAvatar, deleteAccount } = useUserStore();
   const config = useSyncStore((s) => s.config);
   const logout = useSyncStore((s) => s.logout);
-  const isLoggedIn = Boolean(config.access_token && config.user_id);
+  const isLoggedIn = Boolean(config.authenticated && config.user_id);
   const [uploading, setUploading] = useState(false);
 
   const [nickname, setNickname] = useState("");

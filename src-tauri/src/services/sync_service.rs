@@ -3,6 +3,16 @@ use crate::error::AppError;
 use crate::models::sync::*;
 use crate::sync::state::SyncStateManager;
 use crate::sync::transport::SyncTransport;
+use sha2::{Digest, Sha256};
+
+const SYNC_CONFIG_KEY: &str = "quantanote-sync-config";
+const SYNC_CREDENTIAL_SERVICE: &str = "com.quantanote.sync";
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct SyncCredentials {
+    access_token: String,
+    refresh_token: String,
+}
 
 pub struct SyncOutput {
     pub result: SyncResult,
@@ -27,44 +37,169 @@ fn sanitize_sync_component(value: &str, fallback: &str) -> String {
     }
 }
 
-pub fn load_sync_config(db: &DbState) -> SyncConfig {
-    let conn = match db.conn.lock() {
-        Ok(c) => c,
-        Err(e) => {
-            log::warn!("Failed to acquire DB lock for sync config: {}", e);
-            return SyncConfig::default();
+fn credential_account(config: &SyncConfig) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(config.server_url.trim_end_matches('/').as_bytes());
+    hasher.update([0]);
+    hasher.update(config.user_id.as_bytes());
+    format!("sync-{:x}", hasher.finalize())
+}
+
+fn credential_entry(config: &SyncConfig) -> Result<keyring::Entry, AppError> {
+    keyring::Entry::new(SYNC_CREDENTIAL_SERVICE, &credential_account(config))
+        .map_err(|e| AppError::Io(format!("创建系统凭据项失败: {}", e)))
+}
+
+fn store_sync_credentials(
+    config: &SyncConfig,
+    access_token: &str,
+    refresh_token: &str,
+) -> Result<(), AppError> {
+    if config.server_url.trim().is_empty() || config.user_id.trim().is_empty() {
+        return Err(AppError::Validation(
+            "保存同步凭据前必须设置服务器和用户标识".to_string(),
+        ));
+    }
+    let entry = credential_entry(config)?;
+    let credentials = serde_json::to_string(&SyncCredentials {
+        access_token: access_token.to_string(),
+        refresh_token: refresh_token.to_string(),
+    })
+    .map_err(|e| AppError::Io(format!("序列化同步凭据失败: {}", e)))?;
+    entry
+        .set_password(&credentials)
+        .map_err(|e| AppError::Io(format!("写入系统凭据库失败: {}", e)))
+}
+
+fn load_sync_credentials(config: &SyncConfig) -> Option<SyncCredentials> {
+    if config.server_url.trim().is_empty() || config.user_id.trim().is_empty() {
+        return None;
+    }
+    let entry = match credential_entry(config) {
+        Ok(entry) => entry,
+        Err(error) => {
+            log::warn!("无法创建同步凭据项: {}", error);
+            return None;
         }
     };
-    let result = conn.query_row(
-        "SELECT value FROM settings WHERE key = 'quantanote-sync-config'",
-        [],
-        |row| row.get::<_, String>(0),
-    );
-    match result {
-        Ok(json_str) => serde_json::from_str(&json_str).unwrap_or_else(|e| {
-            log::warn!("Failed to parse sync config JSON: {}", e);
-            SyncConfig::default()
-        }),
-        Err(rusqlite::Error::QueryReturnedNoRows) => SyncConfig::default(),
-        Err(e) => {
-            log::warn!("Failed to load sync config from DB: {}", e);
-            SyncConfig::default()
+    match entry.get_password() {
+        Ok(value) => match serde_json::from_str::<SyncCredentials>(&value) {
+            Ok(credentials)
+                if !credentials.access_token.is_empty()
+                    || !credentials.refresh_token.is_empty() =>
+            {
+                Some(credentials)
+            }
+            Ok(_) => None,
+            Err(error) => {
+                log::warn!("系统同步凭据格式无效: {}", error);
+                None
+            }
+        },
+        Err(error) => {
+            log::debug!("未读取到系统同步凭据: {}", error);
+            None
         }
     }
 }
 
-pub fn save_sync_config(db: &DbState, config: &SyncConfig) -> Result<(), AppError> {
+pub fn clear_sync_credentials(config: &SyncConfig) -> Result<(), AppError> {
+    if config.server_url.trim().is_empty() || config.user_id.trim().is_empty() {
+        return Ok(());
+    }
+    let entry = credential_entry(config)?;
+    match entry.delete_credential() {
+        Ok(()) => Ok(()),
+        Err(error) => {
+            log::debug!("系统同步凭据不存在或已清除: {}", error);
+            Ok(())
+        }
+    }
+}
+
+fn read_persisted_sync_config(db: &DbState) -> Option<String> {
+    let conn = db.conn.lock().ok()?;
+    match conn.query_row(
+        "SELECT value FROM settings WHERE key = ?1",
+        rusqlite::params![SYNC_CONFIG_KEY],
+        |row| row.get::<_, String>(0),
+    ) {
+        Ok(value) => Some(value),
+        Err(rusqlite::Error::QueryReturnedNoRows) => None,
+        Err(error) => {
+            log::warn!("读取同步配置失败: {}", error);
+            None
+        }
+    }
+}
+
+fn persist_sync_config_without_tokens(db: &DbState, config: &SyncConfig) -> Result<(), AppError> {
     let conn = db
         .conn
         .lock()
         .map_err(|e| AppError::Database(e.to_string()))?;
     let json = serde_json::to_string(config).map_err(|e| AppError::Io(e.to_string()))?;
     conn.execute(
-        "INSERT OR REPLACE INTO settings (key, value) VALUES ('quantanote-sync-config', ?1)",
-        rusqlite::params![json],
+        "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
+        rusqlite::params![SYNC_CONFIG_KEY, json],
     )
     .map_err(|e| AppError::Database(e.to_string()))?;
     Ok(())
+}
+
+pub fn load_sync_config(db: &DbState) -> SyncConfig {
+    let Some(json_str) = read_persisted_sync_config(db) else {
+        return SyncConfig::default();
+    };
+
+    let raw_value = serde_json::from_str::<serde_json::Value>(&json_str).ok();
+    let mut config = serde_json::from_str::<SyncConfig>(&json_str).unwrap_or_else(|error| {
+        log::warn!("解析同步配置失败: {}", error);
+        SyncConfig::default()
+    });
+
+    // 从旧版本 SQLite 配置迁移 token，并立即擦除明文副本。
+    let legacy_credentials = raw_value.as_ref().and_then(|value| {
+        let access = value
+            .get("access_token")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let refresh = value
+            .get("refresh_token")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        if access.is_empty() && refresh.is_empty() {
+            None
+        } else {
+            Some((access.to_string(), refresh.to_string()))
+        }
+    });
+    if let Some((access, refresh)) = legacy_credentials {
+        if let Err(error) = store_sync_credentials(&config, &access, &refresh) {
+            log::warn!("迁移旧版同步凭据失败，将要求重新登录: {}", error);
+        }
+        if let Err(error) = persist_sync_config_without_tokens(db, &config) {
+            log::warn!("清理旧版同步配置中的明文凭据失败: {}", error);
+        }
+    }
+
+    if let Some(credentials) = load_sync_credentials(&config) {
+        config.access_token = credentials.access_token;
+        config.refresh_token = credentials.refresh_token;
+        config.authenticated = true;
+    } else {
+        config.access_token.clear();
+        config.refresh_token.clear();
+        config.authenticated = false;
+    }
+    config
+}
+
+pub fn save_sync_config(db: &DbState, config: &SyncConfig) -> Result<(), AppError> {
+    if !config.access_token.is_empty() || !config.refresh_token.is_empty() {
+        store_sync_credentials(config, &config.access_token, &config.refresh_token)?;
+    }
+    persist_sync_config_without_tokens(db, config)
 }
 
 pub async fn run_sync_with_transport(
@@ -548,6 +683,49 @@ mod tests {
     use super::*;
     use crate::models::sync::SyncRecordPayload;
     use crate::repositories::{attachment_repository, item_repository};
+
+    #[test]
+    fn sync_config_serialization_redacts_credentials() {
+        let mut config = SyncConfig::default();
+        config.server_url = "https://sync.example.test".to_string();
+        config.user_id = "user-1".to_string();
+        config.access_token = "access-secret".to_string();
+        config.refresh_token = "refresh-secret".to_string();
+        config.authenticated = true;
+
+        let json = serde_json::to_string(&config).expect("serialize sync config");
+        assert!(!json.contains("access-secret"));
+        assert!(!json.contains("refresh-secret"));
+        assert!(!json.contains("access_token"));
+        assert!(!json.contains("refresh_token"));
+
+        let restored: SyncConfig = serde_json::from_str(&json).expect("deserialize sync config");
+        assert!(restored.access_token.is_empty());
+        assert!(restored.refresh_token.is_empty());
+        assert!(restored.authenticated);
+    }
+
+    #[test]
+    fn persisted_sync_config_does_not_contain_credentials() {
+        let db = crate::test_support::test_db();
+        let mut config = SyncConfig::default();
+        config.server_url = "https://sync.example.test".to_string();
+        config.user_id = "user-1".to_string();
+        config.access_token = "access-secret".to_string();
+        config.refresh_token = "refresh-secret".to_string();
+
+        persist_sync_config_without_tokens(&db, &config).expect("persist sync config");
+        let conn = db.conn.lock().expect("lock db");
+        let json: String = conn
+            .query_row(
+                "SELECT value FROM settings WHERE key = ?1",
+                rusqlite::params![SYNC_CONFIG_KEY],
+                |row| row.get(0),
+            )
+            .expect("read persisted sync config");
+        assert!(!json.contains("access-secret"));
+        assert!(!json.contains("refresh-secret"));
+    }
 
     fn deleted_record(
         table_name: &str,

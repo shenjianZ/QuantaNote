@@ -37,7 +37,7 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
   const setAlwaysOnTop = useAppStore((s) => s.setAlwaysOnTop);
   const setSettingsSection = useAppStore((s) => s.setSettingsSection);
   const syncConfig = useSyncStore((s) => s.config);
-  const isLoggedIn = Boolean(syncConfig.access_token && syncConfig.user_id);
+  const isLoggedIn = Boolean(syncConfig.authenticated && syncConfig.user_id);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null);
   const [isMaximized, setIsMaximized] = useState(false);

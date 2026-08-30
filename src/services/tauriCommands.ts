@@ -498,9 +498,11 @@ export async function saveSettings(settings: Record<string, string>) {
 export interface SyncConfig {
     enabled: boolean;
     server_url: string;
-    access_token: string;
-    refresh_token: string;
+    /** Token 仅由 Rust 后端保存在系统凭据库，前端不会收到真实值。 */
+    access_token?: string;
+    refresh_token?: string;
     user_id: string;
+    authenticated: boolean;
     device_id: string;
     auto_sync: boolean;
     sync_interval_minutes: number;
@@ -546,8 +548,8 @@ export interface SyncResult {
 export interface SyncLoginResult {
     user_id: string;
     email: string;
-    access_token: string;
-    refresh_token: string;
+    access_token?: string;
+    refresh_token?: string;
 }
 
 export interface SyncHistoryEntry {

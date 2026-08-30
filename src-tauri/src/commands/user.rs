@@ -193,10 +193,12 @@ pub async fn delete_account(
 
     // 清除本地同步配置（等同于退出登录）
     let mut cleared = config;
+    sync_service::clear_sync_credentials(&cleared)?;
     cleared.access_token = String::new();
     cleared.refresh_token = String::new();
     cleared.user_id = String::new();
     cleared.enabled = false;
+    cleared.authenticated = false;
     cleared.last_snapshot_id = None;
     sync_service::save_sync_config(&db, &cleared)?;
 

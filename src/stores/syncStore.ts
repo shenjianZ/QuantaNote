@@ -87,6 +87,7 @@ const DEFAULT_CONFIG: SyncConfig = {
     access_token: "",
     refresh_token: "",
     user_id: "",
+    authenticated: false,
     device_id: "",
     auto_sync: false,
     sync_interval_minutes: 15,
@@ -132,7 +133,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
             }
 
             // 启动自动同步
-            if (config.enabled && config.access_token && config.auto_sync) {
+            if (config.enabled && config.authenticated && config.auto_sync) {
                 startAutoSync(config.sync_interval_minutes, async () => {
                     try {
                         await get().triggerSync();
@@ -310,7 +311,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
         }
 
         // 更新自动同步定时器
-        if (updated.enabled && updated.access_token && updated.auto_sync) {
+        if (updated.enabled && updated.authenticated && updated.auto_sync) {
             startAutoSync(updated.sync_interval_minutes, async () => {
                 try {
                     await get().triggerSync();

@@ -15,7 +15,7 @@ export const StatusBar = memo(function StatusBar({ currentPage, itemCount }: Sta
   const [online, setOnline] = useState(() => navigator.onLine);
   const { config, state } = useSyncStore();
 
-  const syncActive = config.enabled && Boolean(config.access_token);
+  const syncActive = config.enabled && config.authenticated;
   const isSyncing =
     state.status === "preparing" ||
     state.status === "pushing" ||
