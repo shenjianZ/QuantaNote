@@ -16,6 +16,16 @@
   "aiSummaryGenerated": "AI 摘要已生成",
   "aiSummaryEmpty": "当前笔记没有可供摘要的内容",
   "aiSummaryHint": "仅在点击按钮时将标题和正文发送到已配置的 AI 服务；不会自动上传，也不会读取附件、PDF 或 OCR 内容。",
+  "aiTagsLabel": "标签",
+  "aiTagsNone": "暂无标签",
+  "aiTagsSuggest": "获取 AI 标签建议",
+  "aiTagsGenerating": "正在生成标签建议...",
+  "aiTagsEmpty": "当前笔记没有可供生成标签的内容",
+  "aiTagsNoSuggestions": "AI 没有返回新的标签建议",
+  "aiTagsTitle": "AI 标签建议",
+  "aiTagsHint": "请选择要追加到当前笔记的标签。已有标签不会被覆盖。",
+  "aiTagsApply": "应用选中标签",
+  "aiTagsPrivacyHint": "仅在点击按钮时发送标题和正文；不会读取或上传附件、PDF 或 OCR 内容。",
   "sidebar": {
     "show": "显示描述和目录",
     "hide": "隐藏描述和目录"

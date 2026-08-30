@@ -25,3 +25,11 @@ pub fn clear_ai_api_key() -> Result<(), AppError> {
 pub async fn generate_ai_summary(title: String, content: String) -> Result<String, AppError> {
     ai_service::generate_summary(&title, &content).await
 }
+
+#[tauri::command]
+pub async fn generate_ai_tag_suggestions(
+    title: String,
+    content: String,
+) -> Result<Vec<String>, AppError> {
+    ai_service::generate_tag_suggestions(&title, &content).await
+}

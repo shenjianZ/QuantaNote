@@ -159,6 +159,10 @@ export async function generateAiSummary(title: string, content: string) {
     return invoke<string>("generate_ai_summary", { title, content });
 }
 
+export async function generateAiTagSuggestions(title: string, content: string) {
+    return invoke<string[]>("generate_ai_tag_suggestions", { title, content });
+}
+
 // Search commands
 export type SearchMode = "normal" | "advanced";
 export type SearchScope = "content" | "tags" | "attachments" | "versions";

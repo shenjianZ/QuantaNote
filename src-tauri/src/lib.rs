@@ -341,6 +341,7 @@ pub fn run() {
             ai::save_ai_api_key,
             ai::clear_ai_api_key,
             ai::generate_ai_summary,
+            ai::generate_ai_tag_suggestions,
             commands::sync::get_sync_config,
             commands::sync::save_sync_config_cmd,
             commands::sync::get_sync_state,

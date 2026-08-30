@@ -109,6 +109,10 @@ describe("Document editor", () => {
     expect(await DocumentEditorPage.hasAiSummaryButton()).toBe(true);
   });
 
+  it("shows the explicitly triggered AI tag suggestion control", async () => {
+    expect(await DocumentEditorPage.hasAiTagsButton()).toBe(true);
+  });
+
   it("exposes image and attachment insertion controls", async () => {
     await browser.waitUntil(
       async () => DocumentEditorPage.hasImageInsertionToolbar() && DocumentEditorPage.hasAttachmentInsertionToolbar(),

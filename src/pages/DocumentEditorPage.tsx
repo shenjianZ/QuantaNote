@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, Clock, Loader2, Paperclip, RefreshCw, Save, Sparkles, Star } from "lucide-react";
+import { ArrowLeft, Clock, Loader2, Paperclip, RefreshCw, Save, Sparkles, Star, Tags } from "lucide-react";
 import { useAppStore } from "../stores/appStore";
 import { useItemStore } from "../stores/itemStore";
 import { getVditorLang } from "../utils/vditorConfig";
@@ -9,7 +9,7 @@ import { VersionPanel, type VersionDto } from "../components/editor/VersionPanel
 import { DocumentOutline, DocumentOutlineToggle } from "../components/editor/DocumentOutline";
 import type { VditorEditorHandle } from "../components/editor/VditorEditor";
 import { ContentWidthControl } from "../components/common/ContentWidthControl";
-import { generateAiSummary, getVersions, createVersion, updateVersion, restoreVersion, deleteVersion, type ItemDto, type SummaryMode } from "../services/tauriCommands";
+import { generateAiSummary, generateAiTagSuggestions, getVersions, createVersion, updateVersion, restoreVersion, deleteVersion, setItemTags, type ItemDto, type SummaryMode } from "../services/tauriCommands";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useResponsiveContentWidth } from "../hooks/useResponsiveContentWidth";
 import { CONTENT_WIDTH_EDITOR_BASE, CONTENT_WIDTH_OUTLINE_LAYOUT } from "../utils/contentWidth";
@@ -21,7 +21,10 @@ import { Select } from "../components/common/Select";
 import { getAppCommandId, APP_COMMAND_EVENT } from "../utils/appCommands";
 import { copyTextToSystemClipboard } from "../utils/clipboard";
 import { NotePropertiesPanel } from "../components/editor/NotePropertiesPanel";
+import { AiTagSuggestionsModal } from "../components/editor/AiTagSuggestionsModal";
 import { parseNoteProperties, updateNoteProperties, type NotePropertyUpdates } from "../utils/frontmatter";
+import { TagPill } from "../components/common/TagPill";
+import { useTagStore } from "../stores/tagStore";
 
 const VditorEditor = lazy(() => import("../components/editor/VditorEditor").then((m) => ({ default: m.VditorEditor })));
 
@@ -70,6 +73,8 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
   const addAttachment = useAttachmentStore((s) => s.addAttachment);
   const addAttachmentData = useAttachmentStore((s) => s.addAttachmentData);
   const deleteAttachment = useAttachmentStore((s) => s.deleteAttachment);
+  const itemTags = useTagStore((s) => s.itemTags);
+  const fetchItemTags = useTagStore((s) => s.fetchItemTags);
 
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
@@ -82,6 +87,11 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
   const [versionPanelOpen, setVersionPanelOpen] = useState(false);
   const [attachmentModalOpen, setAttachmentModalOpen] = useState(false);
   const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiTagGenerating, setAiTagGenerating] = useState(false);
+  const [aiTagApplying, setAiTagApplying] = useState(false);
+  const [aiTagSuggestions, setAiTagSuggestions] = useState<string[]>([]);
+  const [selectedAiTags, setSelectedAiTags] = useState<string[]>([]);
+  const [aiTagModalOpen, setAiTagModalOpen] = useState(false);
   const [activeHeadingIndex, setActiveHeadingIndex] = useState(-1);
   const editorRef = useRef<VditorEditorHandle>(null);
   const editorViewportRef = useRef<HTMLDivElement>(null);
@@ -167,9 +177,9 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
 
   // 通知父组件版本面板状态变化
   useEffect(() => {
-    onModalStateChange?.(versionPanelOpen || attachmentModalOpen);
+    onModalStateChange?.(versionPanelOpen || attachmentModalOpen || aiTagModalOpen);
     return () => { onModalStateChange?.(false); };
-  }, [versionPanelOpen, attachmentModalOpen, onModalStateChange]);
+  }, [versionPanelOpen, attachmentModalOpen, aiTagModalOpen, onModalStateChange]);
 
   // 组件卸载时清理防抖定时器
   useEffect(() => {
@@ -193,6 +203,14 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
     fetchAttachments(selectedItemId).catch(() => {});
     setAttachmentModalOpen(false);
   }, [selectedItemId, fetchAttachments]);
+
+  useEffect(() => {
+    if (!selectedItemId) return;
+    fetchItemTags(selectedItemId).catch(() => {});
+    setAiTagModalOpen(false);
+    setAiTagSuggestions([]);
+    setSelectedAiTags([]);
+  }, [selectedItemId, fetchItemTags]);
 
   useEffect(() => {
     if (!selectedItem) return;
@@ -362,6 +380,71 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
       useToastStore.getState().addToast("error", t("common:toast.aiSummaryFailed"));
     } finally {
       setAiGenerating(false);
+    }
+  }
+
+  function toggleAiTag(tag: string) {
+    setSelectedAiTags((current) => current.includes(tag)
+      ? current.filter((item) => item !== tag)
+      : [...current, tag]);
+  }
+
+  async function handleGenerateAiTagSuggestions() {
+    if (aiTagGenerating || !selectedItemId) return;
+    if (!latestTitle.current.trim() && !latestContent.current.trim()) {
+      useToastStore.getState().addToast("error", t("document:aiTagsEmpty"));
+      return;
+    }
+    if (!(await flushSave())) return;
+
+    setAiTagGenerating(true);
+    const sourceTitle = latestTitle.current;
+    const sourceContent = latestContent.current;
+    try {
+      const generated = await generateAiTagSuggestions(sourceTitle, sourceContent);
+      const existing = new Set(itemTags.map((tag) => tag.name.trim().toLowerCase()));
+      const suggestions = generated
+        .map((tag) => tag.trim().replace(/^#+/, "").trim())
+        .filter((tag) => tag.length > 0 && !existing.has(tag.toLowerCase()))
+        .filter((tag, index, all) => all.findIndex((item) => item.toLowerCase() === tag.toLowerCase()) === index)
+        .slice(0, 8);
+      setAiTagSuggestions(suggestions);
+      setSelectedAiTags(suggestions);
+      if (suggestions.length === 0) {
+        useToastStore.getState().addToast("info", t("document:aiTagsNoSuggestions"));
+        return;
+      }
+      setAiTagModalOpen(true);
+    } catch (error) {
+      console.error("AI tag suggestion failed:", error);
+      useToastStore.getState().addToast("error", t("common:toast.aiTagsFailed"));
+    } finally {
+      setAiTagGenerating(false);
+    }
+  }
+
+  async function handleApplyAiTags() {
+    if (!selectedItemId || aiTagApplying || selectedAiTags.length === 0) return;
+    setAiTagApplying(true);
+    try {
+      const seen = new Set<string>();
+      const mergedTags = [...itemTags.map((tag) => tag.name), ...selectedAiTags]
+        .map((tag) => tag.trim())
+        .filter((tag) => {
+          const key = tag.toLowerCase();
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      await setItemTags(selectedItemId, mergedTags);
+      await fetchItemTags(selectedItemId);
+      setAiTagModalOpen(false);
+      useToastStore.getState().addToast("success", t("common:toast.aiTagsApplied"));
+    } catch (error) {
+      console.error("Applying AI tags failed:", error);
+      useToastStore.getState().addToast("error", t("common:toast.aiTagsApplyFailed"));
+    } finally {
+      setAiTagApplying(false);
     }
   }
 
@@ -601,6 +684,28 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
         <aside className="flex min-h-0 min-w-0 flex-col gap-3 lg:sticky lg:top-0 lg:h-full lg:w-[18rem] lg:shrink-0" data-testid="document-editor-sidebar">
           <NotePropertiesPanel properties={properties} onChange={handlePropertiesChange} />
           {showDocumentOutline && <>
+            <section className="shrink-0 rounded-2xl border border-[var(--line)] bg-transparent p-3" data-testid="doc-tags-section">
+              <div className="mb-2 flex items-center gap-2">
+                <Tags className="h-4 w-4 text-[var(--muted)]" />
+                <h2 className="text-sm font-semibold text-[var(--text)]">{t("document:aiTagsLabel")}</h2>
+              </div>
+              <div className="mb-3 flex min-h-6 flex-wrap gap-1.5">
+                {itemTags.length > 0
+                  ? itemTags.map((tag) => <TagPill key={tag.name} tag={tag} />)
+                  : <span className="text-xs text-[var(--muted)]">{t("document:aiTagsNone")}</span>}
+              </div>
+              <button
+                className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-xl border border-[var(--line)] px-3 text-xs text-[var(--muted)] transition-colors hover:border-[var(--accent)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-50"
+                type="button"
+                data-testid="doc-ai-tags-btn"
+                disabled={aiTagGenerating || (!title.trim() && !content.trim())}
+                onClick={() => { void handleGenerateAiTagSuggestions(); }}
+              >
+                {aiTagGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                {t(aiTagGenerating ? "document:aiTagsGenerating" : "document:aiTagsSuggest")}
+              </button>
+              <p className="mt-2 text-[11px] leading-relaxed text-[var(--muted)]">{t("document:aiTagsPrivacyHint")}</p>
+            </section>
             <section className="shrink-0 rounded-2xl border border-[var(--line)] bg-transparent p-3">
             <div className="mb-2 flex items-center justify-between gap-2">
               <label className="block text-sm font-semibold text-[var(--text)]" htmlFor="doc-summary-input">
@@ -730,6 +835,15 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
         itemId={selectedItemId ?? ""}
         onInsertAttachment={handleInsertAttachment}
         onDeleteAttachment={handleDeleteAttachment}
+      />
+      <AiTagSuggestionsModal
+        open={aiTagModalOpen}
+        suggestions={aiTagSuggestions}
+        selectedTags={selectedAiTags}
+        applying={aiTagApplying}
+        onClose={() => setAiTagModalOpen(false)}
+        onToggle={toggleAiTag}
+        onApply={() => { void handleApplyAiTags(); }}
       />
     </div>
   );

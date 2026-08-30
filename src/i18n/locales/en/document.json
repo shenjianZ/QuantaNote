@@ -16,6 +16,16 @@
   "aiSummaryGenerated": "AI summary generated",
   "aiSummaryEmpty": "This note has no content to summarize",
   "aiSummaryHint": "Only when clicked, the configured AI service receives the title and body; attachments, PDFs, and OCR content are not read or uploaded.",
+  "aiTagsLabel": "Tags",
+  "aiTagsNone": "No tags yet",
+  "aiTagsSuggest": "Get AI tag suggestions",
+  "aiTagsGenerating": "Generating tag suggestions...",
+  "aiTagsEmpty": "This note has no content for tag generation",
+  "aiTagsNoSuggestions": "AI returned no new tag suggestions",
+  "aiTagsTitle": "AI Tag Suggestions",
+  "aiTagsHint": "Select the tags to append to this note. Existing tags will not be replaced.",
+  "aiTagsApply": "Apply selected tags",
+  "aiTagsPrivacyHint": "Only the title and body are sent after clicking; attachments, PDFs, and OCR content are not read or uploaded.",
   "sidebar": {
     "show": "Show description and outline",
     "hide": "Hide description and outline"

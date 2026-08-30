@@ -6,6 +6,7 @@ import { useAppStore } from "../stores/appStore";
 import { useItemStore } from "../stores/itemStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useAttachmentStore } from "../stores/attachmentStore";
+import { useTagStore } from "../stores/tagStore";
 import { mockIPC } from "@tauri-apps/api/mocks";
 
 const { scrollToHeadingMock, setValueMock, regenerateSummaryMock } = vi.hoisted(() => ({
@@ -58,6 +59,8 @@ describe("DocumentEditorPage", () => {
     created_at: "2026-01-01",
     updated_at: "2026-01-02",
   };
+  let setItemTagsArgs: unknown = null;
+  let aiTagSuggestionCalls = 0;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -76,6 +79,8 @@ describe("DocumentEditorPage", () => {
       created_at: "2026-01-01",
       updated_at: "2026-01-02",
     };
+    setItemTagsArgs = null;
+    aiTagSuggestionCalls = 0;
 
     useAppStore.setState({ selectedItemId: "item-1", theme: "light" });
     useItemStore.setState({
@@ -100,13 +105,22 @@ describe("DocumentEditorPage", () => {
       settings: { ...state.settings, contentWidthProgress: 0 },
     }));
     useAttachmentStore.setState({ attachments: [], loading: false, error: null });
+    useTagStore.setState({ itemTags: [], fetchItemTags: vi.fn(async () => {}) });
 
-    mockIPC((cmd) => {
+    mockIPC((cmd, args) => {
       if (cmd === "get_versions") return mockedVersions;
       if (cmd === "get_attachments") return [];
       if (cmd === "create_version") return { id: "ver-1", version_number: 1, content: "c", name: "v1", description: "", created_at: new Date().toISOString() };
       if (cmd === "restore_version") return mockedRestoredItem;
       if (cmd === "generate_ai_summary") return "AI 生成的摘要";
+      if (cmd === "generate_ai_tag_suggestions") {
+        aiTagSuggestionCalls += 1;
+        return ["rust", "tauri"];
+      }
+      if (cmd === "set_item_tags") {
+        setItemTagsArgs = args;
+        return null;
+      }
       return null;
     });
   });
@@ -285,6 +299,23 @@ describe("DocumentEditorPage", () => {
       summaryMode: "manual",
     });
     expect(screen.getByTestId("doc-summary-mode-badge")).toHaveTextContent("手动摘要");
+  });
+
+  it("previews AI tag suggestions and applies only the selected additions", async () => {
+    const { user } = setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
+
+    expect(aiTagSuggestionCalls).toBe(0);
+    await user.click(screen.getByTestId("doc-ai-tags-btn"));
+    await waitFor(() => expect(screen.getByTestId("ai-tag-suggestions-modal")).toBeInTheDocument());
+    expect(aiTagSuggestionCalls).toBe(1);
+    expect(screen.getByText("#rust")).toBeInTheDocument();
+    expect(screen.getByText("#tauri")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("ai-tag-suggestion-1"));
+    await user.click(screen.getByTestId("ai-tag-apply-btn"));
+
+    await waitFor(() => expect(screen.queryByTestId("ai-tag-suggestions-modal")).not.toBeInTheDocument());
+    expect(setItemTagsArgs).toEqual({ itemId: "item-1", tagNames: ["rust"] });
   });
 
   it("creates version on save version click", async () => {
