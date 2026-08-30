@@ -94,6 +94,8 @@ The image button creates the attachment automatically. You can also drop an imag
 
 The editor sidebar provides an “AI Summary” button. Before using it, enable the feature under “Settings → Data → AI Summary” and enter an OpenAI-compatible Chat Completions endpoint and model. The API key is stored separately in the system credential manager rather than the configuration file. A local compatible service may be used without an API key.
 
+For the Zhipu GLM Coding Plan, use `https://open.bigmodel.cn/api/coding/paas/v4`, a personal or team coding-plan API key, and a GLM model supported by the plan. This is a Base URL; QuantaNote automatically appends the `/chat/completions` request path.
+
 AI generation runs only after the user explicitly clicks the button. The request contains only the current note title and body; QuantaNote does not upload automatically and does not read or upload attachments, PDF text, or image OCR content. The result is written back as a manual summary. If the endpoint is unavailable or the configuration is incomplete, the existing body and summary are not overwritten.
 
 ### AI Tag Suggestions

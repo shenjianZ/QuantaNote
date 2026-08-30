@@ -127,7 +127,7 @@
     "remoteBackupNeverUploaded": "Never uploaded",
     "remoteBackupLastError": "Most recent remote upload failed",
     "aiSummary": "AI Summary",
-    "aiSummaryDesc": "Only when you click “AI Summary” in the editor, the current note title and body are sent; nothing is uploaded automatically, and attachments, PDFs, and OCR content are not read.",
+    "aiSummaryDesc": "Only when you click “AI Summary” in the editor, the current note title and body are sent; nothing is uploaded automatically, and attachments, PDFs, and OCR content are not read. For Zhipu GLM Coding Plan, use https://open.bigmodel.cn/api/coding/paas/v4 and a key issued by the corresponding personal or team coding plan.",
     "enableAiSummary": "Enable AI summary",
     "aiEndpoint": "AI endpoint",
     "aiModel": "Model name",

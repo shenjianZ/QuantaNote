@@ -127,7 +127,7 @@
     "remoteBackupNeverUploaded": "从未上传",
     "remoteBackupLastError": "最近一次远端上传失败",
     "aiSummary": "AI 摘要",
-    "aiSummaryDesc": "仅在你点击编辑器中的「AI 生成摘要」时发送当前笔记标题和正文；不会自动上传，也不会读取附件、PDF 或 OCR 内容。",
+    "aiSummaryDesc": "仅在你点击编辑器中的「AI 生成摘要」时发送当前笔记标题和正文；不会自动上传，也不会读取附件、PDF 或 OCR 内容。使用智谱 GLM Coding Plan 时，接口地址填 https://open.bigmodel.cn/api/coding/paas/v4，API Key 必须来自对应的个人或团队编程套餐。",
     "enableAiSummary": "启用 AI 摘要",
     "aiEndpoint": "AI 接口地址",
     "aiModel": "模型名称",

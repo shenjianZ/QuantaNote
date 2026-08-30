@@ -94,6 +94,8 @@ aliases:
 
 编辑器侧栏提供“AI 摘要”按钮。首次使用前，请到“设置 → 数据 → AI 摘要”中启用功能，填写 OpenAI 兼容的 Chat Completions 接口和模型；API Key 会单独保存到系统凭据管理器，不会写入配置文件。使用本地兼容服务时，可以不填写 API Key。
 
+如果使用智谱 GLM Coding Plan，接口地址填写 `https://open.bigmodel.cn/api/coding/paas/v4`，API Key 使用对应的个人或团队编程套餐 Key，模型填写套餐支持的 GLM 模型。该地址是 Base URL，QuantaNote 会自动补全 `/chat/completions` 请求路径。
+
 AI 摘要只会在用户明确点击按钮后生成。请求只包含当前笔记标题和正文，不会自动上传，也不会读取或上传附件、PDF 文本或图片 OCR 内容。生成结果会写回摘要，并按手动摘要保存；接口不可用或配置不完整时，原有正文和摘要不会被覆盖。
 
 ### AI 标签建议
