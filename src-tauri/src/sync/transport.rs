@@ -106,6 +106,16 @@ pub struct PaginatedSyncHistory {
     pub page_size: u32,
 }
 
+/// 账户下的同步设备会话
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DeviceSessionInfo {
+    pub device_id: String,
+    pub created_at: String,
+    pub last_seen_at: String,
+    pub expires_at: String,
+    pub is_current: bool,
+}
+
 /// token 刷新后的回调类型
 pub type TokenRefreshCallback = Box<dyn Fn(String, String) + Send + Sync>;
 
@@ -724,6 +734,37 @@ impl SyncTransport {
         let builder = self.client.get(&url);
         let resp = self.send_auth_with_refresh(builder).await?;
         self.handle_response(resp).await
+    }
+
+    /// 获取当前账户的有效设备会话
+    pub async fn list_devices(&self) -> Result<Vec<DeviceSessionInfo>, AppError> {
+        let url = format!("{}/auth/devices", self.server_url);
+        let builder = self.client.get(&url);
+        let resp = self.send_auth_with_refresh(builder).await?;
+        self.handle_response(resp).await
+    }
+
+    /// 撤销当前账户下指定设备的同步会话
+    pub async fn revoke_device(&self, device_id: &str) -> Result<(), AppError> {
+        let url = format!("{}/auth/devices/revoke", self.server_url);
+        let builder = self
+            .client
+            .post(&url)
+            .json(&serde_json::json!({ "device_id": device_id }));
+        let resp = self.send_auth_with_refresh(builder).await?;
+        let body: ApiResponse<serde_json::Value> = resp
+            .json()
+            .await
+            .map_err(|e| AppError::SyncError(format!("解析响应失败: {}", e)))?;
+
+        if body.code == 200 {
+            Ok(())
+        } else {
+            Err(AppError::SyncError(format!(
+                "撤销设备失败: {}",
+                body.message
+            )))
+        }
     }
 
     /// 提交同步

@@ -443,6 +443,103 @@ pub async fn get_sync_history(
 }
 
 #[tauri::command]
+pub async fn get_sync_devices(
+    db: State<'_, DbState>,
+    sync_state: State<'_, SyncEngineState>,
+) -> Result<Vec<crate::sync::transport::DeviceSessionInfo>, AppError> {
+    let _auth_guard = sync_state.auth_request_lock.lock().await;
+    let config = {
+        let cfg = sync_state
+            .config
+            .lock()
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        cfg.clone()
+    };
+    let shared_config = Arc::new(Mutex::new(config.clone()));
+    let db_clone = db.inner().clone();
+    let shared_cfg_clone = shared_config.clone();
+    let state_cfg_clone = sync_state.config.clone();
+    let transport = SyncTransport::new_with_callback(
+        &config.server_url,
+        &config.access_token,
+        &config.refresh_token,
+        &config.device_id,
+        Box::new(move |new_access, new_refresh| {
+            if let Ok(mut cfg) = shared_cfg_clone.lock() {
+                cfg.access_token = new_access.clone();
+                cfg.refresh_token = new_refresh.clone();
+                let _ = sync_service::save_sync_config(&db_clone, &cfg);
+            }
+            if let Ok(mut state_cfg) = state_cfg_clone.lock() {
+                state_cfg.access_token = new_access;
+                state_cfg.refresh_token = new_refresh;
+            }
+        }),
+    );
+    let result = transport.list_devices().await;
+
+    let (new_access, new_refresh) = transport.get_tokens().await;
+    let mut updated_config = config;
+    updated_config.access_token = new_access;
+    updated_config.refresh_token = new_refresh;
+    sync_service::save_sync_config(&db, &updated_config)?;
+    if let Ok(mut cfg) = sync_state.config.lock() {
+        *cfg = updated_config;
+    }
+
+    result
+}
+
+#[tauri::command]
+pub async fn revoke_sync_device(
+    db: State<'_, DbState>,
+    sync_state: State<'_, SyncEngineState>,
+    device_id: String,
+) -> Result<(), AppError> {
+    let _auth_guard = sync_state.auth_request_lock.lock().await;
+    let config = {
+        let cfg = sync_state
+            .config
+            .lock()
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        cfg.clone()
+    };
+    let shared_config = Arc::new(Mutex::new(config.clone()));
+    let db_clone = db.inner().clone();
+    let shared_cfg_clone = shared_config.clone();
+    let state_cfg_clone = sync_state.config.clone();
+    let transport = SyncTransport::new_with_callback(
+        &config.server_url,
+        &config.access_token,
+        &config.refresh_token,
+        &config.device_id,
+        Box::new(move |new_access, new_refresh| {
+            if let Ok(mut cfg) = shared_cfg_clone.lock() {
+                cfg.access_token = new_access.clone();
+                cfg.refresh_token = new_refresh.clone();
+                let _ = sync_service::save_sync_config(&db_clone, &cfg);
+            }
+            if let Ok(mut state_cfg) = state_cfg_clone.lock() {
+                state_cfg.access_token = new_access;
+                state_cfg.refresh_token = new_refresh;
+            }
+        }),
+    );
+    let result = transport.revoke_device(&device_id).await;
+
+    let (new_access, new_refresh) = transport.get_tokens().await;
+    let mut updated_config = config;
+    updated_config.access_token = new_access;
+    updated_config.refresh_token = new_refresh;
+    sync_service::save_sync_config(&db, &updated_config)?;
+    if let Ok(mut cfg) = sync_state.config.lock() {
+        *cfg = updated_config;
+    }
+
+    result
+}
+
+#[tauri::command]
 pub fn get_pending_conflicts(
     sync_state: State<'_, SyncEngineState>,
 ) -> Result<Option<Vec<ConflictInfo>>, AppError> {

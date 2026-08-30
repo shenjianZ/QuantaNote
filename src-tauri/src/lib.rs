@@ -346,6 +346,8 @@ pub fn run() {
             commands::sync::sync_reset_password,
             commands::sync::test_sync_connection,
             commands::sync::get_sync_history,
+            commands::sync::get_sync_devices,
+            commands::sync::revoke_sync_device,
             commands::sync::get_pending_conflicts,
             commands::sync::resolve_sync_conflicts,
             commands::sync::cancel_sync_conflicts,

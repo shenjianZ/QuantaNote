@@ -666,6 +666,14 @@ export interface PaginatedSyncHistory {
     page_size: number;
 }
 
+export interface SyncDevice {
+    device_id: string;
+    created_at: string;
+    last_seen_at: string;
+    expires_at: string;
+    is_current: boolean;
+}
+
 // Sync commands
 export async function getSyncConfig() {
     return invoke<SyncConfig>("get_sync_config");
@@ -744,6 +752,14 @@ export async function testSyncConnection(serverUrl: string) {
 
 export async function getSyncHistory(page: number = 1, pageSize: number = 10) {
     return invoke<PaginatedSyncHistory>("get_sync_history", { page, pageSize });
+}
+
+export async function getSyncDevices() {
+    return invoke<SyncDevice[]>("get_sync_devices");
+}
+
+export async function revokeSyncDevice(deviceId: string) {
+    return invoke<void>("revoke_sync_device", { deviceId });
 }
 
 export async function getPendingConflicts() {

@@ -39,6 +39,7 @@ export function SyncSettingsPanel({ showAccount = true }: SyncSettingsPanelProps
         historyTotal,
         historyPage,
         historyPageSize,
+        devices,
         isLoading,
         error,
         pendingConflicts,
@@ -49,6 +50,8 @@ export function SyncSettingsPanel({ showAccount = true }: SyncSettingsPanelProps
         logout,
         testConnection,
         refreshHistory,
+        refreshDevices,
+        revokeDevice,
         clearError,
     } = useSyncStore();
 
@@ -57,6 +60,7 @@ export function SyncSettingsPanel({ showAccount = true }: SyncSettingsPanelProps
     const [serverUrlInput, setServerUrlInput] = useState(config.server_url);
     const [testResult, setTestResult] = useState<boolean | null>(null);
     const [isTesting, setIsTesting] = useState(false);
+    const [revokingDeviceId, setRevokingDeviceId] = useState<string | null>(null);
 
     useEffect(() => {
         setServerUrlInput(config.server_url);
@@ -65,8 +69,9 @@ export function SyncSettingsPanel({ showAccount = true }: SyncSettingsPanelProps
     useEffect(() => {
         if (config.authenticated) {
             refreshHistory();
+            refreshDevices();
         }
-    }, [config.authenticated, refreshHistory]);
+    }, [config.authenticated, refreshHistory, refreshDevices]);
 
     const isLoggedIn = Boolean(config.authenticated && config.user_id);
 
@@ -105,6 +110,18 @@ export function SyncSettingsPanel({ showAccount = true }: SyncSettingsPanelProps
             await resumeSync();
         } catch {
             // error handled in store
+        }
+    }
+
+    async function handleRevokeDevice(deviceId: string) {
+        if (!window.confirm(t("revokeDeviceConfirm"))) return;
+        setRevokingDeviceId(deviceId);
+        try {
+            await revokeDevice(deviceId);
+        } catch {
+            // 错误由同步状态统一展示
+        } finally {
+            setRevokingDeviceId(null);
         }
     }
 
@@ -438,6 +455,66 @@ export function SyncSettingsPanel({ showAccount = true }: SyncSettingsPanelProps
                                     )}
                                 </div>
                             )}
+                        </div>
+                    </div>
+
+                    {/* 设备会话 */}
+                    <div data-testid="sync-devices" className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <label className="text-sm font-medium text-[var(--text)]">
+                                {t("devices")}
+                            </label>
+                            <button
+                                data-testid="sync-devices-refresh-btn"
+                                onClick={() => refreshDevices()}
+                                disabled={isLoading}
+                                className="rounded-lg p-1.5 text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)] disabled:opacity-50"
+                                title={t("refreshDevices")}
+                            >
+                                <RefreshCw className="h-3.5 w-3.5" />
+                            </button>
+                        </div>
+                        <div className="space-y-1">
+                            {devices.map((device) => (
+                                <div
+                                    key={device.device_id}
+                                    data-testid="sync-device-row"
+                                    data-device-id={device.device_id}
+                                    className="flex items-center justify-between rounded-xl bg-[var(--field)] px-3 py-2.5"
+                                >
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-2 text-xs text-[var(--text)]">
+                                            <span className="truncate" title={device.device_id}>
+                                                {device.is_current
+                                                    ? t("currentDevice")
+                                                    : device.device_id}
+                                            </span>
+                                            {device.is_current && (
+                                                <span className="shrink-0 rounded-full bg-[var(--accent)]/15 px-1.5 py-0.5 text-[10px] text-[var(--accent)]">
+                                                    {t("currentDeviceBadge")}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="mt-0.5 text-[11px] text-[var(--muted)]">
+                                            {t("deviceLastSeen", {
+                                                time: new Date(device.last_seen_at).toLocaleString(),
+                                            })}
+                                        </div>
+                                    </div>
+                                    {!device.is_current && (
+                                        <button
+                                            data-testid="sync-device-revoke-btn"
+                                            onClick={() => handleRevokeDevice(device.device_id)}
+                                            disabled={revokingDeviceId === device.device_id}
+                                            className="ml-3 shrink-0 rounded-lg px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                                        >
+                                            {revokingDeviceId === device.device_id
+                                                ? t("revokingDevice")
+                                                : t("revokeDevice")}
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
                         </div>
                     </div>
 

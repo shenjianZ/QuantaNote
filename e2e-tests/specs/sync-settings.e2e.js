@@ -53,6 +53,10 @@ describe("Sync settings panel", () => {
         expect(await SyncSettingsPanel.isRegisterBtnVisible()).toBe(false);
     });
 
+    it("hides device sessions while signed out", async () => {
+        expect(await SyncSettingsPanel.isDevicesSectionVisible()).toBe(false);
+    });
+
     it("test connection button is disabled when URL is empty", async () => {
         expect(await SyncSettingsPanel.isTestConnectionDisabled()).toBe(true);
     });

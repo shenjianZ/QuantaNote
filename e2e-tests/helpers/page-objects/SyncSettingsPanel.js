@@ -22,6 +22,10 @@ class SyncSettingsPanel {
   get syncResumeBtn() { return "[data-testid='sync-resume-btn']"; }
   get syncQueueStatus() { return "[data-testid='sync-queue-status']"; }
   get syncStatus() { return "[data-testid='sync-status']"; }
+  get devicesSection() { return "[data-testid='sync-devices']"; }
+  get devicesRefreshBtn() { return "[data-testid='sync-devices-refresh-btn']"; }
+  get deviceRows() { return "[data-testid='sync-device-row']"; }
+  get deviceRevokeBtns() { return "[data-testid='sync-device-revoke-btn']"; }
   get syncError() { return "[data-testid='sync-error']"; }
 
   async isTogglePresent() {
@@ -113,6 +117,15 @@ class SyncSettingsPanel {
 
   async isLoggedIn() {
     return this.isLogoutBtnVisible();
+  }
+
+  async isDevicesSectionVisible() {
+    const el = await $(this.devicesSection);
+    return el.isExisting() && el.isDisplayed();
+  }
+
+  async getDeviceRowsCount() {
+    return (await $$(this.deviceRows)).length;
   }
 }
 

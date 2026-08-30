@@ -12,6 +12,8 @@ import {
     syncResetPassword,
     testSyncConnection,
     getSyncHistory,
+    getSyncDevices,
+    revokeSyncDevice,
     getPendingConflicts,
     resolveSyncConflicts,
     cancelSyncConflicts,
@@ -21,6 +23,7 @@ import {
     type SyncState,
     type SyncResult,
     type SyncHistoryEntry,
+    type SyncDevice,
     type ConflictInfo,
     type ConflictResolutionChoice,
 } from "../services/tauriCommands";
@@ -69,6 +72,7 @@ interface SyncStore {
     historyTotal: number;
     historyPage: number;
     historyPageSize: number;
+    devices: SyncDevice[];
     isLoading: boolean;
     error: string | null;
     pendingConflicts: ConflictInfo[] | null;
@@ -89,6 +93,8 @@ interface SyncStore {
     resumeSync: () => Promise<void>;
     testConnection: (serverUrl: string) => Promise<boolean>;
     refreshHistory: (page?: number, pageSize?: number) => Promise<void>;
+    refreshDevices: () => Promise<void>;
+    revokeDevice: (deviceId: string) => Promise<void>;
 
     // 冲突解决
     resolveConflicts: (resolutions: ConflictResolutionChoice[]) => Promise<SyncResult>;
@@ -133,6 +139,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     historyTotal: 0,
     historyPage: 1,
     historyPageSize: 10,
+    devices: [],
     isLoading: false,
     error: null,
     pendingConflicts: null,
@@ -142,6 +149,10 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
             const config = await getSyncConfig();
             const state = await getSyncState();
             set({ config, state });
+
+            if (config.authenticated) {
+                await get().refreshDevices();
+            }
 
             if (state.queued && !state.paused && state.next_retry_at) {
                 scheduleQueueRetry(state.next_retry_at, async () => {
@@ -188,6 +199,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
             await syncLogin(serverUrl, email, password);
             const config = await getSyncConfig();
             set({ config, isLoading: false });
+            await get().refreshDevices();
         } catch (e) {
             set({ isLoading: false, error: String(e) });
             throw e;
@@ -200,6 +212,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
             await syncRegister(serverUrl, email, password, verifyCode);
             const config = await getSyncConfig();
             set({ config, isLoading: false });
+            await get().refreshDevices();
         } catch (e) {
             set({ isLoading: false, error: String(e) });
             throw e;
@@ -212,7 +225,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
         try {
             await syncLogout();
             const config = await getSyncConfig();
-            set({ config, isLoading: false });
+            set({ config, devices: [], isLoading: false });
         } catch (e) {
             set({ isLoading: false, error: String(e) });
             throw e;
@@ -354,6 +367,30 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
             });
         } catch (e) {
             console.error("Fetch sync history failed:", e);
+        }
+    },
+
+    refreshDevices: async () => {
+        if (!get().config.authenticated) {
+            set({ devices: [] });
+            return;
+        }
+        try {
+            const devices = await getSyncDevices();
+            set({ devices });
+        } catch (e) {
+            console.error("Fetch sync devices failed:", e);
+        }
+    },
+
+    revokeDevice: async (deviceId: string) => {
+        set({ error: null });
+        try {
+            await revokeSyncDevice(deviceId);
+            await get().refreshDevices();
+        } catch (e) {
+            set({ error: String(e) });
+            throw e;
         }
     },
 
