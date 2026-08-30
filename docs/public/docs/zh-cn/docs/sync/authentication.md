@@ -1,9 +1,9 @@
 ---
 title: 认证
-description: QuantaNote 同步认证功能，包括账号注册、登录、密码重置和 Token 管理
+description: QuantaNote 同步认证功能，包括账号注册、登录、密码重置、Token 管理和系统凭据库存储
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-30
 ---
 
 # 认证
@@ -63,6 +63,12 @@ QuantaNote 会自动管理这些令牌：
 - 当 Access Token 过期时，自动使用 Refresh Token 获取新令牌
 - 如果 Refresh Token 也过期，则需要重新登录
 
+**令牌存储：**
+
+- Access Token 和 Refresh Token 保存在操作系统的系统凭据库中（Windows 凭据管理器、macOS 钥匙串或 Linux Secret Service）
+- SQLite 配置中不保存令牌明文，只保留同步服务器、设备和同步状态等非敏感配置
+- 从旧版本升级时，应用会将旧配置中的令牌迁移到系统凭据库；迁移成功后清理 SQLite 中的旧令牌
+
 **设备标识：**
 
 每台设备登录后会获得一个唯一的设备 ID（Device ID）。设备 ID 用于：
@@ -101,7 +107,7 @@ QuantaNote 会自动管理这些令牌：
 
 - 自动同步会被停止
 - 本地数据不会受到任何影响
-- Access Token 和 Refresh Token 会被清除
+- 系统凭据库中的 Access Token 和 Refresh Token 会被清除
 - 设备 ID 和同步基线会被保留（下次登录时可继续同步）
 
 > **提示**：如果你要在多台设备上使用同步功能，建议每台设备都保持登录状态，以确保数据能够持续同步。

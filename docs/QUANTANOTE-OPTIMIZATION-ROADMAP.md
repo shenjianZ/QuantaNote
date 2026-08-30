@@ -233,13 +233,17 @@ QuantaNote 已经具备比较完整的本地笔记软件基础：Markdown 编辑
 
 ### P1-09 改进同步安全和冲突处理
 
-- [ ] 使用系统凭据库保存 access token 和 refresh token，不在 SQLite 中明文保存。
-- [ ] 为标签和笔记标签关系增加真实 `updated_at`，避免每次同步被误判为变化。
-- [ ] 增加离线队列、失败重试、暂停和继续同步。
-- [ ] 冲突界面支持本地/远程左右对比。
-- [ ] 支持按字段选择本地值、远程值或手动合并。
+- [x] 使用系统凭据库保存 access token 和 refresh token，不在 SQLite 中明文保存。
+- [x] 为标签和笔记标签关系增加真实 `updated_at`，避免每次同步被误判为变化。
+- [x] 增加离线队列、失败重试、暂停和继续同步。
+- [x] 冲突界面支持本地/远程左右对比。
+- [x] 支持按字段选择本地值、远程值或手动合并。
 
 相关代码：`src-tauri/src/services/sync_service.rs`、`src-tauri/src/sync/diff.rs`。
+
+完成日期：2026-08-30
+修改范围：系统凭据库存储与旧配置迁移；标签和笔记标签关系的真实更新时间及稳定 diff；同步离线队列、持久化失败重试、暂停/继续控制；手动冲突的本地/远端数据对比、字段级本地/远端/手动合并和服务端标识校验；同步设置、冲突弹窗、中英文文案及 E2E 辅助命令。
+验证结果：`cargo fmt --manifest-path src-tauri/Cargo.toml -- --check`、`cargo check`、`cargo test --lib` 通过，共 132 个 Rust 测试通过；`pnpm exec tsc --noEmit`、`pnpm test:unit` 通过，共 152 个前端单元测试通过；`pnpm build` 通过；GitNexus 提交前变更检测覆盖 7 个文件，识别为同步跨层 HIGH 风险，已核对为预期范围；完整桌面 E2E 本次未启动运行时执行。
 
 ## 第三阶段：知识管理能力（P2）
 

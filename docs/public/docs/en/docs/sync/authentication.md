@@ -1,9 +1,9 @@
 ---
 title: Authentication
-description: QuantaNote sync authentication features including account registration, login, password reset, and token management
+description: QuantaNote sync authentication features including registration, login, password reset, token management, and system credential storage
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-30
 ---
 
 # Authentication
@@ -63,6 +63,12 @@ QuantaNote automatically manages these tokens:
 - When the Access Token expires, it automatically uses the Refresh Token to obtain a new one
 - If the Refresh Token also expires, you will need to log in again
 
+**Token storage:**
+
+- Access Token and Refresh Token are stored in the operating system credential store (Windows Credential Manager, macOS Keychain, or Linux Secret Service)
+- SQLite configuration does not store plaintext tokens; it stores only non-sensitive settings such as the server, device, and sync state
+- When upgrading from an older version, the app migrates legacy tokens into the system credential store and removes the old SQLite token values after a successful migration
+
 **Device Identity:**
 
 Each device receives a unique Device ID after logging in. The Device ID is used to:
@@ -101,7 +107,7 @@ When you no longer need sync or want to switch accounts, you can log out.
 
 - Auto sync will be stopped
 - Local data is not affected in any way
-- Access Token and Refresh Token are cleared
+- Access Token and Refresh Token are cleared from the system credential store
 - Device ID and sync baseline are preserved (syncing can continue on next login)
 
 > **Tip:** If you use sync on multiple devices, it's recommended to keep each device logged in to ensure continuous data synchronization.

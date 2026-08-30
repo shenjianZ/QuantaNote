@@ -1,9 +1,9 @@
 ---
 title: Conflict Resolution
-description: QuantaNote sync conflict resolution mechanism, including three-way diff, four resolution strategies, manual conflict resolution UI, and the tombstone mechanism
+description: QuantaNote sync conflict resolution mechanism, including three-way diff, four resolution strategies, side-by-side comparison, field merge, and tombstones
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-30
 ---
 
 # Conflict Resolution
@@ -34,11 +34,11 @@ QuantaNote uses a three-way diff algorithm to accurately detect conflicts. This 
 
 - If only the local version changed → Push the local version directly
 - If only the remote version changed → Pull the remote version directly
-- If both modified the same field → A conflict is detected
+- If both modified the same record and the content hashes differ → A conflict is detected
 
 This three-way comparison is more precise than simple "last write wins" because it can distinguish between true conflicts and non-conflicting concurrent modifications.
 
-For example, if you modified the note title on Device A and the note content on Device B, these changes can be automatically merged without conflict. Only when both devices modify the same field does the conflict resolution process trigger.
+The current diff compares records by content hash, so different changes to the same record on two devices enter conflict resolution. In Manual mode, you can still merge the record field by field instead of choosing an entire version.
 
 ## Conflict Resolution Strategies
 
@@ -88,20 +88,20 @@ When the Manual strategy is selected, every sync that detects conflicts will ope
 **Conflict resolution modal features:**
 
 1. **Conflict list** — Displays all detected conflicting records
-2. **Per-record review** — Click a conflict to view detailed comparison:
-   - Local version content
-   - Remote version content
-   - Baseline version content (for reference)
-3. **Choose which version to keep** — For each conflict, select:
+2. **Side-by-side comparison** — Each conflict shows the complete local and remote data with their update timestamps in two columns
+3. **Choose a resolution** — For each conflict, select:
    - Keep local version
    - Adopt remote version
-4. **Bulk operations** — One-click to keep all local or all remote
-5. **Confirm resolution** — After making all selections, click the "Apply" button
+   - Merge by field
+4. **Field merge** — For ordinary fields, choose a local value, remote value, or enter a manual value; record IDs, tag UUIDs, and association identifiers remain fixed
+5. **Bulk operations** — One-click to keep all local or all remote
+6. **Confirm resolution** — After making all selections, click the "Apply Resolution" button
 
 **Best practices:**
 
 - Carefully compare differences between local and remote versions
-- For important note content, don't rush to choose — consider copying both versions
+- For important note content, use field merge when appropriate; manual values accept JSON or plain text
+- The server validates record identity in the merged result, so it cannot be used to modify another record or submit a deletion marker
 - If there are many conflicts, consider using the Auto strategy to simplify operations
 
 ## Baselines and Tombstones

@@ -1,9 +1,9 @@
 ---
 title: Syncing Your Data
-description: QuantaNote data sync operations guide, including manual sync, auto sync, sync status monitoring, and sync history
+description: QuantaNote data sync operations guide, including manual sync, auto sync, offline queue, retries, pause/resume, and sync history
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-30
 ---
 
 # Syncing Your Data
@@ -66,8 +66,17 @@ The auto sync feature automatically executes sync operations at a configured tim
 
 - Only works while the application is running
 - Does not trigger if the previous sync hasn't completed
-- Silently skips when network is unavailable, without errors
-- Displays error notifications in the status bar on sync failure
+- Enqueues the sync when the network is unavailable or sync fails, then retries after the next backoff time
+- Shows the failure count, next retry time, and latest error in sync settings and the status bar
+
+## Offline Queue and Retries
+
+Sync failures do not discard local data. QuantaNote persists a local pending-sync queue state:
+
+- The queue stores only pending state, failure count, next retry time, and error details; note data remains in the local SQLite database
+- Temporary failures use increasing backoff intervals, and the retry plan is restored after reopening the app
+- Clicking "Pause Sync" in settings stops automatic retries; "Resume & Retry" clears the wait time and resumes sync
+- A successful sync clears the queue and resets the failure count
 
 ## Sync Status
 
@@ -79,6 +88,7 @@ QuantaNote provides a real-time sync status indicator in the status bar:
 | Syncing | Spinning icon | Sync operation in progress |
 | Pending | Blue dot | Local changes awaiting sync |
 | Error | Red exclamation mark | Sync failed, attention needed |
+| Paused | Pause icon | Auto sync and retries are paused |
 | Not logged in | Gray icon | Sync not configured or logged out |
 
 **Error handling:**
@@ -88,7 +98,7 @@ When a sync error occurs:
 - The status bar displays a red error icon
 - Click the icon to view detailed error information
 - Common errors include network timeouts, server unreachable, and authentication failures
-- Most temporary errors are automatically retried on the next auto sync
+- Most temporary errors are automatically retried according to the offline queue schedule
 
 ## Sync Content
 
