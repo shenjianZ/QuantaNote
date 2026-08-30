@@ -8,7 +8,7 @@ lastUpdated: 2026-08-30
 
 # Local Encryption Design
 
-This page records the design constraints for a future encrypted local vault. The current version does not implement at-rest encryption. `items.encrypted` is only a reserved compatibility field and must not be treated as proof that note content is encrypted.
+This page records the design constraints for a future encrypted local vault. The current version does not integrate database-level at-rest encryption. `items.encrypted` is only a reserved compatibility field and must not be treated as proof that note content is encrypted. The project now provides an isolated cryptographic foundation, but it does not change the existing plaintext database read/write path by itself.
 
 ## Goals and boundaries
 
@@ -25,13 +25,24 @@ The implementation must follow these rules:
 
 ### Key hierarchy
 
-Use mature libraries for the following layers; do not invent cryptographic algorithms:
+The cryptographic foundation uses mature libraries for the following layers; it does not invent cryptographic algorithms:
 
 1. Generate a random Vault Data Encryption Key (DEK) when the vault is enabled. The user password is never used directly as the data key.
 2. Derive a Key Encryption Key (KEK) from the master password and a random salt with Argon2id. Store the Argon2id parameters in encrypted metadata so parameters can be upgraded later.
 3. Encrypt the DEK with XChaCha20-Poly1305 and a random nonce, storing the algorithm version, salt, parameters, nonce, and wrapped DEK.
 4. Use a separate random nonce for every note, version, and attachment. Bind the record type, record ID, and field name as AAD so ciphertext cannot be moved between records without failing authentication.
 5. Prefer mature Rust crates such as `argon2`, `chacha20poly1305`, and `zeroize`; use the operating system secure random source. Handle library and parameter upgrades with an explicit envelope version.
+
+### Implemented Cryptographic Foundation
+
+`src-tauri/src/crypto.rs` now provides reusable primitives:
+
+- `create_vault` generates a DEK from the system secure random source, derives a KEK with Argon2id, and wraps the DEK with XChaCha20-Poly1305.
+- `unlock_vault` validates the algorithm version, KDF parameters, random values, and authentication tag; wrong passwords or tampering never return the plaintext DEK.
+- `encrypt_record` / `decrypt_record` use a distinct nonce per record and bind the record type, record ID, and field name as AAD.
+- `VaultKey` is not `Clone` and is cleared with `zeroize` when dropped; key and record envelopes are serializable without containing the master password.
+
+This is only the cryptographic foundation. Database migration, the lock state machine, in-memory index cleanup, encrypted attachment integration, and restore wizard still require separate implementation and security review before local encryption can be enabled.
 
 ### State machine
 
@@ -71,4 +82,4 @@ Attachment sync must transmit encrypted attachments as well. While locked, encry
 
 Before implementation, `encrypted` remains a compatibility field only and is not a security switch. The real implementation needs explicit vault metadata and encryption-state fields plus a one-time migration wizard: verify a backup, encrypt and validate each record, commit safely, and only then remove old plaintext. Older versions opening an encrypted vault must fail safely instead of rendering ciphertext as Markdown or writing it back.
 
-Until runtime implementation and security tests are complete, docs, settings UI, and IPC types must say “reserved/not implemented” rather than implying encryption is active.
+Until database integration, migration rollback, and security testing are complete, docs, settings UI, and IPC types must accurately say “foundation available, full-vault encryption not implemented” rather than implying encryption is active.
