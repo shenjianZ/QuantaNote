@@ -103,6 +103,9 @@ describe("QuantaNote desktop smoke", () => {
     await $("//button[contains(., '字体')]").click();
     await expect($("//span[contains(., '界面字体')]")).toBeDisplayed();
 
+    await $("//button[contains(., '快捷键')]").click();
+    await expect($("[data-testid='settings-shortcuts-section']")).toBeDisplayed();
+
     await $("//button[contains(., '数据')]").click();
     await expect($("//button[contains(., '立即备份')]")).toBeDisplayed();
 

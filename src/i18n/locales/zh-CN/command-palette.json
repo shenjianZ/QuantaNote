@@ -2,5 +2,21 @@
   "searchPlaceholder": "搜索笔记",
   "searchLabel": "搜索笔记",
   "noResults": "没有匹配的笔记",
-  "hint": "输入关键词搜索笔记"
+  "hint": "输入关键词搜索笔记",
+  "commands": {
+    "newNote": "新建笔记",
+    "newNoteDesc": "创建一篇空白笔记",
+    "openSettings": "打开设置",
+    "openSettingsDesc": "管理外观、数据和快捷键",
+    "saveNote": "保存当前笔记",
+    "saveNoteDesc": "立即保存当前编辑内容",
+    "insertImage": "插入图片",
+    "insertImageDesc": "选择图片并插入到当前光标位置",
+    "manageAttachments": "管理附件",
+    "manageAttachmentsDesc": "查看、插入或删除当前笔记附件",
+    "restoreVersion": "恢复历史版本",
+    "restoreVersionDesc": "打开版本历史并选择要恢复的版本",
+    "copyNote": "复制笔记",
+    "copyNoteDesc": "复制当前笔记的正文内容"
+  }
 }

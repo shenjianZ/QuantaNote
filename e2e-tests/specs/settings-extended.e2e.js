@@ -29,6 +29,15 @@ describe("Settings extended coverage", () => {
         await observePause();
     });
 
+    it("records a custom shortcut", async () => {
+        await SettingsPage.selectSection("快捷键");
+        await SettingsPage.recordShortcut("global-openPalette", "p");
+        const recorder = await $("[data-testid='shortcut-recorder-global-openPalette']");
+        expect(await recorder.getText()).toContain("Ctrl+P");
+        await $("[data-testid='shortcuts-reset-btn']").click();
+        await observePause();
+    });
+
     // --- Backup config ---
     it("displays backup now button in data section", async () => {
         await SettingsPage.selectSection("数据");
@@ -62,7 +71,7 @@ describe("Settings extended coverage", () => {
 
     // --- About ---
     it("displays version number in about section", async () => {
-        await SettingsPage.selectSectionByIndex(4);
+        await SettingsPage.selectSectionByIndex(5);
         const version = await SettingsPage.getAboutVersion();
         expect(version).toContain("v0.4.0");
     });

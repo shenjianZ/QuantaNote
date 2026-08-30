@@ -6,7 +6,7 @@ import { pause, observePause } from "../config.js";
 
 class SettingsPage {
   async selectSection(label) {
-    // "外观" / "字体" / "数据" / "关于" / "同步"
+    // "外观" / "字体" / "快捷键" / "数据" / "关于" / "同步"
     const btn = await $(`//nav//button[contains(., '${label}')]`);
     await btn.click();
     await observePause();
@@ -164,6 +164,13 @@ class SettingsPage {
   async getAboutVersion() {
     const el = await $("[data-testid='settings-about-version']");
     return el.getText();
+  }
+
+  async recordShortcut(id, key = "p") {
+    const recorder = await $(`[data-testid='shortcut-recorder-${id}']`);
+    await recorder.click();
+    await browser.keys(["Control", key]);
+    await observePause();
   }
 
   async toggleAutostart() {

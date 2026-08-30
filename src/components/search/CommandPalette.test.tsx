@@ -105,6 +105,33 @@ describe("CommandPalette", () => {
     expect(screen.getByTestId("command-palette-overlay")).toHaveClass("pt-[env(safe-area-inset-top)]");
   });
 
+  it("renders commands and invokes the selected command", () => {
+    const onClose = vi.fn();
+    const onSelect = vi.fn();
+
+    setup(
+      <CommandPalette
+        open
+        onClose={onClose}
+        onSelectItem={vi.fn()}
+        items={items}
+        commands={[{
+          id: "save-note",
+          label: "保存当前笔记",
+          description: "立即保存",
+          shortcut: "Ctrl+S",
+          onSelect,
+        }]}
+      />,
+    );
+
+    expect(screen.getByTestId("palette-command")).toHaveTextContent("保存当前笔记");
+    fireEvent.keyDown(screen.getByPlaceholderText("搜索笔记"), { key: "Enter" });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps the desktop search panel opaque over the blurred backdrop", () => {
     setup(
       <CommandPalette

@@ -2,6 +2,7 @@ import { mockIPC } from "@tauri-apps/api/mocks";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useItemStore } from "./itemStore";
 import { normalizeSettings, useSettingsStore } from "./settingsStore";
+import { DEFAULT_SHORTCUTS } from "../utils/shortcutRegistry";
 
 const saveMock = vi.fn();
 const openMock = vi.fn();
@@ -37,8 +38,9 @@ describe("settingsStore", () => {
           toConsole: false,
           toFile: true,
           pretty: false,
-            maxLen: 4000,
+          maxLen: 4000,
         },
+        shortcuts: { ...DEFAULT_SHORTCUTS },
         locale: "zh-CN",
       },
       dbSize: "计算中...",

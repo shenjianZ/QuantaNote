@@ -1,79 +1,44 @@
 ---
 title: Command Palette
-description: Global quick-access tool for searching and navigating across all items with Ctrl+K in QuantaNote.
+description: Search notes and run page-aware actions with Ctrl+K in QuantaNote.
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-30
 ---
 
 # Command Palette
 
-The Command Palette is QuantaNote's global quick-access tool. Press **Ctrl+K** from anywhere in the application to open a search overlay that lets you instantly find and navigate to any item in your collection. It is designed for power users who want to move fast without taking their hands off the keyboard.
+The Command Palette is QuantaNote's keyboard entry point. Press `Ctrl + K` (`Command + K` on macOS) to open it; it does not take over typing while the editor body is focused.
 
-## Opening
+## Opening and Searching
 
-To open the Command Palette:
+| Action | Shortcut | Description |
+|---|---|---|
+| Open/close | `Ctrl + K` | Toggle the palette outside editable areas |
+| Close | `Esc` | Close the palette without changing the page |
 
-- Press **Ctrl+K** on your keyboard.
-- The palette appears as a modal overlay centered on the screen with a search input field automatically focused.
+Type a query to filter note titles and full-text search results. Click a result, or use `↑` / `↓` and press `Enter` to open it; the app navigates to Library and opens the reader.
 
-To close the Command Palette without taking any action:
+## Available Commands
 
-- Press **Escape**.
-- Click outside the palette overlay.
-- Press **Ctrl+K** again (toggle behavior).
+Commands are page-aware:
 
-The Command Palette can be opened from any page in the application — Workspace, Library, Document Editor, or Settings — making it a truly global navigation tool.
+| Page | Available actions |
+|---|---|
+| Every page | New note, Open Settings |
+| Document Editor | Save current note, Insert image, Manage attachments, Open version history, Copy note |
+| Library (when a note is selected) | Manage attachments, Copy note |
 
-## Searching
+Insert image reuses the editor's image-attachment flow and inserts the image at the saved caret position. Manage attachments opens the current note's attachment manager. Restore a version only opens version history; choose a specific version there to confirm the restore.
 
-Once the Command Palette is open:
+## Keyboard Flow
 
-1. **Start typing** — As you type, results are filtered in real time using the full-text search engine. The search matches against item titles and content.
-2. **Results list** — Matching items are displayed below the search input in a scrollable list. Each result shows:
-   - **Title** — The item's title.
-   - **Summary preview** — A short snippet of the item's content or summary.
-   - **Type icon** — An icon indicating the item type.
-   - **Timestamp** — When the item was last updated.
-3. **Keyboard navigation** — Use the **up/down arrow keys** to navigate through the results list. The currently selected result is highlighted.
-4. **Quick open** — Press **Enter** to open the selected result. This navigates to the Document Editor for that item.
+```text
+Ctrl + K → type a command or note query → arrow keys → Enter
+```
 
-### When No Results Are Found
+Commands and search results share the same arrow-key selection model. Commands match their label and description while note results continue to use full-text search, so both kinds of entries can appear for one query.
 
-If your search query does not match any items, the palette displays a "No results found" message. Try broadening your search terms or checking for typos.
+## Changing Shortcuts
 
-## Navigation
-
-The Command Palette supports several navigation patterns:
-
-### Opening an Item
-
-- Click a result in the list, or use arrow keys + Enter to open it.
-- The application navigates to the **Document Editor** for the selected item.
-- The Command Palette closes automatically.
-
-### Recent Items
-
-When the Command Palette is opened with an empty search query (i.e., you press Ctrl+K without typing anything):
-
-- A list of **recently accessed items** is displayed.
-- These are items you have recently viewed or edited, helping you quickly jump back to your current work.
-- The recent items list updates dynamically based on your activity.
-
-### Cross-Page Navigation
-
-The Command Palette works across all pages:
-
-| Current Page | Result Click Action |
-|-------------|-------------------|
-| Workspace | Navigate to Document Editor for the selected item |
-| Library | Navigate to Document Editor for the selected item |
-| Document Editor | Switch to the selected item (replaces current editor content) |
-| Settings | Navigate to Document Editor for the selected item |
-
-### Tips for Power Users
-
-- **Muscle memory** — Train yourself to use `Ctrl+K` instead of browsing the Library. It is almost always faster.
-- **Partial matches** — You do not need to type the full title. A few characters are usually enough to narrow down results.
-- **Chinese input** — The full-text search supports Chinese substring matching, so type any portion of the Chinese text you are looking for.
-- **Keyboard-only workflow** — Use `Ctrl+K` + type + arrow keys + `Enter` to find and open any note without touching the mouse.
+Open Settings → Shortcuts to customize the Command Palette and other application shortcuts. Duplicate combinations show a conflict warning; after clearing a binding, that command remains available through the palette or another entry point. Shortcut settings use `Mod`, which is displayed as `Ctrl` or `Command` for the current platform.

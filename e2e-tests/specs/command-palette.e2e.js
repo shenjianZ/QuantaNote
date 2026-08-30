@@ -19,6 +19,21 @@ describe("Command palette", () => {
     await expect($(CommandPalette.searchInput)).toBeDisplayed();
   });
 
+  it("shows page-aware commands alongside note search", async () => {
+    await CommandPalette.open();
+    const commands = await CommandPalette.getCommandTexts();
+    expect(commands.some((text) => text.includes("新建笔记"))).toBe(true);
+    expect(commands.some((text) => text.includes("打开设置"))).toBe(true);
+    await CommandPalette.close();
+  });
+
+  it("runs a command from the palette", async () => {
+    await CommandPalette.open();
+    await CommandPalette.selectCommandByLabel("打开设置");
+    await expect($("[data-testid='settings-shortcuts-section']")).toBeDisplayed();
+    await TopBar.navWorkspace();
+  });
+
   it("closes with Escape", async () => {
     await CommandPalette.close();
     await expect($(CommandPalette.searchInput)).not.toBeDisplayed();

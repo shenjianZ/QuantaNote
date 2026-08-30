@@ -18,6 +18,8 @@ import { useAttachmentStore, type AttachmentDto } from "../stores/attachmentStor
 import { AttachmentManagerModal } from "../components/common/AttachmentManagerModal";
 import { isImageAttachment, removeAttachmentReferences } from "../utils/markdownAttachments";
 import { Select } from "../components/common/Select";
+import { getAppCommandId, APP_COMMAND_EVENT } from "../utils/appCommands";
+import { copyTextToSystemClipboard } from "../utils/clipboard";
 
 const VditorEditor = lazy(() => import("../components/editor/VditorEditor").then((m) => ({ default: m.VditorEditor })));
 
@@ -357,6 +359,33 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
     editorRef.current?.saveSelection();
     setAttachmentModalOpen(true);
   }, []);
+
+  useEffect(() => {
+    function handleAppCommand(event: Event) {
+      const command = getAppCommandId(event);
+      if (!command) return;
+
+      if (command === "save-note") {
+        void flushSave();
+      } else if (command === "insert-image") {
+        editorRef.current?.saveSelection();
+        editorRef.current?.openImagePicker();
+      } else if (command === "manage-attachments") {
+        handleOpenAttachments();
+      } else if (command === "restore-version") {
+        setVersionPanelOpen(true);
+      } else if (command === "copy-note") {
+        const text = latestContent.current || latestSummary.current || latestTitle.current;
+        if (!text) return;
+        copyTextToSystemClipboard(text)
+          .then(() => useToastStore.getState().addToast("success", t("common:toast.copySuccess")))
+          .catch(() => useToastStore.getState().addToast("error", t("common:toast.copyFailed")));
+      }
+    }
+
+    window.addEventListener(APP_COMMAND_EVENT, handleAppCommand);
+    return () => window.removeEventListener(APP_COMMAND_EVENT, handleAppCommand);
+  }, [flushSave, handleOpenAttachments, t]);
 
   async function handleToggleFavorite() {
     if (!selectedItemId) return;

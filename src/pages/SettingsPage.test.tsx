@@ -3,6 +3,7 @@ import { fireEvent, screen } from "@testing-library/react";
 import { setup } from "../test/test-utils";
 import { SettingsPage } from "./SettingsPage";
 import { useSettingsStore } from "../stores/settingsStore";
+import { DEFAULT_SHORTCUTS } from "../utils/shortcutRegistry";
 
 vi.mock("@tauri-apps/plugin-opener", () => ({
     openPath: vi.fn(),
@@ -37,6 +38,7 @@ describe("SettingsPage", () => {
                     pretty: false,
                     maxLen: 4000,
                 },
+                shortcuts: { ...DEFAULT_SHORTCUTS },
                 locale: "zh-CN",
             },
             dbSize: "1.2 MB",
@@ -152,6 +154,24 @@ describe("SettingsPage", () => {
         expect(toggle).toBeTruthy();
         await user.click(toggle as HTMLButtonElement);
         expect(updateSqlLoggingMock).toHaveBeenCalledWith({ enabled: true });
+    });
+
+    it("records a custom shortcut and reports conflicts", async () => {
+        const { user } = setup(<SettingsPage />);
+        await user.click(screen.getByText("快捷键"));
+
+        const paletteRecorder = screen.getByTestId("shortcut-recorder-global-openPalette");
+        await user.click(paletteRecorder);
+        fireEvent.keyDown(paletteRecorder, { key: "p", ctrlKey: true });
+        expect(updateSettingMock).toHaveBeenCalledWith(
+            "shortcuts",
+            expect.objectContaining({ "global.openPalette": "Mod+P" }),
+        );
+
+        const newNoteRecorder = screen.getByTestId("shortcut-recorder-global-newNote");
+        await user.click(newNoteRecorder);
+        fireEvent.keyDown(newNoteRecorder, { key: "p", ctrlKey: true });
+        expect(screen.getByTestId("shortcut-conflict-global-openPalette")).toBeInTheDocument();
     });
 
     it("shows storage consistency counts and file details", async () => {

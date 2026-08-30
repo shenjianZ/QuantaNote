@@ -6,6 +6,7 @@ import {
     Download,
     FileText,
     Github,
+    Keyboard,
     Globe2,
     Laptop,
     MessageSquare,
@@ -34,6 +35,13 @@ import { useToastStore } from "../stores/toastStore";
 import { useUpdaterStore } from "../stores/updaterStore";
 import { isMobile } from "../utils/platform";
 import { copyTextToSystemClipboard } from "../utils/clipboard";
+import {
+    eventToShortcut,
+    findShortcutConflicts,
+    getShortcutLabel,
+    SHORTCUT_DEFINITIONS,
+    type ShortcutId,
+} from "../utils/shortcutRegistry";
 
 const FONT_OPTIONS_KEYS = [
     { value: "Noto Sans SC", label: "Noto Sans SC" },
@@ -116,7 +124,9 @@ export function SettingsPage({
     const [exportModalOpen, setExportModalOpen] = useState(false);
     const [importModalOpen, setImportModalOpen] = useState(false);
     const [backupManagerOpen, setBackupManagerOpen] = useState(false);
+    const [recordingShortcutId, setRecordingShortcutId] = useState<ShortcutId | null>(null);
     const settings = useSettingsStore((s) => s.settings);
+    const [shortcutDraft, setShortcutDraft] = useState(settings.shortcuts);
     const isMobilePlatform = isMobile();
     const dbSize = useSettingsStore((s) => s.dbSize);
     const dbPath = useSettingsStore((s) => s.dbPath);
@@ -147,6 +157,10 @@ export function SettingsPage({
     const checkForUpdates = useUpdaterStore((s) => s.checkForUpdates);
     const downloadUpdate = useUpdaterStore((s) => s.downloadUpdate);
     const installUpdate = useUpdaterStore((s) => s.installUpdate);
+
+    useEffect(() => {
+        setShortcutDraft(settings.shortcuts);
+    }, [settings.shortcuts]);
 
     useEffect(() => {
         init();
@@ -212,9 +226,31 @@ export function SettingsPage({
         }
     }
 
+    function updateShortcut(id: ShortcutId, value: string) {
+        const next = { ...shortcutDraft, [id]: value };
+        setShortcutDraft(next);
+        updateSetting("shortcuts", next);
+    }
+
+    function handleShortcutKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, id: ShortcutId) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.key === "Escape") {
+            setRecordingShortcutId(null);
+            event.currentTarget.blur();
+            return;
+        }
+        const shortcut = eventToShortcut(event.nativeEvent);
+        if (!shortcut) return;
+        updateShortcut(id, shortcut);
+        setRecordingShortcutId(null);
+        event.currentTarget.blur();
+    }
+
     const settingsMenu = [
         { label: t("settings:menu.appearance"), icon: Palette },
         { label: t("settings:menu.font"), icon: Globe2 },
+        { label: t("settings:menu.shortcuts"), icon: Keyboard },
         { label: t("settings:menu.data"), icon: Database },
         { label: t("settings:menu.sync"), icon: Cloud },
         { label: t("settings:menu.about"), icon: Settings2 },
@@ -539,6 +575,88 @@ export function SettingsPage({
         }
 
         if (activeSection === 2) {
+            const conflicts = findShortcutConflicts(shortcutDraft);
+            return (
+                <section data-testid="settings-shortcuts-section">
+                    <div className="mb-5 flex items-start justify-between gap-3">
+                        <div>
+                            <h2 className="text-sm font-semibold text-[var(--text)]">
+                                {t("settings:shortcuts.title")}
+                            </h2>
+                            <p className="mt-1 text-xs leading-relaxed text-[var(--muted)]">
+                                {t("settings:shortcuts.description")}
+                            </p>
+                        </div>
+                        <button
+                            className="shrink-0 rounded-full border border-[var(--line)] px-3 py-1.5 text-xs text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
+                            type="button"
+                            data-testid="shortcuts-reset-btn"
+                            onClick={() => {
+                                const defaults = SHORTCUT_DEFINITIONS.reduce(
+                                    (current, definition) => ({ ...current, [definition.id]: definition.defaultShortcut }),
+                                    { ...shortcutDraft },
+                                );
+                                setShortcutDraft(defaults);
+                                updateSetting("shortcuts", defaults);
+                            }}
+                        >
+                            {t("settings:shortcuts.reset")}
+                        </button>
+                    </div>
+                    <div className="divide-y divide-[var(--line)]">
+                        {SHORTCUT_DEFINITIONS.map((definition) => {
+                            const value = shortcutDraft[definition.id];
+                            const conflictingIds = value ? (conflicts.get(value) ?? []).filter((id) => id !== definition.id) : [];
+                            const conflictingNames = conflictingIds
+                                .map((id) => SHORTCUT_DEFINITIONS.find((item) => item.id === id))
+                                .filter(Boolean)
+                                .map((item) => t(item!.labelKey))
+                                .join(", ");
+                            return (
+                                <div className="flex flex-col gap-2 py-3 first:pt-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4" key={definition.id}>
+                                    <div className="min-w-0">
+                                        <div className="text-sm text-[var(--text)]">{t(definition.labelKey)}</div>
+                                        <div className="mt-0.5 text-xs text-[var(--muted)]">{t(definition.descriptionKey)}</div>
+                                        {conflictingNames && (
+                                            <div className="mt-1 text-xs text-red-500" data-testid={`shortcut-conflict-${definition.id.replace(".", "-")}`}>
+                                                {t("settings:shortcuts.conflict", { commands: conflictingNames })}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex shrink-0 items-center gap-2">
+                                        <button
+                                            className={`min-w-28 rounded-xl border px-3 py-2 text-center text-xs font-medium transition-colors ${recordingShortcutId === definition.id ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]" : "border-[var(--line)] bg-[var(--field)] text-[var(--text)] hover:border-[var(--accent)]"}`}
+                                            type="button"
+                                            data-testid={`shortcut-recorder-${definition.id.replace(".", "-")}`}
+                                            data-shortcut-recorder="true"
+                                            onFocus={() => setRecordingShortcutId(definition.id)}
+                                            onBlur={() => setRecordingShortcutId((current) => current === definition.id ? null : current)}
+                                            onKeyDown={(event) => handleShortcutKeyDown(event, definition.id)}
+                                        >
+                                            {recordingShortcutId === definition.id
+                                                ? t("settings:shortcuts.record")
+                                                : value ? getShortcutLabel(value) : t("settings:shortcuts.empty")}
+                                        </button>
+                                        {value && (
+                                            <button
+                                                className="rounded-full px-2 py-1 text-xs text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
+                                                type="button"
+                                                data-testid={`shortcut-clear-${definition.id.replace(".", "-")}`}
+                                                onClick={() => updateShortcut(definition.id, "")}
+                                            >
+                                                {t("settings:shortcuts.clear")}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </section>
+            );
+        }
+
+        if (activeSection === 3) {
             return (
                 <>
                     <section className="mb-6">
@@ -966,7 +1084,7 @@ export function SettingsPage({
             );
         }
 
-        if (activeSection === 3) {
+        if (activeSection === 4) {
             return (
                 <section>
                     <h2 className="mb-3 text-sm font-semibold text-[var(--text)]">

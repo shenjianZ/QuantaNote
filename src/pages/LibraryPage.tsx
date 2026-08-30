@@ -26,6 +26,7 @@ import { TrashModal } from "../components/common/TrashModal";
 import { VirtualItemList } from "../components/common/VirtualItemList";
 import { SearchHighlight } from "../components/common/SearchHighlight";
 import { useAppStore } from "../stores/appStore";
+import { APP_COMMAND_EVENT, getAppCommandId } from "../utils/appCommands";
 import { useAttachmentStore } from "../stores/attachmentStore";
 import { useItemStore } from "../stores/itemStore";
 import { useSearchStore } from "../stores/searchStore";
@@ -345,6 +346,17 @@ export function LibraryPage({
     const selected = await open({ multiple: false });
     if (selected) await addAttachmentAction(selectedItem.id, selected);
   }
+
+  useEffect(() => {
+    function handleAppCommand(event: Event) {
+      if (getAppCommandId(event) !== "manage-attachments" || !selectedItem.id) return;
+      setReaderOpen(true);
+      setAttachmentModalOpen(true);
+    }
+
+    window.addEventListener(APP_COMMAND_EVENT, handleAppCommand);
+    return () => window.removeEventListener(APP_COMMAND_EVENT, handleAppCommand);
+  }, [selectedItem.id]);
 
   async function handleTagChange(tagNames: string[]) {
     if (!selectedItem.id) return;

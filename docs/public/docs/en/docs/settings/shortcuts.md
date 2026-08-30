@@ -1,126 +1,63 @@
 ---
 title: Keyboard Shortcuts
-description: QuantaNote keyboard shortcuts reference covering global shortcuts, workspace shortcuts, editor shortcuts, and navigation shortcuts
+description: QuantaNote's supported shortcuts, command palette actions, and customization options
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-08-19
+lastUpdated: 2026-08-30
 ---
 
 # Keyboard Shortcuts
 
-QuantaNote provides comprehensive keyboard shortcut support for efficient keyboard-centric operation. Mastering these shortcuts can significantly boost your productivity by reducing mouse usage.
+QuantaNote uses `Mod` for the primary modifier on the current platform: `Ctrl` on Windows/Linux and `Command (⌘)` on macOS. Open Settings → Shortcuts to view, record, clear, or reset bindings.
 
-## Global Shortcuts
+## Application Shortcuts
 
-Global shortcuts are available from any page in the application.
+QuantaNote handles the shortcuts below. They do not take over text entry while an input, textarea, or editor body has focus.
 
-| Shortcut | Function | Description |
-|----------|----------|-------------|
-| `Ctrl + K` | Command Palette | Opens the global search panel to search for and jump to any record by keyword |
-| `Ctrl + ,` | Open Settings | Jumps directly to the Settings page |
+| Default | Action | Scope |
+|---|---|---|
+| `Mod + K` | Open/close the Command Palette | Global (not inside the editor body) |
+| `Mod + N` | Create a new note | Global (not in editable areas) |
+| `Mod + ,` | Open Settings | Global (not in editable areas) |
+| `Mod + Enter` | Save workspace content | Workspace |
+| `Mod + S` | Save the current note | Document Editor |
+| `Mod + F` | Find | Document Editor |
+| `Mod + H` | Find and replace | Document Editor |
 
-### Command Palette
+## Command Palette
 
-`Ctrl + K` is one of the most important shortcuts in QuantaNote. The command palette supports:
+Press `Mod + K` to open the Command Palette. It combines note search with commands available on the current page:
 
-- Real-time keyword search across all records
-- Instant display of search results; click to jump to any match
-- Full-text search across titles and content
-- Press `Esc` to close the command palette
-
-## Workspace Shortcuts
-
-The Workspace page is designed for quick note capture. The following shortcuts accelerate the recording workflow.
-
-| Shortcut | Function | Description |
-|----------|----------|-------------|
-| `Ctrl + Enter` | Quick Save | Saves the current input as a new record and clears the editor |
-| `Tab` | Indent | Inserts an indent in the editor |
-| `Shift + Tab` | Outdent | Reduces the indent level |
-
-### Quick Capture Workflow
-
-The fastest note-taking workflow using keyboard shortcuts:
-
-1. Open QuantaNote (or switch to it via the tray icon)
-2. Start typing your content immediately
-3. Press `Ctrl + Enter` to save
-4. Continue typing the next note
+- Create a note and open Settings.
+- In the Document Editor, save the note, insert an image, manage attachments, and open version history.
+- In the Document Editor or Library, copy the current note.
+- Type to filter, use the arrow keys and `Enter` to choose, or press `Esc` to close.
 
 ## Editor Shortcuts
 
-The Document Editor (Vditor) supports a rich set of editing shortcuts, including general editing and Markdown-specific shortcuts.
+The Document Editor uses Vditor for common editing operations. QuantaNote owns save and find/replace:
 
-### General Editing Shortcuts
+| Shortcut | Action |
+|---|---|
+| `Mod + S` | Immediately save the title, summary, and body; auto-save remains enabled |
+| `Mod + F` | Open the find bar |
+| `Mod + H` | Open the find-and-replace bar |
+| `Mod + B` | Bold |
+| `Mod + I` | Italic |
+| `Mod + D` | Strikethrough |
+| `Mod + Z` | Undo |
+| `Mod + Shift + Z` | Redo |
+| `Mod + A` | Select all |
+| `Mod + C` / `Mod + X` / `Mod + V` | Copy / cut / paste |
+| `Tab` / `Shift + Tab` | Indent / outdent a list |
 
-| Shortcut | Function | Description |
-|----------|----------|-------------|
-| `Ctrl + S` | Save | Manually saves the current content (auto-save is also active) |
-| `Ctrl + F` | Find | Opens the search bar to find text within the document |
-| `Ctrl + H` | Replace | Opens the find-and-replace bar |
-| `Ctrl + Z` | Undo | Undoes the last action |
-| `Ctrl + Shift + Z` | Redo | Redoes a previously undone action |
-| `Ctrl + A` | Select All | Selects all content in the editor |
-| `Ctrl + C` | Copy | Copies selected text and displays the result |
-| `Ctrl + X` | Cut | Cuts the selected text |
-| `Ctrl + V` | Paste | Pastes clipboard content and displays the result |
+In the find bar, `Enter` moves to the next match, `Shift + Enter` to the previous match, and `Esc` closes it. `Mod + K`, `Mod + N`, and `Mod + ,` remain text-editing-safe inside the editor body and do not open global actions there.
 
-### Find and Replace
+## Customization and Conflict Detection
 
-The built-in find-and-replace feature supports the following actions:
+1. Open Settings → Shortcuts.
+2. Click a shortcut button and press a combination that includes a modifier.
+3. If two commands use the same combination, the conflicting command names appear immediately.
+4. Use Clear to disable one application shortcut, or Reset defaults to restore all defaults.
 
-| Action | Shortcut / Button | Description |
-|--------|-------------------|-------------|
-| Open Find | `Ctrl + F` | Opens the search bar at the bottom |
-| Open Replace | `Ctrl + H` | Shows the replace input field in the search bar |
-| Next Match | `Enter` | Jumps to the next match |
-| Previous Match | `Shift + Enter` | Jumps to the previous match |
-| Close Search | `Esc` | Closes the search/replace bar |
-
-### Markdown Shortcuts
-
-The editor supports Markdown syntax shortcuts for quick formatting:
-
-| Input | Result |
-|-------|--------|
-| `#` + Space | Heading 1 |
-| `##` + Space | Heading 2 |
-| `###` + Space | Heading 3 |
-| `**text**` | **Bold** |
-| `*text*` | *Italic* |
-| `` `code` `` | Inline code |
-| `- ` + Space | Unordered list |
-| `1.` + Space | Ordered list |
-| `> ` + Space | Blockquote |
-| `---` | Horizontal rule |
-| `[text](url)` | Hyperlink |
-| `![alt](url)` | Image |
-
-## Navigation Shortcuts
-
-The following shortcuts are used for navigating between pages.
-
-| Shortcut | Function | Description |
-|----------|----------|-------------|
-| `Alt + Left` | Back | Navigate back to the previously visited page |
-| `Alt + Right` | Forward | Navigate forward (available after using Back) |
-
-### Page Switching
-
-Use the top navigation bar icons to switch between main pages:
-
-| Page | Entry Point | Description |
-|------|-------------|-------------|
-| Workspace | First icon in the top bar | Quick capture page |
-| Library | Second icon in the top bar | Browse and manage all records |
-| Settings | Gear icon in the top bar | Application settings |
-
-> **Tip**: Using `Ctrl + K` to open the Command Palette is the fastest way to jump to other records without leaving the keyboard.
-
-## Cross-Platform Notes
-
-- Windows and Linux normally use `Ctrl`.
-- macOS normally uses `Command (⌘)` instead of `Ctrl`.
-- The packaged Windows desktop app can use Windows Clipboard History with `Win + V` after copying.
-- macOS and Linux do not have a universal Windows Clipboard History panel, but copy and paste use the clipboard capabilities available on each platform.
-- Copy success, copy failure, and paste success are reported with toasts so you can verify clipboard availability.
+Vditor editing shortcuts are not registered again as application commands, preventing a global customization from overriding text editing. A bare letter or arrow key is not saved as an application shortcut.

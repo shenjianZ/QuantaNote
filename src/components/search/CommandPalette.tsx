@@ -1,17 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, FileText, Loader2, Search } from "lucide-react";
+import { ArrowLeft, FileText, Loader2, Search, type LucideIcon } from "lucide-react";
 import { Kbd } from "../common/Kbd";
 import { SearchHighlight } from "../common/SearchHighlight";
 import { useSearchStore } from "../../stores/searchStore";
 import type { SearchResultDto } from "../../stores/searchStore";
 import type { Item } from "../../types";
 
+export interface CommandPaletteCommand {
+  id: string;
+  label: string;
+  description?: string;
+  shortcut?: string;
+  icon?: LucideIcon;
+  onSelect: () => void | Promise<void>;
+}
+
 interface CommandPaletteProps {
   open: boolean;
   onClose: () => void;
   onSelectItem: (id: string) => void;
   items: Item[];
+  commands?: CommandPaletteCommand[];
 }
 
 function ResultIcon({ type }: { type: string }) {
@@ -30,6 +40,7 @@ export function CommandPalette({
   onClose,
   onSelectItem,
   items,
+  commands = [],
 }: CommandPaletteProps) {
   const { t } = useTranslation(["command-palette"]);
   const query = useSearchStore((s) => s.query);
@@ -63,6 +74,16 @@ export function CommandPalette({
       }));
   }, [results, query, items]);
 
+  const visibleCommands = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return commands;
+    return commands.filter((command) =>
+      `${command.label} ${command.description ?? ""}`.toLowerCase().includes(normalized),
+    );
+  }, [commands, query]);
+
+  const entryCount = visibleCommands.length + effectiveResults.length;
+
   useEffect(() => {
     if (open) {
       setTimeout(() => inputRef.current?.focus(), 50);
@@ -74,7 +95,7 @@ export function CommandPalette({
 
   useEffect(() => {
     setSelectedIdx(0);
-  }, [effectiveResults.length]);
+  }, [entryCount]);
 
   // 组件卸载时清理防抖定时器
   useEffect(() => {
@@ -97,18 +118,29 @@ export function CommandPalette({
     if (result.id) onSelectItem(result.id);
   }
 
+  function handleSelectCommand(command: CommandPaletteCommand) {
+    onClose();
+    void command.onSelect();
+  }
+
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Escape") {
       e.preventDefault();
       onClose();
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
-      setSelectedIdx((i) => Math.min(i + 1, effectiveResults.length - 1));
+      setSelectedIdx((i) => Math.min(i + 1, Math.max(0, entryCount - 1)));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setSelectedIdx((i) => Math.max(i - 1, 0));
-    } else if (e.key === "Enter" && effectiveResults[selectedIdx]) {
-      handleSelect(effectiveResults[selectedIdx]);
+    } else if (e.key === "Enter") {
+      const command = visibleCommands[selectedIdx];
+      if (command) {
+        handleSelectCommand(command);
+        return;
+      }
+      const result = effectiveResults[selectedIdx - visibleCommands.length];
+      if (result) handleSelect(result);
     }
   }
 
@@ -152,7 +184,11 @@ export function CommandPalette({
             role="combobox"
             aria-autocomplete="list"
             aria-controls="palette-results"
-            aria-activedescendant={effectiveResults.length > 0 ? `palette-result-${selectedIdx}` : undefined}
+            aria-activedescendant={entryCount > 0
+              ? selectedIdx < visibleCommands.length
+                ? `palette-command-${visibleCommands[selectedIdx]?.id}`
+                : `palette-result-${selectedIdx - visibleCommands.length}`
+              : undefined}
             value={query}
             onChange={(e) => handleChange(e.currentTarget.value)}
             onKeyDown={handleKeyDown}
@@ -162,42 +198,73 @@ export function CommandPalette({
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto p-2" id="palette-results" role="listbox">
-          {effectiveResults.length === 0 ? (
+          {entryCount === 0 ? (
             <div className="px-4 py-10 text-center text-sm text-[var(--muted)]">
               {query.trim() ? t("command-palette:noResults") : t("command-palette:hint")}
             </div>
           ) : (
-            effectiveResults.map((item, index) => (
-              <button
-                className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left ${
-                  index === selectedIdx ? "bg-[var(--hover)]" : "hover:bg-[var(--hover)]"
-                }`}
-                key={item.id}
-                id={`palette-result-${index}`}
-                data-testid="palette-result"
-                role="option"
-                aria-selected={index === selectedIdx}
-                onClick={() => handleSelect(item)}
-                type="button"
-              >
-                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--field)] text-[var(--muted)]">
-                  <ResultIcon type={item.item_type} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <SearchHighlight
-                    text={item.title}
-                    terms={item.highlight_terms ?? [query]}
-                    className="truncate text-sm font-semibold text-[var(--text)]"
-                  />
-                  <div className="truncate text-sm text-[var(--muted)]">
-                    <SearchHighlight
-                      text={item.context || item.summary || item.item_type}
-                      terms={item.highlight_terms ?? [query]}
-                    />
-                  </div>
-                </div>
-              </button>
-            ))
+            <>
+              {visibleCommands.map((command, index) => {
+                const Icon = command.icon ?? Search;
+                return (
+                  <button
+                    className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left ${
+                      index === selectedIdx ? "bg-[var(--hover)]" : "hover:bg-[var(--hover)]"
+                    }`}
+                    key={command.id}
+                    id={`palette-command-${command.id}`}
+                    data-testid="palette-command"
+                    role="option"
+                    aria-selected={index === selectedIdx}
+                    onClick={() => handleSelectCommand(command)}
+                    type="button"
+                  >
+                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--accent-soft)] text-[var(--accent)]">
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold text-[var(--text)]">{command.label}</div>
+                      {command.description && <div className="truncate text-sm text-[var(--muted)]">{command.description}</div>}
+                    </div>
+                    {command.shortcut && <Kbd plain>{command.shortcut}</Kbd>}
+                  </button>
+                );
+              })}
+              {effectiveResults.map((item, index) => {
+                const entryIndex = visibleCommands.length + index;
+                return (
+                  <button
+                    className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left ${
+                      entryIndex === selectedIdx ? "bg-[var(--hover)]" : "hover:bg-[var(--hover)]"
+                    }`}
+                    key={item.id}
+                    id={`palette-result-${index}`}
+                    data-testid="palette-result"
+                    role="option"
+                    aria-selected={entryIndex === selectedIdx}
+                    onClick={() => handleSelect(item)}
+                    type="button"
+                  >
+                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--field)] text-[var(--muted)]">
+                      <ResultIcon type={item.item_type} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <SearchHighlight
+                        text={item.title}
+                        terms={item.highlight_terms ?? [query]}
+                        className="truncate text-sm font-semibold text-[var(--text)]"
+                      />
+                      <div className="truncate text-sm text-[var(--muted)]">
+                        <SearchHighlight
+                          text={item.context || item.summary || item.item_type}
+                          terms={item.highlight_terms ?? [query]}
+                        />
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </>
           )}
         </div>
       </section>

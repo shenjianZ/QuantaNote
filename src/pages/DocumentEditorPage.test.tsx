@@ -27,6 +27,7 @@ vi.mock("../components/editor/VditorEditor", () => {
           saveSelection: () => {},
           scrollToHeading: scrollToHeadingMock,
           insertAttachment: () => {},
+          openImagePicker: () => {},
         }),
         [initialValue],
       );

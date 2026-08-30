@@ -5,9 +5,9 @@ import { listen } from "@tauri-apps/api/event";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { availableMonitors, getCurrentWindow, primaryMonitor } from "@tauri-apps/api/window";
 import { PhysicalPosition } from "@tauri-apps/api/dpi";
-import { FileText } from "lucide-react";
+import { Copy, FileImage, FileText, History, Paperclip, Plus, Save, Settings2 } from "lucide-react";
 import { AppShell } from "../components/layout/AppShell";
-import { CommandPalette } from "../components/search/CommandPalette";
+import { CommandPalette, type CommandPaletteCommand } from "../components/search/CommandPalette";
 import { ToastContainer } from "../components/common/ToastContainer";
 import { ErrorBoundary } from "../components/common/ErrorBoundary";
 import { WorkspacePage } from "../pages/WorkspacePage";
@@ -29,6 +29,8 @@ import { isMobile, MOBILE_BACK_EVENT } from "../utils/platform";
 import { nativeLog } from "../utils/nativeLog";
 import { getSelectedText, shouldPreventGlobalShortcut } from "../utils/keyboardShortcuts";
 import { copyTextToSystemClipboard } from "../utils/clipboard";
+import { dispatchAppCommand } from "../utils/appCommands";
+import { getShortcutLabel, shortcutMatches } from "../utils/shortcutRegistry";
 import type { AppPage, Item } from "../types";
 import i18n from "../i18n";
 import "../styles/themes.css";
@@ -214,6 +216,7 @@ export function QuantaNoteApp() {
         cleanupTrash,
     } = useItemStore();
     const hasSelectedLanguage = useSettingsStore((s) => s.hasSelectedLanguage);
+    const shortcutBindings = useSettingsStore((s) => s.settings.shortcuts);
     const [initDone, setInitDone] = useState(false);
     const [previewRequest, setPreviewRequest] = useState<{
         itemId: string;
@@ -334,6 +337,103 @@ export function QuantaNoteApp() {
         navigate("document");
     }, [createItem, getItem, navigate, selectItem]);
 
+    const handleCopyCurrentNote = useCallback(async () => {
+        if (currentPage === "document") {
+            dispatchAppCommand("copy-note");
+            return;
+        }
+
+        const item = selectedDbItem?.id === selectedItemId
+            ? selectedDbItem
+            : dbItems.find((candidate) => candidate.id === selectedItemId);
+        const text = item?.content || item?.summary || item?.title || "";
+        if (!text) return;
+        try {
+            await copyTextToSystemClipboard(text);
+            useToastStore.getState().addToast("success", i18n.t("common:toast.copySuccess"));
+        } catch {
+            useToastStore.getState().addToast("error", i18n.t("common:toast.copyFailed"));
+        }
+    }, [currentPage, dbItems, selectedDbItem, selectedItemId]);
+
+    const paletteCommands = useMemo(() => {
+        const commands: CommandPaletteCommand[] = [
+            {
+                id: "new-note",
+                label: i18n.t("command-palette:commands.newNote"),
+                description: i18n.t("command-palette:commands.newNoteDesc"),
+                shortcut: getShortcutLabel(shortcutBindings["global.newNote"]),
+                icon: Plus,
+                onSelect: handleCreateNote,
+            },
+            {
+                id: "open-settings",
+                label: i18n.t("command-palette:commands.openSettings"),
+                description: i18n.t("command-palette:commands.openSettingsDesc"),
+                shortcut: getShortcutLabel(shortcutBindings["global.openSettings"]),
+                icon: Settings2,
+                onSelect: () => {
+                    setSettingsSection(2);
+                    navigate("settings");
+                },
+            },
+        ];
+
+        if (currentPage === "document") {
+            commands.unshift(
+                {
+                    id: "save-note",
+                    label: i18n.t("command-palette:commands.saveNote"),
+                    description: i18n.t("command-palette:commands.saveNoteDesc"),
+                    shortcut: getShortcutLabel(shortcutBindings["editor.save"]),
+                    icon: Save,
+                    onSelect: () => dispatchAppCommand("save-note"),
+                },
+                {
+                    id: "insert-image",
+                    label: i18n.t("command-palette:commands.insertImage"),
+                    description: i18n.t("command-palette:commands.insertImageDesc"),
+                    icon: FileImage,
+                    onSelect: () => dispatchAppCommand("insert-image"),
+                },
+                {
+                    id: "manage-attachments",
+                    label: i18n.t("command-palette:commands.manageAttachments"),
+                    description: i18n.t("command-palette:commands.manageAttachmentsDesc"),
+                    icon: Paperclip,
+                    onSelect: () => dispatchAppCommand("manage-attachments"),
+                },
+                {
+                    id: "restore-version",
+                    label: i18n.t("command-palette:commands.restoreVersion"),
+                    description: i18n.t("command-palette:commands.restoreVersionDesc"),
+                    icon: History,
+                    onSelect: () => dispatchAppCommand("restore-version"),
+                },
+            );
+        }
+
+        if (selectedItemId && (currentPage === "document" || currentPage === "library")) {
+            commands.push({
+                id: "copy-note",
+                label: i18n.t("command-palette:commands.copyNote"),
+                description: i18n.t("command-palette:commands.copyNoteDesc"),
+                icon: Copy,
+                onSelect: handleCopyCurrentNote,
+            });
+            if (currentPage === "library") {
+                commands.push({
+                    id: "manage-attachments",
+                    label: i18n.t("command-palette:commands.manageAttachments"),
+                    description: i18n.t("command-palette:commands.manageAttachmentsDesc"),
+                    icon: Paperclip,
+                    onSelect: () => dispatchAppCommand("manage-attachments"),
+                });
+            }
+        }
+        return commands;
+    }, [currentPage, handleCopyCurrentNote, handleCreateNote, navigate, selectedItemId, setSettingsSection, shortcutBindings]);
+
     const handleQuickCreate = useCallback(
         async (content: string) => {
             const text = content.trim();
@@ -358,23 +458,57 @@ export function QuantaNoteApp() {
             const isVditorEditor =
                 (e.target instanceof Element && Boolean(e.target.closest(".vditor-container"))) ||
                 Boolean(document.querySelector(".vditor-container"));
+            const isShortcutRecorder =
+                e.target instanceof Element && Boolean(e.target.closest("[data-shortcut-recorder='true']"));
+
+            // 快捷键设置正在录入时，不能被全局快捷键捕获器抢先处理。
+            if (isShortcutRecorder) return;
+
+            const matchesShortcut = (id: keyof typeof shortcutBindings) =>
+                shortcutMatches(e, shortcutBindings[id]);
+
+            if (matchesShortcut("editor.find") || matchesShortcut("editor.replace")) {
+                e.preventDefault();
+                if (isVditorEditor) {
+                    e.stopPropagation();
+                    window.dispatchEvent(new Event("quantanote-open-editor-search"));
+                }
+                return;
+            }
+
+            if (matchesShortcut("editor.save") && isVditorEditor) {
+                e.preventDefault();
+                e.stopPropagation();
+                dispatchAppCommand("save-note");
+                return;
+            }
+
+            if (matchesShortcut("global.openPalette")) {
+                if (isEditableShortcutTarget(e.target)) return;
+                e.preventDefault();
+                if (paletteOpen) closePalette();
+                else openPalette();
+                return;
+            }
+
+            if (matchesShortcut("global.newNote")) {
+                if (isEditableShortcutTarget(e.target)) return;
+                e.preventDefault();
+                handleCreateNote().catch(() => {});
+                return;
+            }
+
+            if (matchesShortcut("global.openSettings")) {
+                if (isEditableShortcutTarget(e.target)) return;
+                e.preventDefault();
+                setSettingsSection(2);
+                navigate("settings");
+                return;
+            }
 
             // 禁用浏览器默认快捷键，只保留 F12 (DevTools)
             // 注意：Ctrl+F 和 Ctrl+H 保留给应用内搜索，仅阻止浏览器默认行为
             if (mod) {
-                // 这些快捷键只阻止浏览器默认行为，不阻止事件传播
-                const preventOnlyKeys = ["f", "h"];
-                if (preventOnlyKeys.includes(key)) {
-                    e.preventDefault();
-                    if (isVditorEditor) {
-                        // Ctrl/Cmd+H is also a Vditor heading shortcut. Intercept it
-                        // before Vditor and route it to the app's search bar instead.
-                        e.stopPropagation();
-                        window.dispatchEvent(new Event("quantanote-open-editor-search"));
-                    }
-                    return; // 编辑器内由上面的自定义事件打开搜索栏
-                }
-
                 // 其他快捷键完全阻止；编辑区域内保留系统级编辑快捷键。
                 // 编辑器内的复制交给 Vditor，避免全局处理器把富文本选择降级成纯文本。
                 if (key === "c") {
@@ -405,18 +539,6 @@ export function QuantaNoteApp() {
                 e.stopPropagation();
             }
 
-            // 应用内快捷键
-            if (mod && key === "k") {
-                if (isEditableShortcutTarget(e.target)) return;
-                e.preventDefault();
-                if (paletteOpen) closePalette();
-                else openPalette();
-            }
-            if (mod && key === "n") {
-                if (isEditableShortcutTarget(e.target)) return;
-                e.preventDefault();
-                handleCreateNote().catch(() => {});
-            }
         }
 
         function handlePaste(e: ClipboardEvent) {
@@ -431,7 +553,7 @@ export function QuantaNoteApp() {
             document.removeEventListener("keydown", handleKeyDown, true);
             document.removeEventListener("paste", handlePaste);
         };
-    }, [paletteOpen, openPalette, closePalette, handleCreateNote]);
+    }, [closePalette, handleCreateNote, navigate, openPalette, paletteOpen, setSettingsSection, shortcutBindings]);
 
     useEffect(() => {
         if (isMobile()) return;
@@ -834,6 +956,7 @@ export function QuantaNoteApp() {
                 onClose={closePalette}
                 onSelectItem={handlePaletteSelectItem}
                 items={displayItems}
+                commands={paletteCommands}
             />
             <ToastContainer />
         </AppShell>

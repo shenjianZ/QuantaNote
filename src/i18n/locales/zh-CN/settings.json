@@ -2,6 +2,7 @@
   "menu": {
     "appearance": "外观",
     "font": "字体",
+    "shortcuts": "快捷键",
     "data": "数据",
     "sync": "同步",
     "about": "关于"
@@ -67,6 +68,31 @@
     "title": "文档侧栏",
     "description": "控制文档编辑器右侧描述和目录是否显示",
     "enabled": "显示描述和目录"
+  },
+  "shortcuts": {
+    "title": "快捷键",
+    "description": "查看并自定义应用快捷键；快捷键使用 Ctrl/Cmd 表示当前平台的修饰键。",
+    "reset": "恢复默认",
+    "record": "按下快捷键",
+    "clear": "清除",
+    "conflict": "与 {{commands}} 冲突",
+    "empty": "未设置",
+    "commands": {
+      "openPalette": "打开命令面板",
+      "openPaletteDesc": "搜索笔记或执行常用操作",
+      "newNote": "新建笔记",
+      "newNoteDesc": "创建一篇空白笔记",
+      "openSettings": "打开设置",
+      "openSettingsDesc": "进入快捷键设置页",
+      "workspaceSave": "保存工作区内容",
+      "workspaceSaveDesc": "提交工作区快速输入内容",
+      "editorSave": "保存当前笔记",
+      "editorSaveDesc": "立即保存标题、摘要和正文",
+      "editorFind": "编辑器查找",
+      "editorFindDesc": "在当前正文中查找文本",
+      "editorReplace": "编辑器替换",
+      "editorReplaceDesc": "在当前正文中查找并替换文本"
+    }
   },
   "data": {
     "autoBackup": "自动备份",

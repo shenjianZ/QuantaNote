@@ -3,8 +3,10 @@ import { ArrowRight, CheckCircle2, Edit3, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../stores/appStore";
 import { useToastStore } from "../stores/toastStore";
+import { useSettingsStore } from "../stores/settingsStore";
 import { getVditorLang } from "../utils/vditorConfig";
 import type { VditorEditorHandle } from "../components/editor/VditorEditor";
+import { getShortcutLabel, shortcutMatches } from "../utils/shortcutRegistry";
 
 const VditorEditor = lazy(() => import("../components/editor/VditorEditor").then((m) => ({ default: m.VditorEditor })));
 
@@ -18,7 +20,7 @@ export function WorkspacePage({ onQuickCreate, onViewSaved }: WorkspacePageProps
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [shortcutModifier] = useState(() => navigator.platform.toLowerCase().includes("mac") ? "Cmd" : "Ctrl");
+  const workspaceSaveShortcut = useSettingsStore((s) => s.settings.shortcuts["workspace.save"]);
   const editorRef = useRef<VditorEditorHandle>(null);
   const theme = useAppStore((s) => s.theme);
   const savingRef = useRef(saving);
@@ -36,7 +38,7 @@ export function WorkspacePage({ onQuickCreate, onViewSaved }: WorkspacePageProps
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      if (shortcutMatches(event, workspaceSaveShortcut)) {
         event.preventDefault();
         handleQuickSave().catch(() => {});
       }
@@ -44,7 +46,7 @@ export function WorkspacePage({ onQuickCreate, onViewSaved }: WorkspacePageProps
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onQuickCreate]);
+  }, [onQuickCreate, workspaceSaveShortcut]);
 
   async function handleQuickSave() {
     const currentValue = editorRef.current?.getValue() ?? draft;
@@ -126,7 +128,7 @@ export function WorkspacePage({ onQuickCreate, onViewSaved }: WorkspacePageProps
                   )}
                 </div>
               ) : (
-                  <span className="hidden sm:inline">{t("workspace:shortcutHint", { mod: shortcutModifier })}</span>
+                  <span className="hidden sm:inline">{t("workspace:shortcutHint", { mod: getShortcutLabel(workspaceSaveShortcut) })}</span>
               )}
             </div>
           </footer>

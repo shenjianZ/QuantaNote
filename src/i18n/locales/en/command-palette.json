@@ -2,5 +2,21 @@
   "searchPlaceholder": "Search notes",
   "searchLabel": "Search notes",
   "noResults": "No matching notes",
-  "hint": "Type keywords to search notes"
+  "hint": "Type keywords to search notes",
+  "commands": {
+    "newNote": "New note",
+    "newNoteDesc": "Create a blank note",
+    "openSettings": "Open settings",
+    "openSettingsDesc": "Manage appearance, data, and shortcuts",
+    "saveNote": "Save current note",
+    "saveNoteDesc": "Save the current editor content immediately",
+    "insertImage": "Insert image",
+    "insertImageDesc": "Choose an image and insert it at the current cursor",
+    "manageAttachments": "Manage attachments",
+    "manageAttachmentsDesc": "View, insert, or delete attachments for this note",
+    "restoreVersion": "Restore a version",
+    "restoreVersionDesc": "Open version history and choose a version to restore",
+    "copyNote": "Copy note",
+    "copyNoteDesc": "Copy the current note body"
+  }
 }

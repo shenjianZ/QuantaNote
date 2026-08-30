@@ -8,6 +8,11 @@ import { useToastStore } from "./toastStore";
 import { isMobile } from "../utils/platform";
 import { clampContentWidthProgress } from "../utils/contentWidth";
 import {
+    DEFAULT_SHORTCUTS,
+    normalizeShortcutBindings,
+    type ShortcutBindings,
+} from "../utils/shortcutRegistry";
+import {
     getDbPath,
     setAutostart,
     getAutostart,
@@ -66,6 +71,7 @@ export interface AppSettings {
     floatingBall: boolean;
     floatingBallPosition: FloatingBallPosition | null;
     sqlLogging: SqlLogSettings;
+    shortcuts: ShortcutBindings;
     locale: "zh-CN" | "en";
 }
 
@@ -99,6 +105,7 @@ const DEFAULTS: AppSettings = {
         pretty: false,
         maxLen: 4000,
     },
+    shortcuts: DEFAULT_SHORTCUTS,
     locale: "en",
 };
 
@@ -135,6 +142,7 @@ export function normalizeSettings(settings: AppSettings): AppSettings {
         floatingBall: Boolean(settings.floatingBall),
         floatingBallPosition: normalizeFloatingBallPosition(settings.floatingBallPosition),
         sqlLogging: normalizeSqlLogSettings(settings.sqlLogging),
+        shortcuts: normalizeShortcutBindings(settings.shortcuts),
         locale,
     };
 }
@@ -433,7 +441,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     updateSetting: async (key, value) => {
         const normalizedValue = key === "contentWidthProgress"
             ? clampContentWidthProgress(value)
-            : value;
+            : key === "shortcuts"
+                ? normalizeShortcutBindings(value as ShortcutBindings)
+                : value;
         const settings = { ...get().settings, [key]: normalizedValue };
         persist(settings);
         applySettings(settings);
@@ -507,12 +517,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     },
 
     updateSettings: (partial) => {
-        const normalizedPartial = partial.contentWidthProgress === undefined
-            ? partial
-            : {
-                ...partial,
-                contentWidthProgress: clampContentWidthProgress(partial.contentWidthProgress),
-            };
+        const normalizedPartial: Partial<AppSettings> = {
+            ...partial,
+            ...(partial.contentWidthProgress === undefined
+                ? {}
+                : { contentWidthProgress: clampContentWidthProgress(partial.contentWidthProgress) }),
+            ...(partial.shortcuts === undefined
+                ? {}
+                : { shortcuts: normalizeShortcutBindings(partial.shortcuts) }),
+        };
         const settings = { ...get().settings, ...normalizedPartial };
         persist(settings);
         applySettings(settings);

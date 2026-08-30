@@ -2,6 +2,7 @@
   "menu": {
     "appearance": "Appearance",
     "font": "Font",
+    "shortcuts": "Shortcuts",
     "data": "Data",
     "sync": "Sync",
     "about": "About"
@@ -67,6 +68,31 @@
     "title": "Document Sidebar",
     "description": "Control whether the description and outline are shown beside the document editor",
     "enabled": "Show description and outline"
+  },
+  "shortcuts": {
+    "title": "Keyboard Shortcuts",
+    "description": "View and customize app shortcuts. Ctrl/Cmd uses the modifier key for the current platform.",
+    "reset": "Reset defaults",
+    "record": "Press a shortcut",
+    "clear": "Clear",
+    "conflict": "Conflicts with {{commands}}",
+    "empty": "Not set",
+    "commands": {
+      "openPalette": "Open command palette",
+      "openPaletteDesc": "Search notes or run common actions",
+      "newNote": "New note",
+      "newNoteDesc": "Create a blank note",
+      "openSettings": "Open settings",
+      "openSettingsDesc": "Open the keyboard shortcuts settings",
+      "workspaceSave": "Save workspace content",
+      "workspaceSaveDesc": "Submit the workspace quick input",
+      "editorSave": "Save current note",
+      "editorSaveDesc": "Save the title, summary, and body immediately",
+      "editorFind": "Find in editor",
+      "editorFindDesc": "Find text in the current document",
+      "editorReplace": "Replace in editor",
+      "editorReplaceDesc": "Find and replace text in the current document"
+    }
   },
   "data": {
     "autoBackup": "Auto Backup",

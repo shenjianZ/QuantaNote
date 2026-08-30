@@ -24,6 +24,8 @@ import {
 } from "../../utils/markdownAttachments";
 import { SearchReplaceBar } from "./SearchReplaceBar";
 import { useToastStore } from "../../stores/toastStore";
+import { useSettingsStore } from "../../stores/settingsStore";
+import { shortcutMatches } from "../../utils/shortcutRegistry";
 
 type VditorToolbarItem = string | {
   name: string;
@@ -174,6 +176,7 @@ export interface VditorEditorHandle {
   saveSelection: () => void;
   scrollToHeading: (index: number) => void;
   insertAttachment: (attachment: AttachmentDto, asImage?: boolean) => void;
+  openImagePicker: () => void;
 }
 
 const DEFAULT_TOOLBAR = [
@@ -711,6 +714,8 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
   onOpenAttachments,
 }, ref) {
   const { t } = useTranslation();
+  const editorFindShortcut = useSettingsStore((state) => state.settings.shortcuts["editor.find"]);
+  const editorReplaceShortcut = useSettingsStore((state) => state.settings.shortcuts["editor.replace"]);
   const resolvedPlaceholder = placeholder ?? t("editor:placeholder");
   const containerRef = useRef<HTMLDivElement>(null);
   const vditorRef = useRef<Vditor | null>(null);
@@ -1315,11 +1320,10 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (!(e.target instanceof Node) || !containerRef.current?.contains(e.target)) return;
-      const mod = e.metaKey || e.ctrlKey;
-      if (mod && e.key.toLowerCase() === "f") {
+      if (shortcutMatches(e, editorFindShortcut)) {
         e.preventDefault();
         setSearchOpen(true);
-      } else if (mod && e.key.toLowerCase() === "h") {
+      } else if (shortcutMatches(e, editorReplaceShortcut)) {
         e.preventDefault();
         setSearchOpen(true);
       }
@@ -1331,7 +1335,7 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
       document.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("quantanote-open-editor-search", handleEditorSearch);
     };
-  }, []);
+  }, [editorFindShortcut, editorReplaceShortcut]);
 
   useImperativeHandle(ref, () => ({
     getValue: () => normalizeAttachmentReferences(
@@ -1349,6 +1353,7 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
       vditorRef.current?.focus();
     },
     saveSelection,
+    openImagePicker: () => { void openAttachmentPicker(true, false).catch(() => {}); },
     scrollToHeading: (index: number) => {
       const headings = containerRef.current?.querySelectorAll<HTMLElement>(
         ".vditor-ir h1, .vditor-ir h2, .vditor-ir h3, .vditor-ir h4, .vditor-ir h5, .vditor-ir h6",
@@ -1357,7 +1362,7 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
       heading?.scrollIntoView({ behavior: "smooth", block: "center" });
     },
     insertAttachment,
-  }), [insertAttachment, saveSelection]);
+  }), [insertAttachment, openAttachmentPicker, saveSelection]);
 
   useEffect(() => {
     const container = containerRef.current;

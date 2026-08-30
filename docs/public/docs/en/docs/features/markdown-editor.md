@@ -189,4 +189,4 @@ The packaged Windows application uses the native clipboard first, so copied cont
 
 On macOS, the system convention usually uses `Command` instead of `Ctrl`. Linux and Windows use `Ctrl`.
 
-The editor saves automatically, so `Ctrl + S` is not required. When leaving the editor, QuantaNote waits for the final save; if saving fails, it keeps the editor open and shows the error.
+The editor saves automatically and also supports `Ctrl + S` for an immediate save of the title, summary, and body. When leaving the editor, QuantaNote waits for the final save; if saving fails, it keeps the editor open and shows the error.

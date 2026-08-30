@@ -8,6 +8,7 @@ import { pause, observePause } from "../config.js";
 class CommandPalette {
   get searchInput() { return "[data-testid='palette-search-input']"; }
   get results() { return "[data-testid='palette-result']"; }
+  get commands() { return "[data-testid='palette-command']"; }
 
   async open() {
     const existing = await $(this.searchInput);
@@ -39,6 +40,19 @@ class CommandPalette {
   async getResultCount() {
     const results = await $$(this.results);
     return results.length;
+  }
+
+  async getCommandTexts() {
+    const commands = await $$(this.commands);
+    const texts = [];
+    for (const command of commands) texts.push(await command.getText());
+    return texts;
+  }
+
+  async selectCommandByLabel(label) {
+    const command = await $(`//*[@data-testid='palette-command'][contains(., '${label}')]`);
+    await command.click();
+    await observePause();
   }
 
   async getResults() {
