@@ -155,7 +155,7 @@ export function ConflictResolutionModal({
             open={open}
             onClose={handleCancel}
             title={t("syncConflictTitle")}
-            maxWidth="max-w-5xl"
+            maxWidth="max-w-3xl"
         >
             <div data-testid="conflict-resolution-modal" className="space-y-4">
                 <div className="flex items-start gap-2.5 rounded-xl bg-amber-500/10 px-4 py-3">
