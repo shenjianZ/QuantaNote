@@ -65,6 +65,20 @@ pub fn get_item(db: State<'_, DbState>, id: String) -> Result<ItemDto, AppError>
 }
 
 #[tauri::command]
+pub fn get_daily_note(db: State<'_, DbState>, date: String) -> Result<Option<ItemDto>, AppError> {
+    item_service::get_daily_note(&db, &date)
+}
+
+#[tauri::command]
+pub fn get_record_date_counts(
+    db: State<'_, DbState>,
+    start_date: String,
+    end_date: String,
+) -> Result<Vec<crate::models::item::DailyRecordCountDto>, AppError> {
+    item_service::get_record_date_counts(&db, &start_date, &end_date)
+}
+
+#[tauri::command]
 pub fn update_item(
     db: State<'_, DbState>,
     id: String,

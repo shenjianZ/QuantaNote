@@ -54,6 +54,12 @@ pub struct ItemPageDto {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct DailyRecordCountDto {
+    pub date: String,
+    pub count: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TrashItemDto {
     pub item: ItemDto,
     pub deleted_at: String,

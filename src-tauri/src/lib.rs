@@ -264,6 +264,8 @@ pub fn run() {
             item::get_items,
             item::get_items_page,
             item::get_item,
+            item::get_daily_note,
+            item::get_record_date_counts,
             item::update_item,
             item::regenerate_summary,
             item::delete_item,

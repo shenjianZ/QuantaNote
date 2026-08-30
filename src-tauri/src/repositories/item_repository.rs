@@ -132,6 +132,59 @@ pub fn get_item(db: &DbState, id: &str) -> Result<ItemDto, AppError> {
         .map_err(|e| AppError::Database(e.to_string()))
 }
 
+pub fn get_daily_note(db: &DbState, date: &str) -> Result<Option<ItemDto>, AppError> {
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    let marker = format!("%daily_date: {}%", date);
+    conn.query_row(
+        "SELECT id, title, item_type, content, summary, summary_mode, pinned, favorite, encrypted, created_at, updated_at
+         FROM items
+         WHERE item_type = 'note' AND deleted_at IS NULL AND content LIKE ?1
+         ORDER BY updated_at DESC
+         LIMIT 1",
+        params![marker],
+        row_to_item,
+    )
+    .optional()
+    .map_err(|e| AppError::Database(e.to_string()))
+}
+
+pub fn get_record_date_counts(
+    db: &DbState,
+    start_date: &str,
+    end_date: &str,
+) -> Result<Vec<DailyRecordCountDto>, AppError> {
+    let conn = db
+        .conn
+        .lock()
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT substr(created_at, 1, 10) AS date, COUNT(*)
+             FROM items
+             WHERE deleted_at IS NULL
+               AND substr(created_at, 1, 10) BETWEEN ?1 AND ?2
+             GROUP BY substr(created_at, 1, 10)
+             ORDER BY date ASC",
+        )
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+    let rows = stmt
+        .query_map(params![start_date, end_date], |row| {
+            Ok(DailyRecordCountDto {
+                date: row.get(0)?,
+                count: row.get(1)?,
+            })
+        })
+        .map_err(|e| AppError::Database(e.to_string()))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| AppError::Database(e.to_string()));
+
+    rows
+}
+
 pub fn update(db: &DbState, payload: UpdateItemPayload) -> Result<ItemDto, AppError> {
     let conn = db
         .conn
@@ -588,6 +641,80 @@ mod tests {
         assert_eq!(page.total, 1);
         assert_eq!(page.items.len(), 1);
         assert_eq!(page.items[0].title, "Pinned");
+    }
+
+    #[test]
+    fn get_daily_note_finds_active_note_by_date_marker() {
+        let db = crate::test_support::test_db();
+        let daily = create(
+            &db,
+            CreateItemPayload {
+                title: "每日记录 - 2026-08-30".to_string(),
+                item_type: "note".to_string(),
+                content: Some("---\ndaily_date: 2026-08-30\n---\n# Daily log".to_string()),
+                summary: "".to_string(),
+            },
+        )
+        .expect("create daily note");
+
+        let found = get_daily_note(&db, "2026-08-30")
+            .expect("find daily note")
+            .expect("daily note should exist");
+        assert_eq!(found.id, daily.id);
+
+        let other = create(
+            &db,
+            CreateItemPayload {
+                title: "链接记录".to_string(),
+                item_type: "link".to_string(),
+                content: Some("daily_date: 2026-08-30".to_string()),
+                summary: "".to_string(),
+            },
+        )
+        .expect("create non-note marker");
+        let conn = db.conn.lock().expect("lock db");
+        conn.execute(
+            "UPDATE items SET deleted_at = '2026-08-30T01:00:00Z' WHERE id = ?1",
+            params![daily.id],
+        )
+        .expect("soft delete daily note");
+        drop(conn);
+
+        assert!(get_daily_note(&db, "2026-08-30")
+            .expect("find after delete")
+            .is_none());
+        assert_ne!(other.id, daily.id);
+    }
+
+    #[test]
+    fn get_record_date_counts_groups_active_items_by_created_date() {
+        let db = crate::test_support::test_db();
+        let first = create_test_item(&db, "第一条", "note");
+        let second = create_test_item(&db, "第二条", "task");
+        let deleted = create_test_item(&db, "已删除", "note");
+        let conn = db.conn.lock().expect("lock db");
+        conn.execute(
+            "UPDATE items SET created_at = '2026-08-29T08:00:00Z' WHERE id = ?1",
+            params![first.id],
+        )
+        .expect("set first date");
+        conn.execute(
+            "UPDATE items SET created_at = '2026-08-29T09:00:00Z' WHERE id = ?1",
+            params![second.id],
+        )
+        .expect("set second date");
+        conn.execute(
+            "UPDATE items SET created_at = '2026-08-30T10:00:00Z', deleted_at = '2026-08-30T11:00:00Z' WHERE id = ?1",
+            params![deleted.id],
+        )
+        .expect("soft delete third item");
+        drop(conn);
+
+        let counts =
+            get_record_date_counts(&db, "2026-08-29", "2026-08-30").expect("get date counts");
+        assert_eq!(counts.len(), 1);
+        assert_eq!(counts[0].date, "2026-08-29");
+        assert_eq!(counts[0].count, 2);
     }
 
     #[test]

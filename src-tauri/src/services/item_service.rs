@@ -88,6 +88,37 @@ pub fn get_item(db: &DbState, id: &str) -> Result<ItemDto, AppError> {
     item_repository::get_item(db, id)
 }
 
+fn validate_date_key(date: &str) -> Result<(), AppError> {
+    let parsed = chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d");
+    if parsed
+        .map(|value| value.format("%Y-%m-%d").to_string() != date)
+        .unwrap_or(true)
+    {
+        return Err(AppError::Validation(
+            "日期必须使用 YYYY-MM-DD 格式".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+pub fn get_daily_note(db: &DbState, date: &str) -> Result<Option<ItemDto>, AppError> {
+    validate_date_key(date)?;
+    item_repository::get_daily_note(db, date)
+}
+
+pub fn get_record_date_counts(
+    db: &DbState,
+    start_date: &str,
+    end_date: &str,
+) -> Result<Vec<DailyRecordCountDto>, AppError> {
+    validate_date_key(start_date)?;
+    validate_date_key(end_date)?;
+    if start_date > end_date {
+        return Err(AppError::Validation("日期范围起点不能晚于终点".to_string()));
+    }
+    item_repository::get_record_date_counts(db, start_date, end_date)
+}
+
 pub fn update_item(db: &DbState, payload: UpdateItemPayload) -> Result<ItemDto, AppError> {
     if let Some(ref title) = payload.title {
         if title.trim().is_empty() {
@@ -286,6 +317,24 @@ mod tests {
         ));
         assert!(matches!(
             get_items_page(&db, None, None, None, None, 10, -1),
+            Err(AppError::Validation(_))
+        ));
+    }
+
+    #[test]
+    fn daily_note_queries_validate_date_keys() {
+        let db = crate::test_support::test_db();
+
+        assert!(matches!(
+            get_daily_note(&db, "2026-8-30"),
+            Err(AppError::Validation(_))
+        ));
+        assert!(matches!(
+            get_record_date_counts(&db, "2026-08-31", "2026-08-30"),
+            Err(AppError::Validation(_))
+        ));
+        assert!(matches!(
+            get_record_date_counts(&db, "2026-08-30", "not-a-date"),
             Err(AppError::Validation(_))
         ));
     }
