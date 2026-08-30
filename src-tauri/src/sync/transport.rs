@@ -2,8 +2,11 @@ use crate::error::AppError;
 use crate::models::sync::*;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use tokio::sync::Mutex;
+
+pub const ATTACHMENT_CHUNK_SIZE: usize = 4 * 1024 * 1024;
 
 /// 判断 HTTP 状态码是否值得重试
 fn is_retryable_status(status: reqwest::StatusCode) -> bool {
@@ -114,6 +117,22 @@ pub struct DeviceSessionInfo {
     pub last_seen_at: String,
     pub expires_at: String,
     pub is_current: bool,
+}
+
+/// 远端附件分片上传状态
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AttachmentUploadStatus {
+    pub file_hash: String,
+    pub total_chunks: u32,
+    pub received_chunks: Vec<u32>,
+}
+
+/// 远端附件下载分段响应
+#[derive(Debug)]
+pub struct AttachmentDownloadRange {
+    pub data: Vec<u8>,
+    pub start: u64,
+    pub total_size: u64,
 }
 
 /// token 刷新后的回调类型
@@ -702,7 +721,250 @@ impl SyncTransport {
         }
     }
 
-    /// 下载附件
+    /// 使用分片协议上传附件，并在服务端可用时复用已完成分片。
+    /// 对不支持分片端点的旧服务端回退到完整上传。
+    pub async fn upload_attachment_resumable(
+        &self,
+        attachment_id: &str,
+        item_id: &str,
+        filename: &str,
+        mime_type: &str,
+        file_hash: &str,
+        snapshot_id: &str,
+        data: Vec<u8>,
+    ) -> Result<String, AppError> {
+        let total_chunks = std::cmp::max(
+            1,
+            (data.len() + ATTACHMENT_CHUNK_SIZE - 1) / ATTACHMENT_CHUNK_SIZE,
+        ) as u32;
+        let status = match self
+            .get_attachment_upload_status(file_hash, total_chunks)
+            .await
+        {
+            Ok(status) => status,
+            Err(AppError::SyncError(message))
+                if message.contains("HTTP 404") || message.contains("HTTP 405") =>
+            {
+                return self
+                    .upload_attachment(
+                        attachment_id,
+                        item_id,
+                        filename,
+                        mime_type,
+                        file_hash,
+                        data.len() as i64,
+                        snapshot_id,
+                        data,
+                    )
+                    .await;
+            }
+            Err(error) => return Err(error),
+        };
+
+        for chunk_index in 0..total_chunks {
+            if status.received_chunks.contains(&chunk_index) {
+                continue;
+            }
+            let start = chunk_index as usize * ATTACHMENT_CHUNK_SIZE;
+            let end = std::cmp::min(start + ATTACHMENT_CHUNK_SIZE, data.len());
+            let chunk = data[start..end].to_vec();
+            let mut hasher = Sha256::new();
+            hasher.update(&chunk);
+            let chunk_hash = format!("{:x}", hasher.finalize());
+            self.upload_attachment_chunk(
+                attachment_id,
+                item_id,
+                filename,
+                mime_type,
+                file_hash,
+                data.len() as i64,
+                snapshot_id,
+                chunk_index,
+                total_chunks,
+                &chunk_hash,
+                chunk,
+            )
+            .await?;
+        }
+
+        self.complete_attachment_upload(
+            attachment_id,
+            item_id,
+            filename,
+            mime_type,
+            file_hash,
+            data.len() as i64,
+            snapshot_id,
+            total_chunks,
+        )
+        .await
+    }
+
+    async fn upload_attachment_chunk(
+        &self,
+        attachment_id: &str,
+        item_id: &str,
+        filename: &str,
+        mime_type: &str,
+        file_hash: &str,
+        file_size: i64,
+        snapshot_id: &str,
+        chunk_index: u32,
+        total_chunks: u32,
+        chunk_hash: &str,
+        data: Vec<u8>,
+    ) -> Result<(), AppError> {
+        let mut url = reqwest::Url::parse(&format!(
+            "{}/sync/attachments/upload/chunk",
+            self.server_url
+        ))
+        .map_err(|e| AppError::SyncError(format!("URL 解析失败: {}", e)))?;
+        url.query_pairs_mut()
+            .append_pair("attachment_id", attachment_id)
+            .append_pair("item_id", item_id)
+            .append_pair("filename", filename)
+            .append_pair("mime_type", mime_type)
+            .append_pair("file_hash", file_hash)
+            .append_pair("file_size", &file_size.to_string())
+            .append_pair("snapshot_id", snapshot_id)
+            .append_pair("chunk_index", &chunk_index.to_string())
+            .append_pair("total_chunks", &total_chunks.to_string())
+            .append_pair("chunk_hash", chunk_hash);
+        let builder = self.client.post(url).body(data);
+        let resp = self.send_auth_with_refresh(builder).await?;
+        let _: serde_json::Value = self.handle_response(resp).await?;
+        Ok(())
+    }
+
+    async fn get_attachment_upload_status(
+        &self,
+        file_hash: &str,
+        total_chunks: u32,
+    ) -> Result<AttachmentUploadStatus, AppError> {
+        let mut url = reqwest::Url::parse(&format!(
+            "{}/sync/attachments/upload/status",
+            self.server_url
+        ))
+        .map_err(|e| AppError::SyncError(format!("URL 解析失败: {}", e)))?;
+        url.query_pairs_mut()
+            .append_pair("file_hash", file_hash)
+            .append_pair("total_chunks", &total_chunks.to_string());
+        let builder = self.client.get(url);
+        let resp = self.send_auth_with_refresh(builder).await?;
+        self.handle_response(resp).await
+    }
+
+    async fn complete_attachment_upload(
+        &self,
+        attachment_id: &str,
+        item_id: &str,
+        filename: &str,
+        mime_type: &str,
+        file_hash: &str,
+        file_size: i64,
+        snapshot_id: &str,
+        total_chunks: u32,
+    ) -> Result<String, AppError> {
+        let mut url = reqwest::Url::parse(&format!(
+            "{}/sync/attachments/upload/complete",
+            self.server_url
+        ))
+        .map_err(|e| AppError::SyncError(format!("URL 解析失败: {}", e)))?;
+        url.query_pairs_mut()
+            .append_pair("attachment_id", attachment_id)
+            .append_pair("item_id", item_id)
+            .append_pair("filename", filename)
+            .append_pair("mime_type", mime_type)
+            .append_pair("file_hash", file_hash)
+            .append_pair("file_size", &file_size.to_string())
+            .append_pair("snapshot_id", snapshot_id)
+            .append_pair("total_chunks", &total_chunks.to_string());
+        let builder = self.client.post(url);
+        let resp = self.send_auth_with_refresh(builder).await?;
+        let body: ApiResponse<serde_json::Value> = resp
+            .json()
+            .await
+            .map_err(|e| AppError::SyncError(format!("解析响应失败: {}", e)))?;
+        if body.code == 200 {
+            body.data
+                .and_then(|data| data["storage_key"].as_str().map(ToString::to_string))
+                .ok_or_else(|| AppError::SyncError("未返回存储键".to_string()))
+        } else {
+            Err(AppError::SyncError(format!(
+                "合并附件失败: {}",
+                body.message
+            )))
+        }
+    }
+
+    /// 按字节范围下载附件。旧服务端忽略 Range 时返回完整文件并将 start 设为 0。
+    pub async fn download_attachment_range(
+        &self,
+        attachment_id: &str,
+        start: u64,
+        end: u64,
+    ) -> Result<AttachmentDownloadRange, AppError> {
+        let url = format!(
+            "{}/sync/attachments/download/{}",
+            self.server_url, attachment_id
+        );
+        let builder = self
+            .client
+            .get(&url)
+            .header(reqwest::header::RANGE, format!("bytes={}-{}", start, end));
+        let resp = self.send_auth_with_refresh(builder).await?;
+        let status = resp.status();
+        if status == reqwest::StatusCode::PARTIAL_CONTENT {
+            let content_range = resp
+                .headers()
+                .get(reqwest::header::CONTENT_RANGE)
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_owned)
+                .ok_or_else(|| AppError::SyncError("缺少 Content-Range".to_string()))?;
+            let (_, range) = content_range
+                .split_once(' ')
+                .ok_or_else(|| AppError::SyncError("Content-Range 格式无效".to_string()))?;
+            let (range, total) = range
+                .split_once('/')
+                .ok_or_else(|| AppError::SyncError("Content-Range 格式无效".to_string()))?;
+            let (range_start, _) = range
+                .split_once('-')
+                .ok_or_else(|| AppError::SyncError("Content-Range 格式无效".to_string()))?;
+            let data = resp
+                .bytes()
+                .await
+                .map_err(|e| AppError::SyncError(format!("读取响应失败: {}", e)))?;
+            return Ok(AttachmentDownloadRange {
+                data: data.to_vec(),
+                start: range_start
+                    .parse()
+                    .map_err(|_| AppError::SyncError("Content-Range 起点无效".to_string()))?,
+                total_size: total
+                    .parse()
+                    .map_err(|_| AppError::SyncError("Content-Range 总大小无效".to_string()))?,
+            });
+        }
+
+        if status == reqwest::StatusCode::OK {
+            let data = resp
+                .bytes()
+                .await
+                .map_err(|e| AppError::SyncError(format!("读取响应失败: {}", e)))?;
+            return Ok(AttachmentDownloadRange {
+                total_size: data.len() as u64,
+                start: 0,
+                data: data.to_vec(),
+            });
+        }
+
+        Err(AppError::SyncError(format!(
+            "下载附件分片失败: HTTP {}",
+            status.as_u16()
+        )))
+    }
+
+    /// 下载附件（兼容旧调用方；同步主链路使用分段下载）
+    #[allow(dead_code)]
     pub async fn download_attachment(&self, attachment_id: &str) -> Result<Vec<u8>, AppError> {
         let url = format!(
             "{}/sync/attachments/download/{}",

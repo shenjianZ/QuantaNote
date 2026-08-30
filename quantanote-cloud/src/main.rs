@@ -135,6 +135,19 @@ async fn main() -> anyhow::Result<()> {
             post(handlers::sync::upload_attachment).layer(DefaultBodyLimit::max(50 * 1024 * 1024)), // 附件上传限制 50MB
         )
         .route(
+            "/sync/attachments/upload/chunk",
+            post(handlers::sync::upload_attachment_chunk)
+                .layer(DefaultBodyLimit::max(4 * 1024 * 1024)),
+        )
+        .route(
+            "/sync/attachments/upload/status",
+            get(handlers::sync::get_attachment_upload_status),
+        )
+        .route(
+            "/sync/attachments/upload/complete",
+            post(handlers::sync::complete_attachment_upload),
+        )
+        .route(
             "/sync/attachments/download/:attachment_id",
             get(handlers::sync::download_attachment),
         )

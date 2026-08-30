@@ -491,15 +491,13 @@ pub async fn sync_attachments_upload(
 
     for (_path, hash, data, attachment_id, item_id, filename, mime_type) in &attachments {
         if diff.missing.contains(hash) || !remote_attachment_ids.contains(attachment_id.as_str()) {
-            let file_size = data.len() as i64;
             transport
-                .upload_attachment(
+                .upload_attachment_resumable(
                     attachment_id,
                     item_id,
                     filename,
                     mime_type,
                     hash,
-                    file_size,
                     "pending",
                     data.clone(),
                 )
@@ -583,26 +581,105 @@ pub async fn sync_attachments_download(
             ),
         };
 
-        let data = transport.download_attachment(&remote.attachment_id).await?;
-        if remote.file_size < 0
-            || remote.file_size as u64 > 512 * 1024 * 1024
-            || remote.file_size as usize != data.len()
+        let full_path = resolve_safe_attachment_path(&paths::quantanote_dir(), &target_path)?;
+        if remote.file_size < 0 || remote.file_size as u64 > 512 * 1024 * 1024 {
+            return Err(AppError::SyncError(format!(
+                "附件大小无效: attachment_id={}, expected={}",
+                remote.attachment_id, remote.file_size
+            )));
+        }
+        let expected_size = remote.file_size as u64;
+        let partial_path = std::path::PathBuf::from(format!("{}.qnpart", full_path.display()));
+        let mut partial_data = if partial_path.exists() {
+            std::fs::read(&partial_path).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+
+        if partial_data.len() as u64 > expected_size {
+            let _ = std::fs::remove_file(&partial_path);
+            partial_data.clear();
+        }
+        if partial_data.len() as u64 == expected_size
+            && compute_file_hash(&partial_data) != remote.file_hash
         {
+            let _ = std::fs::remove_file(&partial_path);
+            partial_data.clear();
+        }
+
+        let mut offset = partial_data.len() as u64;
+        while offset < expected_size {
+            let range_end = std::cmp::min(
+                offset + crate::sync::transport::ATTACHMENT_CHUNK_SIZE as u64 - 1,
+                expected_size - 1,
+            );
+            let range = transport
+                .download_attachment_range(&remote.attachment_id, offset, range_end)
+                .await?;
+
+            // 兼容旧服务端：忽略 Range 时会返回完整文件。
+            if range.start == 0 {
+                if range.total_size != expected_size || range.data.len() as u64 != expected_size {
+                    return Err(AppError::SyncError(format!(
+                        "附件大小校验失败: attachment_id={}, expected={}, actual={}",
+                        remote.attachment_id,
+                        expected_size,
+                        range.data.len()
+                    )));
+                }
+                partial_data = range.data;
+                std::fs::write(&partial_path, &partial_data)
+                    .map_err(|e| AppError::Io(format!("保存附件下载进度失败: {}", e)))?;
+                break;
+            }
+
+            if range.start != offset
+                || range.total_size != expected_size
+                || range.data.is_empty()
+                || range.data.len() as u64 > range_end - offset + 1
+            {
+                return Err(AppError::SyncError(format!(
+                    "附件分段响应无效: attachment_id={}, offset={}",
+                    remote.attachment_id, offset
+                )));
+            }
+
+            use std::io::Write;
+            let mut part_file = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&partial_path)
+                .map_err(|e| AppError::Io(format!("打开附件下载进度文件失败: {}", e)))?;
+            part_file
+                .write_all(&range.data)
+                .map_err(|e| AppError::Io(format!("保存附件下载进度失败: {}", e)))?;
+            offset += range.data.len() as u64;
+            partial_data.extend_from_slice(&range.data);
+        }
+
+        let data = if partial_data.len() as u64 == expected_size {
+            partial_data
+        } else {
+            std::fs::read(&partial_path)
+                .map_err(|e| AppError::Io(format!("读取附件下载进度失败: {}", e)))?
+        };
+        if data.len() as u64 != expected_size {
+            let _ = std::fs::remove_file(&partial_path);
             return Err(AppError::SyncError(format!(
                 "附件大小校验失败: attachment_id={}, expected={}, actual={}",
                 remote.attachment_id,
-                remote.file_size,
+                expected_size,
                 data.len()
             )));
         }
         let downloaded_hash = compute_file_hash(&data);
         if downloaded_hash != remote.file_hash {
+            let _ = std::fs::remove_file(&partial_path);
             return Err(AppError::SyncError(format!(
                 "附件下载校验失败: attachment_id={}, expected={}, actual={}",
                 remote.attachment_id, remote.file_hash, downloaded_hash
             )));
         }
-        let full_path = resolve_safe_attachment_path(&paths::quantanote_dir(), &target_path)?;
         attachment_repository::write_file_atomically(&full_path, &data)?;
 
         if !has_local_row {
@@ -627,9 +704,11 @@ pub async fn sync_attachments_download(
                 ],
             ) {
                 let _ = std::fs::remove_file(&full_path);
+                let _ = std::fs::remove_file(&partial_path);
                 return Err(AppError::Database(error.to_string()));
             }
         }
+        let _ = std::fs::remove_file(&partial_path);
         result.attachments_downloaded += 1;
         completed += 1;
         let _ = state_manager.set_progress("下载附件", completed, total);

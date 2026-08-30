@@ -63,6 +63,14 @@ pub struct AttachmentDiffResult {
     pub remote_attachments: Vec<RemoteAttachmentInfo>,
 }
 
+/// 分片上传状态
+#[derive(Debug, Serialize)]
+pub struct AttachmentUploadStatus {
+    pub file_hash: String,
+    pub total_chunks: u32,
+    pub received_chunks: Vec<u32>,
+}
+
 /// 提交结果
 #[derive(Debug, Serialize)]
 pub struct CommitResult {

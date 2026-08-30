@@ -92,8 +92,14 @@ impl StorageBackend for WebDAVStorage {
             .header("Content-Type", "application/xml")
             .body(body)
             .send()
-            .await?
-            .error_for_status()?;
+            .await?;
+
+        // 尚未上传过该附件时，部分 WebDAV 服务不会自动创建分片目录，而是返回 404。
+        // 对列表语义来说这等价于“当前没有已接收分片”，不应阻断首次续传。
+        if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            return Ok(Vec::new());
+        }
+        let resp = resp.error_for_status()?;
 
         let text = resp.text().await?;
         parse_propfind_response(&text, prefix)
