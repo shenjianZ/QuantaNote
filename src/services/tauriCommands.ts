@@ -284,6 +284,41 @@ export interface ItemDto {
     updated_at: string;
 }
 
+export interface NoteLinkDto {
+    source_id: string;
+    source_title: string;
+    target_title: string;
+    target_id: string | null;
+}
+
+export interface NoteLinkGraphNodeDto {
+    id: string;
+    title: string;
+}
+
+export interface NoteLinkGraphEdgeDto {
+    source_id: string;
+    target_id: string | null;
+    target_title: string;
+}
+
+export interface NoteLinkGraphDto {
+    nodes: NoteLinkGraphNodeDto[];
+    edges: NoteLinkGraphEdgeDto[];
+}
+
+export async function getNoteLinks(itemId: string) {
+    return invoke<NoteLinkDto[]>("get_note_links", { itemId });
+}
+
+export async function getNoteBacklinks(itemId: string) {
+    return invoke<NoteLinkDto[]>("get_note_backlinks", { itemId });
+}
+
+export async function getNoteLinkGraph() {
+    return invoke<NoteLinkGraphDto>("get_note_link_graph");
+}
+
 export interface TrashItemDto {
     item: ItemDto;
     deleted_at: string;

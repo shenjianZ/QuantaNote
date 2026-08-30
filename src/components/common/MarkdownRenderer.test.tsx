@@ -216,4 +216,24 @@ graph TD
       marginRight: "0px",
     });
   });
+
+  it("renders wiki links and delegates note navigation", async () => {
+    const onNoteLinkClick = vi.fn();
+    const { user } = setup(
+      <MarkdownRenderer
+        content={"跳转到 [[目标笔记]]，也可以看作 [[目标笔记|显示名称]]。`[[代码中的文本]]`"}
+        onNoteLinkClick={onNoteLinkClick}
+      />,
+    );
+
+    const links = screen.getAllByRole("link");
+    expect(links).toHaveLength(2);
+    expect(links[0]).toHaveAttribute("data-note-target", "目标笔记");
+    expect(links[0]).toHaveAttribute("href", "note://%E7%9B%AE%E6%A0%87%E7%AC%94%E8%AE%B0");
+    expect(links[1]).toHaveTextContent("显示名称");
+    expect(screen.getByText("[[代码中的文本]]")).toBeInTheDocument();
+
+    await user.click(links[0]);
+    expect(onNoteLinkClick).toHaveBeenCalledWith("目标笔记");
+  });
 });

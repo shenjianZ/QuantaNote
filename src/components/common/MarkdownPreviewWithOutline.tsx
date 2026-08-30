@@ -11,6 +11,7 @@ interface MarkdownPreviewWithOutlineProps {
   lang?: "zh_CN" | "en_US";
   testId?: string;
   attachments?: readonly MarkdownAttachment[];
+  onNoteLinkClick?: (targetTitle: string) => void;
 }
 
 export function MarkdownPreviewWithOutline({
@@ -19,6 +20,7 @@ export function MarkdownPreviewWithOutline({
   lang,
   testId = "markdown-preview-layout",
   attachments = [],
+  onNoteLinkClick,
 }: MarkdownPreviewWithOutlineProps) {
   const markdownRef = useRef<HTMLDivElement>(null);
   const showDocumentOutline = useSettingsStore((s) => s.settings.showDocumentOutline);
@@ -115,7 +117,7 @@ export function MarkdownPreviewWithOutline({
         className="min-w-0 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4 sm:rounded-3xl sm:p-5"
         data-testid={`${testId}-markdown`}
       >
-        <MarkdownRenderer content={content} theme={theme} lang={lang} attachments={attachments} />
+        <MarkdownRenderer content={content} theme={theme} lang={lang} attachments={attachments} onNoteLinkClick={onNoteLinkClick} />
       </div>
       {showDocumentOutline && (
         <DocumentOutline

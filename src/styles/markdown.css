@@ -214,6 +214,19 @@
     text-decoration-color: currentColor;
 }
 
+.markdown-preview a[data-note-target] {
+    text-decoration-style: dashed;
+    text-decoration-thickness: 1px;
+}
+
+.markdown-preview a[data-note-target]::before {
+    content: "↗";
+    display: inline-block;
+    margin-right: 0.2em;
+    font-size: 0.8em;
+    text-decoration: none;
+}
+
 .markdown-preview :where(strong, b),
 .vditor-reset :where(strong, b) {
     color: var(--md-heading);

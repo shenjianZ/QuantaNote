@@ -50,7 +50,7 @@ const markdownSanitizeSchema = {
   ...defaultSchema,
   protocols: {
     ...defaultSchema.protocols,
-    href: [...(defaultSchema.protocols?.href ?? []), "attachment"],
+    href: [...(defaultSchema.protocols?.href ?? []), "attachment", "note"],
     src: [...(defaultSchema.protocols?.src ?? []), "attachment"],
   },
   attributes: {
@@ -68,6 +68,76 @@ interface MarkdownRendererProps {
   lang?: "zh_CN" | "en_US";
   emptyText?: string;
   attachments?: readonly MarkdownAttachment[];
+  onNoteLinkClick?: (targetTitle: string) => void;
+}
+
+type MarkdownNode = {
+  type?: string;
+  value?: string;
+  url?: string;
+  children?: MarkdownNode[];
+};
+
+function splitWikiLink(value: string): { target: string; label: string } | null {
+  const raw = value.trim();
+  if (!raw) return null;
+  const [targetPart, ...labelParts] = raw.split("|");
+  const target = targetPart.trim();
+  if (!target) return null;
+  const label = labelParts.join("|").trim() || target;
+  return { target, label };
+}
+
+function remarkWikiLinks() {
+  return (tree: MarkdownNode) => {
+    const splitText = (value: string): MarkdownNode[] => {
+      const children: MarkdownNode[] = [];
+      let cursor = 0;
+      const pattern = /\[\[([^\]\n]+)\]\]/g;
+      let match: RegExpExecArray | null;
+      while ((match = pattern.exec(value))) {
+        if (match.index > cursor) {
+          children.push({ type: "text", value: value.slice(cursor, match.index) });
+        }
+        const link = splitWikiLink(match[1]);
+        if (!link) {
+          children.push({ type: "text", value: match[0] });
+        } else {
+          children.push({
+            type: "link",
+            url: `note://${encodeURIComponent(link.target)}`,
+            children: [{ type: "text", value: link.label }],
+          });
+        }
+        cursor = match.index + match[0].length;
+      }
+      if (children.length === 0) return [{ type: "text", value }];
+      if (cursor < value.length) {
+        children.push({ type: "text", value: value.slice(cursor) });
+      }
+      return children;
+    };
+
+    const visit = (node: MarkdownNode) => {
+      if (!node.children) return;
+      node.children = node.children.flatMap((child) => {
+        if (child.type === "text" && child.value) return splitText(child.value);
+        visit(child);
+        return [child];
+      });
+    };
+
+    visit(tree);
+  };
+}
+
+function getNoteTargetFromHref(href?: string): string | null {
+  if (!href?.toLowerCase().startsWith("note://")) return null;
+  try {
+    return decodeURIComponent(href.slice("note://".length)).trim() || null;
+  } catch {
+    return href.slice("note://".length).trim() || null;
+  }
 }
 
 type CalloutKind = "note" | "tip" | "important" | "warning" | "caution";
@@ -291,7 +361,7 @@ function CalloutIcon({ kind }: { kind: CalloutKind }) {
   return <Icon className="markdown-callout-icon" aria-hidden="true" />;
 }
 
-export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme = "dark", lang, emptyText, attachments = [] }: MarkdownRendererProps) {
+export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme = "dark", lang, emptyText, attachments = [], onNoteLinkClick }: MarkdownRendererProps) {
   const { t } = useTranslation();
   const resolvedEmptyText = emptyText ?? t("common:emptyItem.noContent");
   const headingCounts = new Map<string, number>();
@@ -308,6 +378,15 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme 
       return;
     }
 
+    const noteTarget = anchor.getAttribute("data-note-target");
+    if (noteTarget) {
+      if (onNoteLinkClick) {
+        e.preventDefault();
+        onNoteLinkClick(noteTarget);
+      }
+      return;
+    }
+
     const href = anchor.getAttribute("href") || "";
     if (!href || href.startsWith("#")) return;
 
@@ -315,7 +394,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme 
     if (e.ctrlKey || e.metaKey) {
       openUrl(anchor.href).catch(() => {});
     }
-  }, [attachments]);
+  }, [attachments, onNoteLinkClick]);
 
   if (!content.trim()) {
     return <div className="markdown-empty">{resolvedEmptyText}</div>;
@@ -348,10 +427,12 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme 
     h6: makeHeading(6),
     a: ({ children, href, title }) => {
       const attachmentId = href ? getAttachmentIdFromSource(href) : null;
+      const noteTarget = getNoteTargetFromHref(href);
       return (
       <a
         href={href ? resolveAttachmentSource(href, attachments) : href}
         data-attachment-id={attachmentId ?? undefined}
+        data-note-target={noteTarget ?? undefined}
         title={title}
         rel={href?.startsWith("http") ? "noreferrer" : undefined}
       >
@@ -448,10 +529,15 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme 
       onClick={handleClick}
     >
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkBreaks, remarkMath, remarkDefinitionList]}
+        remarkPlugins={[remarkGfm, remarkBreaks, remarkMath, remarkDefinitionList, remarkWikiLinks]}
         remarkRehypeOptions={{ handlers: defListHastHandlers }}
         rehypePlugins={[rehypeRaw, [rehypeSanitize, markdownSanitizeSchema], rehypeKatex]}
-        urlTransform={(url) => url.toLowerCase().startsWith("attachment://") ? url : defaultUrlTransform(url)}
+        urlTransform={(url) => {
+          const normalized = url.toLowerCase();
+          return normalized.startsWith("attachment://") || normalized.startsWith("note://")
+            ? url
+            : defaultUrlTransform(url);
+        }}
         components={components}
       >
         {content}
