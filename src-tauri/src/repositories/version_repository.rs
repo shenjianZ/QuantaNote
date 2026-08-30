@@ -2,7 +2,7 @@ use rusqlite::params;
 
 use crate::db::DbState;
 use crate::error::AppError;
-use crate::models::item::ItemDto;
+use crate::models::item::{generate_auto_summary, ItemDto, SUMMARY_MODE_AUTO};
 use crate::models::version::VersionDto;
 use crate::utils::ids;
 
@@ -91,7 +91,7 @@ pub fn restore_version_with_snapshot(db: &DbState, version_id: &str) -> Result<I
 
     let current = tx
         .query_row(
-            "SELECT id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at
+            "SELECT id, title, item_type, content, summary, summary_mode, pinned, favorite, encrypted, created_at, updated_at
              FROM items WHERE id = ?1",
             params![version.item_id],
             |row| {
@@ -101,11 +101,12 @@ pub fn restore_version_with_snapshot(db: &DbState, version_id: &str) -> Result<I
                     item_type: row.get(2)?,
                     content: row.get(3)?,
                     summary: row.get(4)?,
-                    pinned: row.get::<_, i32>(5)? != 0,
-                    favorite: row.get::<_, i32>(6)? != 0,
-                    encrypted: row.get::<_, i32>(7)? != 0,
-                    created_at: row.get(8)?,
-                    updated_at: row.get(9)?,
+                    summary_mode: row.get(5)?,
+                    pinned: row.get::<_, i32>(6)? != 0,
+                    favorite: row.get::<_, i32>(7)? != 0,
+                    encrypted: row.get::<_, i32>(8)? != 0,
+                    created_at: row.get(9)?,
+                    updated_at: row.get(10)?,
                 })
             },
         )
@@ -148,14 +149,20 @@ pub fn restore_version_with_snapshot(db: &DbState, version_id: &str) -> Result<I
         .map_err(|e| AppError::Database(e.to_string()))?;
 
         let updated_at = chrono::Utc::now().to_rfc3339();
+        let summary = if current.summary_mode == SUMMARY_MODE_AUTO {
+            generate_auto_summary(&version.content)
+        } else {
+            current.summary.clone()
+        };
         tx.execute(
-            "UPDATE items SET content = ?1, updated_at = ?2 WHERE id = ?3",
-            params![version.content, updated_at, version.item_id],
+            "UPDATE items SET content = ?1, summary = ?2, updated_at = ?3 WHERE id = ?4",
+            params![version.content, summary, updated_at, version.item_id],
         )
         .map_err(|e| AppError::Database(e.to_string()))?;
 
         ItemDto {
             content: version.content,
+            summary,
             updated_at,
             ..current
         }

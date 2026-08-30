@@ -3,7 +3,7 @@ title: 后端架构
 description: QuantaNote Rust 后端的目录结构、Command/Service/Repository 三层架构、同步引擎和错误处理
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-30
 ---
 
 # 后端架构
@@ -128,6 +128,10 @@ Service 层是业务逻辑的核心所在，负责：
 ### 数据验证
 
 在创建和更新操作前验证输入数据的合法性，例如标题不能为空、类型必须是预定义值等。
+
+### 摘要模式
+
+记录的 `summary_mode` 为 `auto` 或 `manual`。Service 层统一处理摘要规则：自动模式根据正文前 10 个字符重算，手动模式保留用户摘要；`regenerate_summary` 命令显式切换回自动模式。
 
 ### 自动版本创建
 

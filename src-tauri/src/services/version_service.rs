@@ -101,6 +101,7 @@ mod tests {
                 title: Some("恢复测试-改名".to_string()),
                 content: Some("当前内容".to_string()),
                 summary: None,
+                summary_mode: None,
                 pinned: Some(true),
                 favorite: Some(true),
                 encrypted: None,
@@ -115,7 +116,7 @@ mod tests {
         let restored = crate::services::item_service::get_item(&db, &item.id).expect("get item");
         assert_eq!(restored.title, "恢复测试-改名");
         assert_eq!(restored.content, "历史内容");
-        assert_eq!(restored.summary, "初始内容");
+        assert_eq!(restored.summary, "历史内容");
         assert!(restored.pinned);
         assert!(restored.favorite);
 

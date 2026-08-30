@@ -3,7 +3,7 @@ title: 数据库设计
 description: QuantaNote 的 SQLite 数据库配置、表结构、FTS5 全文检索和 Schema 迁移系统
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-30
 ---
 
 # 数据库设计
@@ -42,6 +42,7 @@ Write-Ahead Logging (WAL) 模式提供了以下优势：
 | item_type | TEXT NOT NULL | 记录类型（note/link/file/image/code/task） |
 | content | TEXT NOT NULL DEFAULT '' | Markdown 内容正文 |
 | summary | TEXT NOT NULL DEFAULT '' | 摘要/概述 |
+| summary_mode | TEXT NOT NULL DEFAULT 'auto' | 摘要模式：auto 或 manual |
 | pinned | INTEGER NOT NULL DEFAULT 0 | 是否置顶（0/1） |
 | favorite | INTEGER NOT NULL DEFAULT 0 | 是否收藏（0/1） |
 | encrypted | INTEGER NOT NULL DEFAULT 0 | 是否加密（0/1） |
@@ -55,6 +56,7 @@ CREATE TABLE IF NOT EXISTS items (
     item_type TEXT NOT NULL,
     content TEXT NOT NULL DEFAULT '',
     summary TEXT NOT NULL DEFAULT '',
+    summary_mode TEXT NOT NULL DEFAULT 'auto',
     pinned INTEGER NOT NULL DEFAULT 0,
     favorite INTEGER NOT NULL DEFAULT 0,
     encrypted INTEGER NOT NULL DEFAULT 0,
@@ -283,7 +285,7 @@ QuantaNote 使用基于版本号的迁移系统管理数据库 Schema 变更。
 3. `migrate_schema()` 对比当前版本和目标版本，按顺序执行缺失的迁移
 
 ```rust
-const SCHEMA_VERSION: i64 = 5;
+const SCHEMA_VERSION: i64 = 8;
 
 fn migrate_schema(conn: &Connection) -> Result<(), AppError> {
     let current_version: i64 = conn.query_row(
@@ -307,6 +309,9 @@ fn migrate_schema(conn: &Connection) -> Result<(), AppError> {
     }
     if current_version < 5 {
         // 创建 sync_tombstones 表
+    }
+    if current_version < 8 {
+        // 增加 summary_mode，并识别旧摘要的自动/手动模式
     }
 
     Ok(())

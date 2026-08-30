@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import { setup } from "../test/test-utils";
 import { DocumentEditorPage } from "./DocumentEditorPage";
 import { useAppStore } from "../stores/appStore";
@@ -8,9 +8,10 @@ import { useSettingsStore } from "../stores/settingsStore";
 import { useAttachmentStore } from "../stores/attachmentStore";
 import { mockIPC } from "@tauri-apps/api/mocks";
 
-const { scrollToHeadingMock, setValueMock } = vi.hoisted(() => ({
+const { scrollToHeadingMock, setValueMock, regenerateSummaryMock } = vi.hoisted(() => ({
   scrollToHeadingMock: vi.fn(),
   setValueMock: vi.fn(),
+  regenerateSummaryMock: vi.fn(),
 }));
 
 vi.mock("../components/editor/VditorEditor", () => {
@@ -49,6 +50,7 @@ describe("DocumentEditorPage", () => {
     item_type: "note",
     content: "恢复后的内容",
     summary: "恢复后的摘要",
+    summary_mode: "auto",
     pinned: false,
     favorite: false,
     encrypted: false,
@@ -66,6 +68,7 @@ describe("DocumentEditorPage", () => {
       item_type: "note",
       content: "恢复后的内容",
       summary: "恢复后的摘要",
+      summary_mode: "auto",
       pinned: false,
       favorite: false,
       encrypted: false,
@@ -81,6 +84,7 @@ describe("DocumentEditorPage", () => {
         item_type: "note",
         content: "初始内容",
         summary: "初始摘要",
+        summary_mode: "auto",
         pinned: false,
         favorite: false,
         encrypted: false,
@@ -89,6 +93,7 @@ describe("DocumentEditorPage", () => {
       },
       getItem: vi.fn(async () => {}),
       updateItem: updateItemMock,
+      regenerateSummary: regenerateSummaryMock,
     });
     useSettingsStore.setState((state) => ({
       settings: { ...state.settings, contentWidthProgress: 0 },
@@ -210,6 +215,7 @@ describe("DocumentEditorPage", () => {
       title: "快速返回前的标题",
       summary: "初始摘要",
       content: "初始内容",
+      summaryMode: "auto",
     });
   });
 
@@ -232,9 +238,36 @@ describe("DocumentEditorPage", () => {
         title: "测试文档",
         summary: "新的摘要",
         content: "初始内容",
+        summaryMode: "manual",
       }),
       { timeout: 1500 },
     );
+  });
+
+  it("persists summary mode and regenerates the summary", async () => {
+    regenerateSummaryMock.mockResolvedValue({
+      ...mockedRestoredItem,
+      title: "测试文档",
+      summary: "自动生成摘要",
+      summary_mode: "auto",
+    });
+    const { user } = setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
+    const modeSelect = screen.getByTestId("doc-summary-mode-select");
+
+    await user.click(within(modeSelect).getByRole("button"));
+    await user.click(screen.getByRole("button", { name: "手动摘要" }));
+    await waitFor(() => expect(updateItemMock).toHaveBeenLastCalledWith("item-1", {
+      title: "测试文档",
+      summary: "初始摘要",
+      content: "初始内容",
+      summaryMode: "manual",
+    }));
+    expect(screen.getByTestId("doc-summary-mode-badge")).toHaveTextContent("手动摘要");
+
+    await user.click(screen.getByTestId("doc-summary-regenerate-btn"));
+    await waitFor(() => expect(regenerateSummaryMock).toHaveBeenCalledWith("item-1"));
+    expect(screen.getByTestId("doc-summary-input")).toHaveValue("自动生成摘要");
+    expect(screen.getByTestId("doc-summary-mode-badge")).toHaveTextContent("自动摘要");
   });
 
   it("creates version on save version click", async () => {

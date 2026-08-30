@@ -76,6 +76,35 @@ describe("Document editor", () => {
     expect(updated.summary).toBe("手动修改后的摘要");
   });
 
+  it("supports automatic and manual summary modes", async () => {
+    await DocumentEditorPage.setSummaryMode("自动摘要");
+    await DocumentEditorPage.setContent("自动摘要正文abcdefghijk");
+    await DocumentEditorPage.waitForSaved(3000);
+
+    const autoUpdated = await getItemById(testItem.id);
+    expect(autoUpdated.summary_mode).toBe("auto");
+    expect(autoUpdated.summary).toBe(autoUpdated.content.slice(0, 10));
+
+    await DocumentEditorPage.setSummary("固定摘要内容");
+    await DocumentEditorPage.waitForSaved(3000);
+    await DocumentEditorPage.setContent("手动摘要对应的新正文abcdefghijk");
+    await DocumentEditorPage.waitForSaved(3000);
+
+    const manualUpdated = await getItemById(testItem.id);
+    expect(manualUpdated.summary_mode).toBe("manual");
+    expect(manualUpdated.summary).toBe("固定摘要内容");
+
+    await DocumentEditorPage.regenerateSummary();
+    await browser.waitUntil(
+      async () => {
+        const regenerated = await getItemById(testItem.id);
+        return regenerated.summary_mode === "auto"
+          && regenerated.summary === regenerated.content.slice(0, 10);
+      },
+      { timeout: 5000, timeoutMsg: "Summary was not regenerated in automatic mode" },
+    );
+  });
+
   it("exposes image and attachment insertion controls", async () => {
     await browser.waitUntil(
       async () => DocumentEditorPage.hasImageInsertionToolbar() && DocumentEditorPage.hasAttachmentInsertionToolbar(),

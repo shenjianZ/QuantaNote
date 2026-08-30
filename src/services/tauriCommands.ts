@@ -81,6 +81,12 @@ export async function getRecentItems(limit?: number) {
     return invoke("get_recent_items", { limit: limit ?? 20 });
 }
 
+export type SummaryMode = "auto" | "manual";
+
+export async function regenerateSummary(itemId: string) {
+    return invoke<ItemDto>("regenerate_summary", { id: itemId });
+}
+
 // Search commands
 export type SearchMode = "normal" | "advanced";
 export type SearchScope = "content" | "tags" | "attachments" | "versions";
@@ -239,6 +245,7 @@ export interface ItemDto {
     item_type: string;
     content: string;
     summary: string;
+    summary_mode?: SummaryMode;
     pinned: boolean;
     favorite: boolean;
     encrypted: boolean;

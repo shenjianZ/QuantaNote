@@ -4,6 +4,13 @@
   "titlePlaceholder": "文档标题",
   "summaryPlaceholder": "摘要",
   "summaryLabel": "描述",
+  "summaryModeLabel": "摘要模式",
+  "summaryAuto": "自动摘要",
+  "summaryManual": "手动摘要",
+  "summaryAutoHint": "正文变化后会自动更新摘要。",
+  "summaryManualHint": "手动编辑后，正文变化不会覆盖摘要。",
+  "summaryRegenerate": "重新生成摘要",
+  "summaryRegenerated": "摘要已重新生成",
   "sidebar": {
     "show": "显示描述和目录",
     "hide": "隐藏描述和目录"

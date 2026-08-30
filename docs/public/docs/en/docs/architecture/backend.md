@@ -3,7 +3,7 @@ title: Backend Architecture
 description: QuantaNote Rust backend directory structure, Command/Service/Repository three-layer architecture, sync engine, and error handling
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-30
 ---
 
 # Backend Architecture
@@ -128,6 +128,10 @@ The Service Layer is where core business logic resides, responsible for:
 ### Data Validation
 
 Validating input data before create and update operations, such as ensuring titles are not empty and types are predefined values.
+
+### Summary Modes
+
+Each item stores `summary_mode` as `auto` or `manual`. The Service layer centralizes the rule: automatic mode regenerates the summary from the first 10 body characters, while manual mode preserves the user's text; `regenerate_summary` explicitly switches the item back to automatic mode.
 
 ### Automatic Version Creation
 

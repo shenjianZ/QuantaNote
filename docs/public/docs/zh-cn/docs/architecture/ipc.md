@@ -3,7 +3,7 @@ title: IPC 通信
 description: QuantaNote 前后端通信机制 — invoke() 命令调用、JSON 序列化、完整命令参考与类型契约
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-30
 ---
 
 # IPC 通信
@@ -56,7 +56,8 @@ Store 通过服务层间接调用后端，确保调用的一致性和可维护�
 | `create_item` | title, itemType, content? | ItemDto | 创建新记录 |
 | `get_items` | itemType?, limit?, offset? | ItemDto[] | 获取记录列表 |
 | `get_item` | id | ItemDto | 获取单条记录 |
-| `update_item` | id, title?, content?, summary?, pinned?, favorite?, encrypted? | ItemDto | 更新记录 |
+| `update_item` | id, title?, content?, summary?, summaryMode?, pinned?, favorite?, encrypted? | ItemDto | 更新记录；自动模式会根据正文重算摘要 |
+| `regenerate_summary` | id | ItemDto | 根据正文重新生成摘要并切换为自动模式 |
 | `delete_item` | id | void | 删除记录 |
 | `get_pinned_items` | (无) | ItemDto[] | 获取置顶记录 |
 | `get_recent_items` | limit? | ItemDto[] | 获取最近记录 |
@@ -173,6 +174,7 @@ interface ItemDto {
   item_type: string;
   content: string;
   summary: string;
+  summary_mode?: "auto" | "manual";
   pinned: boolean;
   favorite: boolean;
   encrypted: boolean;
@@ -189,6 +191,7 @@ pub struct ItemDto {
     pub item_type: String,
     pub content: String,
     pub summary: String,
+    pub summary_mode: String,
     pub pinned: bool,
     pub favorite: bool,
     pub encrypted: bool,

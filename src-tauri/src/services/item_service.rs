@@ -7,6 +7,14 @@ use crate::utils::paths;
 
 const VALID_ITEM_TYPES: &[&str] = &["note"];
 
+fn validate_summary_mode(mode: &str) -> Result<(), AppError> {
+    if matches!(mode, SUMMARY_MODE_AUTO | SUMMARY_MODE_MANUAL) {
+        Ok(())
+    } else {
+        Err(AppError::Validation(format!("无效的摘要模式: {}", mode)))
+    }
+}
+
 pub fn create_item(
     db: &DbState,
     title: String,
@@ -23,12 +31,7 @@ pub fn create_item(
         )));
     }
     let content_val = content.unwrap_or_default();
-    let summary = if content_val.is_empty() {
-        String::new()
-    } else {
-        let s: String = content_val.chars().take(10).collect();
-        s
-    };
+    let summary = generate_auto_summary(&content_val);
     let item = item_repository::create(
         db,
         CreateItemPayload {
@@ -91,8 +94,57 @@ pub fn update_item(db: &DbState, payload: UpdateItemPayload) -> Result<ItemDto, 
             return Err(AppError::Validation("标题不能为空".to_string()));
         }
     }
-    let updated = item_repository::update(db, payload)?;
+    let existing = item_repository::get_item(db, &payload.id)?;
+    let content = payload
+        .content
+        .clone()
+        .unwrap_or_else(|| existing.content.clone());
+    let summary_changed = payload
+        .summary
+        .as_ref()
+        .is_some_and(|summary| summary != &existing.summary);
+    let summary_mode = payload
+        .summary_mode
+        .as_deref()
+        .unwrap_or(if summary_changed {
+            SUMMARY_MODE_MANUAL
+        } else {
+            existing.summary_mode.as_str()
+        });
+    validate_summary_mode(summary_mode)?;
+    let summary = if summary_mode == SUMMARY_MODE_AUTO {
+        generate_auto_summary(&content)
+    } else {
+        payload
+            .summary
+            .clone()
+            .unwrap_or_else(|| existing.summary.clone())
+    };
+    let normalized_payload = UpdateItemPayload {
+        id: payload.id,
+        title: payload.title,
+        content: Some(content),
+        summary: Some(summary),
+        summary_mode: Some(summary_mode.to_string()),
+        pinned: payload.pinned,
+        favorite: payload.favorite,
+        encrypted: payload.encrypted,
+    };
+    let updated = item_repository::update(db, normalized_payload)?;
     Ok(updated)
+}
+
+pub fn regenerate_summary(db: &DbState, id: &str) -> Result<ItemDto, AppError> {
+    let item = item_repository::get_item(db, id)?;
+    update_item(
+        db,
+        UpdateItemPayload {
+            id: item.id,
+            content: Some(item.content),
+            summary_mode: Some(SUMMARY_MODE_AUTO.to_string()),
+            ..Default::default()
+        },
+    )
 }
 
 pub fn delete_item(db: &DbState, id: &str) -> Result<(), AppError> {
@@ -187,6 +239,7 @@ mod tests {
 
         assert_eq!(item.title, "第一条笔记");
         assert_eq!(item.summary, "这是一段用于摘要的内");
+        assert_eq!(item.summary_mode, SUMMARY_MODE_AUTO);
         assert!(item.id.starts_with("item-"));
 
         let versions =
@@ -239,6 +292,7 @@ mod tests {
                 title: Some("新标题".to_string()),
                 content: None,
                 summary: None,
+                summary_mode: None,
                 pinned: Some(true),
                 favorite: Some(true),
                 encrypted: None,
@@ -251,6 +305,72 @@ mod tests {
         assert!(updated.pinned);
         assert!(updated.favorite);
         assert_eq!(updated.item_type, "note");
+        assert_eq!(updated.summary_mode, SUMMARY_MODE_AUTO);
+    }
+
+    #[test]
+    fn summary_mode_controls_updates_and_regeneration() {
+        let db = crate::test_support::test_db();
+        let item = create_item(
+            &db,
+            "摘要模式测试".to_string(),
+            "note".to_string(),
+            Some("abcdefghijkl".to_string()),
+        )
+        .expect("create item");
+        assert_eq!(item.summary, "abcdefghij");
+        assert_eq!(item.summary_mode, SUMMARY_MODE_AUTO);
+
+        let auto_updated = update_item(
+            &db,
+            UpdateItemPayload {
+                id: item.id.clone(),
+                content: Some("mnopqrstuv".to_string()),
+                ..Default::default()
+            },
+        )
+        .expect("update auto summary");
+        assert_eq!(auto_updated.summary, "mnopqrstuv");
+        assert_eq!(auto_updated.summary_mode, SUMMARY_MODE_AUTO);
+
+        let manual = update_item(
+            &db,
+            UpdateItemPayload {
+                id: item.id.clone(),
+                summary: Some("固定摘要".to_string()),
+                ..Default::default()
+            },
+        )
+        .expect("set manual summary");
+        assert_eq!(manual.summary, "固定摘要");
+        assert_eq!(manual.summary_mode, SUMMARY_MODE_MANUAL);
+
+        let content_changed = update_item(
+            &db,
+            UpdateItemPayload {
+                id: item.id.clone(),
+                content: Some("wxyz012345".to_string()),
+                ..Default::default()
+            },
+        )
+        .expect("update content without replacing manual summary");
+        assert_eq!(content_changed.summary, "固定摘要");
+        assert_eq!(content_changed.summary_mode, SUMMARY_MODE_MANUAL);
+
+        let regenerated = regenerate_summary(&db, &item.id).expect("regenerate summary");
+        assert_eq!(regenerated.summary, "wxyz012345");
+        assert_eq!(regenerated.summary_mode, SUMMARY_MODE_AUTO);
+
+        let invalid = update_item(
+            &db,
+            UpdateItemPayload {
+                id: item.id,
+                summary_mode: Some("invalid".to_string()),
+                ..Default::default()
+            },
+        )
+        .expect_err("invalid summary mode should fail");
+        assert!(matches!(invalid, AppError::Validation(_)));
     }
 
     #[test]

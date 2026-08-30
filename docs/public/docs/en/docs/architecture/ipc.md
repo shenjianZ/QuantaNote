@@ -3,7 +3,7 @@ title: IPC Communication
 description: QuantaNote frontend-backend communication mechanism — invoke() command calls, JSON serialization, complete command reference, and type contracts
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-30
 ---
 
 # IPC Communication
@@ -56,7 +56,8 @@ Stores communicate with the backend indirectly through the service layer, ensuri
 | `create_item` | title, itemType, content? | ItemDto | Create a new record |
 | `get_items` | itemType?, limit?, offset? | ItemDto[] | Get record list |
 | `get_item` | id | ItemDto | Get single record |
-| `update_item` | id, title?, content?, summary?, pinned?, favorite?, encrypted? | ItemDto | Update record |
+| `update_item` | id, title?, content?, summary?, summaryMode?, pinned?, favorite?, encrypted? | ItemDto | Update record; automatic mode recomputes the summary from the body |
+| `regenerate_summary` | id | ItemDto | Regenerate the summary from the body and switch to automatic mode |
 | `delete_item` | id | void | Delete record |
 | `get_pinned_items` | (none) | ItemDto[] | Get pinned records |
 | `get_recent_items` | limit? | ItemDto[] | Get recent records |
@@ -173,6 +174,7 @@ interface ItemDto {
   item_type: string;
   content: string;
   summary: string;
+  summary_mode?: "auto" | "manual";
   pinned: boolean;
   favorite: boolean;
   encrypted: boolean;
@@ -189,6 +191,7 @@ pub struct ItemDto {
     pub item_type: String,
     pub content: String,
     pub summary: String,
+    pub summary_mode: String,
     pub pinned: bool,
     pub favorite: bool,
     pub encrypted: bool,

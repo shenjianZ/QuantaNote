@@ -9,6 +9,8 @@ import { pause, observePause } from "../config.js";
 class DocumentEditorPage {
   get titleInput() { return "[data-testid='doc-title-input']"; }
   get summaryInput() { return "[data-testid='doc-summary-input']"; }
+  get summaryModeSelect() { return "[data-testid='doc-summary-mode-select']"; }
+  get summaryRegenerateBtn() { return "[data-testid='doc-summary-regenerate-btn']"; }
   get saveStatus() { return "[data-testid='doc-save-status']"; }
   get saveVersionBtn() { return "[data-testid='doc-save-version-btn']"; }
   get favoriteBtn() { return "[data-testid='doc-favorite-btn']"; }
@@ -48,6 +50,26 @@ class DocumentEditorPage {
     const input = await $(this.summaryInput);
     await input.clearValue();
     await input.setValue(summary);
+  }
+
+  async setSummaryMode(label) {
+    const select = await $(this.summaryModeSelect);
+    const trigger = await select.$("button");
+    await trigger.click();
+    const options = await select.$$("button");
+    for (const option of options) {
+      if ((await option.getText()).trim() === label) {
+        await option.click();
+        await observePause();
+        return;
+      }
+    }
+    throw new Error(`Summary mode option not found: ${label}`);
+  }
+
+  async regenerateSummary() {
+    await $(this.summaryRegenerateBtn).click();
+    await observePause();
   }
 
   async typeContent(text) {

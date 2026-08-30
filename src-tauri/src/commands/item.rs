@@ -71,6 +71,7 @@ pub fn update_item(
     title: Option<String>,
     content: Option<String>,
     summary: Option<String>,
+    summary_mode: Option<String>,
     pinned: Option<bool>,
     favorite: Option<bool>,
     encrypted: Option<bool>,
@@ -82,11 +83,17 @@ pub fn update_item(
             title,
             content,
             summary,
+            summary_mode,
             pinned,
             favorite,
             encrypted,
         },
     )
+}
+
+#[tauri::command]
+pub fn regenerate_summary(db: State<'_, DbState>, id: String) -> Result<ItemDto, AppError> {
+    item_service::regenerate_summary(&db, &id)
 }
 
 #[tauri::command]

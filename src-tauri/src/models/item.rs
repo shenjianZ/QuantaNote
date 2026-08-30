@@ -1,5 +1,16 @@
 use serde::{Deserialize, Serialize};
 
+pub const SUMMARY_MODE_AUTO: &str = "auto";
+pub const SUMMARY_MODE_MANUAL: &str = "manual";
+
+pub fn default_summary_mode() -> String {
+    SUMMARY_MODE_AUTO.to_string()
+}
+
+pub fn generate_auto_summary(content: &str) -> String {
+    content.chars().take(10).collect()
+}
+
 #[derive(Debug, Deserialize)]
 pub struct CreateItemPayload {
     pub title: String,
@@ -14,6 +25,7 @@ pub struct UpdateItemPayload {
     pub title: Option<String>,
     pub content: Option<String>,
     pub summary: Option<String>,
+    pub summary_mode: Option<String>,
     pub pinned: Option<bool>,
     pub favorite: Option<bool>,
     pub encrypted: Option<bool>,
@@ -26,6 +38,8 @@ pub struct ItemDto {
     pub item_type: String,
     pub content: String,
     pub summary: String,
+    #[serde(default = "default_summary_mode")]
+    pub summary_mode: String,
     pub pinned: bool,
     pub favorite: bool,
     pub encrypted: bool,
@@ -63,6 +77,7 @@ mod tests {
             item_type: "note".to_string(),
             content: "body".to_string(),
             summary: "sum".to_string(),
+            summary_mode: SUMMARY_MODE_AUTO.to_string(),
             pinned: true,
             favorite: false,
             encrypted: false,

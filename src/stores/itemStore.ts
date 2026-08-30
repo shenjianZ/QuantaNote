@@ -10,6 +10,7 @@ import {
   restoreItem,
   type ItemDto,
   type ItemPageOptions,
+  regenerateSummary,
   type TagDto,
   type TrashItemDto,
 } from "../services/tauriCommands";
@@ -43,6 +44,7 @@ interface ItemState {
   getItem: (id: string) => Promise<void>;
   createItem: (title: string, itemType: string, content?: string) => Promise<ItemDto>;
   updateItem: (id: string, updates: Record<string, unknown>) => Promise<void>;
+  regenerateSummary: (id: string) => Promise<ItemDto>;
   deleteItem: (id: string) => Promise<void>;
   fetchTrashItems: () => Promise<void>;
   restoreItem: (id: string) => Promise<void>;
@@ -178,6 +180,22 @@ export const useItemStore = create<ItemState>((set, get) => ({
     } catch (e) {
       set({ error: String(e) });
       useToastStore.getState().addToast("error", i18n.t("common:toast.itemDeleteFailed"));
+      throw e;
+    }
+  },
+
+  regenerateSummary: async (id) => {
+    set({ error: null });
+    try {
+      const updated = await regenerateSummary(id);
+      set((state) => ({
+        items: state.items.map((item) => (item.id === id ? updated : item)),
+        selectedItem: state.selectedItem?.id === id ? updated : state.selectedItem,
+      }));
+      return updated;
+    } catch (e) {
+      set({ error: String(e) });
+      useToastStore.getState().addToast("error", i18n.t("common:toast.itemUpdateFailed"));
       throw e;
     }
   },

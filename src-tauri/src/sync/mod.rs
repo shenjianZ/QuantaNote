@@ -4,6 +4,7 @@ pub mod transport;
 
 use crate::db::DbState;
 use crate::error::AppError;
+use crate::models::item::{SUMMARY_MODE_AUTO, SUMMARY_MODE_MANUAL};
 use crate::models::sync::*;
 use crate::sync::state::SyncStateManager;
 use std::collections::HashMap;
@@ -51,6 +52,10 @@ pub fn apply_item(conn: &rusqlite::Connection, data: &serde_json::Value) -> Resu
     let item_type = data["item_type"].as_str().unwrap_or("note");
     let content = data["content"].as_str().unwrap_or_default();
     let summary = data["summary"].as_str().unwrap_or_default();
+    let summary_mode = match data["summary_mode"].as_str() {
+        Some(SUMMARY_MODE_MANUAL) => SUMMARY_MODE_MANUAL,
+        _ => SUMMARY_MODE_AUTO,
+    };
     let pinned = data["pinned"].as_bool().unwrap_or(false) as i32;
     let favorite = data["favorite"].as_bool().unwrap_or(false) as i32;
     let encrypted = data["encrypted"].as_bool().unwrap_or(false) as i32;
@@ -58,9 +63,9 @@ pub fn apply_item(conn: &rusqlite::Connection, data: &serde_json::Value) -> Resu
     let updated_at = data["updated_at"].as_str().unwrap_or_default();
 
     conn.execute(
-        "INSERT INTO items (id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at, deleted_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
-         ON CONFLICT(id) DO UPDATE SET title=excluded.title, item_type=excluded.item_type, content=excluded.content, summary=excluded.summary, pinned=excluded.pinned, favorite=excluded.favorite, encrypted=excluded.encrypted, created_at=excluded.created_at, updated_at=excluded.updated_at, deleted_at=excluded.deleted_at",
-        rusqlite::params![id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at, data["deleted_at"].as_str()],
+        "INSERT INTO items (id, title, item_type, content, summary, summary_mode, pinned, favorite, encrypted, created_at, updated_at, deleted_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+         ON CONFLICT(id) DO UPDATE SET title=excluded.title, item_type=excluded.item_type, content=excluded.content, summary=excluded.summary, summary_mode=excluded.summary_mode, pinned=excluded.pinned, favorite=excluded.favorite, encrypted=excluded.encrypted, created_at=excluded.created_at, updated_at=excluded.updated_at, deleted_at=excluded.deleted_at",
+        rusqlite::params![id, title, item_type, content, summary, summary_mode, pinned, favorite, encrypted, created_at, updated_at, data["deleted_at"].as_str()],
     ).map_err(|e| AppError::Database(e.to_string()))?;
 
     // 清理可能残留的 tombstone（记录被重新创建的场景）

@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS settings (
 INSERT OR IGNORE INTO schema_version (version) VALUES (1);
 ";
 
-const SCHEMA_VERSION: i64 = 7;
+const SCHEMA_VERSION: i64 = 8;
 
 impl DbState {
     pub fn open(db_path: &str) -> Result<Self, AppError> {
@@ -234,6 +234,18 @@ impl DbState {
             .map_err(|e| AppError::Database(e.to_string()))?;
         }
 
+        if current_version < 8 {
+            conn.execute_batch(
+                "ALTER TABLE items ADD COLUMN summary_mode TEXT NOT NULL DEFAULT 'auto';
+                 UPDATE items
+                 SET summary_mode = 'manual'
+                 WHERE length(trim(summary)) > 0
+                   AND summary != substr(content, 1, 10);
+                 INSERT OR IGNORE INTO schema_version (version) VALUES (8);",
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+
         Ok(())
     }
 
@@ -266,6 +278,15 @@ mod tests {
             )
             .expect("items table count");
         assert_eq!(item_count, 1);
+
+        let summary_mode_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('items') WHERE name = 'summary_mode'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("summary mode column count");
+        assert_eq!(summary_mode_count, 1);
 
         let fts_count: i64 = conn
             .query_row(
@@ -303,6 +324,43 @@ mod tests {
             )
             .expect("settings table count");
         assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn migrates_legacy_summary_values_to_manual_mode() {
+        let db = DbState::open(":memory:").expect("open db");
+        let conn = db.conn.lock().expect("lock db");
+        conn.execute_batch(SCHEMA_SQL)
+            .expect("create legacy schema");
+        conn.execute_batch(
+            "DELETE FROM schema_version;
+             INSERT INTO schema_version (version) VALUES (7);
+             ALTER TABLE items ADD COLUMN deleted_at TEXT;
+             INSERT INTO items (id, title, item_type, content, summary, created_at, updated_at)
+             VALUES ('legacy-manual', 'Legacy', 'note', 'abcdefghijkl', '固定摘要', '2026-01-01', '2026-01-01');
+             INSERT INTO items (id, title, item_type, content, summary, created_at, updated_at)
+             VALUES ('legacy-auto', 'Legacy Auto', 'note', 'abcdefghijkl', 'abcdefghij', '2026-01-01', '2026-01-01');",
+        )
+        .expect("seed legacy items");
+
+        DbState::migrate_schema(&conn).expect("migrate schema");
+
+        let manual_mode: String = conn
+            .query_row(
+                "SELECT summary_mode FROM items WHERE id = 'legacy-manual'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("legacy manual mode");
+        let auto_mode: String = conn
+            .query_row(
+                "SELECT summary_mode FROM items WHERE id = 'legacy-auto'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("legacy auto mode");
+        assert_eq!(manual_mode, "manual");
+        assert_eq!(auto_mode, "auto");
     }
 
     #[test]

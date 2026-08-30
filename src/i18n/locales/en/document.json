@@ -4,6 +4,13 @@
   "titlePlaceholder": "Document Title",
   "summaryPlaceholder": "Summary",
   "summaryLabel": "Description",
+  "summaryModeLabel": "Summary Mode",
+  "summaryAuto": "Automatic Summary",
+  "summaryManual": "Manual Summary",
+  "summaryAutoHint": "The summary updates when the content changes.",
+  "summaryManualHint": "Manual edits are preserved when the content changes.",
+  "summaryRegenerate": "Regenerate Summary",
+  "summaryRegenerated": "Summary regenerated",
   "sidebar": {
     "show": "Show description and outline",
     "hide": "Hide description and outline"

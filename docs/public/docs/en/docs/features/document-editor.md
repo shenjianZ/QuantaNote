@@ -3,7 +3,7 @@ title: Document Editor
 description: Use the QuantaNote document editor for titles, summaries, Markdown formatting, table adjustments, auto-save, and version history
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-08-29
+lastUpdated: 2026-08-30
 ---
 
 # Document Editor
@@ -21,6 +21,14 @@ The top of the editor contains item metadata:
 - **Fixed size**: The summary field keeps a fixed size. Put long content in the document body instead of expanding the summary.
 
 Title and summary changes are included in auto-save. The application shows a status toast when saving succeeds or fails.
+
+### Summary Modes
+
+- **Automatic**: Extracts the first 10 characters from the body. The summary updates when the body changes and is saved.
+- **Manual**: Editing the summary or switching to manual mode protects the custom text from later body changes.
+- **Regenerate summary**: Clicking “Regenerate summary” creates a summary from the current body and switches back to automatic mode.
+
+The summary mode is stored with the item and survives closing and reopening the editor. During migration, a non-empty legacy summary that differs from the first 10 characters of the body is treated as manual.
 
 ## Toolbar
 

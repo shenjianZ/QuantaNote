@@ -72,7 +72,7 @@ pub fn collect_local_records(db: &DbState) -> Result<Vec<SyncRecordPayload>, App
     collect_table_records(
         &conn,
         "items",
-        "SELECT id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at, deleted_at FROM items",
+        "SELECT id, title, item_type, content, summary, summary_mode, pinned, favorite, encrypted, created_at, updated_at, deleted_at FROM items",
         |row| {
             let id: String = row.get(0)?;
             let data = serde_json::json!({
@@ -81,14 +81,15 @@ pub fn collect_local_records(db: &DbState) -> Result<Vec<SyncRecordPayload>, App
                 "item_type": row.get::<_, String>(2)?,
                 "content": row.get::<_, String>(3)?,
                 "summary": row.get::<_, String>(4)?,
-                "pinned": row.get::<_, i32>(5)? != 0,
-                "favorite": row.get::<_, i32>(6)? != 0,
-                "encrypted": row.get::<_, i32>(7)? != 0,
-                "created_at": row.get::<_, String>(8)?,
-                "updated_at": row.get::<_, String>(9)?,
-                "deleted_at": row.get::<_, Option<String>>(10)?,
+                "summary_mode": row.get::<_, String>(5)?,
+                "pinned": row.get::<_, i32>(6)? != 0,
+                "favorite": row.get::<_, i32>(7)? != 0,
+                "encrypted": row.get::<_, i32>(8)? != 0,
+                "created_at": row.get::<_, String>(9)?,
+                "updated_at": row.get::<_, String>(10)?,
+                "deleted_at": row.get::<_, Option<String>>(11)?,
             });
-            let updated_at = row.get::<_, String>(9)?;
+            let updated_at = row.get::<_, String>(10)?;
             Ok((id, data, updated_at))
         },
         &mut all_records,

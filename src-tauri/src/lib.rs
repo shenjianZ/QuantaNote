@@ -265,6 +265,7 @@ pub fn run() {
             item::get_items_page,
             item::get_item,
             item::update_item,
+            item::regenerate_summary,
             item::delete_item,
             item::get_trash_items,
             item::restore_item,

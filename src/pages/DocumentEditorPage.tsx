@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, Clock, Loader2, Paperclip, Save, Star } from "lucide-react";
+import { ArrowLeft, Clock, Loader2, Paperclip, RefreshCw, Save, Star } from "lucide-react";
 import { useAppStore } from "../stores/appStore";
 import { useItemStore } from "../stores/itemStore";
 import { getVditorLang } from "../utils/vditorConfig";
@@ -9,7 +9,7 @@ import { VersionPanel, type VersionDto } from "../components/editor/VersionPanel
 import { DocumentOutline, DocumentOutlineToggle } from "../components/editor/DocumentOutline";
 import type { VditorEditorHandle } from "../components/editor/VditorEditor";
 import { ContentWidthControl } from "../components/common/ContentWidthControl";
-import { getVersions, createVersion, updateVersion, restoreVersion, deleteVersion, type ItemDto } from "../services/tauriCommands";
+import { getVersions, createVersion, updateVersion, restoreVersion, deleteVersion, type ItemDto, type SummaryMode } from "../services/tauriCommands";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useResponsiveContentWidth } from "../hooks/useResponsiveContentWidth";
 import { CONTENT_WIDTH_EDITOR_BASE, CONTENT_WIDTH_OUTLINE_LAYOUT } from "../utils/contentWidth";
@@ -17,6 +17,7 @@ import { parseMarkdownOutline } from "../utils/markdownOutline";
 import { useAttachmentStore, type AttachmentDto } from "../stores/attachmentStore";
 import { AttachmentManagerModal } from "../components/common/AttachmentManagerModal";
 import { isImageAttachment, removeAttachmentReferences } from "../utils/markdownAttachments";
+import { Select } from "../components/common/Select";
 
 const VditorEditor = lazy(() => import("../components/editor/VditorEditor").then((m) => ({ default: m.VditorEditor })));
 
@@ -59,6 +60,7 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
   const selectedItem = useItemStore((s) => s.selectedItem);
   const getItem = useItemStore((s) => s.getItem);
   const updateItem = useItemStore((s) => s.updateItem);
+  const regenerateSummary = useItemStore((s) => s.regenerateSummary);
   const attachments = useAttachmentStore((s) => s.attachments);
   const fetchAttachments = useAttachmentStore((s) => s.fetchAttachments);
   const addAttachment = useAttachmentStore((s) => s.addAttachment);
@@ -67,6 +69,7 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
 
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
+  const [summaryMode, setSummaryMode] = useState<SummaryMode>("auto");
   const [content, setContent] = useState("");
   const [saved, setSaved] = useState(true);
   const [versions, setVersions] = useState<VersionDto[]>([]);
@@ -82,6 +85,7 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
   const pendingItemEchoesRef = useRef<ItemEcho[]>([]);
   const latestTitle = useRef(title);
   const latestSummary = useRef(summary);
+  const latestSummaryMode = useRef<SummaryMode>("auto");
   const latestContent = useRef(content);
   const savePromiseRef = useRef<Promise<boolean> | null>(null);
   const activeHeadingUpdateRef = useRef<(() => void) | null>(null);
@@ -152,6 +156,7 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
 
   useEffect(() => { latestTitle.current = title; }, [title]);
   useEffect(() => { latestSummary.current = summary; }, [summary]);
+  useEffect(() => { latestSummaryMode.current = summaryMode; }, [summaryMode]);
   useEffect(() => { latestContent.current = content; }, [content]);
 
   // 通知父组件版本面板状态变化
@@ -195,27 +200,33 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
     }
     setTitle(selectedItem.title);
     setSummary(selectedItem.summary || "");
+    setSummaryMode(selectedItem.summary_mode === "manual" ? "manual" : "auto");
     setContent(selectedItem.content || "");
     latestTitle.current = selectedItem.title;
     latestSummary.current = selectedItem.summary || "";
+    latestSummaryMode.current = selectedItem.summary_mode === "manual" ? "manual" : "auto";
     latestContent.current = selectedItem.content || "";
     setIsFavorite(selectedItem.favorite);
     setSaved(true);
   }, [selectedItem]);
 
-  const save = useCallback(async (newTitle: string, newSummary: string, newContent: string): Promise<boolean> => {
+  const save = useCallback(async (newTitle: string, newSummary: string, newContent: string, newSummaryMode?: SummaryMode): Promise<boolean> => {
     if (!selectedItemId) return false;
     const echo = queueItemEcho(selectedItemId, {
       title: newTitle,
       summary: newSummary,
       content: newContent,
+      summary_mode: newSummaryMode ?? latestSummaryMode.current,
     });
     try {
-      await updateItem(selectedItemId, {
+      const resolvedSummaryMode = newSummaryMode ?? latestSummaryMode.current;
+      const updates: Record<string, unknown> = {
         title: newTitle,
         summary: newSummary,
         content: newContent,
-      });
+        summaryMode: resolvedSummaryMode,
+      };
+      await updateItem(selectedItemId, updates);
       setSaved(true);
       return true;
     } catch (e) {
@@ -226,8 +237,8 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
     }
   }, [selectedItemId, updateItem, t]);
 
-  const triggerSave = useCallback((newTitle: string, newSummary: string, newContent: string) => {
-    const promise = save(newTitle, newSummary, newContent);
+  const triggerSave = useCallback((newTitle: string, newSummary: string, newContent: string, newSummaryMode?: SummaryMode) => {
+    const promise = save(newTitle, newSummary, newContent, newSummaryMode);
     savePromiseRef.current = promise;
     void promise.then(
       () => { if (savePromiseRef.current === promise) savePromiseRef.current = null; },
@@ -270,7 +281,17 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
   function handleSummaryChange(value: string) {
     latestSummary.current = value;
     setSummary(value);
+    latestSummaryMode.current = "manual";
+    setSummaryMode("manual");
     scheduleSave(latestTitle.current, value, latestContent.current);
+  }
+
+  function handleSummaryModeChange(value: string) {
+    const nextMode = value as SummaryMode;
+    if (nextMode !== "auto" && nextMode !== "manual") return;
+    latestSummaryMode.current = nextMode;
+    setSummaryMode(nextMode);
+    void triggerSave(latestTitle.current, latestSummary.current, latestContent.current, nextMode);
   }
 
   const handleContentChange = useCallback((value: string) => {
@@ -278,6 +299,26 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
     setContent(value);
     scheduleSave(latestTitle.current, latestSummary.current, value);
   }, [scheduleSave]);
+
+  async function handleRegenerateSummary() {
+    if (!selectedItemId || !(await flushSave())) return;
+    setSaved(false);
+    try {
+      const updated = await regenerateSummary(selectedItemId);
+      setTitle(updated.title);
+      setSummary(updated.summary || "");
+      setSummaryMode(updated.summary_mode === "manual" ? "manual" : "auto");
+      latestTitle.current = updated.title;
+      latestSummary.current = updated.summary || "";
+      latestSummaryMode.current = updated.summary_mode === "manual" ? "manual" : "auto";
+      setSaved(true);
+      useToastStore.getState().addToast("success", t("document:summaryRegenerated"));
+    } catch (e) {
+      console.error("Regenerate summary failed:", e);
+      setSaved(true);
+      useToastStore.getState().addToast("error", t("common:toast.itemUpdateFailed"));
+    }
+  }
 
   async function handleBack() {
     if (!(await flushSave())) return;
@@ -366,8 +407,10 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
       setContent(updatedItem.content);
       setTitle(updatedItem.title);
       setSummary(updatedItem.summary || "");
+      setSummaryMode(updatedItem.summary_mode === "manual" ? "manual" : "auto");
       latestTitle.current = updatedItem.title;
       latestSummary.current = updatedItem.summary || "";
+      latestSummaryMode.current = updatedItem.summary_mode === "manual" ? "manual" : "auto";
       latestContent.current = updatedItem.content;
       setSaved(true);
       editorRef.current?.setValue(updatedItem.content);
@@ -485,9 +528,14 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
         {/* Summary and outline */}
         {showDocumentOutline && <aside className="flex min-h-0 min-w-0 flex-col gap-3 lg:sticky lg:top-0 lg:h-full lg:w-[18rem] lg:shrink-0" data-testid="document-editor-sidebar">
           <section className="shrink-0 rounded-2xl border border-[var(--line)] bg-transparent p-3">
-            <label className="mb-2 block text-sm font-semibold text-[var(--text)]" htmlFor="doc-summary-input">
-              {t("document:summaryLabel")}
-            </label>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <label className="block text-sm font-semibold text-[var(--text)]" htmlFor="doc-summary-input">
+                {t("document:summaryLabel")}
+              </label>
+              <span className="rounded-full bg-[var(--field)] px-2 py-0.5 text-[10px] text-[var(--muted)]" data-testid="doc-summary-mode-badge">
+                {t(summaryMode === "auto" ? "document:summaryAuto" : "document:summaryManual")}
+              </span>
+            </div>
             <textarea
               id="doc-summary-input"
               className="h-24 min-h-24 max-h-24 w-full resize-none overflow-y-auto rounded-xl border border-transparent bg-transparent px-3 py-2 text-sm leading-relaxed text-[var(--text)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent)]"
@@ -497,6 +545,33 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
               placeholder={t("document:summaryPlaceholder")}
               rows={4}
             />
+            <div className="mt-2 space-y-2">
+              <label className="block text-xs text-[var(--muted)]">
+                <span className="mb-1 block">{t("document:summaryModeLabel")}</span>
+                <span data-testid="doc-summary-mode-select">
+                  <Select
+                    value={summaryMode}
+                    onChange={handleSummaryModeChange}
+                    options={[
+                      { value: "auto", label: t("document:summaryAuto") },
+                      { value: "manual", label: t("document:summaryManual") },
+                    ]}
+                  />
+                </span>
+              </label>
+              <button
+                className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-xl border border-[var(--line)] px-3 text-xs text-[var(--muted)] transition-colors hover:border-[var(--accent)] hover:text-[var(--text)]"
+                type="button"
+                data-testid="doc-summary-regenerate-btn"
+                onClick={() => { void handleRegenerateSummary(); }}
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                {t("document:summaryRegenerate")}
+              </button>
+              <p className="text-[11px] leading-relaxed text-[var(--muted)]">
+                {t(summaryMode === "auto" ? "document:summaryAutoHint" : "document:summaryManualHint")}
+              </p>
+            </div>
           </section>
           <DocumentOutline
             headings={outline}

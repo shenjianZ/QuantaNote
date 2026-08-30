@@ -1,6 +1,7 @@
 use rusqlite::{params, Connection, Transaction};
 
 use crate::error::AppError;
+use crate::models::item::{SUMMARY_MODE_AUTO, SUMMARY_MODE_MANUAL};
 
 fn db_err(e: rusqlite::Error) -> AppError {
     AppError::Database(e.to_string())
@@ -9,7 +10,7 @@ fn db_err(e: rusqlite::Error) -> AppError {
 pub fn query_items_json(conn: &Connection) -> Result<Vec<serde_json::Value>, AppError> {
     let mut stmt = conn
         .prepare(
-            "SELECT id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at, deleted_at FROM items",
+            "SELECT id, title, item_type, content, summary, summary_mode, pinned, favorite, encrypted, created_at, updated_at, deleted_at FROM items",
         )
         .map_err(db_err)?;
     let rows = stmt
@@ -20,12 +21,13 @@ pub fn query_items_json(conn: &Connection) -> Result<Vec<serde_json::Value>, App
                 "item_type": row.get::<_, String>(2)?,
                 "content": row.get::<_, String>(3)?,
                 "summary": row.get::<_, String>(4)?,
-                "pinned": row.get::<_, i32>(5)? != 0,
-                "favorite": row.get::<_, i32>(6)? != 0,
-                "encrypted": row.get::<_, i32>(7)? != 0,
-                "created_at": row.get::<_, String>(8)?,
-                "updated_at": row.get::<_, String>(9)?,
-                "deleted_at": row.get::<_, Option<String>>(10)?,
+                "summary_mode": row.get::<_, String>(5)?,
+                "pinned": row.get::<_, i32>(6)? != 0,
+                "favorite": row.get::<_, i32>(7)? != 0,
+                "encrypted": row.get::<_, i32>(8)? != 0,
+                "created_at": row.get::<_, String>(9)?,
+                "updated_at": row.get::<_, String>(10)?,
+                "deleted_at": row.get::<_, Option<String>>(11)?,
             }))
         })
         .map_err(db_err)?;
@@ -112,11 +114,11 @@ pub fn import_items(
     overwrite: bool,
 ) -> Result<(), AppError> {
     let sql = if overwrite {
-        "INSERT OR REPLACE INTO items (id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at, deleted_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)"
+        "INSERT OR REPLACE INTO items (id, title, item_type, content, summary, summary_mode, pinned, favorite, encrypted, created_at, updated_at, deleted_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)"
     } else {
-        "INSERT OR IGNORE INTO items (id, title, item_type, content, summary, pinned, favorite, encrypted, created_at, updated_at, deleted_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)"
+        "INSERT OR IGNORE INTO items (id, title, item_type, content, summary, summary_mode, pinned, favorite, encrypted, created_at, updated_at, deleted_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)"
     };
     for item in items {
         tx.execute(
@@ -127,6 +129,7 @@ pub fn import_items(
                 item["item_type"].as_str().unwrap_or("note"),
                 val_str(item, "content"),
                 val_str(item, "summary"),
+                summary_mode(item),
                 val_bool(item, "pinned"),
                 val_bool(item, "favorite"),
                 val_bool(item, "encrypted"),
@@ -241,6 +244,13 @@ pub fn import_attachment_record(
 
 fn val_str(value: &serde_json::Value, key: &str) -> String {
     value[key].as_str().unwrap_or_default().to_string()
+}
+
+fn summary_mode(value: &serde_json::Value) -> &'static str {
+    match value["summary_mode"].as_str() {
+        Some(SUMMARY_MODE_MANUAL) => SUMMARY_MODE_MANUAL,
+        _ => SUMMARY_MODE_AUTO,
+    }
 }
 
 fn val_i64(value: &serde_json::Value, key: &str) -> i64 {

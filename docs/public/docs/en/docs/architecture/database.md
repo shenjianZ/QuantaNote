@@ -3,7 +3,7 @@ title: Database Design
 description: QuantaNote's SQLite database configuration, table structure, FTS5 full-text search indexing, and schema migration system
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-30
 ---
 
 # Database Design
@@ -42,6 +42,7 @@ Stores core data for all notes, links, files, and other records.
 | item_type | TEXT NOT NULL | Record type (note/link/file/image/code/task) |
 | content | TEXT NOT NULL DEFAULT '' | Markdown content body |
 | summary | TEXT NOT NULL DEFAULT '' | Summary/overview |
+| summary_mode | TEXT NOT NULL DEFAULT 'auto' | Summary mode: auto or manual |
 | pinned | INTEGER NOT NULL DEFAULT 0 | Whether pinned (0/1) |
 | favorite | INTEGER NOT NULL DEFAULT 0 | Whether favorited (0/1) |
 | encrypted | INTEGER NOT NULL DEFAULT 0 | Whether encrypted (0/1) |
@@ -55,6 +56,7 @@ CREATE TABLE IF NOT EXISTS items (
     item_type TEXT NOT NULL,
     content TEXT NOT NULL DEFAULT '',
     summary TEXT NOT NULL DEFAULT '',
+    summary_mode TEXT NOT NULL DEFAULT 'auto',
     pinned INTEGER NOT NULL DEFAULT 0,
     favorite INTEGER NOT NULL DEFAULT 0,
     encrypted INTEGER NOT NULL DEFAULT 0,
@@ -283,7 +285,7 @@ QuantaNote uses a version-based migration system to manage database schema chang
 3. `migrate_schema()` compares the current version with the target version and executes missing migrations in order
 
 ```rust
-const SCHEMA_VERSION: i64 = 5;
+const SCHEMA_VERSION: i64 = 8;
 
 fn migrate_schema(conn: &Connection) -> Result<(), AppError> {
     let current_version: i64 = conn.query_row(
@@ -307,6 +309,9 @@ fn migrate_schema(conn: &Connection) -> Result<(), AppError> {
     }
     if current_version < 5 {
         // Create sync_tombstones table
+    }
+    if current_version < 8 {
+        // Add summary_mode and classify legacy summaries as automatic or manual
     }
 
     Ok(())
