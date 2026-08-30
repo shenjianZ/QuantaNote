@@ -28,6 +28,37 @@ export interface StorageConsistencyReport {
     storageBytes: number;
 }
 
+export interface TemplateDto {
+    id: string;
+    name: string;
+    description: string;
+    content: string;
+    built_in: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+export async function getTemplates() {
+    return invoke<TemplateDto[]>("get_templates");
+}
+
+export async function createTemplate(name: string, description: string, content: string) {
+    return invoke<TemplateDto>("create_template", { name, description, content });
+}
+
+export async function updateTemplate(
+    id: string,
+    name: string,
+    description: string,
+    content: string,
+) {
+    return invoke<TemplateDto>("update_template", { id, name, description, content });
+}
+
+export async function deleteTemplate(id: string) {
+    return invoke<void>("delete_template", { id });
+}
+
 // Item commands
 export async function createItem(
     title: string,

@@ -33,6 +33,10 @@ class LibraryPage {
 
   async clickNew() {
     await $(this.newBtn).then(b => b.click());
+    const blankButton = await $("[data-testid='template-blank-btn']");
+    if (await blankButton.isDisplayed()) {
+      await blankButton.click();
+    }
     await waitForDisplayed("input[placeholder='文档标题']");
   }
 

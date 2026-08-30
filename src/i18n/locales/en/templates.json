@@ -1,0 +1,57 @@
+{
+  "title": "Choose a template",
+  "manageTitle": "Manage templates",
+  "selectHint": "Choose a template to start writing, or begin with a blank note.",
+  "blank": "Blank note",
+  "blankDescription": "Start a new note with empty content",
+  "builtIn": "Built-in templates",
+  "user": "My templates",
+  "use": "Use",
+  "manage": "Manage templates",
+  "backToPicker": "Back to templates",
+  "create": "New template",
+  "edit": "Edit template",
+  "copy": "Copy",
+  "delete": "Delete",
+  "confirmDelete": "Click again to confirm",
+  "name": "Name",
+  "description": "Description",
+  "content": "Content",
+  "namePlaceholder": "For example: Weekly review",
+  "descriptionPlaceholder": "Describe when this template is useful",
+  "contentPlaceholder": "Write the template body in Markdown",
+  "save": "Save template",
+  "cancel": "Cancel",
+  "loading": "Loading templates...",
+  "emptyUser": "No custom templates yet",
+  "copyBuiltInHint": "Built-in templates cannot be edited. Copy one first.",
+  "loadFailed": "Unable to load templates. Please try again.",
+  "saveFailed": "Unable to save the template. Please try again.",
+  "nameRequired": "Template name is required.",
+  "deleteFailed": "Unable to delete the template. Please try again.",
+  "saved": "Template saved",
+  "deleted": "Template deleted",
+  "copySuffix": "Copy",
+  "builtin": {
+    "daily": {
+      "name": "Daily log",
+      "description": "Quickly organize your state, takeaways, and plans",
+      "content": "# Daily log - {{date}}\n\n## Today's state\n- Mood:\n- Energy:\n\n## Today's notes\n\n## Takeaways\n- \n\n## Tomorrow's plan\n- "
+    },
+    "meeting": {
+      "name": "Meeting notes",
+      "description": "Capture the goal, decisions, and follow-up actions",
+      "content": "# Meeting notes - {{date}}\n\n## Goal\n\n## Participants\n- \n\n## Discussion and decisions\n\n## Action items\n- [ ] Owner: Task: Due date:"
+    },
+    "reading": {
+      "name": "Reading notes",
+      "description": "Capture important ideas from books, articles, or courses",
+      "content": "# Reading notes\n\n- Source:\n- Author:\n- Read on: {{date}}\n\n## Core ideas\n\n## Important excerpts\n> \n\n## My thoughts\n\n## Actions to try\n- [ ] "
+    },
+    "project": {
+      "name": "Project log",
+      "description": "Track goals, progress, risks, and next steps over time",
+      "content": "# Project log\n\n## Goal\n\n## Current progress\n- \n\n## To-do\n- [ ] \n\n## Risks and blockers\n- \n\n## Next steps\n- "
+    }
+  }
+}

@@ -9,6 +9,7 @@ import { Copy, FileImage, FileText, History, Paperclip, Plus, Save, Settings2 } 
 import { AppShell } from "../components/layout/AppShell";
 import { CommandPalette, type CommandPaletteCommand } from "../components/search/CommandPalette";
 import { ToastContainer } from "../components/common/ToastContainer";
+import { TemplatePickerModal } from "../components/templates/TemplatePickerModal";
 import { ErrorBoundary } from "../components/common/ErrorBoundary";
 import { WorkspacePage } from "../pages/WorkspacePage";
 import { LibraryPage } from "../pages/LibraryPage";
@@ -31,6 +32,8 @@ import { getSelectedText, shouldPreventGlobalShortcut } from "../utils/keyboardS
 import { copyTextToSystemClipboard } from "../utils/clipboard";
 import { dispatchAppCommand } from "../utils/appCommands";
 import { getShortcutLabel, shortcutMatches } from "../utils/shortcutRegistry";
+import { materializeTemplateContent } from "../templates/builtInTemplates";
+import type { TemplateDto } from "../services/tauriCommands";
 import type { AppPage, Item } from "../types";
 import i18n from "../i18n";
 import "../styles/themes.css";
@@ -224,6 +227,7 @@ export function QuantaNoteApp() {
     } | null>(null);
     const [readerOpen, setReaderOpen] = useState(false);
     const [anyModalOpen, setAnyModalOpen] = useState(false);
+    const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
     const lastExitBackAtRef = useRef(0);
 
     useEffect(() => {
@@ -330,10 +334,17 @@ export function QuantaNoteApp() {
         navigate("library");
     }, [navigate, selectedItemId]);
 
-    const handleCreateNote = useCallback(async () => {
-        const item = await createItem(i18n.t("common:emptyItem.untitled"), "note", "");
+    const handleCreateNote = useCallback(() => {
+        setTemplatePickerOpen(true);
+    }, []);
+
+    const handleCreateFromTemplate = useCallback(async (template: TemplateDto | null) => {
+        const title = template?.name ?? i18n.t("common:emptyItem.untitled");
+        const content = template ? materializeTemplateContent(template) : "";
+        const item = await createItem(title, "note", content);
         selectItem(item.id);
         await getItem(item.id);
+        setTemplatePickerOpen(false);
         navigate("document");
     }, [createItem, getItem, navigate, selectItem]);
 
@@ -494,7 +505,7 @@ export function QuantaNoteApp() {
             if (matchesShortcut("global.newNote")) {
                 if (isEditableShortcutTarget(e.target)) return;
                 e.preventDefault();
-                handleCreateNote().catch(() => {});
+                handleCreateNote();
                 return;
             }
 
@@ -563,7 +574,7 @@ export function QuantaNoteApp() {
         listen<TrayCommand>("quantanote-tray-command", (event) => {
             switch (event.payload) {
                 case "new-note":
-                    handleCreateNote().catch(() => {});
+                    handleCreateNote();
                     break;
                 case "open-workspace":
                     navigate("workspace");
@@ -851,7 +862,7 @@ export function QuantaNoteApp() {
                     navigate("library");
                     break;
                 case "new-note":
-                    handleCreateNote().catch(() => {});
+                    handleCreateNote();
                     break;
                 case "hide":
                     useSettingsStore.getState().updateSetting("floatingBall", false);
@@ -957,6 +968,11 @@ export function QuantaNoteApp() {
                 onSelectItem={handlePaletteSelectItem}
                 items={displayItems}
                 commands={paletteCommands}
+            />
+            <TemplatePickerModal
+                open={templatePickerOpen}
+                onClose={() => setTemplatePickerOpen(false)}
+                onSelect={handleCreateFromTemplate}
             />
             <ToastContainer />
         </AppShell>

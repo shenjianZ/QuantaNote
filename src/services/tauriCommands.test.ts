@@ -18,6 +18,10 @@ import {
   repairStorageConsistency,
   getVersions,
   getAllItemTagMappings,
+  getTemplates,
+  createTemplate,
+  updateTemplate,
+  deleteTemplate,
 } from "./tauriCommands";
 
 describe("tauriCommands", () => {
@@ -59,6 +63,23 @@ describe("tauriCommands", () => {
     await searchItems("rust", "note");
     expect(captured?.cmd).toBe("search_items");
     expect(captured?.args).toMatchObject({ query: "rust", itemType: "note" });
+  });
+
+  it("calls template commands with stable arguments", async () => {
+    await getTemplates();
+    expect(captured?.cmd).toBe("get_templates");
+
+    await createTemplate("日记", "每日记录", "# 日记");
+    expect(captured?.cmd).toBe("create_template");
+    expect(captured?.args).toMatchObject({ name: "日记", description: "每日记录", content: "# 日记" });
+
+    await updateTemplate("tpl-1", "会议", "记录结论", "# 会议");
+    expect(captured?.cmd).toBe("update_template");
+    expect(captured?.args).toMatchObject({ id: "tpl-1", name: "会议", description: "记录结论", content: "# 会议" });
+
+    await deleteTemplate("tpl-1");
+    expect(captured?.cmd).toBe("delete_template");
+    expect(captured?.args).toMatchObject({ id: "tpl-1" });
   });
 
   it("searchItems passes advanced mode and selected scopes", async () => {

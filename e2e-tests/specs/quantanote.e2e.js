@@ -36,6 +36,7 @@ describe("QuantaNote desktop smoke", () => {
   async function createNoteFromLibrary(title) {
     await goLibrary();
     await $("//button[contains(., '新建')]").click();
+    await $("[data-testid='template-blank-btn']").click();
     const titleInput = await $("input[placeholder='文档标题']");
     await expect(titleInput).toBeDisplayed();
     await titleInput.setValue(title);
@@ -66,6 +67,7 @@ describe("QuantaNote desktop smoke", () => {
     await expect($("//h1[contains(., '记录库')]")).toBeDisplayed();
 
     await $("//button[contains(., '新建')]").click();
+    await $("[data-testid='template-blank-btn']").click();
     await expect($("input[placeholder='文档标题']")).toBeDisplayed();
     await expect($("[data-testid='doc-version-toggle']")).toBeDisplayed();
   });

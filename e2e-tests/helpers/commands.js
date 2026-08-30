@@ -57,6 +57,22 @@ export async function getAllItems() {
   return tauriInvoke("get_items", { itemType: null, limit: 200, offset: 0 });
 }
 
+// --- Template 操作 ---
+export async function getAllTemplates() {
+  return tauriInvoke("get_templates");
+}
+
+export async function deleteTemplateById(id) {
+  return tauriInvoke("delete_template", { id });
+}
+
+export async function cleanupAllTemplates() {
+  const templates = await getAllTemplates();
+  for (const template of templates) {
+    await deleteTemplateById(template.id);
+  }
+}
+
 export async function deleteItemById(id) {
   const result = await tauriInvoke("delete_item", { id });
   await notifyDataChanged();
