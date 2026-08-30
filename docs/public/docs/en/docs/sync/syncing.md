@@ -103,6 +103,8 @@ When a sync error occurs:
 - Common errors include network timeouts, server unreachable, and authentication failures
 - Most temporary errors are automatically retried according to the offline queue schedule
 
+The sync settings page also shows this device's last sync time, queue, and retry state. The current version only identifies the local device by its Device ID; it does not yet provide an account-wide device list, device activity times, or remote revocation of other device sessions.
+
 ## Sync Content
 
 The sync engine handles the following five data types:
