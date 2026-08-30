@@ -33,3 +33,12 @@ pub async fn generate_ai_tag_suggestions(
 ) -> Result<Vec<String>, AppError> {
     ai_service::generate_tag_suggestions(&title, &content).await
 }
+
+#[tauri::command]
+pub async fn answer_ai_question(
+    title: String,
+    content: String,
+    question: String,
+) -> Result<String, AppError> {
+    ai_service::answer_question(&title, &content, &question).await
+}

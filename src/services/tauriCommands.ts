@@ -163,6 +163,10 @@ export async function generateAiTagSuggestions(title: string, content: string) {
     return invoke<string[]>("generate_ai_tag_suggestions", { title, content });
 }
 
+export async function answerAiQuestion(title: string, content: string, question: string) {
+    return invoke<string>("answer_ai_question", { title, content, question });
+}
+
 // Search commands
 export type SearchMode = "normal" | "advanced";
 export type SearchScope = "content" | "tags" | "attachments" | "versions";

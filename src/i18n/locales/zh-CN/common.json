@@ -61,6 +61,8 @@
     "aiTagsFailed": "AI 标签建议生成失败",
     "aiTagsApplied": "AI 标签已应用",
     "aiTagsApplyFailed": "应用 AI 标签失败",
+    "aiQuestionFailed": "AI 笔记问答失败",
+    "relatedNotesFailed": "查找相关笔记失败",
     "remoteBackupPasswordSaved": "WebDAV 密码已保存到系统凭据库",
     "remoteBackupPasswordSaveFailed": "保存 WebDAV 密码失败",
     "remoteBackupPasswordCleared": "WebDAV 密码已清除",

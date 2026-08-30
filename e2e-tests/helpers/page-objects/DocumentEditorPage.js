@@ -13,6 +13,7 @@ class DocumentEditorPage {
   get summaryRegenerateBtn() { return "[data-testid='doc-summary-regenerate-btn']"; }
   get aiSummaryBtn() { return "[data-testid='doc-ai-summary-btn']"; }
   get aiTagsBtn() { return "[data-testid='doc-ai-tags-btn']"; }
+  get aiKnowledgeBtn() { return "[data-testid='doc-ai-knowledge-btn']"; }
   get saveStatus() { return "[data-testid='doc-save-status']"; }
   get saveVersionBtn() { return "[data-testid='doc-save-version-btn']"; }
   get favoriteBtn() { return "[data-testid='doc-favorite-btn']"; }
@@ -122,6 +123,10 @@ class DocumentEditorPage {
 
   async hasAiTagsButton() {
     return (await $(this.aiTagsBtn)).isDisplayed();
+  }
+
+  async hasAiKnowledgeButton() {
+    return (await $(this.aiKnowledgeBtn)).isDisplayed();
   }
 
   async typeContent(text) {

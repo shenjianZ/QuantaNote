@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, Clock, Loader2, Paperclip, RefreshCw, Save, Sparkles, Star, Tags } from "lucide-react";
+import { ArrowLeft, Clock, Loader2, MessageCircle, Paperclip, RefreshCw, Save, Sparkles, Star, Tags } from "lucide-react";
 import { useAppStore } from "../stores/appStore";
 import { useItemStore } from "../stores/itemStore";
 import { getVditorLang } from "../utils/vditorConfig";
@@ -9,7 +9,7 @@ import { VersionPanel, type VersionDto } from "../components/editor/VersionPanel
 import { DocumentOutline, DocumentOutlineToggle } from "../components/editor/DocumentOutline";
 import type { VditorEditorHandle } from "../components/editor/VditorEditor";
 import { ContentWidthControl } from "../components/common/ContentWidthControl";
-import { generateAiSummary, generateAiTagSuggestions, getVersions, createVersion, updateVersion, restoreVersion, deleteVersion, setItemTags, type ItemDto, type SummaryMode } from "../services/tauriCommands";
+import { answerAiQuestion, generateAiSummary, generateAiTagSuggestions, getVersions, createVersion, updateVersion, restoreVersion, deleteVersion, searchItems, setItemTags, type ItemDto, type SearchResultDto, type SummaryMode } from "../services/tauriCommands";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useResponsiveContentWidth } from "../hooks/useResponsiveContentWidth";
 import { CONTENT_WIDTH_EDITOR_BASE, CONTENT_WIDTH_OUTLINE_LAYOUT } from "../utils/contentWidth";
@@ -22,6 +22,7 @@ import { getAppCommandId, APP_COMMAND_EVENT } from "../utils/appCommands";
 import { copyTextToSystemClipboard } from "../utils/clipboard";
 import { NotePropertiesPanel } from "../components/editor/NotePropertiesPanel";
 import { AiTagSuggestionsModal } from "../components/editor/AiTagSuggestionsModal";
+import { AiKnowledgeModal } from "../components/editor/AiKnowledgeModal";
 import { parseNoteProperties, updateNoteProperties, type NotePropertyUpdates } from "../utils/frontmatter";
 import { TagPill } from "../components/common/TagPill";
 import { useTagStore } from "../stores/tagStore";
@@ -41,6 +42,23 @@ function formatNowAsName() {
 
 function normalizeForVersionCompare(value: string | undefined) {
   return (value ?? "").trimEnd();
+}
+
+function getRelatedQueries(title: string, content: string): string[] {
+  const source = `${title}\n${content}`
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/https?:\/\/\S+/g, " ");
+  const tokens = source.match(/[\p{L}\p{N}_-]{2,}/gu) ?? [];
+  const seen = new Set<string>();
+  return tokens
+    .map((token) => token.trim())
+    .filter((token) => {
+      const key = token.toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 3);
 }
 
 interface DocumentEditorPageProps {
@@ -92,6 +110,13 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
   const [aiTagSuggestions, setAiTagSuggestions] = useState<string[]>([]);
   const [selectedAiTags, setSelectedAiTags] = useState<string[]>([]);
   const [aiTagModalOpen, setAiTagModalOpen] = useState(false);
+  const [aiKnowledgeModalOpen, setAiKnowledgeModalOpen] = useState(false);
+  const [aiQuestion, setAiQuestion] = useState("");
+  const [aiAnswer, setAiAnswer] = useState("");
+  const [aiAnswering, setAiAnswering] = useState(false);
+  const [relatedNotes, setRelatedNotes] = useState<SearchResultDto[]>([]);
+  const [relatedLoading, setRelatedLoading] = useState(false);
+  const [relatedSearched, setRelatedSearched] = useState(false);
   const [activeHeadingIndex, setActiveHeadingIndex] = useState(-1);
   const editorRef = useRef<VditorEditorHandle>(null);
   const editorViewportRef = useRef<HTMLDivElement>(null);
@@ -177,9 +202,9 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
 
   // 通知父组件版本面板状态变化
   useEffect(() => {
-    onModalStateChange?.(versionPanelOpen || attachmentModalOpen || aiTagModalOpen);
+    onModalStateChange?.(versionPanelOpen || attachmentModalOpen || aiTagModalOpen || aiKnowledgeModalOpen);
     return () => { onModalStateChange?.(false); };
-  }, [versionPanelOpen, attachmentModalOpen, aiTagModalOpen, onModalStateChange]);
+  }, [versionPanelOpen, attachmentModalOpen, aiTagModalOpen, aiKnowledgeModalOpen, onModalStateChange]);
 
   // 组件卸载时清理防抖定时器
   useEffect(() => {
@@ -210,6 +235,11 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
     setAiTagModalOpen(false);
     setAiTagSuggestions([]);
     setSelectedAiTags([]);
+    setAiKnowledgeModalOpen(false);
+    setAiQuestion("");
+    setAiAnswer("");
+    setRelatedNotes([]);
+    setRelatedSearched(false);
   }, [selectedItemId, fetchItemTags]);
 
   useEffect(() => {
@@ -445,6 +475,81 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
       useToastStore.getState().addToast("error", t("common:toast.aiTagsApplyFailed"));
     } finally {
       setAiTagApplying(false);
+    }
+  }
+
+  async function handleAskAiQuestion() {
+    if (aiAnswering || !selectedItemId) return;
+    const question = aiQuestion.trim();
+    if (!question) {
+      useToastStore.getState().addToast("error", t("document:aiQuestionEmpty"));
+      return;
+    }
+    if (!latestTitle.current.trim() && !latestContent.current.trim()) {
+      useToastStore.getState().addToast("error", t("document:aiQuestionNoContent"));
+      return;
+    }
+    if (!(await flushSave())) return;
+
+    setAiAnswering(true);
+    try {
+      const answer = await answerAiQuestion(latestTitle.current, latestContent.current, question);
+      setAiAnswer(answer);
+    } catch (error) {
+      console.error("AI question answering failed:", error);
+      useToastStore.getState().addToast("error", t("common:toast.aiQuestionFailed"));
+    } finally {
+      setAiAnswering(false);
+    }
+  }
+
+  async function handleFindRelatedNotes() {
+    if (relatedLoading || !selectedItemId) return;
+    const queries = getRelatedQueries(latestTitle.current, latestContent.current);
+    if (queries.length === 0) {
+      setRelatedNotes([]);
+      setRelatedSearched(true);
+      useToastStore.getState().addToast("info", t("document:relatedNotesEmpty"));
+      return;
+    }
+
+    setRelatedLoading(true);
+    setRelatedSearched(false);
+    try {
+      const pages = await Promise.all(
+        queries.map((query) => searchItems(query, undefined, {
+          scopes: ["content"],
+          limit: 8,
+          offset: 0,
+        })),
+      );
+      const ranked = new Map<string, { result: SearchResultDto; score: number }>();
+      pages.forEach((page) => {
+        page.results.forEach((result) => {
+          if (result.id === selectedItemId) return;
+          const current = ranked.get(result.id);
+          ranked.set(result.id, {
+            result,
+            score: (current?.score ?? 0) + 1,
+          });
+        });
+      });
+      const notes = [...ranked.values()]
+        .sort((left, right) => right.score - left.score || left.result.title.localeCompare(right.result.title))
+        .slice(0, 6)
+        .map(({ result }) => result);
+      setRelatedNotes(notes);
+      setRelatedSearched(true);
+      if (notes.length === 0) {
+        useToastStore.getState().addToast("info", t("document:relatedNotesEmpty"));
+      }
+    } catch (error) {
+      console.error("Finding related notes failed:", error);
+      setRelatedNotes([]);
+      setRelatedSearched(true);
+      useToastStore.getState().addToast("error", t("common:toast.relatedNotesFailed"));
+    } finally {
+      setRelatedLoading(false);
     }
   }
 
@@ -704,6 +809,15 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
                 {aiTagGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                 {t(aiTagGenerating ? "document:aiTagsGenerating" : "document:aiTagsSuggest")}
               </button>
+              <button
+                className="mt-2 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-xl border border-[var(--line)] px-3 text-xs text-[var(--muted)] transition-colors hover:border-[var(--accent)] hover:text-[var(--text)]"
+                type="button"
+                data-testid="doc-ai-knowledge-btn"
+                onClick={() => setAiKnowledgeModalOpen(true)}
+              >
+                <MessageCircle className="h-3.5 w-3.5" />
+                {t("document:aiKnowledge")}
+              </button>
               <p className="mt-2 text-[11px] leading-relaxed text-[var(--muted)]">{t("document:aiTagsPrivacyHint")}</p>
             </section>
             <section className="shrink-0 rounded-2xl border border-[var(--line)] bg-transparent p-3">
@@ -844,6 +958,19 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
         onClose={() => setAiTagModalOpen(false)}
         onToggle={toggleAiTag}
         onApply={() => { void handleApplyAiTags(); }}
+      />
+      <AiKnowledgeModal
+        open={aiKnowledgeModalOpen}
+        question={aiQuestion}
+        answer={aiAnswer}
+        answering={aiAnswering}
+        relatedNotes={relatedNotes}
+        relatedLoading={relatedLoading}
+        relatedSearched={relatedSearched}
+        onClose={() => setAiKnowledgeModalOpen(false)}
+        onQuestionChange={setAiQuestion}
+        onAsk={() => { void handleAskAiQuestion(); }}
+        onFindRelated={() => { void handleFindRelatedNotes(); }}
       />
     </div>
   );

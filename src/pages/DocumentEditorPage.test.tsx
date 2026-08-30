@@ -61,6 +61,8 @@ describe("DocumentEditorPage", () => {
   };
   let setItemTagsArgs: unknown = null;
   let aiTagSuggestionCalls = 0;
+  let aiAnswerCalls = 0;
+  let relatedSearchCalls = 0;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -81,6 +83,8 @@ describe("DocumentEditorPage", () => {
     };
     setItemTagsArgs = null;
     aiTagSuggestionCalls = 0;
+    aiAnswerCalls = 0;
+    relatedSearchCalls = 0;
 
     useAppStore.setState({ selectedItemId: "item-1", theme: "light" });
     useItemStore.setState({
@@ -116,6 +120,22 @@ describe("DocumentEditorPage", () => {
       if (cmd === "generate_ai_tag_suggestions") {
         aiTagSuggestionCalls += 1;
         return ["rust", "tauri"];
+      }
+      if (cmd === "answer_ai_question") {
+        aiAnswerCalls += 1;
+        return "这是基于笔记的回答";
+      }
+      if (cmd === "search_items") {
+        relatedSearchCalls += 1;
+        return {
+          results: [{
+            id: "item-2",
+            title: "相关笔记",
+            item_type: "note",
+            summary: "相关摘要",
+          }],
+          total: 1,
+        };
       }
       if (cmd === "set_item_tags") {
         setItemTagsArgs = args;
@@ -316,6 +336,24 @@ describe("DocumentEditorPage", () => {
 
     await waitFor(() => expect(screen.queryByTestId("ai-tag-suggestions-modal")).not.toBeInTheDocument());
     expect(setItemTagsArgs).toEqual({ itemId: "item-1", tagNames: ["rust"] });
+  });
+
+  it("answers an explicit question and finds related notes locally", async () => {
+    const { user } = setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
+
+    expect(aiAnswerCalls).toBe(0);
+    expect(relatedSearchCalls).toBe(0);
+    await user.click(screen.getByTestId("doc-ai-knowledge-btn"));
+    await user.type(screen.getByTestId("ai-question-input"), "关键结论是什么？");
+    await user.click(screen.getByTestId("ai-ask-btn"));
+
+    await waitFor(() => expect(screen.getByTestId("ai-answer")).toHaveTextContent("这是基于笔记的回答"));
+    expect(aiAnswerCalls).toBe(1);
+    expect(relatedSearchCalls).toBe(0);
+
+    await user.click(screen.getByTestId("related-notes-btn"));
+    await waitFor(() => expect(screen.getByTestId("related-note-0")).toHaveTextContent("相关笔记"));
+    expect(relatedSearchCalls).toBeGreaterThan(0);
   });
 
   it("creates version on save version click", async () => {

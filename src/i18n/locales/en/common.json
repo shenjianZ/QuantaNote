@@ -61,6 +61,8 @@
     "aiTagsFailed": "Failed to generate AI tag suggestions",
     "aiTagsApplied": "AI tags applied",
     "aiTagsApplyFailed": "Failed to apply AI tags",
+    "aiQuestionFailed": "AI question answering failed",
+    "relatedNotesFailed": "Failed to find related notes",
     "remoteBackupPasswordSaved": "WebDAV password saved to the system credential store",
     "remoteBackupPasswordSaveFailed": "Failed to save WebDAV password",
     "remoteBackupPasswordCleared": "WebDAV password cleared",
