@@ -585,7 +585,9 @@ pub async fn sync_attachments_download(
             })?;
             let now = chrono::Utc::now().to_rfc3339();
             if let Err(error) = conn.execute(
-                "INSERT OR IGNORE INTO attachments (id, item_id, filename, file_path, mime_type, file_size, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                "INSERT OR IGNORE INTO attachments
+                 (id, item_id, filename, file_path, mime_type, file_size, content_hash, created_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
                 rusqlite::params![
                     remote.attachment_id,
                     remote.item_id,
@@ -593,6 +595,7 @@ pub async fn sync_attachments_download(
                     target_path,
                     remote.mime_type,
                     remote.file_size,
+                    remote.file_hash,
                     now
                 ],
             ) {
@@ -777,7 +780,7 @@ pub fn apply_pulled_records(records: &[SyncRecordPayload], db: &DbState) -> Resu
         .map_err(|e| AppError::Database(format!("提交事务失败: {}", e)))?;
     drop(conn);
 
-    attachment_repository::cleanup_file_paths(&attachment_cleanup_paths)?;
+    attachment_repository::cleanup_file_paths_if_unreferenced(db, &attachment_cleanup_paths)?;
 
     Ok(())
 }

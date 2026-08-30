@@ -139,7 +139,7 @@ pub fn collect_local_records(db: &DbState) -> Result<Vec<SyncRecordPayload>, App
     collect_table_records(
         &conn,
         "attachments",
-        "SELECT id, item_id, filename, file_path, mime_type, file_size, created_at FROM attachments",
+        "SELECT id, item_id, filename, file_path, mime_type, file_size, content_hash, created_at FROM attachments",
         |row| {
             let id: String = row.get(0)?;
             let data = serde_json::json!({
@@ -149,9 +149,10 @@ pub fn collect_local_records(db: &DbState) -> Result<Vec<SyncRecordPayload>, App
                 "file_path": row.get::<_, String>(3)?,
                 "mime_type": row.get::<_, String>(4)?,
                 "file_size": row.get::<_, i64>(5)?,
-                "created_at": row.get::<_, String>(6)?,
+                "content_hash": row.get::<_, String>(6)?,
+                "created_at": row.get::<_, String>(7)?,
             });
-            let updated_at = row.get::<_, String>(6)?;
+            let updated_at = row.get::<_, String>(7)?;
             Ok((id, data, updated_at))
         },
         &mut all_records,

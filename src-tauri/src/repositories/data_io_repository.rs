@@ -92,7 +92,7 @@ pub fn query_versions_json(conn: &Connection) -> Result<Vec<serde_json::Value>, 
 
 pub fn query_attachments_meta(conn: &Connection) -> Result<Vec<serde_json::Value>, AppError> {
     let mut stmt = conn
-        .prepare("SELECT id, item_id, filename, file_path, mime_type, file_size, created_at FROM attachments")
+        .prepare("SELECT id, item_id, filename, file_path, mime_type, file_size, content_hash, created_at FROM attachments")
         .map_err(db_err)?;
     let rows = stmt
         .query_map([], |row| {
@@ -103,7 +103,8 @@ pub fn query_attachments_meta(conn: &Connection) -> Result<Vec<serde_json::Value
                 "file_path": row.get::<_, String>(3)?,
                 "mime_type": row.get::<_, String>(4)?,
                 "file_size": row.get::<_, i64>(5)?,
-                "created_at": row.get::<_, String>(6)?,
+                "content_hash": row.get::<_, String>(6)?,
+                "created_at": row.get::<_, String>(7)?,
             }))
         })
         .map_err(db_err)?;
@@ -239,8 +240,9 @@ pub fn import_attachment_record(
     attachment: &serde_json::Value,
 ) -> Result<(), AppError> {
     tx.execute(
-        "INSERT OR REPLACE INTO attachments (id, item_id, filename, file_path, mime_type, file_size, created_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        "INSERT OR REPLACE INTO attachments
+         (id, item_id, filename, file_path, mime_type, file_size, content_hash, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
         params![
             val_str(attachment, "id"),
             val_str(attachment, "item_id"),
@@ -248,6 +250,7 @@ pub fn import_attachment_record(
             val_str(attachment, "file_path"),
             val_str(attachment, "mime_type"),
             val_i64(attachment, "file_size"),
+            val_str(attachment, "content_hash"),
             val_str(attachment, "created_at"),
         ],
     )

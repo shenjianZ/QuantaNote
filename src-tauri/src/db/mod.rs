@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS attachments (
     file_path TEXT NOT NULL,
     mime_type TEXT NOT NULL DEFAULT '',
     file_size INTEGER NOT NULL DEFAULT 0,
+    content_hash TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL
 );
 
@@ -133,7 +134,7 @@ CREATE TABLE IF NOT EXISTS templates (
 INSERT OR IGNORE INTO schema_version (version) VALUES (1);
 ";
 
-const SCHEMA_VERSION: i64 = 10;
+const SCHEMA_VERSION: i64 = 11;
 
 impl DbState {
     pub fn open(db_path: &str) -> Result<Self, AppError> {
@@ -317,6 +318,28 @@ impl DbState {
                     updated_at TEXT NOT NULL
                  );
                  INSERT OR IGNORE INTO schema_version (version) VALUES (10);",
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+
+        if current_version < 11 {
+            let has_content_hash = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM pragma_table_info('attachments') WHERE name = 'content_hash'",
+                    [],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map_err(|e| AppError::Database(e.to_string()))?
+                > 0;
+            if !has_content_hash {
+                conn.execute_batch(
+                    "ALTER TABLE attachments ADD COLUMN content_hash TEXT NOT NULL DEFAULT '';",
+                )
+                .map_err(|e| AppError::Database(e.to_string()))?;
+            }
+            conn.execute(
+                "INSERT OR IGNORE INTO schema_version (version) VALUES (11)",
+                [],
             )
             .map_err(|e| AppError::Database(e.to_string()))?;
         }

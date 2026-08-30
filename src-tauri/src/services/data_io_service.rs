@@ -673,6 +673,10 @@ pub fn import_data(db: &DbState, json: String) -> Result<(), AppError> {
                 let _ = resolve_safe_attachment_path(&data_dir, &file_path)?;
                 file_path = relative_path.to_string_lossy().to_string();
             }
+            let mut content_hash = attachment["content_hash"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string();
 
             if let Some(file_data) = attachment["file_data"].as_str() {
                 use base64::engine::general_purpose::STANDARD as BASE64;
@@ -695,34 +699,41 @@ pub fn import_data(db: &DbState, json: String) -> Result<(), AppError> {
                         return Err(AppError::Validation("JSON 附件总大小超过限制".to_string()));
                     }
                     total_attachment_size += attachment_size;
+                    content_hash = attachment_repository::compute_content_hash(&bytes);
                     let relative_path = PathBuf::from("attachments").join(&item_id).join(format!(
                         "{}-{}",
                         safe_id.chars().take(8).collect::<String>(),
                         safe_archive_filename(&filename)
                     ));
                     let relative_path = relative_path.to_string_lossy().to_string();
-                    let dest_path = resolve_safe_attachment_path(&data_dir, &relative_path)?;
-                    let backup = if dest_path.exists() {
-                        let backup = staging_dir.join(format!("backup-{}.bin", index));
-                        std::fs::rename(&dest_path, &backup)
-                            .map_err(|e| AppError::Io(e.to_string()))?;
-                        Some(backup)
+                    let reusable_path =
+                        attachment_repository::find_reusable_file_path(&tx, &content_hash)?;
+                    if let Some(reusable_path) = reusable_path {
+                        file_path = reusable_path;
                     } else {
-                        None
-                    };
-                    if let Err(error) =
-                        attachment_repository::write_file_atomically(&dest_path, &bytes)
-                    {
-                        if let Some(backup_path) = &backup {
-                            let _ = std::fs::rename(backup_path, &dest_path);
+                        let dest_path = resolve_safe_attachment_path(&data_dir, &relative_path)?;
+                        let backup = if dest_path.exists() {
+                            let backup = staging_dir.join(format!("backup-{}.bin", index));
+                            std::fs::rename(&dest_path, &backup)
+                                .map_err(|e| AppError::Io(e.to_string()))?;
+                            Some(backup)
+                        } else {
+                            None
+                        };
+                        if let Err(error) =
+                            attachment_repository::write_file_atomically(&dest_path, &bytes)
+                        {
+                            if let Some(backup_path) = &backup {
+                                let _ = std::fs::rename(backup_path, &dest_path);
+                            }
+                            return Err(error);
                         }
-                        return Err(error);
+                        installed.push(InstalledAttachment {
+                            target: dest_path,
+                            backup,
+                        });
+                        file_path = relative_path;
                     }
-                    installed.push(InstalledAttachment {
-                        target: dest_path,
-                        backup,
-                    });
-                    file_path = relative_path;
                 }
             }
 
@@ -735,6 +746,7 @@ pub fn import_data(db: &DbState, json: String) -> Result<(), AppError> {
 
             let mut record = attachment.clone();
             record["file_path"] = serde_json::Value::String(file_path);
+            record["content_hash"] = serde_json::Value::String(content_hash);
             data_io_repository::import_attachment_record(&tx, &record)?;
         }
 
@@ -973,6 +985,20 @@ pub fn import_data_zip(db: &DbState, path: &str, options: &ImportOptions) -> Res
     let staging_dir = data_dir
         .join("imports")
         .join(format!(".quantanote-staging-{}", uuid::Uuid::new_v4()));
+    let attachment_target_paths: Vec<String> = if options.include_attachments {
+        manifest
+            .as_ref()
+            .map(|value| {
+                value
+                    .attachments
+                    .iter()
+                    .map(|attachment| attachment.file_path.clone())
+                    .collect()
+            })
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
     let mut installed = Vec::new();
     let result = (|| {
         if options.include_attachments {
@@ -1019,8 +1045,13 @@ pub fn import_data_zip(db: &DbState, path: &str, options: &ImportOptions) -> Res
                 for attachment in &manifest.attachments {
                     let mut record = serde_json::to_value(attachment)
                         .map_err(|e| AppError::Database(e.to_string()))?;
-                    record["file_path"] = serde_json::Value::String(attachment.file_path.clone());
+                    let reusable_path =
+                        attachment_repository::find_reusable_file_path(&tx, &attachment.sha256)?;
+                    record["file_path"] = serde_json::Value::String(
+                        reusable_path.unwrap_or_else(|| attachment.file_path.clone()),
+                    );
                     record["file_size"] = serde_json::Value::from(attachment.file_size);
+                    record["content_hash"] = serde_json::Value::String(attachment.sha256.clone());
                     data_io_repository::import_attachment_record(&tx, &record)?;
                 }
             }
@@ -1030,13 +1061,15 @@ pub fn import_data_zip(db: &DbState, path: &str, options: &ImportOptions) -> Res
         Ok(())
     })();
 
-    if result.is_err() {
+    let cleanup_result = if result.is_err() {
         restore_installed_attachments(&installed);
+        Ok(())
     } else {
         remove_attachment_backups(&installed);
-    }
+        attachment_repository::cleanup_file_paths_if_unreferenced(db, &attachment_target_paths)
+    };
     let _ = std::fs::remove_dir_all(&staging_dir);
-    result
+    result.and(cleanup_result)
 }
 
 pub fn create_backup_zip(db: &DbState, dest: &std::path::Path) -> Result<(), AppError> {
@@ -1289,6 +1322,132 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(data_dir);
         let _ = std::fs::remove_dir_all(zip_path.parent().expect("zip parent"));
+    }
+
+    #[test]
+    fn import_json_reuses_existing_attachment_file_by_content_hash() {
+        let data_dir = crate::test_support::unique_temp_dir("data-io-json-dedup");
+        let _guard = crate::test_support::lock_test_data_dir(&data_dir);
+        let source = crate::test_support::test_db();
+        let source_item = crate::services::item_service::create_item(
+            &source,
+            "JSON 来源附件".to_string(),
+            "note".to_string(),
+            None,
+        )
+        .expect("create source item");
+        let source_attachment = crate::services::attachment_service::add_attachment_data(
+            &source,
+            source_item.id.clone(),
+            "source.png".to_string(),
+            "image/png".to_string(),
+            b"deduplicated bytes".to_vec(),
+        )
+        .expect("create source attachment");
+        let json = export_data(&source).expect("export JSON");
+        crate::services::attachment_service::delete_attachment(&source, &source_attachment.id)
+            .expect("remove source file after export");
+
+        let target = crate::test_support::test_db();
+        let target_item = crate::services::item_service::create_item(
+            &target,
+            "已有附件".to_string(),
+            "note".to_string(),
+            None,
+        )
+        .expect("create target item");
+        let existing = crate::services::attachment_service::add_attachment_data(
+            &target,
+            target_item.id,
+            "existing.png".to_string(),
+            "image/png".to_string(),
+            b"deduplicated bytes".to_vec(),
+        )
+        .expect("create existing attachment");
+
+        import_data(&target, json).expect("import JSON");
+        let imported =
+            crate::services::attachment_service::get_attachments(&target, &source_item.id)
+                .expect("list imported attachments");
+        assert_eq!(imported.len(), 1);
+        assert_eq!(imported[0].file_path, existing.file_path);
+        assert_eq!(imported[0].content_hash, existing.content_hash);
+        assert!(std::path::Path::new(&existing.file_path).exists());
+
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn import_zip_reuses_existing_attachment_file_and_removes_staged_duplicate() {
+        let data_dir = crate::test_support::unique_temp_dir("data-io-zip-dedup");
+        let _guard = crate::test_support::lock_test_data_dir(&data_dir);
+        let source = crate::test_support::test_db();
+        let source_item = crate::services::item_service::create_item(
+            &source,
+            "ZIP 来源附件".to_string(),
+            "note".to_string(),
+            None,
+        )
+        .expect("create source item");
+        let source_attachment = crate::services::attachment_service::add_attachment_data(
+            &source,
+            source_item.id.clone(),
+            "source.zip.png".to_string(),
+            "image/png".to_string(),
+            b"zip deduplicated bytes".to_vec(),
+        )
+        .expect("create source attachment");
+        let zip_path = data_dir.join("dedup.zip");
+        let options = ExportOptions {
+            include_tags: true,
+            include_attachments: true,
+            include_versions: true,
+        };
+        export_data_zip(&source, &zip_path.to_string_lossy(), &options).expect("export ZIP");
+        let staged_target = crate::utils::paths::quantanote_dir()
+            .join("attachments")
+            .join(&source_item.id)
+            .join(format!(
+                "{}-{}",
+                source_attachment.id.chars().take(8).collect::<String>(),
+                "source.zip.png"
+            ));
+        crate::services::attachment_service::delete_attachment(&source, &source_attachment.id)
+            .expect("remove source file after export");
+
+        let target = crate::test_support::test_db();
+        let target_item = crate::services::item_service::create_item(
+            &target,
+            "已有 ZIP 附件".to_string(),
+            "note".to_string(),
+            None,
+        )
+        .expect("create target item");
+        let existing = crate::services::attachment_service::add_attachment_data(
+            &target,
+            target_item.id,
+            "existing.zip.png".to_string(),
+            "image/png".to_string(),
+            b"zip deduplicated bytes".to_vec(),
+        )
+        .expect("create existing attachment");
+
+        let import_options = ImportOptions {
+            include_tags: true,
+            include_attachments: true,
+            include_versions: true,
+            overwrite: false,
+        };
+        import_data_zip(&target, &zip_path.to_string_lossy(), &import_options).expect("import ZIP");
+        let imported =
+            crate::services::attachment_service::get_attachments(&target, &source_item.id)
+                .expect("list imported attachments");
+        assert_eq!(imported.len(), 1);
+        assert_eq!(imported[0].file_path, existing.file_path);
+        assert!(!staged_target.exists());
+        assert!(std::path::Path::new(&existing.file_path).exists());
+
+        let _ = std::fs::remove_dir_all(data_dir);
     }
 
     #[test]

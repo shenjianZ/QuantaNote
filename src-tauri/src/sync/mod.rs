@@ -220,6 +220,7 @@ pub fn apply_attachment(
     let file_path = data["file_path"].as_str().unwrap_or_default();
     let mime_type = data["mime_type"].as_str().unwrap_or_default();
     let file_size = data["file_size"].as_i64().unwrap_or_default();
+    let content_hash = data["content_hash"].as_str().unwrap_or_default();
     let created_at = data["created_at"].as_str().unwrap_or_default();
     crate::services::data_io_service::validate_relative_path(file_path, "attachments")?;
     if file_size < 0 || file_size as u64 > 512 * 1024 * 1024 {
@@ -239,10 +240,24 @@ pub fn apply_attachment(
     }
 
     conn.execute(
-        "INSERT INTO attachments (id, item_id, filename, file_path, mime_type, file_size, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-         ON CONFLICT(id) DO UPDATE SET item_id=excluded.item_id, filename=excluded.filename, file_path=excluded.file_path, mime_type=excluded.mime_type, file_size=excluded.file_size, created_at=excluded.created_at",
-        rusqlite::params![id, item_id, filename, file_path, mime_type, file_size, created_at],
-    ).map_err(|e| AppError::Database(e.to_string()))?;
+        "INSERT INTO attachments
+         (id, item_id, filename, file_path, mime_type, file_size, content_hash, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+         ON CONFLICT(id) DO UPDATE SET item_id=excluded.item_id, filename=excluded.filename,
+         file_path=excluded.file_path, mime_type=excluded.mime_type, file_size=excluded.file_size,
+         content_hash=excluded.content_hash, created_at=excluded.created_at",
+        rusqlite::params![
+            id,
+            item_id,
+            filename,
+            file_path,
+            mime_type,
+            file_size,
+            content_hash,
+            created_at
+        ],
+    )
+    .map_err(|e| AppError::Database(e.to_string()))?;
 
     // 清理可能残留的 tombstone
     conn.execute(

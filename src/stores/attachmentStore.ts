@@ -10,6 +10,7 @@ export interface AttachmentDto {
   file_path: string;
   mime_type: string;
   file_size: number;
+  content_hash: string;
   created_at: string;
 }
 

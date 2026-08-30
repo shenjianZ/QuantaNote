@@ -352,7 +352,7 @@ pub fn delete(db: &DbState, id: &str) -> Result<(), AppError> {
         .map_err(|e| AppError::Database(e.to_string()))?;
 
     drop(conn);
-    attachment_repository::cleanup_file_paths(&attachment_paths)?;
+    attachment_repository::cleanup_file_paths_if_unreferenced(db, &attachment_paths)?;
 
     Ok(())
 }

@@ -1,4 +1,6 @@
 use rusqlite::params;
+use rusqlite::Connection;
+use sha2::{Digest, Sha256};
 use std::path::{Component, Path, PathBuf};
 
 use crate::db::DbState;
@@ -117,6 +119,38 @@ pub fn cleanup_file_paths(relative_paths: &[String]) -> Result<(), AppError> {
     Ok(())
 }
 
+/// 仅清理当前没有任何附件记录引用的文件，避免共享物理文件被提前删除。
+pub(crate) fn cleanup_file_paths_if_unreferenced(
+    db: &DbState,
+    relative_paths: &[String],
+) -> Result<(), AppError> {
+    let candidates = {
+        let conn = db
+            .conn
+            .lock()
+            .map_err(|error| AppError::Database(error.to_string()))?;
+        let mut candidates = Vec::new();
+        for relative_path in relative_paths {
+            if candidates.iter().any(|path| path == relative_path) {
+                continue;
+            }
+            let references: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM attachments WHERE file_path = ?1",
+                    params![relative_path],
+                    |row| row.get(0),
+                )
+                .map_err(|error| AppError::Database(error.to_string()))?;
+            if references == 0 {
+                candidates.push(relative_path.clone());
+            }
+        }
+        candidates
+    };
+
+    cleanup_file_paths(&candidates)
+}
+
 /// 重试之前因权限、占用等原因未能删除的附件文件。
 pub fn retry_pending_file_cleanup() -> Result<usize, AppError> {
     let queued = read_cleanup_queue()?;
@@ -203,6 +237,89 @@ pub(crate) fn copy_file_atomically(source: &Path, dest: &Path) -> Result<(), App
     replace_file_with_temp(&temp, dest)
 }
 
+pub(crate) fn compute_content_hash(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    format!("{:x}", hasher.finalize())
+}
+
+/// 查找可以复用的物理附件文件。
+///
+/// 旧版本没有 content_hash，首次遇到时顺便按文件内容补齐，保证升级后的旧附件也能参与去重。
+pub(crate) fn find_reusable_file_path(
+    conn: &Connection,
+    content_hash: &str,
+) -> Result<Option<String>, AppError> {
+    if content_hash.is_empty() {
+        return Ok(None);
+    }
+
+    let hashed_paths: Vec<String> = {
+        let mut stmt = conn
+            .prepare(
+                "SELECT file_path FROM attachments
+                 WHERE content_hash = ?1 ORDER BY created_at ASC, id ASC",
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        let rows = stmt
+            .query_map(params![content_hash], |row| row.get::<_, String>(0))
+            .map_err(|e| AppError::Database(e.to_string()))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        rows
+    };
+    for relative_path in hashed_paths {
+        if let Ok(full_path) = resolve_safe_attachment_file_path(&relative_path) {
+            let is_regular_file = std::fs::symlink_metadata(&full_path)
+                .map(|metadata| metadata.file_type().is_file())
+                .unwrap_or(false);
+            if is_regular_file
+                && std::fs::read(&full_path)
+                    .map(|bytes| compute_content_hash(&bytes) == content_hash)
+                    .unwrap_or(false)
+            {
+                return Ok(Some(relative_path));
+            }
+        }
+    }
+
+    let legacy_rows: Vec<(String, String)> = {
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, file_path FROM attachments
+                 WHERE content_hash = '' ORDER BY created_at ASC, id ASC",
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        let rows = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .map_err(|e| AppError::Database(e.to_string()))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        rows
+    };
+    for (id, relative_path) in legacy_rows {
+        let full_path = match resolve_safe_attachment_file_path(&relative_path) {
+            Ok(path) => path,
+            Err(_) => continue,
+        };
+        let bytes = match std::fs::read(&full_path) {
+            Ok(bytes) => bytes,
+            Err(_) => continue,
+        };
+        let hash = compute_content_hash(&bytes);
+        conn.execute(
+            "UPDATE attachments SET content_hash = ?1 WHERE id = ?2 AND content_hash = ''",
+            params![hash, id],
+        )
+        .map_err(|e| AppError::Database(e.to_string()))?;
+        if hash == content_hash {
+            return Ok(Some(relative_path));
+        }
+    }
+
+    Ok(None)
+}
+
 /// 将附件复制到用户选择的导出位置。源文件必须来自 QuantaNote 附件目录，
 /// 防止前端传入任意路径后借此命令读取或复制其他文件。
 pub fn export_file(source_path: &str, destination_path: &str) -> Result<(), AppError> {
@@ -244,12 +361,12 @@ pub fn add(db: &DbState, item_id: String, source_path: String) -> Result<Attachm
     let relative_path = PathBuf::from("attachments")
         .join(&safe_item_id)
         .join(format!("{}-{}", &id[..8], filename));
-    let dest_path = paths::quantanote_dir().join(&relative_path);
+    let mut dest_path = paths::quantanote_dir().join(&relative_path);
     copy_file_atomically(source, &dest_path)?;
 
-    let file_size = std::fs::metadata(&dest_path)
-        .map(|m| m.len() as i64)
-        .unwrap_or(0);
+    let bytes = std::fs::read(&dest_path).map_err(|error| AppError::Io(error.to_string()))?;
+    let file_size = bytes.len() as i64;
+    let content_hash = compute_content_hash(&bytes);
     let mime_type = match source
         .extension()
         .and_then(|ext| ext.to_str())
@@ -337,7 +454,8 @@ pub fn add(db: &DbState, item_id: String, source_path: String) -> Result<Attachm
     }
     .to_string();
 
-    let relative_str = relative_path.to_string_lossy().to_string();
+    let mut relative_str = relative_path.to_string_lossy().to_string();
+    let mut owns_file = true;
 
     let conn = match db.conn.lock() {
         Ok(conn) => conn,
@@ -346,12 +464,30 @@ pub fn add(db: &DbState, item_id: String, source_path: String) -> Result<Attachm
             return Err(AppError::Database(error.to_string()));
         }
     };
-    if let Err(error) = conn.execute(
-        "INSERT INTO attachments (id, item_id, filename, file_path, mime_type, file_size, created_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        params![id, item_id, filename, relative_str, mime_type, file_size, now],
-    ) {
+    if let Some(existing_path) = find_reusable_file_path(&conn, &content_hash)? {
         let _ = std::fs::remove_file(&dest_path);
+        relative_str = existing_path;
+        dest_path = resolve_file_path(&relative_str);
+        owns_file = false;
+    }
+    if let Err(error) = conn.execute(
+        "INSERT INTO attachments
+         (id, item_id, filename, file_path, mime_type, file_size, content_hash, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        params![
+            id,
+            item_id,
+            filename,
+            relative_str,
+            mime_type,
+            file_size,
+            content_hash,
+            now
+        ],
+    ) {
+        if owns_file {
+            let _ = std::fs::remove_file(&dest_path);
+        }
         return Err(AppError::Database(error.to_string()));
     }
 
@@ -362,6 +498,7 @@ pub fn add(db: &DbState, item_id: String, source_path: String) -> Result<Attachm
         file_path: dest_path.to_string_lossy().to_string(),
         mime_type,
         file_size,
+        content_hash,
         created_at: now,
     })
 }
@@ -384,13 +521,13 @@ pub fn add_bytes(
     let relative_path = PathBuf::from("attachments")
         .join(&safe_item_id)
         .join(format!("{}-{}", &id[..8], filename));
-    let dest_path = paths::quantanote_dir().join(&relative_path);
+    let mut dest_path = paths::quantanote_dir().join(&relative_path);
     write_file_atomically(&dest_path, &bytes)?;
 
-    let file_size = std::fs::metadata(&dest_path)
-        .map(|metadata| metadata.len() as i64)
-        .unwrap_or(0);
-    let relative_str = relative_path.to_string_lossy().to_string();
+    let file_size = bytes.len() as i64;
+    let content_hash = compute_content_hash(&bytes);
+    let mut relative_str = relative_path.to_string_lossy().to_string();
+    let mut owns_file = true;
     let conn = match db.conn.lock() {
         Ok(conn) => conn,
         Err(error) => {
@@ -398,12 +535,30 @@ pub fn add_bytes(
             return Err(AppError::Database(error.to_string()));
         }
     };
-    if let Err(error) = conn.execute(
-        "INSERT INTO attachments (id, item_id, filename, file_path, mime_type, file_size, created_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        params![id, item_id, filename, relative_str, mime_type, file_size, now],
-    ) {
+    if let Some(existing_path) = find_reusable_file_path(&conn, &content_hash)? {
         let _ = std::fs::remove_file(&dest_path);
+        relative_str = existing_path;
+        dest_path = resolve_file_path(&relative_str);
+        owns_file = false;
+    }
+    if let Err(error) = conn.execute(
+        "INSERT INTO attachments
+         (id, item_id, filename, file_path, mime_type, file_size, content_hash, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        params![
+            id,
+            item_id,
+            filename,
+            relative_str,
+            mime_type,
+            file_size,
+            content_hash,
+            now
+        ],
+    ) {
+        if owns_file {
+            let _ = std::fs::remove_file(&dest_path);
+        }
         return Err(AppError::Database(error.to_string()));
     }
 
@@ -414,6 +569,7 @@ pub fn add_bytes(
         file_path: dest_path.to_string_lossy().to_string(),
         mime_type,
         file_size,
+        content_hash,
         created_at: now,
     })
 }
@@ -425,7 +581,7 @@ pub fn get_by_item(db: &DbState, item_id: &str) -> Result<Vec<AttachmentDto>, Ap
         .map_err(|e| AppError::Database(e.to_string()))?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, item_id, filename, file_path, mime_type, file_size, created_at
+            "SELECT id, item_id, filename, file_path, mime_type, file_size, content_hash, created_at
              FROM attachments WHERE item_id = ?1 ORDER BY created_at DESC",
         )
         .map_err(|e| AppError::Database(e.to_string()))?;
@@ -442,7 +598,8 @@ pub fn get_by_item(db: &DbState, item_id: &str) -> Result<Vec<AttachmentDto>, Ap
                     .to_string(),
                 mime_type: row.get(4)?,
                 file_size: row.get(5)?,
-                created_at: row.get(6)?,
+                content_hash: row.get(6)?,
+                created_at: row.get(7)?,
             })
         })
         .map_err(|e| AppError::Database(e.to_string()))?
@@ -504,7 +661,7 @@ pub fn delete(db: &DbState, id: &str) -> Result<(), AppError> {
 
     // 删除文件（在 DB 记录删除之后，避免删了文件但 DB 记录还在的不一致状态）
     if let Some(rel) = relative_path {
-        cleanup_file_paths(&[rel])?;
+        cleanup_file_paths_if_unreferenced(db, &[rel])?;
     }
 
     Ok(())
@@ -547,6 +704,93 @@ mod tests {
 
         let list = get_by_item(&db, &item_id).unwrap();
         assert_eq!(list.len(), 1);
+        assert_eq!(list[0].content_hash, compute_content_hash(b"hello"));
+    }
+
+    #[test]
+    fn duplicate_content_reuses_file_and_deletes_only_after_last_reference() {
+        let (db, first_item_id, _guard) = setup();
+        let second_item = item_repository::create(
+            &db,
+            CreateItemPayload {
+                title: "Second".to_string(),
+                item_type: "note".to_string(),
+                content: None,
+                summary: String::new(),
+            },
+        )
+        .unwrap();
+
+        let first = add_bytes(
+            &db,
+            first_item_id,
+            "first.png".to_string(),
+            "image/png".to_string(),
+            b"same bytes".to_vec(),
+        )
+        .expect("create first attachment");
+        let second = add_bytes(
+            &db,
+            second_item.id.clone(),
+            "renamed.png".to_string(),
+            "image/png".to_string(),
+            b"same bytes".to_vec(),
+        )
+        .expect("create duplicate attachment");
+
+        assert_eq!(first.content_hash, second.content_hash);
+        assert_eq!(first.file_path, second.file_path);
+        assert_eq!(
+            std::fs::read_dir(std::path::Path::new(&first.file_path).parent().unwrap())
+                .unwrap()
+                .filter_map(Result::ok)
+                .count(),
+            1
+        );
+
+        delete(&db, &first.id).expect("delete first reference");
+        assert!(std::path::Path::new(&second.file_path).exists());
+
+        delete(&db, &second.id).expect("delete last reference");
+        assert!(!std::path::Path::new(&second.file_path).exists());
+    }
+
+    #[test]
+    fn deleting_item_keeps_shared_attachment_file_for_remaining_item() {
+        let (db, first_item_id, _guard) = setup();
+        let second_item = item_repository::create(
+            &db,
+            CreateItemPayload {
+                title: "Second item".to_string(),
+                item_type: "note".to_string(),
+                content: None,
+                summary: String::new(),
+            },
+        )
+        .unwrap();
+        let first = add_bytes(
+            &db,
+            first_item_id.clone(),
+            "shared.bin".to_string(),
+            "application/octet-stream".to_string(),
+            b"shared item bytes".to_vec(),
+        )
+        .expect("create first shared attachment");
+        let second = add_bytes(
+            &db,
+            second_item.id.clone(),
+            "shared-copy.bin".to_string(),
+            "application/octet-stream".to_string(),
+            b"shared item bytes".to_vec(),
+        )
+        .expect("create second shared attachment");
+
+        item_repository::delete(&db, &first_item_id).expect("delete first item");
+        assert!(std::path::Path::new(&second.file_path).exists());
+        assert_eq!(get_by_item(&db, &second_item.id).unwrap()[0].id, second.id);
+
+        item_repository::delete(&db, &second_item.id).expect("delete second item");
+        assert!(!std::path::Path::new(&first.file_path).exists());
     }
 
     #[test]

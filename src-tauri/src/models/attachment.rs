@@ -8,6 +8,7 @@ pub struct AttachmentDto {
     pub file_path: String,
     pub mime_type: String,
     pub file_size: i64,
+    pub content_hash: String,
     pub created_at: String,
 }
 
@@ -24,6 +25,7 @@ mod tests {
             file_path: "/path/test.pdf".to_string(),
             mime_type: "application/pdf".to_string(),
             file_size: 1024,
+            content_hash: "a".repeat(64),
             created_at: "2026-01-01".to_string(),
         };
         let json = serde_json::to_string(&dto).unwrap();

@@ -3,7 +3,7 @@ title: Attachments
 description: Manage files associated with your notes and items in QuantaNote.
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-08-29
+lastUpdated: 2026-08-30
 ---
 
 # Attachments
@@ -58,6 +58,10 @@ The **Attachment Manager Modal** is the primary interface for managing an item's
 - **Delete** — Remove an attachment from the item. The file is deleted from the QuantaNote data directory. A confirmation prompt prevents accidental deletion.
 - **File Info** — Each attachment displays its filename, file size, and upload date.
 
+### Duplicate Attachments
+
+QuantaNote computes a SHA-256 hash from each attachment's content. Attachments with identical content reuse the same physical file while keeping separate attachment records and document references. Deleting one reference does not affect the other; the physical file is cleaned up only after the last reference is removed.
+
 ## Storage Location
 
 All attachments are stored on your local filesystem in the QuantaNote data directory:
@@ -72,7 +76,7 @@ On Windows, this resolves to:
 %USERPROFILE%\.quantanote\attachments\{item_id}\
 ```
 
-Each item has its own subdirectory named after the item's ID. Documents refer to attachments with stable `attachment://<id>` references, and the reader resolves them to local asset URLs. When an item is deleted, its attachment directory and all contained files are removed automatically.
+Attachments are grouped under item directories, but identical content may be shared by multiple attachment records. Documents refer to attachments with stable `attachment://<id>` references, and the reader resolves them to local asset URLs. When an item is deleted, a shared file is removed only when no remaining attachment record references it.
 
 ### Backup Considerations
 
