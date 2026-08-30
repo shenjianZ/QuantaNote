@@ -130,6 +130,8 @@ sidebar:
                         path: "/docs/architecture/backend"
                       - title: "数据库设计"
                         path: "/docs/architecture/database"
+                      - title: "本地加密设计"
+                        path: "/docs/architecture/encryption"
                       - title: "IPC 通信"
                         path: "/docs/architecture/ipc"
                       - title: "状态管理"

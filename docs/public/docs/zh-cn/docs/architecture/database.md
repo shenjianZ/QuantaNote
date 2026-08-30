@@ -45,7 +45,7 @@ Write-Ahead Logging (WAL) 模式提供了以下优势：
 | summary_mode | TEXT NOT NULL DEFAULT 'auto' | 摘要模式：auto 或 manual |
 | pinned | INTEGER NOT NULL DEFAULT 0 | 是否置顶（0/1） |
 | favorite | INTEGER NOT NULL DEFAULT 0 | 是否收藏（0/1） |
-| encrypted | INTEGER NOT NULL DEFAULT 0 | 是否加密（0/1） |
+| encrypted | INTEGER NOT NULL DEFAULT 0 | 预留兼容字段；当前版本未实现静态加密（0/1） |
 | created_at | TEXT NOT NULL | 创建时间（ISO 8601） |
 | updated_at | TEXT NOT NULL | 更新时间（ISO 8601） |
 
@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS items (
     summary_mode TEXT NOT NULL DEFAULT 'auto',
     pinned INTEGER NOT NULL DEFAULT 0,
     favorite INTEGER NOT NULL DEFAULT 0,
-    encrypted INTEGER NOT NULL DEFAULT 0,
+    encrypted INTEGER NOT NULL DEFAULT 0, -- 预留字段，当前版本未实现静态加密
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );

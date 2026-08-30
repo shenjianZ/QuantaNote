@@ -45,7 +45,7 @@ Stores core data for all notes, links, files, and other records.
 | summary_mode | TEXT NOT NULL DEFAULT 'auto' | Summary mode: auto or manual |
 | pinned | INTEGER NOT NULL DEFAULT 0 | Whether pinned (0/1) |
 | favorite | INTEGER NOT NULL DEFAULT 0 | Whether favorited (0/1) |
-| encrypted | INTEGER NOT NULL DEFAULT 0 | Whether encrypted (0/1) |
+| encrypted | INTEGER NOT NULL DEFAULT 0 | Reserved compatibility field; at-rest encryption is not implemented (0/1) |
 | created_at | TEXT NOT NULL | Creation timestamp (ISO 8601) |
 | updated_at | TEXT NOT NULL | Update timestamp (ISO 8601) |
 
@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS items (
     summary_mode TEXT NOT NULL DEFAULT 'auto',
     pinned INTEGER NOT NULL DEFAULT 0,
     favorite INTEGER NOT NULL DEFAULT 0,
-    encrypted INTEGER NOT NULL DEFAULT 0,
+    encrypted INTEGER NOT NULL DEFAULT 0, -- Reserved; at-rest encryption is not implemented
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );

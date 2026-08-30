@@ -130,6 +130,8 @@ sidebar:
                         path: "/docs/architecture/backend"
                       - title: "Database Schema"
                         path: "/docs/architecture/database"
+                      - title: "Local Encryption Design"
+                        path: "/docs/architecture/encryption"
                       - title: "IPC Commands"
                         path: "/docs/architecture/ipc"
                       - title: "State Management"
