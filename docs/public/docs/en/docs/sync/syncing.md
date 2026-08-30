@@ -103,7 +103,7 @@ When a sync error occurs:
 - Common errors include network timeouts, server unreachable, and authentication failures
 - Most temporary errors are automatically retried according to the offline queue schedule
 
-The sync settings page also shows this device's last sync time, queue, and retry state. The current version only identifies the local device by its Device ID; it does not yet provide an account-wide device list, device activity times, or remote revocation of other device sessions.
+The sync settings page also shows this device's last sync time, queue, and retry state. After signing in, it lists the account's active device sessions and their last activity times. You can revoke any other device's session; that device must sign in again afterward. The list shows only Device IDs and does not upload device names or extra hardware information.
 
 ## Sync Content
 
