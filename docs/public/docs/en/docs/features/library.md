@@ -61,6 +61,7 @@ Change the sort mode using the sort dropdown in the Library toolbar.
 The Reader Drawer is a side panel that slides in from the right when you click an item card. It provides:
 
 - **Rendered Markdown** — The item's content is rendered as formatted Markdown with proper styling for headings, lists, code blocks, links, and images.
+- **Note links** — Click `[[Note title]]` links to navigate to another note, and use the panel below the content to inspect forward links, backlinks, and the relationship graph.
 - **Metadata** — Tags, timestamps, and summary are displayed at the top of the drawer.
 - **Actions** — Quick action buttons to edit, pin, favorite, or delete the item without closing the drawer.
 - **Close** — Click the close button or press `Escape` to dismiss the drawer.

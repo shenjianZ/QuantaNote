@@ -259,10 +259,14 @@ QuantaNote 已经具备比较完整的本地笔记软件基础：Markdown 编辑
 
 ### P2-02 双向链接和反向链接
 
-- [ ] 支持 `[[笔记名称]]` 链接。
-- [ ] 显示正向链接和反向链接。
-- [ ] 链接不存在时支持快速创建。
-- [ ] 支持查看笔记关系图。
+- [x] 支持 `[[笔记名称]]` 链接。
+- [x] 显示正向链接和反向链接。
+- [x] 链接不存在时支持快速创建。
+- [x] 支持查看笔记关系图。
+
+完成日期：2026-08-30
+修改范围：新增笔记链接模型、实时解析仓储和 Tauri 查询命令；Markdown 阅读预览支持 `[[标题]]` / `[[标题|显示名称]]`；记录库阅读抽屉新增正向链接、反向链接、未解析链接快速创建和 SVG 关系图；补充中英文功能文档、Markdown/记录库说明、E2E 场景及前端/Rust 测试。
+验证结果：`cargo fmt --manifest-path src-tauri/Cargo.toml -- --check`、`cargo check --manifest-path src-tauri/Cargo.toml`、`cargo test --manifest-path src-tauri/Cargo.toml --lib` 通过，共 140 个 Rust 测试通过；`pnpm exec tsc --noEmit`、`pnpm test:unit --run` 通过，共 161 个前端测试通过；全部 E2E JavaScript 文件 `node --check` 通过；`pnpm docs:check` 和 `pnpm docs:build` 通过；完整桌面 E2E 未在本次环境启动运行时执行。
 
 ### P2-03 Frontmatter 和笔记属性
 

@@ -70,6 +70,8 @@ sidebar:
                         path: "/docs/features/library"
                       - title: "Templates"
                         path: "/docs/features/templates"
+                      - title: "Note Links"
+                        path: "/docs/features/note-links"
                       - title: "Document Editor"
                         path: "/docs/features/document-editor"
                       - title: "Markdown Editor"

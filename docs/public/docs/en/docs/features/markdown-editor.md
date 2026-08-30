@@ -72,6 +72,10 @@ Reducing the table size removes rows or columns from the end. Check the trailing
 
 The image button creates the attachment automatically. You can also drop an image into the editor or paste a screenshot from the clipboard. The Attachment Manager's insert action can place an existing attachment at the current caret.
 
+### Note Links
+
+Use `[[Note title]]` in the body to create a note link, or `[[Note title|Display label]]` to customize the visible text. Links can be clicked in the Library reader to navigate; clicking an unresolved target creates an empty note with that title. Examples inside fenced or inline code do not create relationships.
+
 ### GFM Extensions
 
 Supported extensions include tables, task lists, strikethrough, footnotes, and definition lists.

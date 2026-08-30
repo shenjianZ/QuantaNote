@@ -70,6 +70,8 @@ sidebar:
                         path: "/docs/features/library"
                       - title: "模板"
                         path: "/docs/features/templates"
+                      - title: "双向链接"
+                        path: "/docs/features/note-links"
                       - title: "文档编辑器"
                         path: "/docs/features/document-editor"
                       - title: "Markdown 编辑器"
