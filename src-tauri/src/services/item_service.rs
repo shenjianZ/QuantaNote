@@ -5,7 +5,7 @@ use crate::repositories::item_repository;
 use crate::repositories::version_repository;
 use crate::utils::paths;
 
-const VALID_ITEM_TYPES: &[&str] = &["note"];
+const VALID_ITEM_TYPES: &[&str] = &["note", "link", "file", "image", "code", "task"];
 
 fn validate_summary_mode(mode: &str) -> Result<(), AppError> {
     if matches!(mode, SUMMARY_MODE_AUTO | SUMMARY_MODE_MANUAL) {
@@ -258,6 +258,22 @@ mod tests {
 
         assert!(matches!(error, AppError::Validation(_)));
         assert!(error.to_string().contains("标题不能为空"));
+    }
+
+    #[test]
+    fn create_item_accepts_all_supported_item_types() {
+        let db = crate::test_support::test_db();
+
+        for item_type in ["note", "link", "file", "image", "code", "task"] {
+            let item = create_item(
+                &db,
+                format!("{} item", item_type),
+                item_type.to_string(),
+                Some("content".to_string()),
+            )
+            .expect("supported item type should be accepted");
+            assert_eq!(item.item_type, item_type);
+        }
     }
 
     #[test]
