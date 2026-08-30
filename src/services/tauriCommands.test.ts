@@ -25,6 +25,7 @@ import {
   getNoteLinks,
   getNoteBacklinks,
   getNoteLinkGraph,
+  saveAiApiKey,
 } from "./tauriCommands";
 
 describe("tauriCommands", () => {
@@ -66,6 +67,12 @@ describe("tauriCommands", () => {
     await searchItems("rust", "note");
     expect(captured?.cmd).toBe("search_items");
     expect(captured?.args).toMatchObject({ query: "rust", itemType: "note" });
+  });
+
+  it("saveAiApiKey uses the Tauri camelCase argument name", async () => {
+    await saveAiApiKey("test-key");
+    expect(captured?.cmd).toBe("save_ai_api_key");
+    expect(captured?.args).toEqual({ apiKey: "test-key" });
   });
 
   it("calls template commands with stable arguments", async () => {

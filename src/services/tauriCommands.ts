@@ -148,7 +148,7 @@ export async function updateAiConfig(config: AiConfig) {
 }
 
 export async function saveAiApiKey(apiKey: string) {
-    return invoke("save_ai_api_key", { api_key: apiKey });
+    return invoke("save_ai_api_key", { apiKey });
 }
 
 export async function clearAiApiKey() {
