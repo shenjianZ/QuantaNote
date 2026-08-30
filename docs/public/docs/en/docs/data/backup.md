@@ -39,6 +39,14 @@ Before bulk editing, importing, upgrading, or migrating, open **Settings > Data 
 
 The settings page records the time, filename, and size of the most recent successful backup. If a backup fails, that successful record is kept while the reason for the latest failure is shown separately.
 
+## WebDAV Remote Backup
+
+To keep a copy outside the current device, enable WebDAV upload under **Settings > Data Management > WebDAV Remote Backup**. The feature is disabled by default and does not replace local backups: an automatic or manual ZIP is uploaded only after it has passed the local integrity check.
+
+The configuration includes the WebDAV URL, remote directory, and username. The password is not written to the backup configuration JSON; it is stored in the current operating system's credential manager. Leave the password field blank to keep the saved password. Use **Test connection** before saving or relying on the configuration.
+
+If a remote upload fails, the verified local ZIP remains available and the latest remote error is shown in Settings; a later backup can retry the upload. HTTPS is recommended for the WebDAV endpoint. Remote backups are currently ordinary ZIP files, not encrypted backups, so access control and transport security must be configured on the WebDAV server.
+
 ## Backup Manager and Integrity Checks
 
 The Backup Manager shows the backup type, file size, creation time, and integrity status:
