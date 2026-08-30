@@ -33,7 +33,8 @@ import { useSettingsStore } from "../stores/settingsStore";
 import { useAppStore } from "../stores/appStore";
 import { useToastStore } from "../stores/toastStore";
 import { useUpdaterStore } from "../stores/updaterStore";
-import type { RemoteBackupConfig } from "../services/tauriCommands";
+import type { AiConfig, RemoteBackupConfig } from "../services/tauriCommands";
+import { DEFAULT_AI_CONFIG, useAiStore } from "../stores/aiStore";
 import { isMobile } from "../utils/platform";
 import { copyTextToSystemClipboard } from "../utils/clipboard";
 import {
@@ -141,6 +142,8 @@ export function SettingsPage({
     const [remotePassword, setRemotePassword] = useState("");
     const [remoteTesting, setRemoteTesting] = useState(false);
     const [remoteDraft, setRemoteDraft] = useState<RemoteBackupConfig>(DEFAULT_REMOTE_BACKUP);
+    const [aiPassword, setAiPassword] = useState("");
+    const [aiDraft, setAiDraft] = useState<AiConfig>(DEFAULT_AI_CONFIG);
     const [recordingShortcutId, setRecordingShortcutId] = useState<ShortcutId | null>(null);
     const settings = useSettingsStore((s) => s.settings);
     const [shortcutDraft, setShortcutDraft] = useState(settings.shortcuts);
@@ -177,12 +180,23 @@ export function SettingsPage({
     const checkForUpdates = useUpdaterStore((s) => s.checkForUpdates);
     const downloadUpdate = useUpdaterStore((s) => s.downloadUpdate);
     const installUpdate = useUpdaterStore((s) => s.installUpdate);
+    const aiConfig = useAiStore((s) => s.config);
+    const fetchAiConfig = useAiStore((s) => s.fetchConfig);
+    const updateAiConfig = useAiStore((s) => s.updateConfig);
+    const saveAiApiKey = useAiStore((s) => s.saveApiKey);
+    const clearAiApiKey = useAiStore((s) => s.clearApiKey);
 
     useEffect(() => {
         if (autoBackupConfig?.remote) {
             setRemoteDraft(autoBackupConfig.remote);
         }
     }, [autoBackupConfig?.remote]);
+
+    useEffect(() => {
+        if (aiConfig) {
+            setAiDraft(aiConfig);
+        }
+    }, [aiConfig]);
 
     useEffect(() => {
         setShortcutDraft(settings.shortcuts);
@@ -197,7 +211,8 @@ export function SettingsPage({
         fetchBackups();
         fetchDiagnosticsPaths();
         fetchStorageConsistency();
-    }, [init, refreshDbSize, fetchDbPath, fetchAutoBackupConfig, fetchBackupDirPath, fetchBackups, fetchDiagnosticsPaths, fetchStorageConsistency]);
+        fetchAiConfig();
+    }, [init, refreshDbSize, fetchDbPath, fetchAutoBackupConfig, fetchBackupDirPath, fetchBackups, fetchDiagnosticsPaths, fetchStorageConsistency, fetchAiConfig]);
 
     useEffect(() => {
         if (settingsSection != null) {
@@ -283,6 +298,20 @@ export function SettingsPage({
         } finally {
             setRemoteTesting(false);
         }
+    }
+
+    function updateAiDraft<K extends keyof AiConfig>(field: K, value: AiConfig[K]) {
+        setAiDraft((current) => ({ ...current, [field]: value }));
+    }
+
+    function saveAiConfig() {
+        void updateAiConfig(aiDraft);
+    }
+
+    async function handleAiApiKeySave() {
+        if (!aiPassword) return;
+        const saved = await saveAiApiKey(aiPassword);
+        if (saved) setAiPassword("");
     }
 
     function handleShortcutKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, id: ShortcutId) {
@@ -987,6 +1016,94 @@ export function SettingsPage({
                                         <div className="mt-1 break-all">{remoteDraft.last_upload_error}</div>
                                     </div>
                                 )}
+                            </div>
+                        )}
+                    </section>
+                    <section className="mb-6" data-testid="ai-summary-settings">
+                        <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">
+                            {t("settings:data.aiSummary")}
+                        </h2>
+                        <div className="mb-3 text-xs leading-relaxed text-[var(--muted)]">
+                            {t("settings:data.aiSummaryDesc")}
+                        </div>
+                        <div className={rowClass}>
+                            <span className="text-sm text-[var(--text)]">
+                                {t("settings:data.enableAiSummary")}
+                            </span>
+                            {renderToggle(
+                                aiDraft.enabled,
+                                (value) => updateAiDraft("enabled", value),
+                                "ai-summary-toggle",
+                            )}
+                        </div>
+                        {aiDraft.enabled && (
+                            <div className="mt-3 space-y-3 rounded-2xl border border-[var(--line)] bg-[var(--field)] p-4">
+                                <label className="block text-xs text-[var(--muted)]">
+                                    {t("settings:data.aiEndpoint")}
+                                    <input
+                                        className={`${inputClass} mt-1`}
+                                        data-testid="ai-summary-endpoint"
+                                        type="url"
+                                        value={aiDraft.endpoint}
+                                        onChange={(event) => updateAiDraft("endpoint", event.target.value)}
+                                        placeholder="https://api.openai.com/v1/chat/completions"
+                                    />
+                                </label>
+                                <label className="block text-xs text-[var(--muted)]">
+                                    {t("settings:data.aiModel")}
+                                    <input
+                                        className={`${inputClass} mt-1`}
+                                        data-testid="ai-summary-model"
+                                        value={aiDraft.model}
+                                        onChange={(event) => updateAiDraft("model", event.target.value)}
+                                        placeholder="gpt-4o-mini"
+                                    />
+                                </label>
+                                <label className="block text-xs text-[var(--muted)]">
+                                    {t("settings:data.aiApiKey")}
+                                    <input
+                                        className={`${inputClass} mt-1`}
+                                        data-testid="ai-summary-api-key"
+                                        type="password"
+                                        value={aiPassword}
+                                        onChange={(event) => setAiPassword(event.target.value)}
+                                        placeholder={t("settings:data.aiApiKeyPlaceholder")}
+                                    />
+                                </label>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <button
+                                        className="rounded-full bg-[var(--accent)] px-3 py-2 text-xs text-white hover:opacity-90"
+                                        data-testid="ai-summary-save-config-btn"
+                                        type="button"
+                                        onClick={saveAiConfig}
+                                    >
+                                        {t("settings:data.saveAiConfig")}
+                                    </button>
+                                    <button
+                                        className="rounded-full bg-[var(--field)] px-3 py-2 text-xs text-[var(--text)] hover:bg-[var(--hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                                        data-testid="ai-summary-save-key-btn"
+                                        type="button"
+                                        disabled={!aiPassword}
+                                        onClick={() => void handleAiApiKeySave()}
+                                    >
+                                        {t("settings:data.saveAiApiKey")}
+                                    </button>
+                                    {aiDraft.api_key_configured && (
+                                        <button
+                                            className="rounded-full px-3 py-2 text-xs text-red-300 hover:bg-red-400/10"
+                                            data-testid="ai-summary-clear-key-btn"
+                                            type="button"
+                                            onClick={() => void clearAiApiKey()}
+                                        >
+                                            {t("settings:data.clearAiApiKey")}
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="text-xs text-[var(--muted)]">
+                                    {aiDraft.api_key_configured
+                                        ? t("settings:data.aiApiKeyConfigured")
+                                        : t("settings:data.aiApiKeyNotConfigured")}
+                                </div>
                             </div>
                         )}
                     </section>

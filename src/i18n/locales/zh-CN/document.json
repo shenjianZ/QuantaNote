@@ -11,6 +11,11 @@
   "summaryManualHint": "手动编辑后，正文变化不会覆盖摘要。",
   "summaryRegenerate": "重新生成摘要",
   "summaryRegenerated": "摘要已重新生成",
+  "aiSummary": "AI 生成摘要",
+  "aiSummaryGenerating": "正在生成 AI 摘要...",
+  "aiSummaryGenerated": "AI 摘要已生成",
+  "aiSummaryEmpty": "当前笔记没有可供摘要的内容",
+  "aiSummaryHint": "仅在点击按钮时将标题和正文发送到已配置的 AI 服务；不会自动上传，也不会读取附件、PDF 或 OCR 内容。",
   "sidebar": {
     "show": "显示描述和目录",
     "hide": "隐藏描述和目录"

@@ -11,6 +11,11 @@
   "summaryManualHint": "Manual edits are preserved when the content changes.",
   "summaryRegenerate": "Regenerate Summary",
   "summaryRegenerated": "Summary regenerated",
+  "aiSummary": "AI Summary",
+  "aiSummaryGenerating": "Generating AI summary...",
+  "aiSummaryGenerated": "AI summary generated",
+  "aiSummaryEmpty": "This note has no content to summarize",
+  "aiSummaryHint": "Only when clicked, the configured AI service receives the title and body; attachments, PDFs, and OCR content are not read or uploaded.",
   "sidebar": {
     "show": "Show description and outline",
     "hide": "Hide description and outline"

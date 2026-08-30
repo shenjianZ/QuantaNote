@@ -3,6 +3,7 @@ import { fireEvent, screen } from "@testing-library/react";
 import { setup } from "../test/test-utils";
 import { SettingsPage } from "./SettingsPage";
 import { useSettingsStore } from "../stores/settingsStore";
+import { DEFAULT_AI_CONFIG, useAiStore } from "../stores/aiStore";
 import { DEFAULT_SHORTCUTS } from "../utils/shortcutRegistry";
 
 vi.mock("@tauri-apps/plugin-opener", () => ({
@@ -16,6 +17,9 @@ describe("SettingsPage", () => {
     const saveRemoteBackupPasswordMock = vi.fn();
     const clearRemoteBackupPasswordMock = vi.fn();
     const testRemoteBackupMock = vi.fn();
+    const updateAiConfigMock = vi.fn(async () => true);
+    const saveAiApiKeyMock = vi.fn(async () => true);
+    const clearAiApiKeyMock = vi.fn(async () => true);
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -94,6 +98,13 @@ describe("SettingsPage", () => {
             repairStorageConsistency: vi.fn(),
             updateSqlLogging: updateSqlLoggingMock,
             clearSqlLogFile: vi.fn(),
+        });
+        useAiStore.setState({
+            config: DEFAULT_AI_CONFIG,
+            fetchConfig: vi.fn(),
+            updateConfig: updateAiConfigMock,
+            saveApiKey: saveAiApiKeyMock,
+            clearApiKey: clearAiApiKeyMock,
         });
     });
 
@@ -268,5 +279,23 @@ describe("SettingsPage", () => {
 
         await user.click(screen.getByTestId("remote-backup-save-password-btn"));
         expect(saveRemoteBackupPasswordMock).toHaveBeenCalledWith("secret");
+    });
+
+    it("configures AI summary and stores the API key separately", async () => {
+        const { user } = setup(<SettingsPage />);
+
+        await user.click(screen.getByText("数据"));
+        await user.click(screen.getByTestId("ai-summary-toggle"));
+        await user.clear(screen.getByTestId("ai-summary-model"));
+        await user.type(screen.getByTestId("ai-summary-model"), "local-model");
+        await user.click(screen.getByTestId("ai-summary-save-config-btn"));
+
+        expect(updateAiConfigMock).toHaveBeenCalledWith(
+            expect.objectContaining({ enabled: true, model: "local-model" }),
+        );
+
+        await user.type(screen.getByTestId("ai-summary-api-key"), "sk-test");
+        await user.click(screen.getByTestId("ai-summary-save-key-btn"));
+        expect(saveAiApiKeyMock).toHaveBeenCalledWith("sk-test");
     });
 });

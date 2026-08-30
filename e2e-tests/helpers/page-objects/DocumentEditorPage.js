@@ -11,6 +11,7 @@ class DocumentEditorPage {
   get summaryInput() { return "[data-testid='doc-summary-input']"; }
   get summaryModeSelect() { return "[data-testid='doc-summary-mode-select']"; }
   get summaryRegenerateBtn() { return "[data-testid='doc-summary-regenerate-btn']"; }
+  get aiSummaryBtn() { return "[data-testid='doc-ai-summary-btn']"; }
   get saveStatus() { return "[data-testid='doc-save-status']"; }
   get saveVersionBtn() { return "[data-testid='doc-save-version-btn']"; }
   get favoriteBtn() { return "[data-testid='doc-favorite-btn']"; }
@@ -112,6 +113,10 @@ class DocumentEditorPage {
   async regenerateSummary() {
     await $(this.summaryRegenerateBtn).click();
     await observePause();
+  }
+
+  async hasAiSummaryButton() {
+    return (await $(this.aiSummaryBtn)).isDisplayed();
   }
 
   async typeContent(text) {

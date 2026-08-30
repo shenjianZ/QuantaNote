@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, Clock, Loader2, Paperclip, RefreshCw, Save, Star } from "lucide-react";
+import { ArrowLeft, Clock, Loader2, Paperclip, RefreshCw, Save, Sparkles, Star } from "lucide-react";
 import { useAppStore } from "../stores/appStore";
 import { useItemStore } from "../stores/itemStore";
 import { getVditorLang } from "../utils/vditorConfig";
@@ -9,7 +9,7 @@ import { VersionPanel, type VersionDto } from "../components/editor/VersionPanel
 import { DocumentOutline, DocumentOutlineToggle } from "../components/editor/DocumentOutline";
 import type { VditorEditorHandle } from "../components/editor/VditorEditor";
 import { ContentWidthControl } from "../components/common/ContentWidthControl";
-import { getVersions, createVersion, updateVersion, restoreVersion, deleteVersion, type ItemDto, type SummaryMode } from "../services/tauriCommands";
+import { generateAiSummary, getVersions, createVersion, updateVersion, restoreVersion, deleteVersion, type ItemDto, type SummaryMode } from "../services/tauriCommands";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useResponsiveContentWidth } from "../hooks/useResponsiveContentWidth";
 import { CONTENT_WIDTH_EDITOR_BASE, CONTENT_WIDTH_OUTLINE_LAYOUT } from "../utils/contentWidth";
@@ -81,6 +81,7 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
   const [isFavorite, setIsFavorite] = useState(false);
   const [versionPanelOpen, setVersionPanelOpen] = useState(false);
   const [attachmentModalOpen, setAttachmentModalOpen] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
   const [activeHeadingIndex, setActiveHeadingIndex] = useState(-1);
   const editorRef = useRef<VditorEditorHandle>(null);
   const editorViewportRef = useRef<HTMLDivElement>(null);
@@ -331,6 +332,36 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
       console.error("Regenerate summary failed:", e);
       setSaved(true);
       useToastStore.getState().addToast("error", t("common:toast.itemUpdateFailed"));
+    }
+  }
+
+  async function handleGenerateAiSummary() {
+    if (aiGenerating || !selectedItemId) return;
+    if (!latestTitle.current.trim() && !latestContent.current.trim()) {
+      useToastStore.getState().addToast("error", t("document:aiSummaryEmpty"));
+      return;
+    }
+    if (!(await flushSave())) return;
+
+    setAiGenerating(true);
+    setSaved(false);
+    const sourceTitle = latestTitle.current;
+    const sourceContent = latestContent.current;
+    try {
+      const generated = await generateAiSummary(sourceTitle, sourceContent);
+      latestSummary.current = generated;
+      latestSummaryMode.current = "manual";
+      setSummary(generated);
+      setSummaryMode("manual");
+      const savedResult = await triggerSave(sourceTitle, generated, sourceContent, "manual");
+      if (!savedResult) return;
+      useToastStore.getState().addToast("success", t("document:aiSummaryGenerated"));
+    } catch (error) {
+      console.error("AI summary generation failed:", error);
+      setSaved(true);
+      useToastStore.getState().addToast("error", t("common:toast.aiSummaryFailed"));
+    } finally {
+      setAiGenerating(false);
     }
   }
 
@@ -602,15 +633,30 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
                   />
                 </span>
               </label>
-              <button
-                className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-xl border border-[var(--line)] px-3 text-xs text-[var(--muted)] transition-colors hover:border-[var(--accent)] hover:text-[var(--text)]"
-                type="button"
-                data-testid="doc-summary-regenerate-btn"
-                onClick={() => { void handleRegenerateSummary(); }}
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-                {t("document:summaryRegenerate")}
-              </button>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <button
+                  className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-xl border border-[var(--line)] px-3 text-xs text-[var(--muted)] transition-colors hover:border-[var(--accent)] hover:text-[var(--text)]"
+                  type="button"
+                  data-testid="doc-summary-regenerate-btn"
+                  onClick={() => { void handleRegenerateSummary(); }}
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  {t("document:summaryRegenerate")}
+                </button>
+                <button
+                  className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-xl border border-[var(--line)] px-3 text-xs text-[var(--muted)] transition-colors hover:border-[var(--accent)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-50"
+                  type="button"
+                  data-testid="doc-ai-summary-btn"
+                  disabled={aiGenerating || (!title.trim() && !content.trim())}
+                  onClick={() => { void handleGenerateAiSummary(); }}
+                >
+                  {aiGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  {t(aiGenerating ? "document:aiSummaryGenerating" : "document:aiSummary")}
+                </button>
+              </div>
+              <p className="text-[11px] leading-relaxed text-[var(--muted)]">
+                {t("document:aiSummaryHint")}
+              </p>
               <p className="text-[11px] leading-relaxed text-[var(--muted)]">
                 {t(summaryMode === "auto" ? "document:summaryAutoHint" : "document:summaryManualHint")}
               </p>

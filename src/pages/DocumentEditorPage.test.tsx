@@ -106,6 +106,7 @@ describe("DocumentEditorPage", () => {
       if (cmd === "get_attachments") return [];
       if (cmd === "create_version") return { id: "ver-1", version_number: 1, content: "c", name: "v1", description: "", created_at: new Date().toISOString() };
       if (cmd === "restore_version") return mockedRestoredItem;
+      if (cmd === "generate_ai_summary") return "AI 生成的摘要";
       return null;
     });
   });
@@ -269,6 +270,21 @@ describe("DocumentEditorPage", () => {
     await waitFor(() => expect(regenerateSummaryMock).toHaveBeenCalledWith("item-1"));
     expect(screen.getByTestId("doc-summary-input")).toHaveValue("自动生成摘要");
     expect(screen.getByTestId("doc-summary-mode-badge")).toHaveTextContent("自动摘要");
+  });
+
+  it("generates an AI summary only after an explicit click and saves it manually", async () => {
+    const { user } = setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
+
+    await user.click(screen.getByTestId("doc-ai-summary-btn"));
+    await waitFor(() => expect(screen.getByTestId("doc-summary-input")).toHaveValue("AI 生成的摘要"));
+
+    expect(updateItemMock).toHaveBeenLastCalledWith("item-1", {
+      title: "测试文档",
+      summary: "AI 生成的摘要",
+      content: "初始内容",
+      summaryMode: "manual",
+    });
+    expect(screen.getByTestId("doc-summary-mode-badge")).toHaveTextContent("手动摘要");
   });
 
   it("creates version on save version click", async () => {

@@ -132,6 +132,33 @@ export async function regenerateSummary(itemId: string) {
     return invoke<ItemDto>("regenerate_summary", { id: itemId });
 }
 
+export interface AiConfig {
+    enabled: boolean;
+    endpoint: string;
+    model: string;
+    api_key_configured: boolean;
+}
+
+export async function getAiConfig() {
+    return invoke<AiConfig>("get_ai_config");
+}
+
+export async function updateAiConfig(config: AiConfig) {
+    return invoke("update_ai_config", { config });
+}
+
+export async function saveAiApiKey(apiKey: string) {
+    return invoke("save_ai_api_key", { api_key: apiKey });
+}
+
+export async function clearAiApiKey() {
+    return invoke("clear_ai_api_key");
+}
+
+export async function generateAiSummary(title: string, content: string) {
+    return invoke<string>("generate_ai_summary", { title, content });
+}
+
 // Search commands
 export type SearchMode = "normal" | "advanced";
 export type SearchScope = "content" | "tags" | "attachments" | "versions";
