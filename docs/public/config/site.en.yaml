@@ -68,6 +68,8 @@ sidebar:
                         path: "/docs/features/workspace"
                       - title: "Library"
                         path: "/docs/features/library"
+                      - title: "Templates"
+                        path: "/docs/features/templates"
                       - title: "Document Editor"
                         path: "/docs/features/document-editor"
                       - title: "Markdown Editor"

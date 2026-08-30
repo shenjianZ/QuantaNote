@@ -81,6 +81,6 @@ Each item in the Library supports a set of actions accessible via the card's con
 
 ## Create New Item
 
-A prominent **New Note** button is available in the Library toolbar. Clicking it creates a new empty item and immediately opens it in the Document Editor, where you can start writing.
+A prominent **New Note** button is available in the Library toolbar. Clicking it opens the template picker, where you can choose a blank note, a built-in template, or one of your custom templates before entering the Document Editor.
 
 Alternatively, you can create items quickly from the Workspace using the quick capture flow.

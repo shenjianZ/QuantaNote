@@ -68,6 +68,8 @@ sidebar:
                         path: "/docs/features/workspace"
                       - title: "记录库"
                         path: "/docs/features/library"
+                      - title: "模板"
+                        path: "/docs/features/templates"
                       - title: "文档编辑器"
                         path: "/docs/features/document-editor"
                       - title: "Markdown 编辑器"
