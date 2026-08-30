@@ -76,6 +76,11 @@
   "backupManager": {
     "title": "备份管理",
     "noBackups": "暂无备份记录",
+    "automatic": "自动",
+    "manual": "手动",
+    "verified": "完整性已验证",
+    "invalid": "校验失败",
+    "verifyBackup": "检查备份完整性",
     "deleteBackup": "删除此备份",
     "close": "关闭"
   },

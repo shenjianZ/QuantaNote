@@ -8,7 +8,7 @@ lastUpdated: 2026-05-03
 
 # Data Management
 
-QuantaNote provides comprehensive data management features to help you safely import, export, and back up all your note data. Your data is stored locally as a SQLite database, giving you complete control over your information.
+QuantaNote provides comprehensive data management features to help you safely import, export, and back up all your note data. The active data is stored locally in SQLite, while built-in automatic and manual backups create logical ZIP files that can be imported and migrated.
 
 ## Feature Overview
 
@@ -54,3 +54,5 @@ All QuantaNote local data is stored in the following directory:
 On Windows, the default path is `%USERPROFILE%\.quantanote\`.
 
 > **Tip:** If you are also using the sync feature, local data will be kept in sync with the remote server, but backups are always local operations.
+
+> **Distinction:** `quanta_note.sqlite` is the active database used by the app. **Backup Now** and automatic backup create verified logical ZIP files under `backups/`. These serve different purposes; see the [backup guide](./backup) for details.

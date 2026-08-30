@@ -28,6 +28,7 @@ import {
     getBackupDirPath as getBackupDirPathCmd,
     listBackups as listBackupsCmd,
     deleteBackup as deleteBackupCmd,
+    verifyBackup as verifyBackupCmd,
     updateSqlLogConfig as updateSqlLogConfigCmd,
     clearSqlLog as clearSqlLogCmd,
     getLogDir as getLogDirCmd,
@@ -39,6 +40,7 @@ import {
     type ExportSizeEstimate,
     type AutoBackupConfig,
     type BackupFileInfo,
+    type BackupVerification,
     type SqlLogConfig,
     type StorageConsistencyReport,
     getStorageConsistencyReport,
@@ -356,6 +358,7 @@ interface SettingsState {
     fetchBackupDirPath: () => Promise<void>;
     fetchBackups: () => Promise<void>;
     deleteBackup: (filename: string) => Promise<void>;
+    verifyBackup: (filename: string) => Promise<BackupVerification>;
     fetchDiagnosticsPaths: () => Promise<void>;
     fetchStorageConsistency: () => Promise<void>;
     repairStorageConsistency: () => Promise<void>;
@@ -716,6 +719,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             await get().fetchAutoBackupConfig();
             useToastStore.getState().addToast("success", i18n.t("common:toast.backupSuccess"));
         } catch {
+            await get().fetchAutoBackupConfig();
             useToastStore.getState().addToast("error", i18n.t("common:toast.backupFailed"));
         }
     },
@@ -757,6 +761,22 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             set({ logDir, sqlLogPath });
         } catch {
             set({ logDir: "", sqlLogPath: "" });
+        }
+    },
+
+    verifyBackup: async (filename: string) => {
+        try {
+            const verification = await verifyBackupCmd(filename);
+            await get().fetchBackups();
+            if (verification.valid) {
+                useToastStore.getState().addToast("success", i18n.t("common:toast.backupVerified"));
+            } else {
+                useToastStore.getState().addToast("error", i18n.t("common:toast.backupInvalid"));
+            }
+            return verification;
+        } catch (error) {
+            useToastStore.getState().addToast("error", i18n.t("common:toast.backupVerifyFailed"));
+            throw error;
         }
     },
 

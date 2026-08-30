@@ -435,12 +435,26 @@ export interface AutoBackupConfig {
     max_backups: number;
     expire_days: number;
     last_backup_at: string | null;
+    last_backup_filename?: string | null;
+    last_backup_size?: number | null;
+    last_backup_error?: string | null;
 }
 
 export interface BackupFileInfo {
     filename: string;
     size: number;
     created_at: string;
+    backup_type: "automatic" | "manual";
+    verified: boolean;
+    verification_error: string | null;
+}
+
+export interface BackupVerification {
+    filename: string;
+    size: number;
+    valid: boolean;
+    checked_at: string;
+    error: string | null;
 }
 
 export async function getAutoBackupConfig() {
@@ -465,6 +479,10 @@ export async function listBackups() {
 
 export async function deleteBackup(filename: string) {
     return invoke("delete_backup", { filename });
+}
+
+export async function verifyBackup(filename: string) {
+    return invoke<BackupVerification>("verify_backup", { filename });
 }
 
 // Settings (SQLite-backed)

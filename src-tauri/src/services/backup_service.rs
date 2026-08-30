@@ -15,6 +15,12 @@ pub struct AutoBackupConfig {
     pub max_backups: u32,
     pub expire_days: u32,
     pub last_backup_at: Option<String>,
+    #[serde(default)]
+    pub last_backup_filename: Option<String>,
+    #[serde(default)]
+    pub last_backup_size: Option<u64>,
+    #[serde(default)]
+    pub last_backup_error: Option<String>,
 }
 
 #[derive(Serialize, Clone)]
@@ -22,6 +28,18 @@ pub struct BackupFileInfo {
     pub filename: String,
     pub size: u64,
     pub created_at: String,
+    pub backup_type: String,
+    pub verified: bool,
+    pub verification_error: Option<String>,
+}
+
+#[derive(Serialize, Clone)]
+pub struct BackupVerification {
+    pub filename: String,
+    pub size: u64,
+    pub valid: bool,
+    pub checked_at: String,
+    pub error: Option<String>,
 }
 
 impl Default for AutoBackupConfig {
@@ -32,8 +50,38 @@ impl Default for AutoBackupConfig {
             max_backups: 10,
             expire_days: 90,
             last_backup_at: None,
+            last_backup_filename: None,
+            last_backup_size: None,
+            last_backup_error: None,
         }
     }
+}
+
+#[derive(Clone, Copy)]
+enum BackupKind {
+    Automatic,
+    Manual,
+}
+
+impl BackupKind {
+    fn prefix(self) -> &'static str {
+        match self {
+            Self::Automatic => "auto-backup",
+            Self::Manual => "manual-backup",
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Automatic => "automatic",
+            Self::Manual => "manual",
+        }
+    }
+}
+
+struct BackupArtifact {
+    filename: String,
+    size: u64,
 }
 
 fn backups_dir() -> PathBuf {
@@ -86,17 +134,32 @@ fn should_backup(config: &AutoBackupConfig) -> bool {
     }
 }
 
-fn do_backup(db: &DbState) -> Result<String, AppError> {
+fn do_backup(db: &DbState, kind: BackupKind) -> Result<BackupArtifact, AppError> {
     let dir = backups_dir();
     std::fs::create_dir_all(&dir).map_err(|e| AppError::Io(e.to_string()))?;
 
     let now = chrono::Utc::now().format("%Y-%m-%dT%H-%M-%S").to_string();
-    let filename = format!("backup-{}.zip", now);
+    let unique_suffix = uuid::Uuid::new_v4().simple().to_string();
+    let filename = format!("{}-{}-{}.zip", kind.prefix(), now, &unique_suffix[..8]);
     let dest = dir.join(&filename);
+    let temp = dir.join(format!(".{}.{}.tmp", filename, uuid::Uuid::new_v4()));
 
-    data_io_service::create_backup_zip(db, &dest)?;
+    let result = (|| {
+        data_io_service::create_backup_zip(db, &temp)?;
+        data_io_service::verify_backup_zip(&temp)?;
+        let size = std::fs::metadata(&temp)
+            .map_err(|e| AppError::Io(format!("读取备份大小失败: {}", e)))?
+            .len();
+        std::fs::rename(&temp, &dest).map_err(|e| AppError::Io(format!("保存备份失败: {}", e)))?;
 
-    Ok(filename)
+        Ok(BackupArtifact { filename, size })
+    })();
+
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temp);
+    }
+
+    result
 }
 
 fn cleanup_old_backups(config: &AutoBackupConfig) {
@@ -109,7 +172,13 @@ fn cleanup_old_backups(config: &AutoBackupConfig) {
     if let Ok(entries) = std::fs::read_dir(&dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().map_or(false, |e| e == "zip") {
+            let filename = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or_default();
+            if path.extension().map_or(false, |e| e == "zip")
+                && is_automatic_backup_filename(filename)
+            {
                 if let Ok(meta) = path.metadata() {
                     files.push((path, meta));
                 }
@@ -140,20 +209,45 @@ fn cleanup_old_backups(config: &AutoBackupConfig) {
     }
 }
 
+fn is_automatic_backup_filename(filename: &str) -> bool {
+    filename.starts_with("auto-backup-") || filename.starts_with("backup-")
+}
+
+fn backup_path(filename: &str) -> Result<PathBuf, AppError> {
+    let safe_name = sanitize_filename(filename);
+    if safe_name != filename || !filename.ends_with(".zip") {
+        return Err(AppError::Validation("备份文件名无效".to_string()));
+    }
+    Ok(backups_dir().join(safe_name))
+}
+
+fn mark_backup_success(config: &mut AutoBackupConfig, artifact: &BackupArtifact) {
+    config.last_backup_at = Some(chrono::Utc::now().to_rfc3339());
+    config.last_backup_filename = Some(artifact.filename.clone());
+    config.last_backup_size = Some(artifact.size);
+    config.last_backup_error = None;
+}
+
+fn mark_backup_failure(config: &mut AutoBackupConfig, error: &AppError) {
+    config.last_backup_error = Some(error.to_string());
+}
+
 pub fn run_auto_backup(db: &DbState) {
     let mut config = load_config();
     if !should_backup(&config) {
         return;
     }
 
-    match do_backup(db) {
-        Ok(_) => {
-            config.last_backup_at = Some(chrono::Utc::now().to_rfc3339());
+    match do_backup(db, BackupKind::Automatic) {
+        Ok(artifact) => {
+            mark_backup_success(&mut config, &artifact);
             let _ = save_config(&config);
             cleanup_old_backups(&config);
             log::info!("自动备份完成");
         }
         Err(e) => {
+            mark_backup_failure(&mut config, &e);
+            let _ = save_config(&config);
             log::warn!("自动备份失败: {}", e);
         }
     }
@@ -177,14 +271,19 @@ pub fn start_backup_scheduler(app: &AppHandle) {
 }
 
 pub fn trigger_backup_now(db: &DbState) -> Result<String, AppError> {
-    let filename = do_backup(db)?;
-
     let mut config = load_config();
-    config.last_backup_at = Some(chrono::Utc::now().to_rfc3339());
-    save_config(&config)?;
-    cleanup_old_backups(&config);
-
-    Ok(filename)
+    match do_backup(db, BackupKind::Manual) {
+        Ok(artifact) => {
+            mark_backup_success(&mut config, &artifact);
+            save_config(&config)?;
+            Ok(artifact.filename)
+        }
+        Err(e) => {
+            mark_backup_failure(&mut config, &e);
+            let _ = save_config(&config);
+            Err(e)
+        }
+    }
 }
 
 pub fn get_backup_dir_path() -> Result<String, AppError> {
@@ -217,10 +316,23 @@ pub fn list_backups() -> Result<Vec<BackupFileInfo>, AppError> {
                 })
                 .unwrap_or_default();
 
+            let verification_error = match data_io_service::verify_backup_zip(&path) {
+                Ok(()) => None,
+                Err(error) => Some(error.to_string()),
+            };
+            let backup_type = if filename.starts_with("manual-backup-") {
+                BackupKind::Manual.label()
+            } else {
+                BackupKind::Automatic.label()
+            };
+
             files.push(BackupFileInfo {
                 filename,
                 size: meta.len(),
                 created_at,
+                backup_type: backup_type.to_string(),
+                verified: verification_error.is_none(),
+                verification_error,
             });
         }
     }
@@ -241,4 +353,88 @@ pub fn delete_backup(filename: String) -> Result<(), AppError> {
     }
     std::fs::remove_file(&path).map_err(|e| AppError::Io(e.to_string()))?;
     Ok(())
+}
+
+pub fn verify_backup(filename: String) -> Result<BackupVerification, AppError> {
+    let path = backup_path(&filename)?;
+    let size = std::fs::metadata(&path)
+        .map_err(|_| AppError::NotFound("备份文件不存在".to_string()))?
+        .len();
+    let error = data_io_service::verify_backup_zip(&path)
+        .err()
+        .map(|error| error.to_string());
+
+    Ok(BackupVerification {
+        filename,
+        size,
+        valid: error.is_none(),
+        checked_at: chrono::Utc::now().to_rfc3339(),
+        error,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn legacy_config_gets_new_status_defaults() {
+        let config: AutoBackupConfig = serde_json::from_value(serde_json::json!({
+            "enabled": true,
+            "interval_days": 7,
+            "max_backups": 10,
+            "expire_days": 90,
+            "last_backup_at": null,
+        }))
+        .expect("deserialize legacy config");
+
+        assert!(config.last_backup_filename.is_none());
+        assert!(config.last_backup_size.is_none());
+        assert!(config.last_backup_error.is_none());
+    }
+
+    #[test]
+    fn manual_backups_are_not_removed_by_automatic_cleanup() {
+        let data_dir = crate::test_support::unique_temp_dir("backup-cleanup");
+        let _guard = crate::test_support::lock_test_data_dir(&data_dir);
+        let dir = backups_dir();
+        std::fs::create_dir_all(&dir).expect("create backup dir");
+        let automatic = dir.join("auto-backup-old.zip");
+        let legacy = dir.join("backup-legacy.zip");
+        let manual = dir.join("manual-backup-important.zip");
+        std::fs::write(&automatic, b"automatic").expect("write automatic backup");
+        std::fs::write(&legacy, b"legacy").expect("write legacy backup");
+        std::fs::write(&manual, b"manual").expect("write manual backup");
+
+        cleanup_old_backups(&AutoBackupConfig {
+            max_backups: 0,
+            expire_days: 365,
+            ..AutoBackupConfig::default()
+        });
+
+        assert!(!automatic.exists());
+        assert!(!legacy.exists());
+        assert!(manual.exists());
+    }
+
+    #[test]
+    fn backup_is_verified_before_atomic_rename() {
+        let data_dir = crate::test_support::unique_temp_dir("backup-atomic");
+        let _guard = crate::test_support::lock_test_data_dir(&data_dir);
+        let db = crate::test_support::test_db();
+
+        let artifact = do_backup(&db, BackupKind::Manual).expect("create manual backup");
+        assert!(artifact.filename.starts_with("manual-backup-"));
+        assert!(artifact.size > 0);
+        assert!(backups_dir().join(&artifact.filename).is_file());
+        data_io_service::verify_backup_zip(&backups_dir().join(&artifact.filename))
+            .expect("renamed backup should remain verifiable");
+
+        let temp_files = std::fs::read_dir(backups_dir())
+            .expect("read backup dir")
+            .flatten()
+            .filter(|entry| entry.file_name().to_string_lossy().ends_with(".tmp"))
+            .count();
+        assert_eq!(temp_files, 0);
+    }
 }

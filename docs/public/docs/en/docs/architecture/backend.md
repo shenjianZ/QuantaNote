@@ -117,7 +117,7 @@ All Commands are registered in `lib.rs` via the `invoke_handler`:
 | search | `commands/search.rs` | 1 | FTS5 full-text search |
 | settings | `commands/settings.rs` | 2 | Settings read/write |
 | data_io | `commands/data_io.rs` | 6 | JSON/ZIP import/export, file read/write, size estimation |
-| auto_backup | `commands/auto_backup.rs` | 6 | Backup config, trigger, list, delete |
+| auto_backup | `commands/auto_backup.rs` | 7 | Backup config, trigger, list, delete, integrity verification |
 | diagnostics | `commands/diagnostics.rs` | 4 | SQL log config, clear, path retrieval |
 | sync | `commands/sync.rs` | 12 | Sync config, state, auth, trigger, conflict resolution, history |
 

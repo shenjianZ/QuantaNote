@@ -10,6 +10,7 @@ class BackupManagerModal {
   get emptyState() { return "[data-testid='backup-empty']"; }
   get list() { return "[data-testid='backup-list']"; }
   get items() { return "[data-testid='backup-item']"; }
+  get verifyBtns() { return "[data-testid='backup-verify-btn']"; }
   get deleteBtns() { return "[data-testid='backup-delete-btn']"; }
   get closeBtn() { return "[data-testid='backup-close-btn']"; }
 
@@ -42,6 +43,14 @@ class BackupManagerModal {
         await btns[index].click();
         await observePause();
       }
+    }
+  }
+
+  async verifyBackup(index) {
+    const btns = await $$(this.verifyBtns);
+    if (btns[index]) {
+      await btns[index].click();
+      await observePause();
     }
   }
 

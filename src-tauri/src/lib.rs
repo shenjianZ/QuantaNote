@@ -308,6 +308,7 @@ pub fn run() {
             auto_backup::get_backup_dir_path,
             auto_backup::list_backups,
             auto_backup::delete_backup,
+            auto_backup::verify_backup,
             tag::get_all_tags,
             tag::create_tag,
             tag::delete_tag,

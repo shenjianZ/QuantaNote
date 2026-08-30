@@ -117,7 +117,7 @@ pub fn create_item(
 | search | `commands/search.rs` | 1 | FTS5 全文搜索 |
 | settings | `commands/settings.rs` | 2 | 设置读写 |
 | data_io | `commands/data_io.rs` | 6 | JSON/ZIP 导入导出、文件读写、大小估算 |
-| auto_backup | `commands/auto_backup.rs` | 6 | 备份配置、触发、列表、删除 |
+| auto_backup | `commands/auto_backup.rs` | 7 | 备份配置、触发、列表、删除、完整性校验 |
 | diagnostics | `commands/diagnostics.rs` | 4 | SQL 日志配置、清理、路径获取 |
 | sync | `commands/sync.rs` | 12 | 同步配置、状态、认证、触发、冲突解决、历史 |
 

@@ -162,6 +162,7 @@ Stores communicate with the backend indirectly through the service layer, ensuri
 | `get_backup_dir_path` | (none) | string | Get backup directory |
 | `list_backups` | (none) | BackupFileInfo[] | List backup files |
 | `delete_backup` | filename | void | Delete backup |
+| `verify_backup` | filename | BackupVerification | Verify ZIP backup integrity |
 
 ## Type Contracts
 

@@ -76,6 +76,11 @@
   "backupManager": {
     "title": "Backup Manager",
     "noBackups": "No backups",
+    "automatic": "Automatic",
+    "manual": "Manual",
+    "verified": "Integrity verified",
+    "invalid": "Verification failed",
+    "verifyBackup": "Check backup integrity",
     "deleteBackup": "Delete this backup",
     "close": "Close"
   },

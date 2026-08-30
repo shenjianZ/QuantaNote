@@ -142,7 +142,7 @@ search: async (q, itemType, options) => {
 | dbSize | string | 数据库大小 |
 | dbPath | string | 数据库路径 |
 | autoBackupConfig | AutoBackupConfig \| null | 自动备份配置 |
-| backupFiles | BackupFileInfo[] | 备份文件列表 |
+| backupFiles | BackupFileInfo[] | 备份文件列表，包含类型、大小和完整性状态 |
 | sqlLogging | SqlLogSettings | SQL 日志设置 |
 
 | 关键操作 | 说明 |
@@ -153,6 +153,7 @@ search: async (q, itemType, options) => {
 | exportDataWithOptions(options) | ZIP 导出数据 |
 | importDataWithOptions(options) | ZIP 导入数据 |
 | triggerBackupNow() | 立即执行备份 |
+| verifyBackup(filename) | 检查指定 ZIP 备份的完整性 |
 | updateSqlLogging(partial) | 更新 SQL 日志配置 |
 
 ### syncStore

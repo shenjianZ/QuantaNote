@@ -1,114 +1,78 @@
 ---
 title: Backup
-description: QuantaNote backup features including automatic scheduled backups and manual instant backups with configurable intervals, retention limits, and expiration policies
+description: QuantaNote backup features with scheduled backups, manual snapshots, integrity checks, and failure status reporting
 author: QuantaNote Team
 createdAt: 2026-05-03
-lastUpdated: 2026-05-03
+lastUpdated: 2026-08-30
 ---
 
 # Backup
 
-QuantaNote provides a flexible backup mechanism, including automatic scheduled backups and manual instant backups. Backup data is saved as SQLite database copies, ensuring your note data can be recovered in any unexpected situation.
+QuantaNote's built-in automatic and manual backups create **logical ZIP backups**. They are not copies of the live SQLite database file. Instead, notes, tags, versions, and attachments are packaged in QuantaNote's ZIP format so the data can be restored or migrated through the app.
 
 ## Auto Backup
 
-The auto backup feature automatically creates database backups at configured time intervals without manual intervention.
+Auto backup creates a ZIP file at the configured interval while the application is running. The scheduled task does not run while the application is closed.
 
-**Enabling auto backup:**
+**To enable auto backup:**
 
-1. Open the **Settings > Data Management** page
-2. Find the "Auto Backup" option
-3. Toggle the auto backup switch on
-4. Configure backup parameters (see "Backup Configuration" below)
+1. Open **Settings > Data Management**
+2. Find **Auto Backup**
+3. Turn on the toggle
+4. Configure the interval, maximum count, and expiration period
 
-Once enabled, QuantaNote will automatically create backups at the configured interval while the application is running. If the application is not running, backup tasks will not be triggered.
-
-> **Note:** Auto backup only works while the application is running. If you rarely open QuantaNote, consider performing manual backups regularly as well.
+Each automatic backup is first written to a hidden temporary file in the backup directory. QuantaNote then checks the ZIP structure, JSON content, and attachment hashes. Only a verified file is atomically renamed to its final backup name; failed temporary files are removed and are not listed as usable backups.
 
 ## Backup Configuration
-
-Auto backup provides the following configurable parameters:
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | Backup interval | 7 days | Time between automatic backups |
-| Maximum backups | 10 | Maximum number of backup files to retain |
-| Expiration days | 30 days | Backups older than this are automatically cleaned up |
+| Maximum backups | 10 | Maximum number of automatic backups to retain |
+| Expiration period | 90 days | Automatic backups older than this are cleaned up |
 
-**Backup interval:** Can be set to any value between 1-30 days. Shorter intervals mean more frequent backups but use more disk space.
-
-**Maximum backups:** When the number of backup files exceeds this limit, the system automatically deletes the oldest backup files.
-
-**Expiration days:** Even if the backup count hasn't reached the limit, backups older than the expiration period are automatically cleaned up.
-
-> **Tip:** Adjust these parameters based on your usage frequency and data importance. For heavy daily users, an interval of 1-3 days and maximum of 15-20 backups is recommended.
+Count and expiration policies apply only to automatic backups. Automatic files use the `auto-backup-` prefix; files created by older versions with the `backup-` prefix continue to be treated as automatic backups for cleanup.
 
 ## Manual Backup
 
-In addition to auto backup, you can create a backup manually at any time:
+Before bulk editing, importing, upgrading, or migrating, open **Settings > Data Management** and click **Backup Now**. Manual backups go through the same integrity checks, but use the `manual-backup-` prefix and are **not affected by automatic count or expiration cleanup**.
 
-1. Open the **Settings > Data Management** page
-2. Click the "Backup Now" button
-3. The system will immediately create a backup file
+The settings page records the time, filename, and size of the most recent successful backup. If a backup fails, that successful record is kept while the reason for the latest failure is shown separately.
 
-Manual backups are not subject to auto backup interval limits or count limits. They execute immediately and are saved with a timestamp-based filename.
+## Backup Manager and Integrity Checks
 
-Manual backups are useful in the following scenarios:
+The Backup Manager shows the backup type, file size, creation time, and integrity status:
 
-- Before performing bulk editing operations
-- As a safety measure before importing data
-- Before system updates or migrations
-- Any important moment when you feel extra protection is needed
+- **Integrity verified** means the ZIP structure, data files, and attachment hashes all passed validation.
+- **Verification failed** means the file may be damaged or incomplete; the detail includes the validation reason.
+- Use the check button next to a backup to run the integrity check again.
+- Deletion cannot be undone; confirm that a backup is no longer needed first.
 
-## Backup Manager
+Integrity checking is read-only and does not write data back to the current database. To actually restore data, use **Settings > Data Management > Import**, and create a new manual backup before importing.
 
-The backup manager provides a visual interface for managing all backup files.
+## Logical ZIP Backups vs. SQLite File Backups
 
-**Features:**
+QuantaNote contains two kinds of files that are easy to confuse:
 
-- **View backup list** — Display all backups in reverse chronological order, newest first
-- **View details** — Each backup shows creation time, file size, and other information
-- **Delete backups** — Manually delete unnecessary backup files to free up disk space
-- **Bulk cleanup** — One-click cleanup of expired or redundant backups
+| Type | Location/source | Purpose |
+|------|------|------|
+| Logical ZIP backup | `backups/`, created by automatic backup or **Backup Now** | Imported by QuantaNote for recovery, migration, and archiving; contains `data.json`, `versions.json`, `manifest.json`, and attachment files |
+| SQLite main database | `quanta_note.sqlite` | The local database currently used by the app; it is not generated by **Backup Now** |
 
-**Backup list information:**
-
-| Field | Description |
-|-------|-------------|
-| Filename | Auto-generated with timestamp, e.g., `backup_20260503_143022.db` |
-| Created | Exact time the backup was created |
-| File size | Disk space occupied by the backup file |
-| Actions | Delete button |
-
-> **Note:** Deleting backups is irreversible. Confirm that you no longer need a backup before deleting it.
+Do not copy the live `quanta_note.sqlite` and assume it is a reliable backup, and do not replace it with an external file while the app may still be running. For cross-device recovery or migration, prefer a verified logical ZIP and import it through the app.
 
 ## Storage Location
 
-All backup files are saved in the following directory:
+All built-in ZIP backups are stored in:
 
 ```
 ~/.quantanote/backups/
 ```
 
-On Windows, the full path is:
+On Windows, the default path is:
 
 ```
 %USERPROFILE%\.quantanote\backups\
 ```
 
-**Backup file naming convention:**
-
-```
-backup_YYYYMMDD_HHmmss.db
-```
-
-For example: `backup_20260503_143022.db` represents a backup created on May 3, 2026 at 14:30:22.
-
-**Backup file details:**
-
-- Backup files are complete SQLite database copies
-- They can be used directly to replace the main database for data recovery
-- File size depends on actual data volume, typically smaller than exported ZIP files
-- The backup process uses SQLite's backup API and does not lock the database, so it doesn't affect normal usage
-
-> **Recommendation:** For particularly important data, consider copying backup files to external storage devices or cloud storage to prevent losing both the backup and original data in case of device failure.
+For important data, copy the ZIP to an external drive or another secure location after it passes the integrity check. Keeping the only backup on the same device as the main database does not protect against device loss or failure.

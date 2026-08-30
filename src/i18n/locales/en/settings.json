@@ -105,6 +105,8 @@
     "expireDays": "Expire After",
     "backupDir": "Backup Directory",
     "lastBackup": "Last Backup",
+    "lastSuccessfulBackup": "Last Successful Backup",
+    "lastBackupError": "Most Recent Backup Failed",
     "neverBackup": "Never",
     "backupNow": "Backup Now",
     "backupManager": "Backup Manager",

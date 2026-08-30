@@ -39,7 +39,7 @@ All settings are stored locally in the SQLite database at `~/.quantanote/quanta_
 To restore all settings to their initial state:
 
 1. Close QuantaNote
-2. Back up the database file (optional but recommended)
+2. If you need a settings rollback copy the SQLite main database after closing the app (optional; use the logical ZIP backup in Data Management for routine backups)
 3. Delete the `quantanote-settings` entry from the database
 4. Restart the application; it will automatically load default settings
 

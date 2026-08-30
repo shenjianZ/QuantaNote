@@ -414,6 +414,66 @@ fn validate_zip_manifest(
     Ok(())
 }
 
+/// 验证逻辑备份 ZIP 的结构、JSON 内容和附件哈希。
+///
+/// 自动备份在正式重命名前会调用此函数，备份管理器也会用它标记历史文件是否可恢复。
+pub fn verify_backup_zip(path: &Path) -> Result<(), AppError> {
+    let file = std::fs::File::open(path).map_err(|e| AppError::Io(e.to_string()))?;
+    let mut archive = zip::ZipArchive::new(file)
+        .map_err(|e| AppError::Validation(format!("打开备份 ZIP 失败: {}", e)))?;
+    let entry_names = validate_zip_archive_entries(&mut archive)?;
+
+    let data_json = String::from_utf8(read_zip_entry(&mut archive, "data.json")?)
+        .map_err(|e| AppError::Validation(format!("data.json 编码无效: {}", e)))?;
+    serde_json::from_str::<serde_json::Value>(&data_json)
+        .map_err(|e| AppError::Validation(format!("data.json 无效: {}", e)))?;
+
+    let versions_json = read_zip_entry(&mut archive, "versions.json")?;
+    serde_json::from_slice::<serde_json::Value>(&versions_json)
+        .map_err(|e| AppError::Validation(format!("versions.json 无效: {}", e)))?;
+
+    let manifest_bytes = read_zip_entry(&mut archive, "manifest.json")?;
+    let manifest: ZipManifest = serde_json::from_slice(&manifest_bytes)
+        .map_err(|e| AppError::Validation(format!("manifest.json 无效: {}", e)))?;
+    validate_zip_manifest(&manifest, &entry_names)?;
+
+    for attachment in &manifest.attachments {
+        let mut entry = archive
+            .by_name(&attachment.archive_path)
+            .map_err(|e| AppError::Validation(format!("读取附件失败: {}", e)))?;
+        if entry.size() != attachment.file_size {
+            return Err(AppError::Validation(format!(
+                "附件大小与清单不一致: {}",
+                attachment.filename
+            )));
+        }
+
+        let mut hasher = Sha256::new();
+        let mut buffer = [0_u8; 64 * 1024];
+        let mut size = 0_u64;
+        loop {
+            let read = entry
+                .read(&mut buffer)
+                .map_err(|e| AppError::Io(e.to_string()))?;
+            if read == 0 {
+                break;
+            }
+            hasher.update(&buffer[..read]);
+            size += read as u64;
+        }
+        if size != attachment.file_size
+            || format!("{:x}", hasher.finalize()) != attachment.sha256.to_lowercase()
+        {
+            return Err(AppError::Validation(format!(
+                "附件哈希校验失败: {}",
+                attachment.filename
+            )));
+        }
+    }
+
+    Ok(())
+}
+
 #[derive(Debug)]
 struct InstalledAttachment {
     target: PathBuf,
@@ -1068,6 +1128,20 @@ mod tests {
             .expect_err("missing file should fail");
 
         assert!(matches!(error, AppError::Io(_)));
+    }
+
+    #[test]
+    fn backup_zip_integrity_check_detects_corruption() {
+        let data_dir = crate::test_support::unique_temp_dir("data-io-backup-verify");
+        let _guard = crate::test_support::lock_test_data_dir(&data_dir);
+        let db = crate::test_support::test_db();
+        let zip_path = data_dir.join("backup.zip");
+
+        create_backup_zip(&db, &zip_path).expect("create backup");
+        verify_backup_zip(&zip_path).expect("fresh backup should verify");
+
+        std::fs::write(&zip_path, b"corrupted backup").expect("corrupt backup");
+        assert!(verify_backup_zip(&zip_path).is_err());
     }
 
     #[test]

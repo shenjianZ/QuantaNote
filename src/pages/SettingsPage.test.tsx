@@ -71,6 +71,7 @@ describe("SettingsPage", () => {
             fetchBackupDirPath: vi.fn(),
             fetchBackups: vi.fn(),
             deleteBackup: vi.fn(),
+            verifyBackup: vi.fn(),
             fetchDiagnosticsPaths: vi.fn(),
             fetchStorageConsistency: vi.fn(),
             repairStorageConsistency: vi.fn(),
@@ -196,5 +197,26 @@ describe("SettingsPage", () => {
         await user.click(screen.getByText("数据"));
         expect(screen.getByTestId("storage-missing-count")).toHaveTextContent("1");
         expect(screen.getByTestId("storage-missing-details")).toHaveTextContent("missing.png");
+    });
+
+    it("shows the latest successful backup metadata and the last failure reason", async () => {
+        useSettingsStore.setState({
+            autoBackupConfig: {
+                enabled: false,
+                interval_days: 7,
+                max_backups: 10,
+                expire_days: 90,
+                last_backup_at: "2026-08-30T08:30:00Z",
+                last_backup_filename: "manual-backup-2026-08-30T08-30-00-ab12cd34.zip",
+                last_backup_size: 2048,
+                last_backup_error: "附件哈希校验失败: image.png",
+            },
+        });
+        const { user } = setup(<SettingsPage />);
+
+        await user.click(screen.getByText("数据"));
+        expect(screen.getByTestId("backup-last-success")).toHaveTextContent("manual-backup-");
+        expect(screen.getByTestId("backup-last-success")).toHaveTextContent("2.0 KB");
+        expect(screen.getByTestId("backup-last-error")).toHaveTextContent("附件哈希校验失败");
     });
 });

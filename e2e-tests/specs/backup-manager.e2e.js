@@ -54,7 +54,36 @@ describe("Backup manager modal", () => {
         expect(text.length).toBeGreaterThan(0);
     });
 
+    it("marks manual backups as verified and supports rechecking integrity", async () => {
+        const backups = await listBackups();
+        const manual = backups.find((backup) => backup.filename.startsWith("manual-backup-"));
+        expect(manual).toBeTruthy();
+        expect(manual.verified).toBe(true);
+        expect(manual.backup_type).toBe("manual");
+
+        await BackupManagerModal.verifyBackup(0);
+        const status = await $("[data-testid='backup-verification-status']");
+        await status.waitForDisplayed();
+        expect(await status.getText()).toContain("完整性已验证");
+    });
+
+    it("shows the latest successful backup filename and size in data settings", async () => {
+        await BackupManagerModal.close();
+        await SettingsPage.clickBackupNow();
+        await pause(500);
+
+        const latest = await $("[data-testid='backup-last-success']");
+        await latest.waitForDisplayed();
+        const text = await latest.getText();
+        expect(text).toContain("manual-backup-");
+        expect(text).toMatch(/\d+(\.\d+)?\s(B|KB|MB|GB)/);
+    });
+
     it("deletes a backup when delete button is clicked", async () => {
+        if (!(await BackupManagerModal.isOpen())) {
+            await SettingsPage.clickBackupManager();
+            await BackupManagerModal.waitOpen();
+        }
         const countBefore = await BackupManagerModal.getBackupCount();
         if (countBefore > 0) {
             await BackupManagerModal.deleteBackup(0);
@@ -69,7 +98,9 @@ describe("Backup manager modal", () => {
     });
 
     it("closes modal via close button", async () => {
-        await BackupManagerModal.close();
+        if (await BackupManagerModal.isOpen()) {
+            await BackupManagerModal.close();
+        }
         await observePause();
         expect(await BackupManagerModal.isOpen()).toBe(false);
     });

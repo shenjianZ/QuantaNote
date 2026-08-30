@@ -162,6 +162,7 @@ Store 通过服务层间接调用后端，确保调用的一致性和可维护�
 | `get_backup_dir_path` | (无) | string | 获取备份目录 |
 | `list_backups` | (无) | BackupFileInfo[] | 列出备份文件 |
 | `delete_backup` | filename | void | 删除备份 |
+| `verify_backup` | filename | BackupVerification | 检查 ZIP 备份完整性 |
 
 ## 类型契约
 

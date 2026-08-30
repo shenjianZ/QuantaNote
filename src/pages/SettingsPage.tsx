@@ -756,16 +756,37 @@ export function SettingsPage({
                                 {backupDirPath || t("common:buttons.loading")}
                             </span>
                         </div>
-                        <div className={rowClass}>
+                        <div className={rowClass} data-testid="backup-last-success">
                             <span className="text-sm text-[var(--text)]">
-                                {t("settings:data.lastBackup")}
+                                {t("settings:data.lastSuccessfulBackup")}
                             </span>
-                            <span className="text-sm text-[var(--muted)]">
-                                {autoBackupConfig?.last_backup_at
-                                    ? new Date(autoBackupConfig.last_backup_at).toLocaleString()
-                                    : t("settings:data.neverBackup")}
+                            <span className="max-w-[65%] text-right text-sm text-[var(--muted)]">
+                                {autoBackupConfig?.last_backup_at ? (
+                                    <>
+                                        <span>{new Date(autoBackupConfig.last_backup_at).toLocaleString()}</span>
+                                        {autoBackupConfig.last_backup_filename && (
+                                            <span className="ml-2 break-all text-xs">
+                                                {autoBackupConfig.last_backup_filename}
+                                                {autoBackupConfig.last_backup_size != null && (
+                                                    <> · {formatStorageBytes(autoBackupConfig.last_backup_size)}</>
+                                                )}
+                                            </span>
+                                        )}
+                                    </>
+                                ) : t("settings:data.neverBackup")}
                             </span>
                         </div>
+                        {autoBackupConfig?.last_backup_error && (
+                            <div
+                                className="rounded-2xl border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-xs text-amber-300"
+                                data-testid="backup-last-error"
+                            >
+                                <div className="font-medium">{t("settings:data.lastBackupError")}</div>
+                                <div className="mt-1 break-all text-amber-200/80">
+                                    {autoBackupConfig.last_backup_error}
+                                </div>
+                            </div>
+                        )}
                         <div className="mt-3 flex gap-2">
                             <button
                                 className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm text-white hover:opacity-90"

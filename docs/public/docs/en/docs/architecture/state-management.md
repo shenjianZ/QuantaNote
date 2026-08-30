@@ -142,7 +142,7 @@ Manages application settings and system administration functions — the most fe
 | dbSize | string | Database size |
 | dbPath | string | Database path |
 | autoBackupConfig | AutoBackupConfig \| null | Auto backup configuration |
-| backupFiles | BackupFileInfo[] | Backup file list |
+| backupFiles | BackupFileInfo[] | Backup file list with type, size, and integrity status |
 | sqlLogging | SqlLogSettings | SQL log settings |
 
 | Key Operations | Description |
@@ -153,6 +153,7 @@ Manages application settings and system administration functions — the most fe
 | exportDataWithOptions(options) | ZIP data export |
 | importDataWithOptions(options) | ZIP data import |
 | triggerBackupNow() | Execute backup immediately |
+| verifyBackup(filename) | Verify the integrity of a selected ZIP backup |
 | updateSqlLogging(partial) | Update SQL log configuration |
 
 ### syncStore

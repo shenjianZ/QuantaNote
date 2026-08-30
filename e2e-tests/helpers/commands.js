@@ -329,6 +329,10 @@ export async function deleteBackup(filename) {
   return tauriInvoke("delete_backup", { filename });
 }
 
+export async function verifyBackup(filename) {
+  return tauriInvoke("verify_backup", { filename });
+}
+
 // --- SQL 诊断 ---
 
 export async function getSqlLogConfig() {

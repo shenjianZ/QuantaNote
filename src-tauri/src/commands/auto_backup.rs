@@ -2,7 +2,7 @@ use tauri::State;
 
 use crate::db::DbState;
 use crate::error::AppError;
-use crate::services::backup_service::{self, AutoBackupConfig, BackupFileInfo};
+use crate::services::backup_service::{self, AutoBackupConfig, BackupFileInfo, BackupVerification};
 
 #[tauri::command]
 pub fn get_auto_backup_config() -> Result<AutoBackupConfig, AppError> {
@@ -32,4 +32,9 @@ pub fn list_backups() -> Result<Vec<BackupFileInfo>, AppError> {
 #[tauri::command]
 pub fn delete_backup(filename: String) -> Result<(), AppError> {
     backup_service::delete_backup(filename)
+}
+
+#[tauri::command]
+pub fn verify_backup(filename: String) -> Result<BackupVerification, AppError> {
+    backup_service::verify_backup(filename)
 }
