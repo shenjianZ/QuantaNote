@@ -1214,7 +1214,7 @@ export function SettingsPage({
                                 type="button"
                                 data-testid="storage-consistency-scan-btn"
                                 disabled={storageScanLoading}
-                                onClick={() => void fetchStorageConsistency()}
+                                onClick={() => void fetchStorageConsistency(true)}
                             >
                                 <RefreshCw className={`h-4 w-4 ${storageScanLoading ? "animate-spin" : ""}`} />
                                 {t("settings:data.storageScan")}

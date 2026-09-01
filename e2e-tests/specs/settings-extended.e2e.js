@@ -71,6 +71,10 @@ describe("Settings extended coverage", () => {
         expect(await section.isDisplayed()).toBe(true);
         const scanButton = await $("[data-testid='storage-consistency-scan-btn']");
         expect(await scanButton.isDisplayed()).toBe(true);
+
+        await scanButton.click();
+        const scanToast = await $("[data-testid='toast-info'], [data-testid='toast-success']");
+        await scanToast.waitForExist({ timeout: 5000 });
     });
 
     // --- SQL Diagnostics ---

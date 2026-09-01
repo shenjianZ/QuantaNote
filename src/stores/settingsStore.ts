@@ -370,7 +370,7 @@ interface SettingsState {
     deleteBackup: (filename: string) => Promise<void>;
     verifyBackup: (filename: string) => Promise<BackupVerification>;
     fetchDiagnosticsPaths: () => Promise<void>;
-    fetchStorageConsistency: () => Promise<void>;
+    fetchStorageConsistency: (notify?: boolean) => Promise<void>;
     repairStorageConsistency: () => Promise<void>;
     updateSqlLogging: (partial: Partial<SqlLogSettings>) => Promise<void>;
     clearSqlLogFile: () => Promise<void>;
@@ -824,13 +824,30 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         }
     },
 
-    fetchStorageConsistency: async () => {
+    fetchStorageConsistency: async (notify = false) => {
         set({ storageScanLoading: true });
         try {
             const storageReport = await getStorageConsistencyReport();
             set({ storageReport });
+            if (notify) {
+                const issueCount =
+                    storageReport.missingFiles.length +
+                    storageReport.orphanFiles.length +
+                    storageReport.brokenReferences.length;
+                useToastStore.getState().addToast(
+                    issueCount > 0 ? "info" : "success",
+                    issueCount > 0
+                        ? i18n.t("common:toast.storageScanIssues", { count: issueCount })
+                        : i18n.t("common:toast.storageScanClean"),
+                );
+            }
         } catch {
             set({ storageReport: null });
+            if (notify) {
+                useToastStore
+                    .getState()
+                    .addToast("error", i18n.t("common:toast.storageScanFailed"));
+            }
         } finally {
             set({ storageScanLoading: false });
         }

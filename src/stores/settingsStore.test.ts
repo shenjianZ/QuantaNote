@@ -2,6 +2,7 @@ import { mockIPC } from "@tauri-apps/api/mocks";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useItemStore } from "./itemStore";
 import { normalizeSettings, useSettingsStore } from "./settingsStore";
+import { useToastStore } from "./toastStore";
 import { DEFAULT_SHORTCUTS } from "../utils/shortcutRegistry";
 
 const saveMock = vi.fn();
@@ -137,5 +138,74 @@ describe("settingsStore", () => {
     expect(openMock).toHaveBeenCalled();
     expect(calls).toEqual(["read_from_file", "import_data", "get_items", "get_db_size"]);
     expect(useSettingsStore.getState().dbSize).toBe("1.0 KB");
+  });
+
+  it("notifies with issue count when a manual storage scan finds problems", async () => {
+    useToastStore.setState({ toasts: [] });
+    mockIPC((cmd) => {
+      if (cmd === "get_storage_consistency_report") {
+        return {
+          missingFiles: [{ path: "attachments/a/missing.png", sizeBytes: 1, reason: "数据库记录存在，但附件文件不存在" }],
+          orphanFiles: [],
+          brokenReferences: [],
+          scannedFiles: 1,
+          storageBytes: 1,
+        };
+      }
+      return null;
+    });
+
+    await useSettingsStore.getState().fetchStorageConsistency(true);
+
+    const toasts = useToastStore.getState().toasts;
+    expect(toasts).toHaveLength(1);
+    expect(toasts[0].type).toBe("info");
+    expect(toasts[0].message).toContain("1");
+    expect(useSettingsStore.getState().storageReport?.missingFiles).toHaveLength(1);
+  });
+
+  it("notifies with clean result when a manual storage scan finds no issues", async () => {
+    useToastStore.setState({ toasts: [] });
+    mockIPC((cmd) => {
+      if (cmd === "get_storage_consistency_report") {
+        return { missingFiles: [], orphanFiles: [], brokenReferences: [], scannedFiles: 0, storageBytes: 0 };
+      }
+      return null;
+    });
+
+    await useSettingsStore.getState().fetchStorageConsistency(true);
+
+    const toasts = useToastStore.getState().toasts;
+    expect(toasts).toHaveLength(1);
+    expect(toasts[0].type).toBe("success");
+  });
+
+  it("notifies with error when a manual storage scan fails", async () => {
+    useToastStore.setState({ toasts: [] });
+    mockIPC((cmd) => {
+      if (cmd === "get_storage_consistency_report") throw new Error("scan failed");
+      return null;
+    });
+
+    await useSettingsStore.getState().fetchStorageConsistency(true);
+
+    const toasts = useToastStore.getState().toasts;
+    expect(toasts).toHaveLength(1);
+    expect(toasts[0].type).toBe("error");
+    expect(useSettingsStore.getState().storageReport).toBeNull();
+  });
+
+  it("stays silent for automatic storage scans", async () => {
+    useToastStore.setState({ toasts: [] });
+    mockIPC((cmd) => {
+      if (cmd === "get_storage_consistency_report") {
+        return { missingFiles: [], orphanFiles: [], brokenReferences: [], scannedFiles: 0, storageBytes: 0 };
+      }
+      return null;
+    });
+
+    await useSettingsStore.getState().fetchStorageConsistency();
+
+    expect(useToastStore.getState().toasts).toHaveLength(0);
   });
 });
