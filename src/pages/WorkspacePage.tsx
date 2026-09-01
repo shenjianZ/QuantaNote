@@ -6,7 +6,7 @@ import { useToastStore } from "../stores/toastStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { getVditorLang } from "../utils/vditorConfig";
 import type { VditorEditorHandle } from "../components/editor/VditorEditor";
-import { getShortcutLabel, shortcutMatches } from "../utils/shortcutRegistry";
+import { shortcutMatches } from "../utils/shortcutRegistry";
 
 const VditorEditor = lazy(() => import("../components/editor/VditorEditor").then((m) => ({ default: m.VditorEditor })));
 
@@ -107,9 +107,9 @@ export function WorkspacePage({ onQuickCreate, onViewSaved }: WorkspacePageProps
               />
             </Suspense>
           </div>
-          <footer className="mt-3 flex shrink-0 items-center justify-between">
-            <div className="min-w-0 text-xs text-[var(--muted)]" data-testid="workspace-status">
-              {saved ? (
+          {saved && (
+            <footer className="mt-3 flex shrink-0 items-center justify-between">
+              <div className="min-w-0 text-xs text-[var(--muted)]" data-testid="workspace-status">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="inline-flex items-center gap-1 text-[var(--accent)]">
                     <CheckCircle2 className="h-3.5 w-3.5" />
@@ -127,11 +127,9 @@ export function WorkspacePage({ onQuickCreate, onViewSaved }: WorkspacePageProps
                     </button>
                   )}
                 </div>
-              ) : (
-                  <span className="hidden sm:inline">{t("workspace:shortcutHint", { mod: getShortcutLabel(workspaceSaveShortcut) })}</span>
-              )}
-            </div>
-          </footer>
+              </div>
+            </footer>
+          )}
         </article>
       </section>
     </div>
