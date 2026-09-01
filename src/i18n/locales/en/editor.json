@@ -25,13 +25,15 @@
     "copy": "Copy image",
     "export": "Export image",
     "openOriginal": "Open original",
+    "delete": "Delete image",
     "retry": "Retry",
     "loadFailed": "Image failed to load: {{name}}",
     "unknownImage": "Unnamed image",
     "copySuccess": "Image copied to clipboard",
     "copyFailed": "Unable to copy image; image clipboard is not supported",
     "exportSuccess": "Image exported",
-    "exportFailed": "Failed to export image"
+    "exportFailed": "Failed to export image",
+    "deleteSuccess": "Image removed from note"
   },
   "searchReplace": {
     "search": "Search",

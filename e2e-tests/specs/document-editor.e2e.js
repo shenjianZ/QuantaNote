@@ -478,6 +478,55 @@ describe("Document editor", () => {
     await $("[data-testid='image-editor-close']").click();
   });
 
+  it("removes only the selected image from the note", async () => {
+    const imageReference = `attachment://${encodeURIComponent(testAttachment.id)}`;
+    const deletionFixture = `删除前的文字\n\n![待删除图片](${imageReference})\n\n删除后的文字`;
+    await tauriInvoke("update_item", { id: testItem.id, content: deletionFixture });
+    await notifyDataChanged();
+    await TopBar.navLibrary();
+    const libraryItem = await $("[data-testid='library-item']");
+    await libraryItem.waitForDisplayed({ timeout: 10000 });
+    await libraryItem.click();
+    await expect($("[data-testid='reader-drawer']")).toBeDisplayed();
+    await LibraryPage.clickEdit();
+    await browser.waitUntil(
+      async () => $(".vditor-ir img[alt='待删除图片']").isExisting(),
+      { timeout: 5000, timeoutMsg: "Image deletion fixture did not render in the editor" },
+    );
+    await browser.waitUntil(
+      async () => (await getItemById(testItem.id)).content.includes("删除前的文字"),
+      { timeout: 5000, timeoutMsg: "Image deletion fixture was not persisted before opening the image editor" },
+    );
+
+    await $(".vditor-ir img[alt='待删除图片']").click();
+    await browser.waitUntil(
+      async () => (await $("[data-testid='image-editor-delete']")).isDisplayed(),
+      { timeout: 3000, timeoutMsg: "Image delete action did not appear" },
+    );
+    await $("[data-testid='image-editor-delete']").click();
+
+    await browser.waitUntil(
+      async () => browser.execute(() => !document.querySelector(".vditor-ir img[alt='待删除图片']")),
+      { timeout: 3000, timeoutMsg: "Selected image remained in the editor after deletion" },
+    );
+    await browser.waitUntil(
+      async () => {
+        const updated = await getItemById(testItem.id);
+        return updated.content.includes("删除前的文字")
+          && updated.content.includes("删除后的文字")
+          && !updated.content.includes("待删除图片");
+      },
+      { timeout: 5000, timeoutMsg: "Deleted image content was not persisted" },
+    );
+    const updated = await getItemById(testItem.id);
+    expect(updated.content).toContain("删除前的文字");
+    expect(updated.content).toContain("删除后的文字");
+    expect(updated.content).not.toContain("待删除图片");
+
+    const attachments = await tauriInvoke("get_attachments", { itemId: testItem.id });
+    expect(attachments).toHaveLength(1);
+  });
+
   it("keeps the image editor popover visible and attached while scrolling", async () => {
     const imageSource = `attachment://${encodeURIComponent(testAttachment.id)}`;
     const floatingImageDocument = [

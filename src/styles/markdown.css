@@ -1222,6 +1222,15 @@
     color: white;
 }
 
+.quantanote-image-editor-popover__actions button.is-danger {
+    color: var(--danger);
+}
+
+.quantanote-image-editor-popover__actions button.is-danger:hover {
+    background: color-mix(in srgb, var(--danger) 14%, transparent);
+    color: var(--danger);
+}
+
 .quantanote-image-editor-popover__actions button:disabled {
     cursor: not-allowed;
     opacity: 0.45;

@@ -2,7 +2,7 @@ import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useRef, 
 import { createPortal } from "react-dom";
 import Vditor from "vditor";
 import "vditor/dist/index.css";
-import { AlignCenter, AlignLeft, AlignRight, Copy, Download, ExternalLink, Maximize2, RefreshCw, Replace, X } from "lucide-react";
+import { AlignCenter, AlignLeft, AlignRight, Copy, Download, ExternalLink, Maximize2, RefreshCw, Replace, Trash2, X } from "lucide-react";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -291,6 +291,18 @@ function updateMarkdownImage(
   const safeTitle = title.trim().replace(/[\\"]/g, "\\$&");
   const nextImage = `![${safeAlt}](${source}${safeTitle ? ` "${safeTitle}"` : ""})`;
   return `${value.slice(0, match.index)}${nextImage}${value.slice(match.index + match.full.length)}`;
+}
+
+function removeMarkdownImage(
+  value: string,
+  image: HTMLImageElement,
+  container: HTMLElement,
+) {
+  const match = findMarkdownImageMatch(value, image, container);
+  if (!match || match.index < 0) return null;
+
+  return `${value.slice(0, match.index)}${value.slice(match.index + match.full.length)}`
+    .replace(/\n{3,}/g, "\n\n");
 }
 
 function applyImagePresentation(image: HTMLImageElement, options: { width?: number; align?: AttachmentImageAlignment }) {
@@ -1274,6 +1286,21 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
     closeImageEditor();
   }, [closeImageEditor, commitEditorValue, getSelectedImage, imageEditor, t]);
 
+  const deleteSelectedImage = useCallback(() => {
+    const image = getSelectedImage(imageEditor);
+    const editor = containerRef.current;
+    const vditor = vditorRef.current;
+    if (!image || !editor?.contains(image) || !vditor) {
+      closeImageEditor();
+      return;
+    }
+
+    const nextValue = removeMarkdownImage(vditor.getValue(), image, editor);
+    if (nextValue === null || !commitEditorValue(nextValue)) return;
+    closeImageEditor();
+    useToastStore.getState().addToast("success", t("editor:imageEditor.deleteSuccess"));
+  }, [closeImageEditor, commitEditorValue, getSelectedImage, imageEditor, t]);
+
   const copySelectedImage = useCallback(async () => {
     const image = getSelectedImage();
     if (!image) return;
@@ -2215,6 +2242,9 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
             </button>
             <button type="button" onClick={() => void openSelectedImage()}>
               <ExternalLink className="h-3.5 w-3.5" />{t("editor:imageEditor.openOriginal")}
+            </button>
+            <button className="is-danger" type="button" onClick={deleteSelectedImage} data-testid="image-editor-delete">
+              <Trash2 className="h-3.5 w-3.5" />{t("editor:imageEditor.delete")}
             </button>
             <button className="is-primary" type="button" onClick={applyImageEditor} data-testid="image-editor-apply">
               {t("editor:imageEditor.apply")}

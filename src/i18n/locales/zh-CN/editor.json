@@ -25,13 +25,15 @@
     "copy": "复制图片",
     "export": "导出图片",
     "openOriginal": "查看原文件",
+    "delete": "删除图片",
     "retry": "重试",
     "loadFailed": "图片加载失败：{{name}}",
     "unknownImage": "未命名图片",
     "copySuccess": "图片已复制到剪贴板",
     "copyFailed": "复制图片失败，当前环境可能不支持图片剪贴板",
     "exportSuccess": "图片已导出",
-    "exportFailed": "导出图片失败"
+    "exportFailed": "导出图片失败",
+    "deleteSuccess": "图片已从笔记中删除"
   },
   "searchReplace": {
     "search": "搜索",
