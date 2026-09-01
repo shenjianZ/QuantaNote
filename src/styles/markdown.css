@@ -425,6 +425,13 @@
     border: 0;
 }
 
+/* 编辑区长 URL(附件资源地址等)按字符断行。
+   没有这条时 IR 源码标记里的长 URL 会被挤进极窄的列里逐字符竖排,
+   把内容区撑高数千像素。预览区 .markdown-preview 已有同样规则。 */
+.vditor-ir .vditor-reset {
+    overflow-wrap: anywhere;
+}
+
 .markdown-preview img.emoji,
 .vditor-reset img.emoji {
     border: 0;
@@ -869,7 +876,39 @@
 /* ───────────────────── 5. Vditor 编辑器 chrome ───────────────────── */
 
 .vditor-container {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
     height: 100%;
+}
+
+/* Vditor 的 mount 节点是运行时创建的。显式建立 flex 高度链，避免 IR 内容重排或滚动
+   后百分比高度退化为内容高度，导致编辑器卡片塌缩到正文高度。 */
+.vditor-container > .quantanote-vditor-mount {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 0%;
+    height: 100%;
+}
+
+.vditor-container > .quantanote-vditor-mount > .vditor {
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 0%;
+    height: 100%;
+}
+
+.vditor-container .vditor-content,
+.vditor-container .vditor-ir,
+.vditor-container .vditor-reset {
+    min-height: 0;
+}
+
+/* 首次加载附件图片时暂时隐藏正文,等图片完成预加载并写入固有比例后再显示。
+   工具栏保持可见,用户仍能看到编辑器正在初始化。 */
+.vditor-container[data-qn-image-hydration="pending"] .vditor-content {
+    visibility: hidden;
 }
 
 .vditor {

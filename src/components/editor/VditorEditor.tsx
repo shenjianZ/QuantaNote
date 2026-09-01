@@ -10,6 +10,7 @@ import { VDITOR_CDN, getVditorLang } from "../../utils/vditorConfig";
 import type { AttachmentDto } from "../../stores/attachmentStore";
 import { exportAttachment } from "../../services/tauriCommands";
 import {
+  ATTACHMENT_PROTOCOL,
   buildAttachmentMarkdown,
   getAttachmentAssetUrl,
   getAttachmentImageOptions,
@@ -120,6 +121,73 @@ function getMarkdownImageMatches(value: string): MarkdownImageMatch[] {
   }));
 }
 
+interface ImageIntrinsicSize {
+  width: number;
+  height: number;
+}
+
+const IMAGE_PRELOAD_TIMEOUT = 5000;
+const imageIntrinsicSizeCache = new Map<string, Promise<ImageIntrinsicSize | null>>();
+const imageIntrinsicSizes = new Map<string, ImageIntrinsicSize>();
+
+function getImageSourceKey(source: string) {
+  return source.split("#", 1)[0].trim();
+}
+
+function preloadImageSource(source: string) {
+  const key = getImageSourceKey(source);
+  if (!key || key.toLowerCase().startsWith(ATTACHMENT_PROTOCOL)) return Promise.resolve(null);
+
+  const cachedSize = imageIntrinsicSizes.get(key);
+  if (cachedSize) return Promise.resolve(cachedSize);
+
+  const cachedLoad = imageIntrinsicSizeCache.get(key);
+  if (cachedLoad) return cachedLoad;
+
+  const load = new Promise<ImageIntrinsicSize | null>((resolve) => {
+    const image = new Image();
+    let settled = false;
+    let timeoutId: number | undefined;
+
+    const readSize = () => image.naturalWidth > 0 && image.naturalHeight > 0
+      ? { width: image.naturalWidth, height: image.naturalHeight }
+      : null;
+    const finish = (size: ImageIntrinsicSize | null) => {
+      if (settled) return;
+      settled = true;
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+      if (size) imageIntrinsicSizes.set(key, size);
+      resolve(size);
+    };
+    const recordLoadedSize = () => {
+      const size = readSize();
+      if (size) imageIntrinsicSizes.set(key, size);
+      return size;
+    };
+    const handleLoad = () => {
+      const decoded = typeof image.decode === "function" ? image.decode() : Promise.resolve();
+      void decoded.catch(() => {}).then(() => {
+        const size = recordLoadedSize();
+        finish(size);
+      });
+    };
+
+    image.onload = handleLoad;
+    image.onerror = () => finish(null);
+    timeoutId = window.setTimeout(() => finish(recordLoadedSize()), IMAGE_PRELOAD_TIMEOUT);
+    image.src = source;
+    if (image.complete && image.naturalWidth > 0) handleLoad();
+  });
+  imageIntrinsicSizeCache.set(key, load);
+  return load;
+}
+
+async function preloadMarkdownImages(markdown: string) {
+  const sources = getMarkdownImageMatches(markdown).map((match) => match.source);
+  if (sources.length === 0) return;
+  await Promise.all(sources.map((source) => preloadImageSource(source)));
+}
+
 function findMarkdownImageMatch(
   value: string,
   image: HTMLImageElement,
@@ -159,14 +227,30 @@ function applyImagePresentation(image: HTMLImageElement, options: { width?: numb
   const style = getAttachmentImageStyle(options);
   image.style.width = style.width ?? "";
   image.style.maxWidth = style.maxWidth ?? "";
+  image.style.height = "auto";
   image.style.display = style.display ?? "";
   image.style.marginLeft = style.marginLeft ?? "";
   image.style.marginRight = style.marginRight ?? "";
 }
 
+function applyImageIntrinsicSize(image: HTMLImageElement) {
+  const key = getImageSourceKey(image.getAttribute("src") || "");
+  const size = imageIntrinsicSizes.get(key);
+  if (!size) return;
+
+  // 预加载得到的固有比例必须在图片节点首次可见前写入,
+  // 否则浏览器会先按 0 高度排版,解码完成后再把后续文字推下去。
+  image.setAttribute("width", String(size.width));
+  image.setAttribute("height", String(size.height));
+  image.style.aspectRatio = `${size.width} / ${size.height}`;
+}
+
 function refreshImagePresentation(container: HTMLElement) {
   container.querySelectorAll<HTMLImageElement>("img")
-    .forEach((image) => applyImagePresentation(image, getAttachmentImageOptions(image.getAttribute("src") || "")));
+    .forEach((image) => {
+      applyImageIntrinsicSize(image);
+      applyImagePresentation(image, getAttachmentImageOptions(image.getAttribute("src") || ""));
+    });
 }
 
 export interface VditorEditorHandle {
@@ -923,30 +1007,38 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
     }
   }, []);
 
-  const insertAttachment = useCallback((
+  const insertAttachment = useCallback(async (
     attachment: AttachmentDto | readonly AttachmentInsertItem[],
     asImage?: boolean,
     bookmark?: EditorSelectionBookmark | null,
   ) => {
-    const vditor = vditorRef.current;
-    if (!vditor) return;
+    const vditorAtStart = vditorRef.current;
+    if (!vditorAtStart) return;
     const insertionItems: readonly AttachmentInsertItem[] = Array.isArray(attachment)
       ? attachment as readonly AttachmentInsertItem[]
       : [{ attachment: attachment as AttachmentDto, asImage: asImage ?? isImageAttachment(attachment as AttachmentDto) }];
     const insertionBookmark = bookmark
       ?? savedInsertRangeRef.current
-      ?? getEditorSelectionBookmark(vditor)
+      ?? getEditorSelectionBookmark(vditorAtStart)
       ?? lastEditorRangeRef.current;
     savedInsertRangeRef.current = null;
-    restoreEditorSelection(vditor, insertionBookmark);
+    // 新附件写入 store 后 attachmentsRef 要等下一次渲染才同步;
+    // 解析引用时把手头的新附件一并传入,避免插入瞬间 attachment:// 原文进编辑器。
+    const pendingAttachments = insertionItems.map((item) => item.attachment);
     const markdown = insertionItems
       .map(({ attachment: itemAttachment, asImage: itemAsImage }) => resolveAttachmentReferences(
         buildAttachmentMarkdown(itemAttachment, itemAsImage),
-        attachmentsRef.current,
+        [...pendingAttachments, ...attachmentsRef.current],
       ))
       .join("");
     if (!markdown) return;
+    // 先让浏览器完成图片解码,再把 Markdown 交给 Vditor,避免图片节点先以 0 高度出现。
+    await preloadMarkdownImages(markdown);
+    const vditor = vditorRef.current;
+    if (!vditor || vditor !== vditorAtStart) return;
+    restoreEditorSelection(vditor, insertionBookmark);
     vditor.insertMD(markdown);
+    if (containerRef.current) refreshImagePresentation(containerRef.current);
     const nextBookmark = getEditorSelectionBookmark(vditor);
     // insertMD 会先把浏览器选区移动到插入内容之后；先保存这个位置，
     // 再恢复编辑器焦点，避免 focus() 让下一张附件回到文档开头。
@@ -957,12 +1049,12 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
     }
   }, []);
 
-  const insertAttachmentBatch = useCallback((items: readonly AttachmentInsertItem[], bookmark: EditorSelectionBookmark | null) => {
+  const insertAttachmentBatch = useCallback(async (items: readonly AttachmentInsertItem[], bookmark: EditorSelectionBookmark | null) => {
     if (items.length === 0) return;
-    const vditor = vditorRef.current;
-    if (!vditor) return;
+    const vditorAtStart = vditorRef.current;
+    if (!vditorAtStart) return;
     const baseBookmark = bookmark
-      ?? getEditorSelectionBookmark(vditor)
+      ?? getEditorSelectionBookmark(vditorAtStart)
       ?? lastEditorRangeRef.current;
     // Vditor 的 insertMD 对连续块节点只保留最后一个节点。逐个插入时从后
     // 往前使用同一个文本偏移，最终正文仍保持用户选择的正向顺序。
@@ -972,9 +1064,11 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
       : baseBookmark;
     for (let index = items.length - 1; index >= 0; index -= 1) {
       const item = items[index];
-      insertAttachment(item.attachment, item.asImage, fixedBookmark);
+      await insertAttachment(item.attachment, item.asImage, fixedBookmark);
     }
 
+    const vditor = vditorRef.current;
+    if (!vditor || vditor !== vditorAtStart) return;
     const lastItem = items[items.length - 1];
     const editorState = vditor?.vditor[vditor.vditor.currentMode];
     const editor = editorState?.element;
@@ -1257,7 +1351,7 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
   const insertAttachmentAtRange = useCallback((attachment: AttachmentDto, bookmark: EditorSelectionBookmark | null, asImage?: boolean) => {
     const vditor = vditorRef.current;
     if (!vditor) return;
-    insertAttachment(attachment, asImage, bookmark);
+    return insertAttachment(attachment, asImage, bookmark);
   }, [insertAttachment]);
 
   const addAttachmentFromPath = useCallback(async (path: string, bookmark: EditorSelectionBookmark | null, forceImage = false, insert = true) => {
@@ -1265,7 +1359,7 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
     if (!add) return null;
     const attachment = await add(path);
     if (attachment && insert) {
-      insertAttachmentAtRange(attachment, bookmark, forceImage || isImageAttachment(attachment) || isImagePath(path));
+      await insertAttachmentAtRange(attachment, bookmark, forceImage || isImageAttachment(attachment) || isImagePath(path));
     }
     return attachment;
   }, [insertAttachmentAtRange]);
@@ -1282,7 +1376,7 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
       file.type || "image/png",
       data,
     );
-    if (attachment && insert) insertAttachmentAtRange(attachment, bookmark, true);
+    if (attachment && insert) await insertAttachmentAtRange(attachment, bookmark, true);
     return attachment;
   }, [addAttachmentFromPath, insertAttachmentAtRange]);
 
@@ -1303,7 +1397,7 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
       if (attachment) pending.push({ attachment, asImage });
     }
     if (pending.length > 0) {
-      insertAttachmentBatch(pending, insertionBookmark);
+      await insertAttachmentBatch(pending, insertionBookmark);
     }
   }, [insertAttachmentBatch]);
 
@@ -1342,12 +1436,19 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
       vditorRef.current?.getValue() ?? initialValueRef.current,
       attachmentsRef.current,
     ),
-    setValue: (value: string) => {
+    setValue: async (value: string) => {
       const vditor = vditorRef.current;
       if (!vditor) return;
       const normalizedValue = normalizeAttachmentReferences(value, attachmentsRef.current);
+      const resolvedValue = resolveAttachmentReferences(normalizedValue, attachmentsRef.current);
+      const hasImages = getMarkdownImageMatches(resolvedValue).length > 0;
+      if (hasImages) containerRef.current?.setAttribute("data-qn-image-hydration", "pending");
+      await preloadMarkdownImages(resolvedValue);
+      if (vditorRef.current !== vditor) return;
       skipNextValueRef.current = normalizedValue;
-      vditor.setValue(resolveAttachmentReferences(normalizedValue, attachmentsRef.current));
+      vditor.setValue(resolvedValue);
+      if (containerRef.current) refreshImagePresentation(containerRef.current);
+      if (hasImages) containerRef.current?.setAttribute("data-qn-image-hydration", "ready");
     },
     focus: () => {
       vditorRef.current?.focus();
@@ -1391,12 +1492,25 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
     const handleImageLoad = (event: Event) => {
       const target = event.target;
       if (!(target instanceof HTMLImageElement)) return;
-      if (imageErrorRef.current?.image === target) setImageError(null);
+      const errorState = imageErrorRef.current;
+      if (!errorState) return;
+      // setValue 会重建 DOM,失败时记录的元素会被替换;
+      // 同名图片加载成功即可认为失败状态已过期。
+      if (
+        errorState.image === target
+        || (target.getAttribute("alt") || "") === errorState.filename
+      ) {
+        setImageError(null);
+      }
     };
 
     const handleImageError = (event: Event) => {
       const target = event.target;
       if (!(target instanceof HTMLImageElement) || target.classList.contains("emoji")) return;
+      // attachment:// 引用是附件解析完成前的预期暂态,值刷新后会被替换成
+      // 资源地址,不要为它弹出失败提示。
+      const source = (target.getAttribute("src") || "").toLowerCase();
+      if (source.startsWith(ATTACHMENT_PROTOCOL)) return;
       const position = getImageOverlayPosition(target, host, 320);
       setImageEditor(null);
       setImageError({
@@ -1447,6 +1561,14 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
     mount.style.height = "100%";
     container.appendChild(mount);
 
+    const resolvedInitialValue = resolveAttachmentReferences(initialValue, attachmentsRef.current);
+    const waitForInitialImages = getMarkdownImageMatches(resolvedInitialValue).length > 0;
+    const hasUnresolvedInitialImages = getMarkdownImageMatches(resolvedInitialValue)
+      .some((match) => match.source.toLowerCase().startsWith(ATTACHMENT_PROTOCOL));
+    container.dataset.qnImageHydration = hasUnresolvedInitialImages
+      ? "awaiting-attachments"
+      : waitForInitialImages ? "pending" : "ready";
+
     // 跟踪 Ctrl/Meta 按键状态，用于 Vditor link.click 回调
     let modifierHeld = false;
     let disposed = false;
@@ -1482,7 +1604,7 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
             if (attachment) pending.push({ attachment, asImage: true });
           }
           if (pending.length > 0) {
-            insertAttachmentBatch(pending, insertionBookmark);
+            await insertAttachmentBatch(pending, insertionBookmark);
           }
         })().catch(() => {});
         return;
@@ -1510,7 +1632,8 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
       theme: theme === "dark" ? "dark" : "classic",
       icon: "ant",
       cache: { enable: false },
-      value: resolveAttachmentReferences(initialValue, attachmentsRef.current),
+      // 图片附件先预加载并解码,让正文与图片一起首次可见,避免下方文字被图片推移。
+      value: waitForInitialImages ? "" : resolvedInitialValue,
       input: (value) => {
         const normalizedValue = normalizeAttachmentReferences(value, attachmentsRef.current);
         if (skipNextValueRef.current !== null) {
@@ -1592,12 +1715,31 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
             }));
           };
         }
-        const latestValue = normalizeAttachmentReferences(initialValueRef.current, attachmentsRef.current);
-        if (normalizeAttachmentReferences(vditor.getValue(), attachmentsRef.current) !== latestValue) {
-          skipNextValueRef.current = latestValue;
-          lastEmittedRef.current = latestValue;
-          vditor.setValue(resolveAttachmentReferences(latestValue, attachmentsRef.current));
-        }
+        const hydrateInitialValue = () => {
+          if (disposed || vditorRef.current !== vditor || !container.contains(mount)) return;
+          const latestValue = normalizeAttachmentReferences(initialValueRef.current, attachmentsRef.current);
+          const latestResolvedValue = resolveAttachmentReferences(latestValue, attachmentsRef.current);
+          const hasUnresolvedImages = getMarkdownImageMatches(latestResolvedValue)
+            .some((match) => match.source.toLowerCase().startsWith(ATTACHMENT_PROTOCOL));
+          if (hasUnresolvedImages) {
+            container.dataset.qnImageHydration = "awaiting-attachments";
+            return;
+          }
+          container.dataset.qnImageHydration = waitForInitialImages ? "pending" : "ready";
+          void preloadMarkdownImages(latestResolvedValue)
+            .catch(() => {})
+            .then(() => {
+              if (disposed || vditorRef.current !== vditor || !container.contains(mount)) return;
+              if (normalizeAttachmentReferences(vditor.getValue(), attachmentsRef.current) !== latestValue) {
+                skipNextValueRef.current = latestValue;
+                lastEmittedRef.current = latestValue;
+                vditor.setValue(latestResolvedValue);
+              }
+              refreshImagePresentation(mount);
+              container.dataset.qnImageHydration = "ready";
+            });
+        };
+        hydrateInitialValue();
       },
     });
 
@@ -1622,6 +1764,7 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
       if (mountedEditor.__vditor === vditor) {
         delete mountedEditor.__vditor;
         container.dataset.vditorReady = "false";
+        delete container.dataset.qnImageHydration;
       }
       if (vditorRef.current === vditor) {
         vditorRef.current = null;
@@ -1668,7 +1811,7 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
           if (attachment) pending.push({ attachment, asImage: isImagePath(path) || isImageAttachment(attachment) });
         }
         if (pending.length > 0) {
-          insertAttachmentBatch(pending, insertionBookmark);
+          await insertAttachmentBatch(pending, insertionBookmark);
         }
       })().catch(() => {});
     };
@@ -1696,7 +1839,7 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
           if (attachment) pending.push({ attachment, asImage: true });
         }
         if (pending.length > 0) {
-          insertAttachmentBatch(pending, insertionBookmark);
+          await insertAttachmentBatch(pending, insertionBookmark);
         }
       })().catch(() => {});
     };
@@ -1730,10 +1873,19 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
   useEffect(() => {
     const vditor = vditorRef.current;
     if (!vditor || !readyRef.current) return;
+    const container = containerRef.current;
+    if (!container) return;
     const normalizedInitialValue = normalizeAttachmentReferences(initialValue, attachmentsRef.current);
     const resolvedInitialValue = resolveAttachmentReferences(normalizedInitialValue, attachmentsRef.current);
     const currentValue = vditor.getValue();
     const current = normalizeAttachmentReferences(currentValue, attachmentsRef.current);
+    const hasUnresolvedImages = getMarkdownImageMatches(resolvedInitialValue)
+      .some((match) => match.source.toLowerCase().startsWith(ATTACHMENT_PROTOCOL));
+    if (hasUnresolvedImages) {
+      container.dataset.qnImageHydration = "awaiting-attachments";
+      return;
+    }
+    if (container.dataset.qnImageHydration === "pending" && currentValue === "") return;
     // initialValue 就是本组件最近上报的值,且编辑区已经显示了同一个解析后的值,
     // 说明是父组件回传的回声而非外部变更;此时不要 setValue,避免打字时光标跳回开头。
     // 如果附件列表刚刚异步加载,编辑区的原始值仍是 attachment://...,
@@ -1745,9 +1897,24 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
     // Compare the rendered value as well so the newly loaded attachment list
     // triggers one view-only re-resolution without changing saved Markdown.
     if (current !== normalizedInitialValue || currentValue !== resolvedInitialValue) {
-      skipNextValueRef.current = normalizedInitialValue;
-      lastEmittedRef.current = normalizedInitialValue;
-      vditor.setValue(resolvedInitialValue);
+      let cancelled = false;
+      const hasImages = getMarkdownImageMatches(resolvedInitialValue).length > 0;
+      if (hasImages) container.dataset.qnImageHydration = "pending";
+      void preloadMarkdownImages(resolvedInitialValue)
+        .catch(() => {})
+        .then(() => {
+          if (cancelled || vditorRef.current !== vditor || !readyRef.current) return;
+          skipNextValueRef.current = normalizedInitialValue;
+          lastEmittedRef.current = normalizedInitialValue;
+          vditor.setValue(resolvedInitialValue);
+          refreshImagePresentation(container);
+          if (hasImages) container.dataset.qnImageHydration = "ready";
+          // setValue 重建编辑器 DOM,之前记录的失败图片元素已被替换,失败提示随之过期。
+          setImageError(null);
+        });
+      return () => {
+        cancelled = true;
+      };
     }
   }, [initialValue, attachments]);
 
@@ -1773,7 +1940,7 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
   }, [clearHighlights]);
 
   return (
-    <div className="relative h-full">
+    <div className="relative h-full min-h-0 min-w-0">
       <div ref={containerRef} className="vditor-container" />
       {imageEditor && (
         <div

@@ -765,10 +765,10 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto lg:flex-row lg:overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto lg:h-full lg:flex-row lg:overflow-hidden" data-testid="document-editor-main">
         {/* Editor */}
-        <article className="flex min-h-[24rem] min-w-0 flex-col rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3 sm:rounded-3xl sm:p-4 lg:min-h-0 lg:flex-1">
-          <div ref={editorViewportRef} className="min-h-0 flex-1 overflow-hidden">
+        <article className="flex min-h-[24rem] min-w-0 flex-col rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3 sm:rounded-3xl sm:p-4 lg:h-full lg:min-h-0 lg:flex-1" data-testid="document-editor-article">
+          <div ref={editorViewportRef} className="h-full min-h-0 flex-1 overflow-hidden">
             <Suspense fallback={<div className="flex h-full items-center justify-center text-[var(--muted)]"><Loader2 className="mr-2 h-4 w-4" />{t("document:loadingEditor")}</div>}>
               <VditorEditor
                 ref={editorRef}
@@ -786,7 +786,7 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
         </article>
 
         {/* Note properties, summary and outline */}
-        <aside className="flex min-h-0 min-w-0 flex-col gap-3 lg:sticky lg:top-0 lg:h-full lg:w-[18rem] lg:shrink-0" data-testid="document-editor-sidebar">
+        <aside className="flex min-h-0 min-w-0 flex-col gap-3 lg:sticky lg:top-0 lg:h-full lg:overflow-y-auto lg:w-[18rem] lg:shrink-0" data-testid="document-editor-sidebar">
           <NotePropertiesPanel properties={properties} onChange={handlePropertiesChange} />
           {showDocumentOutline && <>
             <section className="shrink-0 rounded-2xl border border-[var(--line)] bg-transparent p-3" data-testid="doc-tags-section">
@@ -891,14 +891,14 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
               editorRef.current?.scrollToHeading(index);
             }}
             showToggle={false}
-            className="lg:min-h-0 lg:flex-1"
+            className="lg:min-h-32 lg:flex-none"
             />
           </>}
         </aside>
       </div>
 
       {/* Bottom status bar */}
-      <div className="mt-2 flex shrink-0 flex-wrap items-center justify-between gap-2 px-1 text-xs text-[var(--muted)] safe-area-inset-bottom">
+      <div className="mt-2 flex shrink-0 flex-wrap items-center justify-between gap-2 px-1 text-xs text-[var(--muted)] safe-area-inset-bottom" data-testid="document-editor-status">
         <div className="flex items-center gap-3">
           <span data-testid="doc-save-status">{saved ? t("document:saved") : t("document:saving")}</span>
           <span>{t("document:charCount", { count: charCount })}</span>

@@ -63,10 +63,12 @@ class DocumentEditorPage {
   async setSummaryMode(label) {
     const select = await $(this.summaryModeSelect);
     const trigger = await select.$("button");
+    await trigger.scrollIntoView();
     await trigger.click();
     const options = await select.$$("button");
     for (const option of options) {
       if ((await option.getText()).trim() === label) {
+        await option.scrollIntoView();
         await option.click();
         await observePause();
         return;
@@ -170,7 +172,23 @@ class DocumentEditorPage {
   }
 
   async clickOutlineItem(index) {
-    await $(`[data-testid='document-outline-item-${index}']`).click();
+    const selector = `[data-testid='document-outline-item-${index}']`;
+    const item = await $(selector);
+    await browser.execute((targetSelector) => {
+      const item = document.querySelector(targetSelector);
+      const sidebar = item?.closest("[data-testid='document-editor-sidebar']");
+      if (!(item instanceof HTMLElement) || !(sidebar instanceof HTMLElement)) {
+        throw new Error("Document outline item or sidebar not found");
+      }
+      const itemRect = item.getBoundingClientRect();
+      const sidebarRect = sidebar.getBoundingClientRect();
+      if (itemRect.top < sidebarRect.top) {
+        sidebar.scrollTop -= sidebarRect.top - itemRect.top;
+      } else if (itemRect.bottom > sidebarRect.bottom) {
+        sidebar.scrollTop += itemRect.bottom - sidebarRect.bottom;
+      }
+    }, selector);
+    await item.click();
     await observePause();
   }
 

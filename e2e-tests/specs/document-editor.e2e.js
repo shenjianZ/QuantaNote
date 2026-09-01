@@ -30,6 +30,7 @@ async function completeInitialLanguageSetup() {
 
 describe("Document editor", () => {
   let testItem;
+  let testAttachment;
 
   before(async () => {
     await completeInitialLanguageSetup();
@@ -37,12 +38,12 @@ describe("Document editor", () => {
     testItem = await seedItem({ title: "编辑器测试笔记", content: "初始内容" });
     const imagePath = await createTestFile(
       "quantanote-editor-reentry.svg",
-      "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"120\" height=\"80\"><rect width=\"120\" height=\"80\" fill=\"#2563eb\"/></svg>",
+      "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1200\" height=\"1800\" viewBox=\"0 0 1200 1800\"><rect width=\"1200\" height=\"1800\" fill=\"#2563eb\"/><circle cx=\"600\" cy=\"900\" r=\"280\" fill=\"#93c5fd\"/></svg>",
     );
-    const attachment = await tauriInvoke("add_attachment", { itemId: testItem.id, path: imagePath });
+    testAttachment = await tauriInvoke("add_attachment", { itemId: testItem.id, path: imagePath });
     await tauriInvoke("update_item", {
       id: testItem.id,
-      content: `![quantanote-editor-reentry.svg](attachment://${encodeURIComponent(attachment.id)})`,
+      content: `![quantanote-editor-reentry.svg](attachment://${encodeURIComponent(testAttachment.id)})`,
     });
     await notifyDataChanged();
     await TopBar.navLibrary();
@@ -142,6 +143,143 @@ describe("Document editor", () => {
       timeout: 5000,
       timeoutMsg: "Image attachment was not resolved after reopening the editor",
     });
+
+    await browser.waitUntil(
+      async () => browser.execute(() => {
+        const editor = document.querySelector(".vditor-ir .vditor-reset");
+        return Boolean(editor && editor.scrollHeight > editor.clientHeight);
+      }),
+      { timeout: 5000, timeoutMsg: "Reopened image document did not become scrollable" },
+    );
+    const before = await browser.execute(() => {
+      const main = document.querySelector("[data-testid='document-editor-main']");
+      const article = document.querySelector("[data-testid='document-editor-article']");
+      if (!main || !article) throw new Error("Editor layout nodes not found");
+      return {
+        mainHeight: main.getBoundingClientRect().height,
+        articleHeight: article.getBoundingClientRect().height,
+      };
+    });
+    const editor = await $(".vditor-ir .vditor-reset");
+    await editor.scrollIntoView();
+    await browser.action("wheel").scroll({
+      origin: editor,
+      deltaX: 0,
+      deltaY: 900,
+      duration: 100,
+    }).perform();
+    await pause(200);
+    const after = await browser.execute(() => {
+      const main = document.querySelector("[data-testid='document-editor-main']");
+      const article = document.querySelector("[data-testid='document-editor-article']");
+      const editorNode = document.querySelector(".vditor-ir .vditor-reset");
+      if (!main || !article || !editorNode) throw new Error("Editor layout nodes not found");
+      return {
+        mainHeight: main.getBoundingClientRect().height,
+        articleHeight: article.getBoundingClientRect().height,
+        scrollTop: editorNode.scrollTop,
+      };
+    });
+    expect(after.scrollTop).toBeGreaterThan(0);
+    expect(Math.abs(after.mainHeight - before.mainHeight)).toBeLessThan(4);
+    expect(Math.abs(after.articleHeight - after.mainHeight)).toBeLessThan(4);
+  });
+
+  it("keeps the editor card stable while mouse-wheel scrolling an image document", async () => {
+    const imageReference = `attachment://${encodeURIComponent(testAttachment.id)}`;
+    const imageDocument = [
+      "# 图片滚动布局检查",
+      ...Array.from({ length: 10 }, (_, index) => `![quantanote-editor-reentry.svg](${imageReference})\n\n图片节点 ${index + 1}`),
+    ].join("\n\n");
+    await DocumentEditorPage.setContent(imageDocument);
+    await browser.waitUntil(
+      async () => browser.execute(() => {
+        const editor = document.querySelector(".vditor-ir .vditor-reset");
+        const images = document.querySelectorAll(".vditor-ir img:not(.emoji)");
+        return Boolean(editor && images.length === 10 && editor.scrollHeight > editor.clientHeight);
+      }),
+      { timeout: 8000, timeoutMsg: "Image document did not become scrollable" },
+    );
+
+    const getGeometry = () => browser.execute(() => {
+      const main = document.querySelector("[data-testid='document-editor-main']");
+      const article = document.querySelector("[data-testid='document-editor-article']");
+      if (!main || !article) throw new Error("Editor layout nodes not found");
+      return {
+        mainHeight: main.getBoundingClientRect().height,
+        articleHeight: article.getBoundingClientRect().height,
+      };
+    });
+    const before = await getGeometry();
+    const editor = await $(".vditor-ir .vditor-reset");
+    await editor.scrollIntoView();
+    await browser.action("wheel").scroll({
+      origin: editor,
+      deltaX: 0,
+      deltaY: 900,
+      duration: 100,
+    }).perform();
+    await pause(200);
+    const after = await getGeometry();
+    const scrollTop = await browser.execute(() => document.querySelector(".vditor-ir .vditor-reset")?.scrollTop ?? 0);
+
+    expect(scrollTop).toBeGreaterThan(0);
+    expect(Math.abs(after.mainHeight - before.mainHeight)).toBeLessThan(4);
+    expect(Math.abs(after.articleHeight - after.mainHeight)).toBeLessThan(4);
+  });
+
+  it("does not shift text when a newly opened image finishes loading", async () => {
+    const delayedImageDocument = [
+      "# 图片加载位移检查",
+      `![quantanote-editor-reentry.svg](attachment://${encodeURIComponent(testAttachment.id)})`,
+      "图片加载完成后，这行文字的位置不应改变。",
+    ].join("\n\n");
+    await tauriInvoke("update_item", { id: testItem.id, content: delayedImageDocument });
+    await notifyDataChanged();
+    await TopBar.navLibrary();
+    const libraryItem = await $("[data-testid='library-item']");
+    await libraryItem.waitForDisplayed({ timeout: 10000 });
+    await libraryItem.click();
+    await expect($("[data-testid='reader-drawer']")).toBeDisplayed();
+
+    await LibraryPage.clickEdit();
+    await browser.execute(() => {
+      window.__quantanoteLayoutShifts = [];
+      if (typeof PerformanceObserver === "undefined") return;
+      const observer = new PerformanceObserver((list) => {
+        window.__quantanoteLayoutShifts.push(...list.getEntries().map((entry) => ({
+          value: entry.value,
+          hadRecentInput: entry.hadRecentInput,
+        })));
+      });
+      try {
+        observer.observe({ type: "layout-shift", buffered: false });
+        window.__quantanoteLayoutShiftObserver = observer;
+      } catch {
+        // WebView2 版本不支持 layout-shift 时,下面的元素几何检查仍会执行。
+      }
+    });
+    await browser.waitUntil(
+      async () => browser.execute(() => {
+        const image = document.querySelector(".vditor-ir img[alt='quantanote-editor-reentry.svg']");
+        const text = Array.from(document.querySelectorAll(".vditor-ir *")).find((node) => node.textContent?.includes("这行文字的位置"));
+        return Boolean(image?.complete && image.naturalWidth > 0 && text);
+      }),
+      { timeout: 8000, timeoutMsg: "Layout-shift verification image did not finish loading" },
+    );
+    await pause(300);
+    const layoutShift = await browser.execute(() => {
+      window.__quantanoteLayoutShiftObserver?.disconnect();
+      const entries = window.__quantanoteLayoutShifts || [];
+      return {
+        supported: Boolean(window.__quantanoteLayoutShiftObserver),
+        value: entries.filter((entry) => !entry.hadRecentInput).reduce((total, entry) => total + entry.value, 0),
+      };
+    });
+    if (layoutShift.supported) expect(layoutShift.value).toBeLessThan(0.001);
+
+    await DocumentEditorPage.setContent(`![quantanote-editor-reentry.svg](attachment://${encodeURIComponent(testAttachment.id)})`);
+    await DocumentEditorPage.waitForSaved(3000);
   });
 
   it("inserts an attachment at the saved editor cursor position", async () => {
@@ -679,6 +817,63 @@ describe("Document editor", () => {
 
     const content = await DocumentEditorPage.getContent();
     expect(content).toContain("manual version change");
+  });
+
+  it("keeps the editor card viewport-sized after scrolling long content", async () => {
+    const longContent = Array.from({ length: 80 }, (_, index) => `## 滚动布局检查 ${index + 1}\n\n这是用于验证编辑器高度约束的正文。`).join("\n\n");
+    await DocumentEditorPage.setContent(longContent);
+    await browser.waitUntil(
+      async () => browser.execute(() => {
+        const editor = document.querySelector(".vditor-ir .vditor-reset");
+        return Boolean(editor && editor.scrollHeight > editor.clientHeight);
+      }),
+      { timeout: 5000, timeoutMsg: "Long editor content did not become scrollable" },
+    );
+
+    const getGeometry = () => browser.execute(() => {
+      const content = document.querySelector("[data-testid='document-editor-content']");
+      const toolbar = document.querySelector("[data-testid='document-editor-toolbar']");
+      const main = document.querySelector("[data-testid='document-editor-main']");
+      const article = document.querySelector("[data-testid='document-editor-article']");
+      const status = document.querySelector("[data-testid='document-editor-status']");
+      if (!content || !toolbar || !main || !article || !status) throw new Error("Editor layout nodes not found");
+      const toolbarRect = toolbar.getBoundingClientRect();
+      const mainRect = main.getBoundingClientRect();
+      const articleRect = article.getBoundingClientRect();
+      const statusRect = status.getBoundingClientRect();
+      const contentStyle = getComputedStyle(content);
+      const statusStyle = getComputedStyle(status);
+      const contentInnerHeight = content.clientHeight
+        - parseFloat(contentStyle.paddingTop)
+        - parseFloat(contentStyle.paddingBottom);
+      return {
+        expectedMainHeight: contentInnerHeight
+          - toolbarRect.height
+          - parseFloat(getComputedStyle(toolbar).marginBottom)
+          - statusRect.height
+          - parseFloat(statusStyle.marginTop),
+        mainHeight: mainRect.height,
+        articleHeight: articleRect.height,
+      };
+    });
+
+    const before = await getGeometry();
+    const editor = await $(".vditor-ir .vditor-reset");
+    await editor.scrollIntoView();
+    await browser.action("wheel").scroll({
+      origin: editor,
+      deltaX: 0,
+      deltaY: 700,
+      duration: 100,
+    }).perform();
+    await pause(200);
+    const after = await getGeometry();
+    const scrollTop = await browser.execute(() => document.querySelector(".vditor-ir .vditor-reset")?.scrollTop ?? 0);
+
+    expect(scrollTop).toBeGreaterThan(0);
+    expect(after.mainHeight).toBeGreaterThan(after.expectedMainHeight - 4);
+    expect(Math.abs(after.articleHeight - after.mainHeight)).toBeLessThan(4);
+    expect(Math.abs(after.mainHeight - before.mainHeight)).toBeLessThan(4);
   });
 
   it("adjusts editor width and shares the setting with the reader", async () => {
