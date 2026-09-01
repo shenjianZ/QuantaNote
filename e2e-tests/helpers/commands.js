@@ -83,15 +83,16 @@ export async function permanentlyDeleteItemById(id) {
   return tauriInvoke("permanently_delete_item", { id });
 }
 
+export async function permanentlyDeleteAllTrash() {
+  return tauriInvoke("permanently_delete_all_trash");
+}
+
 export async function cleanupAllItems() {
   const items = await getAllItems();
   for (const item of items) {
     await permanentlyDeleteItemById(item.id);
   }
-  const trashItems = await tauriInvoke("get_trash_items");
-  for (const trashItem of trashItems) {
-    await permanentlyDeleteItemById(trashItem.item.id);
-  }
+  await permanentlyDeleteAllTrash();
 }
 
 // --- Tag 操作 ---

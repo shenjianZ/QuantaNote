@@ -122,6 +122,10 @@ export async function cleanupTrash(olderThanDays?: number) {
     return invoke<number>("cleanup_trash", { olderThanDays: olderThanDays ?? 30 });
 }
 
+export async function permanentlyDeleteAllTrash() {
+    return invoke<number>("permanently_delete_all_trash");
+}
+
 export async function getRecentItems(limit?: number) {
     return invoke("get_recent_items", { limit: limit ?? 20 });
 }

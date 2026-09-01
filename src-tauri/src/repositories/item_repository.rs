@@ -547,6 +547,35 @@ pub fn cleanup_trash(db: &DbState, older_than_days: i64) -> Result<usize, AppErr
     Ok(deleted)
 }
 
+pub fn delete_all_trash(db: &DbState) -> Result<usize, AppError> {
+    let ids = {
+        let conn = db
+            .conn
+            .lock()
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT id FROM items
+                 WHERE deleted_at IS NOT NULL
+                 ORDER BY deleted_at ASC",
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        let ids = stmt
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(|e| AppError::Database(e.to_string()))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        ids
+    };
+
+    let mut deleted = 0;
+    for id in ids {
+        delete(db, &id)?;
+        deleted += 1;
+    }
+    Ok(deleted)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -244,6 +244,33 @@ describe("Library reader and item actions", () => {
     await LibraryPage.expectItemVisible("收藏笔记");
   });
 
+  it("permanently deletes all items from trash", async () => {
+    const first = await seedItem({ title: "批量删除笔记一", content: "待彻底删除" });
+    const second = await seedItem({ title: "批量删除笔记二", content: "待彻底删除" });
+    await tauriInvoke("delete_item", { id: first.id });
+    await tauriInvoke("delete_item", { id: second.id });
+    await notifyDataChanged();
+
+    await LibraryPage.openTrash();
+    const dialog = await $("[role='dialog'][aria-label='回收站']");
+    await browser.waitUntil(
+      async () => (await dialog.$$(`[data-testid^='trash-delete-']:not([data-testid='trash-delete-all-btn'])`)).length === 2,
+      { timeout: 5000, timeoutMsg: "Trash did not render both items" },
+    );
+
+    const deleteAll = await $("[data-testid='trash-delete-all-btn']");
+    await deleteAll.click();
+    await expect(deleteAll).toHaveText("再次点击确认全部删除");
+    await deleteAll.click();
+
+    await browser.waitUntil(
+      async () => (await tauriInvoke("get_trash_items")).length === 0,
+      { timeout: 5000, timeoutMsg: "Trash items were not permanently deleted" },
+    );
+    await expect(dialog.$("//*[contains(., '回收站是空的')]")).toBeDisplayed();
+    await $("[data-testid='modal-close-btn']").click();
+  });
+
   it("supports advanced search, highlights matches, and searches attachment names", async () => {
     await LibraryPage.selectSearchMode("advanced");
     await LibraryPage.search("普通 OR 收藏");

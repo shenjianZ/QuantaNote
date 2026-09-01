@@ -6,6 +6,7 @@ import {
   getAllTags,
   getItemsPage,
   getTrashItems,
+  permanentlyDeleteAllTrash as permanentlyDeleteAllTrashCommand,
   permanentlyDeleteItem,
   restoreItem,
   type ItemDto,
@@ -49,6 +50,7 @@ interface ItemState {
   fetchTrashItems: () => Promise<void>;
   restoreItem: (id: string) => Promise<void>;
   permanentlyDeleteItem: (id: string) => Promise<void>;
+  permanentlyDeleteAllTrash: () => Promise<number>;
   cleanupTrash: (olderThanDays?: number) => Promise<number>;
   fetchPinned: () => Promise<void>;
   fetchRecent: (limit?: number) => Promise<void>;
@@ -231,6 +233,18 @@ export const useItemStore = create<ItemState>((set, get) => ({
       set((state) => ({
         trashItems: state.trashItems.filter((trashItem) => trashItem.item.id !== id),
       }));
+    } catch (e) {
+      set({ error: String(e) });
+      throw e;
+    }
+  },
+
+  permanentlyDeleteAllTrash: async () => {
+    set({ error: null });
+    try {
+      const deletedCount = await permanentlyDeleteAllTrashCommand();
+      set({ trashItems: [] });
+      return deletedCount;
     } catch (e) {
       set({ error: String(e) });
       throw e;

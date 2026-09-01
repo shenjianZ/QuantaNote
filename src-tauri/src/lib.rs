@@ -274,6 +274,7 @@ pub fn run() {
             item::restore_item,
             item::permanently_delete_item,
             item::cleanup_trash,
+            item::permanently_delete_all_trash,
             item::get_pinned_items,
             item::get_recent_items,
             note_link::get_note_links,

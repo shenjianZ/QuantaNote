@@ -109,7 +109,9 @@
     "deletedAt": "删除于 {{time}}",
     "restore": "恢复",
     "permanentDelete": "彻底删除",
-    "confirmPermanentDelete": "再次点击确认"
+    "confirmPermanentDelete": "再次点击确认",
+    "permanentDeleteAll": "彻底删除全部笔记",
+    "confirmPermanentDeleteAll": "再次点击确认全部删除"
   },
   "reader": {
     "pin": "置顶",

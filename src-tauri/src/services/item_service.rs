@@ -203,6 +203,10 @@ pub fn cleanup_trash(db: &DbState, older_than_days: i64) -> Result<usize, AppErr
     item_repository::cleanup_trash(db, older_than_days)
 }
 
+pub fn permanently_delete_all_trash(db: &DbState) -> Result<usize, AppError> {
+    item_repository::delete_all_trash(db)
+}
+
 pub fn get_pinned(db: &DbState) -> Result<Vec<ItemDto>, AppError> {
     item_repository::get_pinned(db)
 }
@@ -532,6 +536,27 @@ mod tests {
         drop(conn);
 
         assert_eq!(cleanup_trash(&db, 30).expect("cleanup trash"), 1);
+        assert!(get_trash_items(&db).unwrap().is_empty());
+    }
+
+    #[test]
+    fn permanently_delete_all_trash_removes_only_trashed_items() {
+        let db = crate::test_support::test_db();
+        let first = create_item(&db, "回收站记录一".to_string(), "note".to_string(), None).unwrap();
+        let second =
+            create_item(&db, "回收站记录二".to_string(), "note".to_string(), None).unwrap();
+        let active = create_item(&db, "保留记录".to_string(), "note".to_string(), None).unwrap();
+
+        delete_item(&db, &first.id).expect("trash first item");
+        delete_item(&db, &second.id).expect("trash second item");
+
+        assert_eq!(permanently_delete_all_trash(&db).expect("empty trash"), 2);
+        assert!(get_item(&db, &first.id).is_err());
+        assert!(get_item(&db, &second.id).is_err());
+        assert_eq!(
+            get_item(&db, &active.id).expect("active item").id,
+            active.id
+        );
         assert!(get_trash_items(&db).unwrap().is_empty());
     }
 

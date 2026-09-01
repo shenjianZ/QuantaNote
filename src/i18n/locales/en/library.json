@@ -109,7 +109,9 @@
     "deletedAt": "Deleted {{time}}",
     "restore": "Restore",
     "permanentDelete": "Delete forever",
-    "confirmPermanentDelete": "Click again to confirm"
+    "confirmPermanentDelete": "Click again to confirm",
+    "permanentDeleteAll": "Delete all forever",
+    "confirmPermanentDeleteAll": "Click again to delete all"
   },
   "reader": {
     "pin": "Pin",

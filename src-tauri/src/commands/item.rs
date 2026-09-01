@@ -139,6 +139,11 @@ pub fn cleanup_trash(
 }
 
 #[tauri::command]
+pub fn permanently_delete_all_trash(db: State<'_, DbState>) -> Result<usize, AppError> {
+    item_service::permanently_delete_all_trash(&db)
+}
+
+#[tauri::command]
 pub fn get_pinned_items(db: State<'_, DbState>) -> Result<Vec<ItemDto>, AppError> {
     item_service::get_pinned(&db)
 }
