@@ -4,11 +4,12 @@
 2. 始终使用中文回复
 3. 修改前端 UI 代码后，需要考虑是否需要同步修改 E2E 测试文件。允许先批量完成前端 UI 修改，再统一修复对应的 E2E 测试文件并运行测试验证
 4. rust 修改完需要 check 、fmt
+5. 运行 E2E 测试时只执行与当前改动相关的测试规格或用例，不需要运行完整 E2E 测试套件
 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **QuantaNote** (4760 symbols, 9930 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **QuantaNote** (6965 symbols, 14268 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 

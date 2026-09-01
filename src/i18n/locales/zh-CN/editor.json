@@ -5,6 +5,11 @@
   "imageEditor": {
     "title": "编辑图片",
     "close": "关闭",
+    "preview": "预览图片",
+    "editDetails": "编辑文字属性",
+    "collapseDetails": "收起文字属性",
+    "noDescription": "未设置替代文本",
+    "noTitle": "未设置标题",
     "alt": "替代文本",
     "altPlaceholder": "图片说明（可选）",
     "imageTitle": "标题",

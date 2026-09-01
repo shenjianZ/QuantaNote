@@ -333,12 +333,15 @@ describe("Document editor", () => {
       { timeout: 3000, timeoutMsg: "Image editor popover did not open" },
     );
 
+    await expect($("[data-testid='image-editor-alt']")).not.toBeExisting();
+    await $("[data-testid='image-editor-details-toggle']").click();
     const altInput = await $("[data-testid='image-editor-alt']");
     await altInput.clearValue();
     await altInput.setValue("正文截图");
     const widthInput = await $("[data-testid='image-editor-width']");
     await widthInput.clearValue();
     await widthInput.setValue("640");
+    await $("button[aria-label='右对齐']").click();
     await $("[data-testid='image-editor-apply']").click();
 
     let latestImageContent = "";
@@ -346,7 +349,9 @@ describe("Document editor", () => {
       async () => {
         const updated = await getItemById(testItem.id);
         latestImageContent = updated.content;
-        return updated.content.includes("正文截图") && updated.content.includes("qn-width=640");
+        return updated.content.includes("正文截图")
+          && updated.content.includes("qn-width=640")
+          && updated.content.includes("qn-align=right");
       },
       { timeout: 5000, timeoutMsg: `Image metadata was not persisted: ${latestImageContent}` },
     );
@@ -356,6 +361,34 @@ describe("Document editor", () => {
 
     await DocumentEditorPage.clickBack();
     await expect($("[data-testid='reader-drawer']")).toBeDisplayed();
+    const readerImageLayout = await browser.execute(() => {
+      const preview = document.querySelector("[data-testid='reader-drawer'] .markdown-preview");
+      const frame = preview?.querySelector(".markdown-image-frame");
+      if (!preview || !frame) throw new Error("Reader image frame was not found");
+      const previewRect = preview.getBoundingClientRect();
+      const frameRect = frame.getBoundingClientRect();
+      const previewStyle = window.getComputedStyle(preview);
+      const contentRight = previewRect.right - Number.parseFloat(previewStyle.paddingRight || "0");
+      return {
+        className: frame.className,
+        frameRight: frameRect.right,
+        contentRight,
+      };
+    });
+    expect(readerImageLayout.className).toContain("markdown-image-frame--right");
+    expect(readerImageLayout.frameRight).toBeGreaterThanOrEqual(readerImageLayout.contentRight - 8);
+    const readerImage = await $("[data-testid='reader-drawer'] .markdown-image-frame img[alt='正文截图']");
+    await readerImage.click();
+    await expect($("[data-testid='reader-image-preview-modal']")).toBeDisplayed();
+    await browser.waitUntil(
+      async () => browser.execute(() => {
+        const preview = document.querySelector("[data-testid='reader-image-preview-content']");
+        return preview instanceof HTMLImageElement && preview.complete && preview.naturalWidth > 0;
+      }),
+      { timeout: 3000, timeoutMsg: "Reader image preview did not render" },
+    );
+    await $("[data-testid='reader-image-preview-close']").click();
+    await expect($("[data-testid='reader-image-preview-modal']")).not.toBeDisplayed();
     await LibraryPage.clickEdit();
     await browser.waitUntil(
       async () => browser.execute(() => {
@@ -364,6 +397,169 @@ describe("Document editor", () => {
       }),
       { timeout: 5000, timeoutMsg: "Image presentation was not restored after reopening" },
     );
+  });
+
+  it("previews and copies an image from the compact image editor", async () => {
+    const image = await $(".vditor-ir img:not(.emoji)");
+    await image.click();
+    await browser.waitUntil(
+      async () => (await $("[data-testid='image-editor-popover']")).isDisplayed(),
+      { timeout: 3000, timeoutMsg: "Image editor popover did not open for preview test" },
+    );
+
+    await $("[data-testid='image-preview']").click();
+    await expect($("[data-testid='image-preview-modal']")).toBeDisplayed();
+    await browser.waitUntil(
+      async () => browser.execute(() => {
+        const preview = document.querySelector("[data-testid='image-preview-content']");
+        return preview instanceof HTMLImageElement && preview.complete && preview.naturalWidth > 0;
+      }),
+      { timeout: 3000, timeoutMsg: "Full-screen image preview did not render" },
+    );
+    await expect($("[data-testid='image-preview-scale']")).toHaveText("100%");
+    const scaleBeforeWheel = await browser.execute(() => {
+      const preview = document.querySelector("[data-testid='image-preview-content']");
+      return preview instanceof HTMLImageElement ? preview.style.transform : "";
+    });
+    await browser.execute(() => {
+      const stage = document.querySelector("[data-testid='image-preview-stage']");
+      stage?.dispatchEvent(new WheelEvent("wheel", { deltaY: -120, bubbles: true, cancelable: true }));
+    });
+    await browser.waitUntil(
+      async () => browser.execute((before) => {
+        const preview = document.querySelector("[data-testid='image-preview-content']");
+        return preview instanceof HTMLImageElement && preview.style.transform !== before;
+      }, scaleBeforeWheel),
+      { timeout: 3000, timeoutMsg: "Image preview did not zoom with the mouse wheel" },
+    );
+    const scaleAfterWheel = await browser.execute(() => {
+      const preview = document.querySelector("[data-testid='image-preview-content']");
+      return preview instanceof HTMLImageElement ? preview.style.transform : "";
+    });
+    expect(scaleAfterWheel).toContain("scale(1.1)");
+    await expect($("[data-testid='image-preview-scale']")).toHaveText("110%");
+    await browser.execute(() => {
+      const stage = document.querySelector("[data-testid='image-preview-stage']");
+      stage?.dispatchEvent(new MouseEvent("mousedown", {
+        button: 0,
+        clientX: 100,
+        clientY: 100,
+        bubbles: true,
+      }));
+    });
+    await browser.pause(50);
+    await browser.execute(() => {
+      window.dispatchEvent(new MouseEvent("mousemove", {
+        clientX: 140,
+        clientY: 125,
+        bubbles: true,
+      }));
+      window.dispatchEvent(new MouseEvent("mouseup", {
+        button: 0,
+        clientX: 140,
+        clientY: 125,
+        bubbles: true,
+      }));
+    });
+    await browser.pause(100);
+    const transformAfterDrag = await browser.execute(() => {
+      const preview = document.querySelector("[data-testid='image-preview-content']");
+      return preview instanceof HTMLImageElement ? preview.style.transform : "";
+    });
+    expect(transformAfterDrag).toContain("translate3d(40px, 25px");
+    await $("[data-testid='image-preview-close']").click();
+    await expect($("[data-testid='image-preview-modal']")).not.toBeDisplayed();
+
+    await $("[data-testid='image-editor-copy']").click();
+    await browser.waitUntil(
+      async () => (await $("[data-testid='toast-success']")).isDisplayed(),
+      { timeout: 3000, timeoutMsg: "Image copy did not report success" },
+    );
+    await $("[data-testid='image-editor-close']").click();
+  });
+
+  it("keeps the image editor popover visible and attached while scrolling", async () => {
+    const imageSource = `attachment://${encodeURIComponent(testAttachment.id)}`;
+    const floatingImageDocument = [
+      "# 图片属性浮层定位检查",
+      ...Array.from({ length: 6 }, (_, index) => `浮层定位前的正文 ${index + 1}`),
+      `![quantanote-editor-reentry.svg](${imageSource})`,
+      ...Array.from({ length: 20 }, (_, index) => `浮层定位后的正文 ${index + 1}`),
+    ].join("\n\n");
+    await tauriInvoke("update_item", { id: testItem.id, content: floatingImageDocument });
+    await notifyDataChanged();
+    await TopBar.navLibrary();
+    const libraryItem = await $("[data-testid='library-item']");
+    await libraryItem.waitForDisplayed({ timeout: 10000 });
+    await libraryItem.click();
+    await expect($("[data-testid='reader-drawer']")).toBeDisplayed();
+    await LibraryPage.clickEdit();
+    await browser.waitUntil(
+      async () => browser.execute(() => {
+        const image = document.querySelector(".vditor-ir img[alt='quantanote-editor-reentry.svg']");
+        const editor = document.querySelector(".vditor-ir .vditor-reset");
+        return Boolean(image?.complete && image.naturalWidth > 0 && editor && editor.scrollHeight > editor.clientHeight);
+      }),
+      { timeout: 5000, timeoutMsg: "Floating UI test image did not render" },
+    );
+
+    await browser.execute(() => {
+      const image = document.querySelector(".vditor-ir img[alt='quantanote-editor-reentry.svg']");
+      if (!(image instanceof HTMLImageElement)) throw new Error("Floating UI test image was not found");
+      image.scrollIntoView({ block: "end", inline: "nearest" });
+      image.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await browser.waitUntil(
+      async () => $("[data-testid='image-editor-popover']").isDisplayed(),
+      { timeout: 3000, timeoutMsg: "Image editor popover did not open for positioning test" },
+    );
+
+    const getPopoverLayout = () => browser.execute(() => {
+      const image = document.querySelector(".vditor-ir img[alt='quantanote-editor-reentry.svg']");
+      const popover = document.querySelector("[data-testid='image-editor-popover']");
+      const editor = document.querySelector(".vditor-ir .vditor-reset");
+      if (!image || !popover || !editor) throw new Error("Floating UI layout nodes were not found");
+      const imageRect = image.getBoundingClientRect();
+      const popoverRect = popover.getBoundingClientRect();
+      return {
+        imageBottom: imageRect.bottom,
+        popoverTop: popoverRect.top,
+        popoverRight: popoverRect.right,
+        popoverBottom: popoverRect.bottom,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+        scrollTop: editor.scrollTop,
+      };
+    });
+    const before = await getPopoverLayout();
+    expect(before.popoverTop).toBeGreaterThanOrEqual(0);
+    expect(before.popoverRight).toBeLessThanOrEqual(before.viewportWidth + 1);
+    expect(before.popoverBottom).toBeLessThanOrEqual(before.viewportHeight + 1);
+
+    await browser.execute(() => {
+      const editor = document.querySelector(".vditor-ir .vditor-reset");
+      if (!editor) throw new Error("Editor scroll container was not found");
+      const maxScrollTop = Math.max(0, editor.scrollHeight - editor.clientHeight);
+      const nextScrollTop = Math.min(maxScrollTop, editor.scrollTop + 180);
+      if (nextScrollTop <= editor.scrollTop) {
+        throw new Error(`Editor did not have enough scrollable content: ${editor.scrollTop}/${maxScrollTop}`);
+      }
+      editor.scrollTop = nextScrollTop;
+      editor.dispatchEvent(new Event("scroll", { bubbles: false }));
+    });
+    await pause(200);
+    const after = await getPopoverLayout();
+    expect(after.scrollTop).toBeGreaterThan(before.scrollTop);
+    expect(after.popoverTop).toBeGreaterThanOrEqual(0);
+    expect(after.popoverRight).toBeLessThanOrEqual(after.viewportWidth + 1);
+    expect(after.popoverBottom).toBeLessThanOrEqual(after.viewportHeight + 1);
+    expect(Math.abs(
+      (after.popoverTop - after.imageBottom) - (before.popoverTop - before.imageBottom),
+    )).toBeLessThan(4);
+
+    await $("[data-testid='image-editor-close']").click();
+    await DocumentEditorPage.setContent(`![quantanote-editor-reentry.svg](attachment://${encodeURIComponent(testAttachment.id)})`);
+    await DocumentEditorPage.waitForSaved(3000);
   });
 
   it("shows a clear image load error and retries the failed source", async () => {

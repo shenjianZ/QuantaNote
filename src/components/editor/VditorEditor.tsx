@@ -1,7 +1,8 @@
 import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Vditor from "vditor";
 import "vditor/dist/index.css";
-import { AlignCenter, AlignLeft, AlignRight, Copy, Download, ExternalLink, RefreshCw, Replace, X } from "lucide-react";
+import { AlignCenter, AlignLeft, AlignRight, Copy, Download, ExternalLink, Maximize2, RefreshCw, Replace, X } from "lucide-react";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -27,6 +28,7 @@ import { SearchReplaceBar } from "./SearchReplaceBar";
 import { useToastStore } from "../../stores/toastStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { shortcutMatches } from "../../utils/shortcutRegistry";
+import { ImagePreviewModal } from "../common/ImagePreviewModal";
 
 type VditorToolbarItem = string | {
   name: string;
@@ -53,6 +55,8 @@ interface AttachmentInsertItem {
   asImage: boolean;
 }
 
+type ImageOverlayPlacement = "above" | "below";
+
 interface ImageEditorState {
   attachmentId?: string;
   sourceBase: string;
@@ -62,6 +66,7 @@ interface ImageEditorState {
   align: AttachmentImageAlignment;
   left: number;
   top: number;
+  placement: ImageOverlayPlacement;
 }
 
 interface ImageErrorState {
@@ -69,6 +74,12 @@ interface ImageErrorState {
   filename: string;
   left: number;
   top: number;
+  placement: ImageOverlayPlacement;
+}
+
+interface ImagePreviewState {
+  src: string;
+  alt: string;
 }
 
 function imageSourceBase(source: string) {
@@ -86,13 +97,72 @@ function findAttachmentForImage(
   });
 }
 
-function getImageOverlayPosition(image: HTMLImageElement, host: HTMLElement, width: number) {
+function getImageOverlayPosition(
+  image: HTMLImageElement,
+  width: number,
+  height: number,
+  placement?: ImageOverlayPlacement,
+) {
   const imageRect = image.getBoundingClientRect();
-  const hostRect = host.getBoundingClientRect();
-  const maxLeft = Math.max(8, hostRect.width - width - 8);
-  const left = Math.max(8, Math.min(imageRect.left - hostRect.left, maxLeft));
-  const top = imageRect.bottom - hostRect.top + 8;
-  return { left, top };
+  const margin = 8;
+  const gap = 8;
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const effectiveWidth = Math.min(width, Math.max(0, viewportWidth - margin * 2));
+  const maxLeft = Math.max(margin, viewportWidth - effectiveWidth - margin);
+  const left = Math.max(margin, Math.min(imageRect.left, maxLeft));
+  const belowTop = imageRect.bottom + gap;
+  const aboveTop = imageRect.top - height - gap;
+  const resolvedPlacement = placement ?? (
+    belowTop + height <= viewportHeight - margin || aboveTop < margin ? "below" : "above"
+  );
+  const preferredTop = resolvedPlacement === "below" ? belowTop : aboveTop;
+  const maxTop = Math.max(margin, viewportHeight - height - margin);
+  const top = Math.max(margin, Math.min(preferredTop, maxTop));
+  return { left, top, placement: resolvedPlacement };
+}
+
+async function getClipboardImageBlob(blob: Blob) {
+  if (blob.type === "image/png") return blob;
+
+  const canvas = document.createElement("canvas");
+  const drawToPng = async (source: CanvasImageSource, width: number, height: number) => {
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("当前环境不支持图片格式转换");
+    context.drawImage(source, 0, 0);
+    const pngBlob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+    if (!pngBlob) throw new Error("图片格式转换失败");
+    return pngBlob;
+  };
+
+  if (typeof createImageBitmap === "function") {
+    try {
+      const bitmap = await createImageBitmap(blob);
+      try {
+        return await drawToPng(bitmap, bitmap.width, bitmap.height);
+      } finally {
+        bitmap.close();
+      }
+    } catch {
+      // SVG 等格式在部分 WebView 中不能直接通过 createImageBitmap 解码，继续使用 Image 回退。
+    }
+  }
+
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("图片格式转换失败"));
+    reader.readAsDataURL(blob);
+  });
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const element = new Image();
+    element.onload = () => resolve(element);
+    element.onerror = () => reject(new Error("图片格式转换失败"));
+    element.src = dataUrl;
+  });
+  return drawToPng(image, image.naturalWidth, image.naturalHeight);
 }
 
 function getImageWidthValue(value: string) {
@@ -827,6 +897,10 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
   const imageErrorRef = useRef<ImageErrorState | null>(null);
   const [imageEditor, setImageEditor] = useState<ImageEditorState | null>(null);
   const [imageError, setImageError] = useState<ImageErrorState | null>(null);
+  const [imageEditorDetailsOpen, setImageEditorDetailsOpen] = useState(false);
+  const [imagePreview, setImagePreview] = useState<ImagePreviewState | null>(null);
+  const imageEditorPopoverRef = useRef<HTMLDivElement | null>(null);
+  const imageErrorPopoverRef = useRef<HTMLDivElement | null>(null);
   imageErrorRef.current = imageError;
 
   const getSelectedImage = useCallback((state: ImageEditorState | null = imageEditor) => {
@@ -1210,13 +1284,25 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
       const response = await fetch(image.currentSrc || image.src);
       if (!response.ok) throw new Error(`图片读取失败: ${response.status}`);
       const blob = await response.blob();
-      await navigator.clipboard.write([new ClipboardItem({ [blob.type || "image/png"]: blob })]);
+      const clipboardBlob = await getClipboardImageBlob(blob);
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": clipboardBlob })]);
       useToastStore.getState().addToast("success", t("editor:imageEditor.copySuccess"));
     } catch (error) {
       console.error("Copy image failed:", error);
       useToastStore.getState().addToast("error", t("editor:imageEditor.copyFailed"));
     }
   }, [getSelectedImage, t]);
+
+  const previewSelectedImage = useCallback(() => {
+    const image = getSelectedImage(imageEditor);
+    if (!image) return;
+    const src = image.currentSrc || image.src;
+    if (!src) return;
+    setImagePreview({
+      src,
+      alt: image.getAttribute("alt") || t("editor:imageEditor.unknownImage"),
+    });
+  }, [getSelectedImage, imageEditor, t]);
 
   const exportSelectedImage = useCallback(async () => {
     const image = getSelectedImage();
@@ -1468,15 +1554,15 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-    const host = container.parentElement ?? container;
 
     const handleImageClick = (event: MouseEvent) => {
       const target = event.target;
       if (!(target instanceof HTMLImageElement) || target.classList.contains("emoji")) return;
       const options = getAttachmentImageOptions(target.getAttribute("src") || "");
       const attachment = findAttachmentForImage(target, attachmentsRef.current);
-      const position = getImageOverlayPosition(target, host, 380);
+      const position = getImageOverlayPosition(target, 380, 360);
       selectedImageRef.current = target;
+      setImageEditorDetailsOpen(false);
       setImageError(null);
       setImageEditor({
         attachmentId: attachment?.id,
@@ -1511,7 +1597,7 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
       // 资源地址,不要为它弹出失败提示。
       const source = (target.getAttribute("src") || "").toLowerCase();
       if (source.startsWith(ATTACHMENT_PROTOCOL)) return;
-      const position = getImageOverlayPosition(target, host, 320);
+      const position = getImageOverlayPosition(target, 320, 80);
       setImageEditor(null);
       setImageError({
         image: target,
@@ -1536,6 +1622,77 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
       selectedImageRef.current = null;
     };
   }, [lang, t]);
+
+  useEffect(() => {
+    if (!imageEditor && !imageError) return;
+    const container = containerRef.current;
+    if (!container) return;
+
+    const activeImage = imageEditor
+      ? getSelectedImage(imageEditor)
+      : imageError?.image ?? null;
+    if (!activeImage) return;
+
+    let frame: number | null = null;
+    const reposition = () => {
+      frame = null;
+      const currentImage = imageEditor
+        ? getSelectedImage(imageEditor)
+        : imageErrorRef.current?.image ?? null;
+      if (!currentImage || !container.contains(currentImage)) {
+        if (imageEditor) setImageEditor(null);
+        if (imageError) setImageError(null);
+        return;
+      }
+
+      if (imageEditor) {
+        const overlayHeight = imageEditorPopoverRef.current?.getBoundingClientRect().height ?? 360;
+        const nextPosition = getImageOverlayPosition(currentImage, 380, overlayHeight, imageEditor.placement);
+        setImageEditor((current) => {
+          if (!current || (current.left === nextPosition.left && current.top === nextPosition.top)) return current;
+          return { ...current, ...nextPosition };
+        });
+      } else {
+        const overlayHeight = imageErrorPopoverRef.current?.getBoundingClientRect().height ?? 80;
+        const nextPosition = getImageOverlayPosition(currentImage, 320, overlayHeight, imageError?.placement);
+        setImageError((current) => {
+          if (!current || (current.left === nextPosition.left && current.top === nextPosition.top)) return current;
+          return { ...current, ...nextPosition };
+        });
+      }
+    };
+    const scheduleReposition = () => {
+      if (frame !== null) return;
+      frame = window.requestAnimationFrame(reposition);
+    };
+    const scrollParents: Array<HTMLElement | Window> = [window];
+    let parent = activeImage.parentElement;
+    while (parent) {
+      const style = window.getComputedStyle(parent);
+      const overflow = `${style.overflow}${style.overflowX}${style.overflowY}`;
+      if (/(auto|scroll|overlay)/.test(overflow)) scrollParents.push(parent);
+      parent = parent.parentElement;
+    }
+
+    scrollParents.forEach((scrollParent) => {
+      scrollParent.addEventListener("scroll", scheduleReposition, { passive: true });
+    });
+    window.addEventListener("resize", scheduleReposition);
+    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(scheduleReposition);
+    resizeObserver?.observe(activeImage);
+    resizeObserver?.observe(container);
+    resizeObserver?.observe(imageEditor ? imageEditorPopoverRef.current ?? container : imageErrorPopoverRef.current ?? container);
+    reposition();
+
+    return () => {
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      scrollParents.forEach((scrollParent) => {
+        scrollParent.removeEventListener("scroll", scheduleReposition);
+      });
+      window.removeEventListener("resize", scheduleReposition);
+      resizeObserver?.disconnect();
+    };
+  }, [getSelectedImage, imageEditor, imageError]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -1632,6 +1789,8 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
       theme: theme === "dark" ? "dark" : "classic",
       icon: "ant",
       cache: { enable: false },
+      // 使用应用统一的图片预览层，避免 Vditor 自带的旧式查看器接管双击事件。
+      image: { isPreview: false },
       // 图片附件先预加载并解码,让正文与图片一起首次可见,避免下方文字被图片推移。
       value: waitForInitialImages ? "" : resolvedInitialValue,
       input: (value) => {
@@ -1942,37 +2101,64 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
   return (
     <div className="relative h-full min-h-0 min-w-0">
       <div ref={containerRef} className="vditor-container" />
-      {imageEditor && (
+      {imageEditor && typeof document !== "undefined" && document.body && createPortal(
         <div
+          ref={imageEditorPopoverRef}
           className="quantanote-image-editor-popover"
           data-testid="image-editor-popover"
           style={{ left: imageEditor.left, top: imageEditor.top }}
           onMouseDown={(event) => event.stopPropagation()}
         >
           <div className="quantanote-image-editor-popover__header">
-            <span>{t("editor:imageEditor.title")}</span>
-            <button type="button" onClick={closeImageEditor} aria-label={t("editor:imageEditor.close")} title={t("editor:imageEditor.close")}>
-              <X className="h-3.5 w-3.5" />
+            <div className="quantanote-image-editor-popover__heading">
+              <span>{t("editor:imageEditor.title")}</span>
+              <span className="quantanote-image-editor-popover__filename" title={imageEditor.alt || t("editor:imageEditor.noDescription")}>
+                {imageEditor.alt || t("editor:imageEditor.noDescription")}
+              </span>
+            </div>
+            <div className="quantanote-image-editor-popover__header-actions">
+              <button type="button" onClick={previewSelectedImage} aria-label={t("editor:imageEditor.preview")} title={t("editor:imageEditor.preview")} data-testid="image-preview">
+                <Maximize2 className="h-3.5 w-3.5" />
+              </button>
+              <button type="button" onClick={closeImageEditor} aria-label={t("editor:imageEditor.close")} title={t("editor:imageEditor.close")} data-testid="image-editor-close">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+          <div className="quantanote-image-editor-popover__summary">
+            <span>{imageEditor.title || t("editor:imageEditor.noTitle")}</span>
+            <button
+              type="button"
+              className="quantanote-image-editor-popover__details-toggle"
+              aria-expanded={imageEditorDetailsOpen}
+              data-testid="image-editor-details-toggle"
+              onClick={() => setImageEditorDetailsOpen((open) => !open)}
+            >
+              {imageEditorDetailsOpen ? t("editor:imageEditor.collapseDetails") : t("editor:imageEditor.editDetails")}
             </button>
           </div>
-          <label className="quantanote-image-editor-popover__field">
-            <span>{t("editor:imageEditor.alt")}</span>
-            <input
-              value={imageEditor.alt}
-              onChange={(event) => setImageEditor((current) => current ? { ...current, alt: event.target.value } : current)}
-              placeholder={t("editor:imageEditor.altPlaceholder")}
-              data-testid="image-editor-alt"
-            />
-          </label>
-          <label className="quantanote-image-editor-popover__field">
-            <span>{t("editor:imageEditor.imageTitle")}</span>
-            <input
-              value={imageEditor.title}
-              onChange={(event) => setImageEditor((current) => current ? { ...current, title: event.target.value } : current)}
-              placeholder={t("editor:imageEditor.titlePlaceholder")}
-              data-testid="image-editor-title"
-            />
-          </label>
+          {imageEditorDetailsOpen && (
+            <div className="quantanote-image-editor-popover__details">
+              <label className="quantanote-image-editor-popover__field">
+                <span>{t("editor:imageEditor.alt")}</span>
+                <input
+                  value={imageEditor.alt}
+                  onChange={(event) => setImageEditor((current) => current ? { ...current, alt: event.target.value } : current)}
+                  placeholder={t("editor:imageEditor.altPlaceholder")}
+                  data-testid="image-editor-alt"
+                />
+              </label>
+              <label className="quantanote-image-editor-popover__field">
+                <span>{t("editor:imageEditor.imageTitle")}</span>
+                <input
+                  value={imageEditor.title}
+                  onChange={(event) => setImageEditor((current) => current ? { ...current, title: event.target.value } : current)}
+                  placeholder={t("editor:imageEditor.titlePlaceholder")}
+                  data-testid="image-editor-title"
+                />
+              </label>
+            </div>
+          )}
           <div className="quantanote-image-editor-popover__row">
             <label className="quantanote-image-editor-popover__field flex-1">
               <span>{t("editor:imageEditor.width")}</span>
@@ -2021,7 +2207,7 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
             <button type="button" onClick={() => void replaceSelectedImage()} disabled={!onAddAttachment}>
               <Replace className="h-3.5 w-3.5" />{t("editor:imageEditor.replace")}
             </button>
-            <button type="button" onClick={() => void copySelectedImage()}>
+            <button type="button" onClick={() => void copySelectedImage()} data-testid="image-editor-copy">
               <Copy className="h-3.5 w-3.5" />{t("editor:imageEditor.copy")}
             </button>
             <button type="button" onClick={() => void exportSelectedImage()}>
@@ -2034,10 +2220,12 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
               {t("editor:imageEditor.apply")}
             </button>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
-      {imageError && (
+      {imageError && typeof document !== "undefined" && document.body && createPortal(
         <div
+          ref={imageErrorPopoverRef}
           className="quantanote-image-error-popover"
           data-testid="image-load-error"
           style={{ left: imageError.left, top: imageError.top }}
@@ -2050,8 +2238,15 @@ const VditorEditorBase = forwardRef<VditorEditorHandle, VditorEditorProps>(funct
           <button type="button" onClick={() => setImageError(null)} aria-label={t("editor:imageEditor.close")} data-testid="image-error-close">
             <X className="h-3.5 w-3.5" />
           </button>
-        </div>
+        </div>,
+        document.body,
       )}
+      <ImagePreviewModal
+        open={Boolean(imagePreview)}
+        src={imagePreview?.src ?? ""}
+        alt={imagePreview?.alt ?? ""}
+        onClose={() => setImagePreview(null)}
+      />
       {dragActive && (
         <div className="quantanote-editor-drop-overlay" data-testid="editor-drop-overlay" aria-hidden="true">
           <div className="quantanote-editor-drop-overlay__content">

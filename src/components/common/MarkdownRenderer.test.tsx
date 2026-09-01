@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { setup } from "../../test/test-utils";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import Vditor from "vditor";
@@ -208,6 +208,7 @@ graph TD
       />,
     );
 
+    expect(document.querySelector(".markdown-image-frame")).toHaveClass("markdown-image-frame--right");
     expect(document.querySelector(".markdown-image-frame img")).toHaveStyle({
       width: "640px",
       maxWidth: "100%",
@@ -215,6 +216,53 @@ graph TD
       marginLeft: "auto",
       marginRight: "0px",
     });
+  });
+
+  it("centers reader images without an explicit alignment", () => {
+    setup(
+      <MarkdownRenderer
+        content="![默认图片](attachment://att-1)"
+        attachments={[{
+          id: "att-1",
+          filename: "截图.png",
+          file_path: "C:/attachments/att-1.png",
+          mime_type: "image/png",
+        }]}
+      />,
+    );
+
+    expect(document.querySelector(".markdown-image-frame")).toHaveClass("markdown-image-frame--center");
+  });
+
+  it("opens reader images in the shared preview and zooms with the wheel", async () => {
+    const { user } = setup(
+      <MarkdownRenderer content="![预览图片](https://example.com/image.png)" />,
+    );
+
+    await user.click(document.querySelector(".markdown-image-frame img") as HTMLImageElement);
+
+    const modal = screen.getByTestId("reader-image-preview-modal");
+    const image = screen.getByTestId("reader-image-preview-content");
+    expect(modal).toBeInTheDocument();
+    expect(image).toHaveAttribute("src", "https://example.com/image.png");
+    expect(image).toHaveStyle({ transform: "scale(1)" });
+    expect(screen.getByTestId("reader-image-preview-scale")).toHaveTextContent("100%");
+
+    fireEvent.wheel(screen.getByTestId("reader-image-preview-stage"), { deltaY: -100 });
+    expect(image).toHaveStyle({ transform: "scale(1.1)" });
+    expect(screen.getByTestId("reader-image-preview-scale")).toHaveTextContent("110%");
+
+    const stage = screen.getByTestId("reader-image-preview-stage");
+    fireEvent.mouseDown(stage, { button: 0, clientX: 100, clientY: 100 });
+    fireEvent.mouseMove(window, { clientX: 140, clientY: 125 });
+    fireEvent.mouseUp(window, { clientX: 140, clientY: 125 });
+    expect(image).toHaveStyle({ transform: "translate3d(40px, 25px, 0) scale(1.1)" });
+
+    fireEvent.wheel(stage, { deltaY: 100 });
+    expect(image).toHaveStyle({ transform: "scale(1)" });
+
+    await user.click(screen.getByTestId("reader-image-preview-close"));
+    expect(screen.queryByTestId("reader-image-preview-modal")).not.toBeInTheDocument();
   });
 
   it("renders wiki links and delegates note navigation", async () => {

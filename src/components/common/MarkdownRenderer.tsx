@@ -28,6 +28,7 @@ import { copyTextToSystemClipboard } from "../../utils/clipboard";
 import { useToastStore } from "../../stores/toastStore";
 import type { MarkdownAttachment } from "../../utils/markdownAttachments";
 import { NotePropertiesBadges } from "./NotePropertiesBadges";
+import { ImagePreviewModal } from "./ImagePreviewModal";
 import { hasNoteProperties, parseNoteProperties, stripFrontmatter } from "../../utils/frontmatter";
 import {
   getAttachmentIdFromSource,
@@ -369,8 +370,23 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme 
   const properties = parseNoteProperties(content);
   const bodyContent = stripFrontmatter(content);
   const headingCounts = new Map<string, number>();
+  const [previewImage, setPreviewImage] = useState<{ src: string; alt: string } | null>(null);
 
   const handleClick = useCallback((e: React.MouseEvent<HTMLElement>) => {
+    const image = (e.target as HTMLElement).closest("img");
+    if (image && e.currentTarget.contains(image) && !image.classList.contains("emoji")) {
+      const src = image.currentSrc || image.src || image.getAttribute("src") || "";
+      if (src) {
+        e.preventDefault();
+        e.stopPropagation();
+        setPreviewImage({
+          src,
+          alt: image.getAttribute("alt") || t("editor:imageEditor.unknownImage"),
+        });
+      }
+      return;
+    }
+
     const anchor = (e.target as HTMLElement).closest("a");
     if (!anchor) return;
 
@@ -398,7 +414,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme 
     if (e.ctrlKey || e.metaKey) {
       openUrl(anchor.href).catch(() => {});
     }
-  }, [attachments, onNoteLinkClick]);
+  }, [attachments, onNoteLinkClick, t]);
 
   if (!bodyContent.trim() && !hasNoteProperties(properties)) {
     return <div className="markdown-empty">{resolvedEmptyText}</div>;
@@ -477,8 +493,9 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme 
     img: ({ src, alt, title }) => {
       if (!src) return null;
       const imageOptions = getAttachmentImageOptions(src);
+      const imageAlignment = imageOptions.align ?? "center";
       return (
-        <span className="markdown-image-frame">
+        <span className={`markdown-image-frame markdown-image-frame--${imageAlignment}`}>
           <img
             src={resolveAttachmentSource(src, attachments)}
             alt={alt || ""}
@@ -547,6 +564,13 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme 
       >
         {bodyContent}
       </ReactMarkdown>
+      <ImagePreviewModal
+        open={Boolean(previewImage)}
+        src={previewImage?.src ?? ""}
+        alt={previewImage?.alt ?? ""}
+        onClose={() => setPreviewImage(null)}
+        testIdPrefix="reader-image-preview"
+      />
     </article>
   );
 });

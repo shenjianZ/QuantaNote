@@ -5,6 +5,11 @@
   "imageEditor": {
     "title": "Edit image",
     "close": "Close",
+    "preview": "Preview image",
+    "editDetails": "Edit text properties",
+    "collapseDetails": "Hide text properties",
+    "noDescription": "No alt text",
+    "noTitle": "No title",
     "alt": "Alt text",
     "altPlaceholder": "Image description (optional)",
     "imageTitle": "Title",
