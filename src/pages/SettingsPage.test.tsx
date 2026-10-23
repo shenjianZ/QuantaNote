@@ -31,6 +31,9 @@ describe("SettingsPage", () => {
                 fontSize: 16,
                 contentWidthProgress: 0,
                 showDocumentOutline: true,
+                editorSidebarTab: "outline",
+                dockPanelWidth: 352,
+                aiChatModel: "",
                 minimizeToTray: false,
                 closeKeepRunning: false,
                 autoBackup: false,
@@ -48,6 +51,7 @@ describe("SettingsPage", () => {
                 },
                 shortcuts: { ...DEFAULT_SHORTCUTS },
                 locale: "zh-CN",
+                savedSearches: [],
             },
             dbSize: "1.2 MB",
             dbPath: "D:\\data\\quanta_note.sqlite",
@@ -110,18 +114,20 @@ describe("SettingsPage", () => {
 
     it("renders appearance section by default", () => {
         setup(<SettingsPage />);
-        expect(screen.getByText("外观主题")).toBeInTheDocument();
-        expect(screen.getByTestId("settings-content-width-control")).toBeInTheDocument();
+        expect(screen.getAllByText("外观").length).toBeGreaterThan(0);
+        expect(screen.getByText("强调色")).toBeInTheDocument();
     });
 
     it("updates the shared content width setting from a preset", async () => {
         const { user } = setup(<SettingsPage />);
+        await user.click(screen.getByText("编辑器"));
         await user.click(screen.getByTestId("settings-content-width-control-preset-comfortable"));
         expect(updateSettingMock).toHaveBeenCalledWith("contentWidthProgress", 25);
     });
 
     it("toggles the document outline visibility setting", async () => {
         const { user } = setup(<SettingsPage />);
+        await user.click(screen.getByText("编辑器"));
         const toggle = screen.getByTestId("settings-document-outline-toggle");
 
         expect(toggle).toHaveAttribute("aria-checked", "true");
@@ -130,9 +136,9 @@ describe("SettingsPage", () => {
         expect(updateSettingMock).toHaveBeenCalledWith("showDocumentOutline", false);
     });
 
-    it("switches to font section", async () => {
+    it("switches to editor section and shows fonts", async () => {
         const { user } = setup(<SettingsPage />);
-        await user.click(screen.getByText("字体"));
+        await user.click(screen.getByText("编辑器"));
         expect(screen.getByText("界面字体")).toBeInTheDocument();
     });
 
@@ -169,7 +175,7 @@ describe("SettingsPage", () => {
 
     it("switches to data section and shows export", async () => {
         const { user } = setup(<SettingsPage />);
-        await user.click(screen.getByText("数据"));
+        await user.click(screen.getByText("数据与备份"));
         expect(screen.getByText("立即备份")).toBeInTheDocument();
         expect(screen.getByText("导出")).toBeInTheDocument();
         expect(screen.getByText("SQL 日志")).toBeInTheDocument();
@@ -177,7 +183,7 @@ describe("SettingsPage", () => {
 
     it("toggles sql logging", async () => {
         const { user } = setup(<SettingsPage />);
-        await user.click(screen.getByText("数据"));
+        await user.click(screen.getByText("数据与备份"));
         const sqlRow = screen.getByText("SQL 日志").closest("div[class*='flex']");
         const toggle = sqlRow?.querySelector("button");
         expect(toggle).toBeTruthy();
@@ -222,7 +228,7 @@ describe("SettingsPage", () => {
         });
         const { user } = setup(<SettingsPage />);
 
-        await user.click(screen.getByText("数据"));
+        await user.click(screen.getByText("数据与备份"));
         expect(screen.getByTestId("storage-missing-count")).toHaveTextContent("1");
         expect(screen.getByTestId("storage-missing-details")).toHaveTextContent("missing.png");
     });
@@ -252,17 +258,34 @@ describe("SettingsPage", () => {
         });
         const { user } = setup(<SettingsPage />);
 
-        await user.click(screen.getByText("数据"));
+        await user.click(screen.getByText("数据与备份"));
         expect(screen.getByTestId("backup-last-success")).toHaveTextContent("manual-backup-");
         expect(screen.getByTestId("backup-last-success")).toHaveTextContent("2.0 KB");
         expect(screen.getByTestId("backup-last-error")).toHaveTextContent("附件哈希校验失败");
     });
 
     it("saves WebDAV config and password separately", async () => {
+        useSettingsStore.setState({
+            autoBackupConfig: {
+                ...useSettingsStore.getState().autoBackupConfig!,
+                remote: {
+                    ...(useSettingsStore.getState().autoBackupConfig?.remote ?? {
+                        endpoint: "",
+                        remote_path: "quantanote/backups",
+                        username: "",
+                        password_configured: false,
+                        last_upload_at: null,
+                        last_upload_filename: null,
+                        last_upload_error: null,
+                    }),
+                    enabled: true,
+                },
+            },
+        });
         const { user } = setup(<SettingsPage />);
 
-        await user.click(screen.getByText("数据"));
-        await user.click(screen.getByTestId("remote-backup-toggle"));
+        await user.click(screen.getByTestId("settings-nav-5"));
+        await user.click(screen.getByTestId("remote-backup-config-btn"));
         await user.type(screen.getByTestId("remote-backup-endpoint"), "https://dav.example.com/dav");
         await user.type(screen.getByTestId("remote-backup-password"), "secret");
 
@@ -284,16 +307,22 @@ describe("SettingsPage", () => {
     it("configures AI summary and stores the API key separately", async () => {
         const { user } = setup(<SettingsPage />);
 
-        await user.click(screen.getByText("数据"));
+        await user.click(screen.getByText("AI 服务"));
         await user.click(screen.getByTestId("ai-summary-toggle"));
-        await user.clear(screen.getByTestId("ai-summary-model"));
-        await user.type(screen.getByTestId("ai-summary-model"), "local-model");
-        await user.click(screen.getByTestId("ai-summary-save-config-btn"));
-
         expect(updateAiConfigMock).toHaveBeenCalledWith(
-            expect.objectContaining({ enabled: true, model: "local-model" }),
+            expect.objectContaining({ enabled: true }),
         );
 
+        // 模型经模型管理对话框选择（fireEvent 规避 Modal 自动聚焦与 userEvent 计时冲突）
+        await user.click(screen.getByTestId("ai-summary-model"));
+        fireEvent.change(screen.getByTestId("model-manager-manual-input"), { target: { value: "local-model" } });
+        fireEvent.click(screen.getByTestId("model-manager-manual-use-btn"));
+        expect(updateAiConfigMock).toHaveBeenCalledWith(
+            expect.objectContaining({ model: "local-model" }),
+        );
+
+        // API 密钥经密钥对话框保存
+        await user.click(screen.getByTestId("ai-api-key-manage-btn"));
         await user.type(screen.getByTestId("ai-summary-api-key"), "sk-test");
         await user.click(screen.getByTestId("ai-summary-save-key-btn"));
         expect(saveAiApiKeyMock).toHaveBeenCalledWith("sk-test");
