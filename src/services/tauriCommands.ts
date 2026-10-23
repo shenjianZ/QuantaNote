@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, Channel } from "@tauri-apps/api/core";
 
 // Types
 export interface AttachmentResult {
@@ -169,6 +169,134 @@ export async function generateAiTagSuggestions(title: string, content: string) {
 
 export async function answerAiQuestion(title: string, content: string, question: string) {
     return invoke<string>("answer_ai_question", { title, content, question });
+}
+
+// --- AI 聊天（多轮流式会话） ---
+
+export interface AiChatMessage {
+    id: string;
+    itemId: string;
+    sessionId: string;
+    role: "user" | "assistant";
+    content: string;
+    createdAt: string;
+}
+
+export interface AiChatSession {
+    id: string;
+    itemId: string;
+    title: string;
+    model: string;
+    systemPrompt: string;
+    temperature: number | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface AiChatExtraNote {
+    title: string;
+    content: string;
+}
+
+export interface AiChatSummary {
+    sessionId: string;
+    summary: string;
+    summarizedUntil: string;
+}
+
+export type AiChatStreamEvent =
+    | { type: "user_message"; message: AiChatMessage }
+    | { type: "chunk"; delta: string }
+    | { type: "done"; message: AiChatMessage }
+    | { type: "compressed"; summary: string; summarizedUntil: string };
+
+export async function getAiModels() {
+    return invoke<string[]>("get_ai_models");
+}
+
+export async function listAiChatSessions(itemId: string) {
+    return invoke<AiChatSession[]>("list_ai_chat_sessions", { itemId });
+}
+
+export async function createAiChatSession(itemId: string, title?: string) {
+    return invoke<AiChatSession>("create_ai_chat_session", { itemId, title: title ?? null });
+}
+
+export async function updateAiChatSession(
+    sessionId: string,
+    updates: { title?: string; model?: string; systemPrompt?: string; temperature?: number | null },
+) {
+    return invoke<AiChatSession>("update_ai_chat_session", {
+        sessionId,
+        title: updates.title ?? null,
+        model: updates.model ?? null,
+        systemPrompt: updates.systemPrompt ?? null,
+        temperature: updates.temperature === undefined ? null : updates.temperature,
+    });
+}
+
+export async function deleteAiChatSession(sessionId: string) {
+    return invoke<void>("delete_ai_chat_session", { sessionId });
+}
+
+export async function getAiChatMessages(sessionId: string) {
+    return invoke<AiChatMessage[]>("get_ai_chat_messages", { sessionId });
+}
+
+export async function deleteAiChatMessage(messageId: string) {
+    return invoke<void>("delete_ai_chat_message", { messageId });
+}
+
+export async function getAiChatSummary(sessionId: string) {
+    return invoke<AiChatSummary>("get_ai_chat_summary", { sessionId });
+}
+
+export async function clearAiChatMessages(sessionId: string) {
+    return invoke<void>("clear_ai_chat_messages", { sessionId });
+}
+
+export async function compressAiChatMessages(sessionId: string) {
+    return invoke<AiChatSummary>("compress_ai_chat_messages", { sessionId });
+}
+
+export async function sendAiChatMessage(
+    sessionId: string,
+    title: string,
+    content: string,
+    question: string,
+    onEvent: (event: AiChatStreamEvent) => void,
+    options?: { model?: string; extraNotes?: AiChatExtraNote[] },
+) {
+    const channel = new Channel<AiChatStreamEvent>();
+    channel.onmessage = onEvent;
+    return invoke<void>("send_ai_chat_message", {
+        sessionId,
+        title,
+        content,
+        question,
+        model: options?.model ?? null,
+        extraNotes: options?.extraNotes ?? [],
+        onEvent: channel,
+    });
+}
+
+export async function regenerateAiChatReply(
+    sessionId: string,
+    title: string,
+    content: string,
+    onEvent: (event: AiChatStreamEvent) => void,
+    options?: { model?: string; extraNotes?: AiChatExtraNote[] },
+) {
+    const channel = new Channel<AiChatStreamEvent>();
+    channel.onmessage = onEvent;
+    return invoke<void>("regenerate_ai_chat_reply", {
+        sessionId,
+        title,
+        content,
+        model: options?.model ?? null,
+        extraNotes: options?.extraNotes ?? [],
+        onEvent: channel,
+    });
 }
 
 // Search commands

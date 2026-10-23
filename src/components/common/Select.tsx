@@ -13,6 +13,7 @@ interface SelectProps {
   onChange: (value: string) => void;
   className?: string;
   placeholder?: string;
+  disabled?: boolean;
 }
 
 export function Select({
@@ -21,6 +22,7 @@ export function Select({
   onChange,
   className = "",
   placeholder,
+  disabled = false,
 }: SelectProps) {
   const { t } = useTranslation(["common"]);
   const [open, setOpen] = useState(false);
@@ -47,8 +49,9 @@ export function Select({
     <div ref={ref} className={`relative ${className}`}>
       <button
         type="button"
-        className="flex h-9 w-full items-center justify-between rounded-xl border border-[var(--line)] bg-[var(--field)] px-3 text-sm text-[var(--text)] transition-colors hover:border-[var(--accent)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-soft)]"
-        onClick={() => setOpen(!open)}
+        disabled={disabled}
+        className={`flex h-9 w-full items-center justify-between rounded-xl border border-[var(--line)] bg-[var(--field)] px-3 text-sm text-[var(--text)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-soft)] ${disabled ? "cursor-not-allowed opacity-70" : "hover:border-[var(--accent)] focus:border-[var(--accent)]"}`}
+        onClick={() => { if (!disabled) setOpen(!open); }}
       >
         <span className={!selected ? "text-[var(--muted)]" : ""}>
           {selected?.label ?? placeholder ?? t("common:buttons.done")}

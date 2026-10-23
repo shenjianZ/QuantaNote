@@ -108,6 +108,7 @@ export function TagPickerModal({ open, onClose, selectedTags, onChange, onOpenMa
             className="ml-auto rounded-full bg-[var(--accent)] px-4 py-2 text-sm text-white hover:opacity-90"
             type="button"
             onClick={onClose}
+            data-testid="tag-picker-done-btn"
           >
             {t("modals:tagPicker.done")}
           </button>

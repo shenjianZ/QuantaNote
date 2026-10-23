@@ -13,7 +13,6 @@ class DocumentEditorPage {
   get summaryRegenerateBtn() { return "[data-testid='doc-summary-regenerate-btn']"; }
   get aiSummaryBtn() { return "[data-testid='doc-ai-summary-btn']"; }
   get aiTagsBtn() { return "[data-testid='doc-ai-tags-btn']"; }
-  get aiKnowledgeBtn() { return "[data-testid='doc-ai-knowledge-btn']"; }
   get saveStatus() { return "[data-testid='doc-save-status']"; }
   get saveVersionBtn() { return "[data-testid='doc-save-version-btn']"; }
   get favoriteBtn() { return "[data-testid='doc-favorite-btn']"; }
@@ -33,6 +32,27 @@ class DocumentEditorPage {
   get versionToggle() { return "[data-testid='doc-version-toggle']"; }
   get versionPanel() { return "[data-testid='version-panel']"; }
 
+  sidebarTabSelector(tab) {
+    return `[data-testid='editor-sidebar-tab-${tab}']`;
+  }
+
+  // 侧栏为 Tab 布局:操作侧栏内容前先确保对应 Tab 激活(必要时展开被隐藏的侧栏)
+  async activateSidebarTab(tab) {
+    let btn = await $(this.sidebarTabSelector(tab));
+    if (!(await btn.isExisting()) || !(await btn.isDisplayed())) {
+      const toggle = await $(this.outlineToggle);
+      if ((await toggle.getAttribute("aria-pressed")) !== "true") {
+        await toggle.click();
+        await observePause();
+      }
+      btn = await $(this.sidebarTabSelector(tab));
+    }
+    if ((await btn.getAttribute("aria-selected")) !== "true") {
+      await btn.click();
+      await observePause();
+    }
+  }
+
   async isDisplayed() {
     const input = await $(this.titleInput);
     return input.isDisplayed();
@@ -50,17 +70,20 @@ class DocumentEditorPage {
   }
 
   async getSummary() {
+    await this.activateSidebarTab("summary");
     const input = await $(this.summaryInput);
     return input.getValue();
   }
 
   async setSummary(summary) {
+    await this.activateSidebarTab("summary");
     const input = await $(this.summaryInput);
     await input.clearValue();
     await input.setValue(summary);
   }
 
   async setSummaryMode(label) {
+    await this.activateSidebarTab("summary");
     const select = await $(this.summaryModeSelect);
     const trigger = await select.$("button");
     await trigger.scrollIntoView();
@@ -78,6 +101,7 @@ class DocumentEditorPage {
   }
 
   async selectProperty(selector, label) {
+    await this.activateSidebarTab("properties");
     const select = await $(selector);
     await select.$("button").click();
     const options = await select.$$("button");
@@ -100,6 +124,7 @@ class DocumentEditorPage {
   }
 
   async setPropertyDueDate(value) {
+    await this.activateSidebarTab("properties");
     const input = await $(this.propertyDueDate);
     await input.setValue(value);
     await browser.keys("Tab");
@@ -107,6 +132,7 @@ class DocumentEditorPage {
   }
 
   async setPropertyAliases(value) {
+    await this.activateSidebarTab("properties");
     const input = await $(this.propertyAliases);
     await input.clearValue();
     await input.setValue(value);
@@ -115,20 +141,24 @@ class DocumentEditorPage {
   }
 
   async regenerateSummary() {
+    await this.activateSidebarTab("summary");
     await $(this.summaryRegenerateBtn).click();
     await observePause();
   }
 
   async hasAiSummaryButton() {
+    await this.activateSidebarTab("summary");
     return (await $(this.aiSummaryBtn)).isDisplayed();
   }
 
   async hasAiTagsButton() {
+    await this.activateSidebarTab("tags");
     return (await $(this.aiTagsBtn)).isDisplayed();
   }
 
   async hasAiKnowledgeButton() {
-    return (await $(this.aiKnowledgeBtn)).isDisplayed();
+    await this.activateSidebarTab("chat");
+    return (await $("[data-testid='doc-ai-chat']")).isDisplayed();
   }
 
   async typeContent(text) {
@@ -156,6 +186,10 @@ class DocumentEditorPage {
   }
 
   async getOutlineItemCount() {
+    // 侧栏隐藏时直接数 DOM(应为 0),不能激活 Tab——否则会把隐藏的侧栏重新打开
+    if (await this.isOutlineVisible()) {
+      await this.activateSidebarTab("outline");
+    }
     return browser.execute(() => document.querySelectorAll("[data-testid^='document-outline-item-']").length);
   }
 
@@ -169,23 +203,27 @@ class DocumentEditorPage {
       await $(this.outlineToggle).click();
       await observePause();
     }
+    if (visible) {
+      await this.activateSidebarTab("outline");
+    }
   }
 
   async clickOutlineItem(index) {
+    await this.activateSidebarTab("outline");
     const selector = `[data-testid='document-outline-item-${index}']`;
     const item = await $(selector);
     await browser.execute((targetSelector) => {
       const item = document.querySelector(targetSelector);
-      const sidebar = item?.closest("[data-testid='document-editor-sidebar']");
-      if (!(item instanceof HTMLElement) || !(sidebar instanceof HTMLElement)) {
-        throw new Error("Document outline item or sidebar not found");
+      const nav = item?.closest("[data-testid='document-outline'] nav");
+      if (!(item instanceof HTMLElement) || !(nav instanceof HTMLElement)) {
+        throw new Error("Document outline item or nav not found");
       }
       const itemRect = item.getBoundingClientRect();
-      const sidebarRect = sidebar.getBoundingClientRect();
-      if (itemRect.top < sidebarRect.top) {
-        sidebar.scrollTop -= sidebarRect.top - itemRect.top;
-      } else if (itemRect.bottom > sidebarRect.bottom) {
-        sidebar.scrollTop += itemRect.bottom - sidebarRect.bottom;
+      const navRect = nav.getBoundingClientRect();
+      if (itemRect.top < navRect.top) {
+        nav.scrollTop -= navRect.top - itemRect.top;
+      } else if (itemRect.bottom > navRect.bottom) {
+        nav.scrollTop += itemRect.bottom - navRect.bottom;
       }
     }, selector);
     await item.click();

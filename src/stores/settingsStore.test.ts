@@ -104,6 +104,30 @@ describe("settingsStore", () => {
     expect(invalid.showDocumentOutline).toBe(true);
   });
 
+  it("defaults the editor sidebar tab to outline and preserves a valid tab", () => {
+    const settings = useSettingsStore.getState().settings;
+    const missing = normalizeSettings({ ...settings, editorSidebarTab: undefined as unknown as string });
+    const invalid = normalizeSettings({ ...settings, editorSidebarTab: "bogus" as unknown as string });
+    const tags = normalizeSettings({ ...settings, editorSidebarTab: "tags" });
+
+    expect(missing.editorSidebarTab).toBe("outline");
+    expect(invalid.editorSidebarTab).toBe("outline");
+    expect(tags.editorSidebarTab).toBe("tags");
+  });
+
+  it("clamps the dock panel width to the supported range", () => {
+    const settings = useSettingsStore.getState().settings;
+    const missing = normalizeSettings({ ...settings, dockPanelWidth: undefined as unknown as number });
+    const tooSmall = normalizeSettings({ ...settings, dockPanelWidth: 100 });
+    const tooLarge = normalizeSettings({ ...settings, dockPanelWidth: 9999 });
+    const valid = normalizeSettings({ ...settings, dockPanelWidth: 420 });
+
+    expect(missing.dockPanelWidth).toBe(352);
+    expect(tooSmall.dockPanelWidth).toBe(288);
+    expect(tooLarge.dockPanelWidth).toBe(512);
+    expect(valid.dockPanelWidth).toBe(420);
+  });
+
   it("exports data through dialog and save_to_file command", async () => {
     const calls: Array<{ cmd: string; args: unknown }> = [];
     saveMock.mockResolvedValue("D:\\backup.json");

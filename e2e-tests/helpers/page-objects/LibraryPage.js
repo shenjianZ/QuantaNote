@@ -96,6 +96,14 @@ class LibraryPage {
     await waitForDisplayed("//*[@data-testid='library-filter-panel']");
   }
 
+  async closeFilterPanel() {
+    await browser.execute((selector) => {
+      const summary = document.querySelector(selector);
+      summary?.parentElement?.removeAttribute("open");
+    }, this.filterBtn);
+    await observePause();
+  }
+
   async selectTab(tabName) {
     const tabIds = {
       "全部": "library-tab-recent",

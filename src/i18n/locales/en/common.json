@@ -140,6 +140,11 @@
     "due": "Due date",
     "aliases": "Aliases",
     "aliasesPlaceholder": "Separate multiple aliases with commas",
+    "tags": "Tags",
+    "summary": "Summary",
+    "overdue": "Overdue",
+    "showMore": "More",
+    "showLess": "Less",
     "statuses": {
       "inbox": "Inbox",
       "inProgress": "In progress",

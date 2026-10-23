@@ -1,4 +1,4 @@
-import { Eye, EyeOff } from "lucide-react";
+import { PanelRight } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import type { MarkdownHeading } from "../../utils/markdownOutline";
@@ -22,11 +22,15 @@ interface DocumentOutlineToggleProps {
 
 export function DocumentOutlineToggle({ visible, onToggle, testId = "document-outline-toggle", ariaLabel }: DocumentOutlineToggleProps) {
   const { t } = useTranslation(["document"]);
-  const label = ariaLabel ?? (visible ? t("document:outline.hide") : t("document:outline.show"));
+  const label = ariaLabel ?? (visible ? t("document:outline.show") : t("document:outline.hide"));
 
   return (
     <button
-      className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
+      className={`grid h-8 w-8 shrink-0 place-items-center rounded-full transition-colors ${
+        visible
+          ? "bg-[var(--accent-soft)] text-[var(--accent)]"
+          : "text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
+      }`}
       type="button"
       aria-label={label}
       aria-pressed={visible}
@@ -34,7 +38,7 @@ export function DocumentOutlineToggle({ visible, onToggle, testId = "document-ou
       title={label}
       onClick={onToggle}
     >
-      {visible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+      <PanelRight className="h-4 w-4" />
     </button>
   );
 }
@@ -79,7 +83,7 @@ export function DocumentOutline({ headings, visible, onToggle, onSelect, activeI
   }, [activeIndex, visible]);
 
   return (
-    <section className={`flex min-h-0 flex-none flex-col overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3 ${className}`} data-testid="document-outline">
+    <section className={`flex min-h-0 flex-none flex-col overflow-hidden p-3 ${className}`} data-testid="document-outline">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-[var(--text)]">{t("document:outline.title")}</h2>
         {showToggle && <DocumentOutlineToggle visible={visible} onToggle={onToggle} />}
@@ -87,7 +91,7 @@ export function DocumentOutline({ headings, visible, onToggle, onSelect, activeI
 
       {visible && (
         headings.length > 0 ? (
-          <nav ref={navRef} className="mt-2 min-h-0 shrink-0 overflow-y-auto overscroll-contain lg:max-h-[calc(100vh-11rem)] lg:flex-1" aria-label={t("document:outline.title")}>
+          <nav ref={navRef} className="mt-2 min-h-0 shrink-0 overflow-y-auto overscroll-contain max-h-[calc(100vh-11rem)] lg:flex-1" aria-label={t("document:outline.title")}>
             <ol className="space-y-0.5">
               {headings.map((heading) => (
                 <li key={heading.index}>

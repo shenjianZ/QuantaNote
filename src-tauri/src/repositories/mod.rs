@@ -1,3 +1,4 @@
+pub mod ai_chat_repository;
 pub mod attachment_repository;
 pub mod data_io_repository;
 pub mod item_repository;

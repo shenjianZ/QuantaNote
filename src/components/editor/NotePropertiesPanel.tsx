@@ -6,9 +6,11 @@ import type { NotePriority, NoteProperties, NotePropertyUpdates } from "../../ut
 interface NotePropertiesPanelProps {
   properties: NoteProperties;
   onChange: (updates: NotePropertyUpdates) => void;
+  /** 预览态：禁用全部编辑控件 */
+  readOnly?: boolean;
 }
 
-export function NotePropertiesPanel({ properties, onChange }: NotePropertiesPanelProps) {
+export function NotePropertiesPanel({ properties, onChange, readOnly = false }: NotePropertiesPanelProps) {
   const { t } = useTranslation(["common"]);
   const [aliasesText, setAliasesText] = useState(properties.aliases.join(", "));
 
@@ -42,40 +44,45 @@ export function NotePropertiesPanel({ properties, onChange }: NotePropertiesPane
   }
 
   return (
-    <section className="shrink-0 rounded-2xl border border-[var(--line)] bg-transparent p-3" data-testid="doc-note-properties">
+    <section className="flex min-h-0 flex-1 flex-col p-3" data-testid="doc-note-properties">
       <div className="mb-3">
         <h2 className="text-sm font-semibold text-[var(--text)]">{t("common:noteProperties.title")}</h2>
         <p className="mt-1 text-[11px] leading-relaxed text-[var(--muted)]">{t("common:noteProperties.hint")}</p>
       </div>
       <div className="space-y-3">
-        <label className="block text-xs text-[var(--muted)]">
-          <span className="mb-1 block">{t("common:noteProperties.status")}</span>
-          <span data-testid="doc-property-status">
-            <Select
-              value={properties.status}
-              onChange={(value) => onChange({ status: value })}
-              options={statusOptions}
-            />
-          </span>
-        </label>
-        <label className="block text-xs text-[var(--muted)]">
-          <span className="mb-1 block">{t("common:noteProperties.priority")}</span>
-          <span data-testid="doc-property-priority">
-            <Select
-              value={properties.priority}
-              onChange={(value) => onChange({ priority: value as NotePriority })}
-              options={priorityOptions}
-            />
-          </span>
-        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block text-xs text-[var(--muted)]">
+            <span className="mb-1 block">{t("common:noteProperties.status")}</span>
+            <span data-testid="doc-property-status">
+              <Select
+                value={properties.status}
+                onChange={(value) => onChange({ status: value })}
+                options={statusOptions}
+                disabled={readOnly}
+              />
+            </span>
+          </label>
+          <label className="block text-xs text-[var(--muted)]">
+            <span className="mb-1 block">{t("common:noteProperties.priority")}</span>
+            <span data-testid="doc-property-priority">
+              <Select
+                value={properties.priority}
+                onChange={(value) => onChange({ priority: value as NotePriority })}
+                options={priorityOptions}
+                disabled={readOnly}
+              />
+            </span>
+          </label>
+        </div>
         <label className="block text-xs text-[var(--muted)]" htmlFor="doc-property-due-date">
           <span className="mb-1 block">{t("common:noteProperties.due")}</span>
           <input
             id="doc-property-due-date"
-            className="h-9 w-full rounded-xl border border-[var(--line)] bg-[var(--field)] px-3 text-sm text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)]"
+            className="h-9 w-full rounded-xl border border-[var(--line)] bg-[var(--field)] px-3 text-sm text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-70"
             type="date"
             value={properties.dueDate ?? ""}
             onChange={(event) => onChange({ dueDate: event.currentTarget.value || null })}
+            disabled={readOnly}
             data-testid="doc-property-due-date"
           />
         </label>
@@ -83,7 +90,7 @@ export function NotePropertiesPanel({ properties, onChange }: NotePropertiesPane
           <span className="mb-1 block">{t("common:noteProperties.aliases")}</span>
           <input
             id="doc-property-aliases"
-            className="h-9 w-full rounded-xl border border-[var(--line)] bg-[var(--field)] px-3 text-sm text-[var(--text)] outline-none transition-colors placeholder:text-[var(--muted)] focus:border-[var(--accent)]"
+            className="h-9 w-full rounded-xl border border-[var(--line)] bg-[var(--field)] px-3 text-sm text-[var(--text)] outline-none transition-colors placeholder:text-[var(--muted)] focus:border-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-70"
             type="text"
             value={aliasesText}
             placeholder={t("common:noteProperties.aliasesPlaceholder")}
@@ -95,6 +102,7 @@ export function NotePropertiesPanel({ properties, onChange }: NotePropertiesPane
                 event.currentTarget.blur();
               }
             }}
+            disabled={readOnly}
             data-testid="doc-property-aliases"
           />
         </label>

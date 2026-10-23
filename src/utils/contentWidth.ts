@@ -6,10 +6,19 @@ export const CONTENT_WIDTH_PROGRESS_SCALE = 100;
 export const CONTENT_WIDTH_CONTROL_MAX_PROGRESS = 100;
 export const CONTENT_WIDTH_CONTROL_SCALE = CONTENT_WIDTH_CONTROL_MAX_PROGRESS / CONTENT_WIDTH_MAX_PROGRESS;
 
-export const CONTENT_WIDTH_EDITOR_BASE = 56 * 16;
+// 编辑器与预览共用同一基准宽度：两页的内容留白保持一致观感。
+export const CONTENT_WIDTH_EDITOR_BASE = 42 * 16;
 export const CONTENT_WIDTH_WORKSPACE_BASE = 42 * 16;
 export const CONTENT_WIDTH_PREVIEW_BASE = 42 * 16;
 export const CONTENT_WIDTH_OUTLINE_LAYOUT = 18 * 16 + 12;
+
+/** dock 图标列与间隙占位（面板宽度之外）。 */
+export const DOCK_RAIL_RESERVED = 64;
+
+/** dock 开启时内容区需要避让的总宽度（面板 + 图标列 + 间隙）。 */
+export function getDockReservedWidth(panelWidth: number): number {
+  return panelWidth + DOCK_RAIL_RESERVED;
+}
 
 export function clampContentWidthProgress(value: unknown): number {
   const numericValue = Number(value);

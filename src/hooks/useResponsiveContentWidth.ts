@@ -5,6 +5,8 @@ interface ResponsiveContentWidthOptions {
   baseWidth: number;
   progress: number;
   horizontalGutter?: number;
+  /** lg+ 视口下额外预留的宽度（如右侧 dock 占位），小屏不扣除 */
+  reservedWidth?: number;
   enabled?: boolean;
 }
 
@@ -13,20 +15,27 @@ interface ResponsiveContentWidthResult<T extends HTMLElement> {
   style: CSSProperties | undefined;
 }
 
+const LG_BREAKPOINT = 1024;
+
 function getResponsiveGutter(gutter: number) {
   return typeof window !== "undefined" && window.innerWidth >= 640 ? gutter : 0;
 }
 
-function getElementAvailableWidth(element: HTMLElement, horizontalGutter: number) {
+function getResponsiveReserved(reservedWidth: number) {
+  return typeof window !== "undefined" && window.innerWidth >= LG_BREAKPOINT ? reservedWidth : 0;
+}
+
+function getElementAvailableWidth(element: HTMLElement, horizontalGutter: number, reservedWidth: number) {
   const parent = element.parentElement;
   const parentWidth = parent?.getBoundingClientRect().width || parent?.clientWidth || window.innerWidth;
-  return Math.max(0, parentWidth - getResponsiveGutter(horizontalGutter));
+  return Math.max(0, parentWidth - getResponsiveGutter(horizontalGutter) - getResponsiveReserved(reservedWidth));
 }
 
 export function useResponsiveContentWidth<T extends HTMLElement = HTMLElement>({
   baseWidth,
   progress,
   horizontalGutter = 0,
+  reservedWidth = 0,
   enabled = true,
 }: ResponsiveContentWidthOptions): ResponsiveContentWidthResult<T> {
   const ref = useRef<T>(null);
@@ -43,7 +52,7 @@ export function useResponsiveContentWidth<T extends HTMLElement = HTMLElement>({
     const parent = element.parentElement;
 
     const measure = () => {
-      setAvailableWidth(getElementAvailableWidth(element, horizontalGutter));
+      setAvailableWidth(getElementAvailableWidth(element, horizontalGutter, reservedWidth));
     };
 
     measure();
@@ -57,7 +66,7 @@ export function useResponsiveContentWidth<T extends HTMLElement = HTMLElement>({
       observer?.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [enabled, horizontalGutter]);
+  }, [enabled, horizontalGutter, reservedWidth]);
 
   if (!enabled || availableWidth === null) {
     return { ref, style: undefined };
@@ -75,26 +84,29 @@ export function useViewportContentWidth(
   baseWidth: number,
   progress: number,
   horizontalGutter = 0,
-): { style: CSSProperties } {
-  const [availableWidth, setAvailableWidth] = useState(() => {
+  /** lg+ 视口下额外预留的宽度（如右侧 dock 占位），小屏不扣除 */
+  reservedWidth = 0,
+): { style: CSSProperties; width: number } {
+  const computeWidth = () => {
     const viewportWidth = typeof window !== "undefined" ? window.innerWidth : baseWidth;
-    return Math.max(0, viewportWidth - getResponsiveGutter(horizontalGutter));
-  });
+    const available = Math.max(0, viewportWidth - getResponsiveGutter(horizontalGutter) - getResponsiveReserved(reservedWidth));
+    return interpolateContentWidth(baseWidth, available, progress);
+  };
+
+  const [width, setWidth] = useState(computeWidth);
 
   useLayoutEffect(() => {
-    const measure = () => {
-      const viewportWidth = typeof window !== "undefined" ? window.innerWidth : baseWidth;
-      setAvailableWidth(Math.max(0, viewportWidth - getResponsiveGutter(horizontalGutter)));
-    };
-
+    const measure = () => setWidth(computeWidth());
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, [baseWidth, horizontalGutter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseWidth, horizontalGutter, reservedWidth, progress]);
 
   return {
     style: {
-      maxWidth: `${interpolateContentWidth(baseWidth, availableWidth, progress)}px`,
+      maxWidth: `${width}px`,
     },
+    width,
   };
 }

@@ -428,6 +428,13 @@
 /* 编辑区长 URL(附件资源地址等)按字符断行。
    没有这条时 IR 源码标记里的长 URL 会被挤进极窄的列里逐字符竖排,
    把内容区撑高数千像素。预览区 .markdown-preview 已有同样规则。 */
+/* 编辑器开放式布局：Vditor 默认自带 1px 边框与圆角，去掉，
+   内容区与右侧 dock 之间仅保留 dock 左缘的一条分割线。 */
+.vditor {
+    border: none;
+    border-radius: 0;
+}
+
 .vditor-ir .vditor-reset {
     overflow-wrap: anywhere;
 }

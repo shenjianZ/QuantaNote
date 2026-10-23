@@ -131,10 +131,40 @@ CREATE TABLE IF NOT EXISTS templates (
     updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS ai_chat_messages (
+    id TEXT PRIMARY KEY,
+    item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    session_id TEXT NOT NULL DEFAULT '',
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS ai_chat_sessions (
+    id TEXT PRIMARY KEY,
+    item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    title TEXT NOT NULL DEFAULT '',
+    model TEXT NOT NULL DEFAULT '',
+    system_prompt TEXT NOT NULL DEFAULT '',
+    temperature REAL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS ai_chat_summaries (
+    session_id TEXT PRIMARY KEY,
+    summary TEXT NOT NULL DEFAULT '',
+    summarized_until TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_chat_messages_item
+    ON ai_chat_messages(item_id, created_at);
+
 INSERT OR IGNORE INTO schema_version (version) VALUES (1);
 ";
 
-const SCHEMA_VERSION: i64 = 11;
+const SCHEMA_VERSION: i64 = 15;
 
 impl DbState {
     pub fn open(db_path: &str) -> Result<Self, AppError> {
@@ -344,6 +374,132 @@ impl DbState {
             .map_err(|e| AppError::Database(e.to_string()))?;
         }
 
+        if current_version < 12 {
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS ai_chat_messages (
+                    id TEXT PRIMARY KEY,
+                    item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+                    role TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                 );
+                 CREATE INDEX IF NOT EXISTS idx_ai_chat_messages_item
+                    ON ai_chat_messages(item_id, created_at);
+                 INSERT OR IGNORE INTO schema_version (version) VALUES (12);",
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+
+        if current_version < 13 {
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS ai_chat_summaries (
+                    item_id TEXT PRIMARY KEY REFERENCES items(id) ON DELETE CASCADE,
+                    summary TEXT NOT NULL DEFAULT '',
+                    summarized_until TEXT NOT NULL DEFAULT '',
+                    updated_at TEXT NOT NULL
+                 );
+                 INSERT OR IGNORE INTO schema_version (version) VALUES (13);",
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+
+        if current_version < 14 {
+            // 会话化：新 sessions 表；messages 挂 session；summaries 由 item 维度改为 session 维度。
+            // 旧数据（item 级）自动归入每篇笔记的"默认会话"。新装库（SCHEMA_SQL 已是 v14 结构）
+            // 通过结构探测跳过 ALTER/搬运，仅补版本号。
+            let has_session_column = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM pragma_table_info('ai_chat_messages') WHERE name = 'session_id'",
+                    [],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map_err(|e| AppError::Database(e.to_string()))?
+                > 0;
+
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS ai_chat_sessions (
+                    id TEXT PRIMARY KEY,
+                    item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+                    title TEXT NOT NULL DEFAULT '',
+                    model TEXT NOT NULL DEFAULT '',
+                    system_prompt TEXT NOT NULL DEFAULT '',
+                    temperature REAL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                 );
+                 CREATE INDEX IF NOT EXISTS idx_ai_chat_messages_session
+                    ON ai_chat_messages(session_id, created_at);",
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+
+            if !has_session_column {
+                conn.execute_batch(
+                    "ALTER TABLE ai_chat_messages ADD COLUMN session_id TEXT NOT NULL DEFAULT '';
+                     CREATE TABLE IF NOT EXISTS ai_chat_summaries_v14 (
+                        session_id TEXT PRIMARY KEY,
+                        summary TEXT NOT NULL DEFAULT '',
+                        summarized_until TEXT NOT NULL DEFAULT '',
+                        updated_at TEXT NOT NULL
+                     );
+                     INSERT INTO ai_chat_sessions (id, item_id, title, created_at, updated_at)
+                     SELECT 'sess-default-' || item_id, item_id, '默认会话',
+                            COALESCE(MIN(created_at), '1970-01-01T00:00:00Z'),
+                            COALESCE(MAX(created_at), '1970-01-01T00:00:00Z')
+                     FROM ai_chat_messages GROUP BY item_id;
+                     UPDATE ai_chat_messages
+                     SET session_id = 'sess-default-' || item_id
+                     WHERE session_id = '';
+                     INSERT OR IGNORE INTO ai_chat_summaries_v14 (session_id, summary, summarized_until, updated_at)
+                     SELECT 'sess-default-' || item_id, summary, summarized_until, updated_at
+                     FROM ai_chat_summaries;
+                     DROP TABLE ai_chat_summaries;
+                     ALTER TABLE ai_chat_summaries_v14 RENAME TO ai_chat_summaries;",
+                )
+                .map_err(|e| AppError::Database(e.to_string()))?;
+            }
+
+            conn.execute(
+                "INSERT OR IGNORE INTO schema_version (version) VALUES (14)",
+                [],
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+
+        if current_version < 15 {
+            // v14 开发中途存在过一版不含会话配置列的 sessions 结构；
+            // 已按旧结构建库的用户不会再走 v14 分支，这里幂等补齐缺失列。
+            let missing_columns: Vec<(&str, &str)> = vec![
+                ("model", "ALTER TABLE ai_chat_sessions ADD COLUMN model TEXT NOT NULL DEFAULT ''"),
+                (
+                    "system_prompt",
+                    "ALTER TABLE ai_chat_sessions ADD COLUMN system_prompt TEXT NOT NULL DEFAULT ''",
+                ),
+                (
+                    "temperature",
+                    "ALTER TABLE ai_chat_sessions ADD COLUMN temperature REAL",
+                ),
+            ];
+            for (column, ddl) in missing_columns {
+                let exists = conn
+                    .query_row(
+                        "SELECT COUNT(*) FROM pragma_table_info('ai_chat_sessions') WHERE name = ?1",
+                        [column],
+                        |row| row.get::<_, i64>(0),
+                    )
+                    .map_err(|e| AppError::Database(e.to_string()))?
+                    > 0;
+                if !exists {
+                    conn.execute_batch(ddl)
+                        .map_err(|e| AppError::Database(e.to_string()))?;
+                }
+            }
+            conn.execute(
+                "INSERT OR IGNORE INTO schema_version (version) VALUES (15)",
+                [],
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+
         Ok(())
     }
 
@@ -406,6 +562,55 @@ mod tests {
             )
             .expect("trigger count");
         assert_eq!(trigger_count, 6);
+    }
+
+    #[test]
+    fn migrates_v14_sessions_without_config_columns() {
+        // 模拟 v14 开发中途的旧结构：sessions 无 model/system_prompt/temperature 列。
+        let db = DbState::open(":memory:").expect("open db");
+        {
+            let conn = db.conn.lock().expect("lock db");
+            conn.execute_batch(SCHEMA_SQL).expect("create base schema");
+            conn.execute_batch(
+                "DROP TABLE ai_chat_sessions;
+                 CREATE TABLE ai_chat_sessions (
+                    id TEXT PRIMARY KEY,
+                    item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+                    title TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                 );
+                 INSERT INTO items (id, title, item_type, content, summary, created_at, updated_at)
+                 VALUES ('item-1', 'T', 'note', '', '', '2026-01-01', '2026-01-01');
+                 INSERT INTO ai_chat_sessions (id, item_id, title, created_at, updated_at)
+                 VALUES ('sess-1', 'item-1', '旧会话', '2026-01-01', '2026-01-01');
+                 DELETE FROM schema_version WHERE version >= 14;
+                 INSERT OR IGNORE INTO schema_version (version) VALUES (14);",
+            )
+            .expect("seed legacy v14 sessions");
+        }
+
+        db.initialize_schema().expect("migrate schema");
+
+        let conn = db.conn.lock().expect("lock db");
+        for column in ["model", "system_prompt", "temperature"] {
+            let exists = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM pragma_table_info('ai_chat_sessions') WHERE name = ?1",
+                    [column],
+                    |row| row.get::<_, i64>(0),
+                )
+                .expect("column check");
+            assert_eq!(exists, 1, "column {column} should exist after migration");
+        }
+        let title: String = conn
+            .query_row(
+                "SELECT title FROM ai_chat_sessions WHERE id = 'sess-1'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("legacy session preserved");
+        assert_eq!(title, "旧会话");
     }
 
     #[test]

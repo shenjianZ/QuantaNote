@@ -29,16 +29,17 @@ export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg", h
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
-  // 自动聚焦：仅在 open 从 false 变为 true 时执行一次
+  // 自动聚焦：仅在 open 从 false 变为 true 时执行一次。
+  // querySelector 按文档序返回，需先查输入控件再兜底按钮，
+  // 否则焦点总是落在头部关闭按钮上，用户无法直接打字。
   useEffect(() => {
     if (!open) return;
     const timer = setTimeout(() => {
-      if (dialogRef.current) {
-        const first = dialogRef.current.querySelector<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        );
-        first?.focus();
-      }
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const first = dialog.querySelector<HTMLElement>('input, textarea, select')
+        ?? dialog.querySelector<HTMLElement>('[tabindex]:not([tabindex="-1"]), button, [href]');
+      first?.focus();
     }, 50);
     return () => clearTimeout(timer);
   }, [open]);

@@ -31,7 +31,8 @@ describe("Sync settings panel", () => {
         await cleanupAll();
         await resetAppState();
         await TopBar.openSettings();
-        await SettingsPage.selectSectionByIndex(3);
+        // 按文字定位分区：字体分区加入后，索引定位会错位到数据分区
+        await SettingsPage.selectSection("同步");
     });
 
     after(async () => {

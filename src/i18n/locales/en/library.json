@@ -120,11 +120,11 @@
     "unfavorite": "Unfavorite",
     "copy": "Copy Content",
     "addAttachment": "Add Attachment",
-    "fullEdit": "Full Edit",
     "delete": "Delete",
     "confirmDelete": "Confirm delete",
     "tags": "Tags",
     "attachments": "Attachments",
+    "edit": "Edit",
     "editCurrent": "Edit Current Note",
     "moreActions": "More Actions"
   },

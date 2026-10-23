@@ -17,13 +17,25 @@ describe("Command palette", () => {
   it("opens with Ctrl+K", async () => {
     await CommandPalette.open();
     await expect($(CommandPalette.searchInput)).toBeDisplayed();
+    await CommandPalette.close();
   });
 
-  it("shows page-aware commands alongside note search", async () => {
+  it("opens from the topbar command palette entry", async () => {
+    const trigger = await $("header button[aria-label='命令面板']");
+    await expect(trigger).toBeDisplayed();
+    await trigger.click();
+    await expect($(CommandPalette.searchInput)).toBeDisplayed();
+    await CommandPalette.close();
+  });
+
+  it("shows commands alongside note search", async () => {
     await CommandPalette.open();
     const commands = await CommandPalette.getCommandTexts();
     expect(commands.some((text) => text.includes("新建笔记"))).toBe(true);
+    expect(commands.some((text) => text.includes("打开工作台"))).toBe(true);
+    expect(commands.some((text) => text.includes("打开记录库"))).toBe(true);
     expect(commands.some((text) => text.includes("打开设置"))).toBe(true);
+    expect(commands.some((text) => text.includes("打开今日笔记"))).toBe(true);
     await CommandPalette.close();
   });
 
@@ -76,10 +88,20 @@ describe("Command palette", () => {
     await LibraryPage.closeReader();
   });
 
+  it("hides current-note commands when the reader is closed", async () => {
+    await CommandPalette.open();
+    const commands = await CommandPalette.getCommandTexts();
+
+    expect(commands.some((text) => text.includes("复制笔记"))).toBe(false);
+    expect(commands.some((text) => text.includes("管理附件"))).toBe(false);
+    expect(commands.some((text) => text.includes("打开今日笔记"))).toBe(true);
+    await CommandPalette.close();
+  });
+
   it("empty results show message", async () => {
     await CommandPalette.open();
     await CommandPalette.search("xyznonexistent999");
-    const msg = await $("//*[contains(., '没有匹配的笔记')]");
+    const msg = await $("//*[contains(., '没有匹配的命令或笔记')]");
     await expect(msg).toBeDisplayed();
     await CommandPalette.close();
   });

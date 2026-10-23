@@ -3,6 +3,7 @@
   "library": "记录库",
   "settings": "设置",
   "search": "搜索",
+  "commandPalette": "命令面板",
   "menu": "菜单",
   "pin": "窗口置顶",
   "unpin": "窗口已置顶，点击取消",

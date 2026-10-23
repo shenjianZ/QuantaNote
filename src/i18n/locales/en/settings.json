@@ -66,8 +66,9 @@
   },
   "documentOutline": {
     "title": "Document Sidebar",
-    "description": "Control whether the description and outline are shown beside the document editor",
-    "enabled": "Show description and outline"
+    "description": "Control whether the note sidebar is shown beside the document editor",
+    "enabled": "Show editor sidebar",
+    "panelWidth": "Sidebar panel width"
   },
   "shortcuts": {
     "title": "Keyboard Shortcuts",

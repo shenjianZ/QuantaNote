@@ -61,12 +61,30 @@ export interface FloatingBallPosition {
     y: number;
 }
 
+export type EditorSidebarTab = "properties" | "tags" | "summary" | "outline" | "chat";
+
+const EDITOR_SIDEBAR_TABS = new Set<EditorSidebarTab>(["properties", "tags", "summary", "outline", "chat"]);
+
+export const DOCK_PANEL_WIDTH_MIN = 288;
+export const DOCK_PANEL_WIDTH_MAX = 512;
+export const DOCK_PANEL_WIDTH_DEFAULT = 352;
+
+export function clampDockPanelWidth(value: unknown): number {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) return DOCK_PANEL_WIDTH_DEFAULT;
+    return Math.round(Math.min(DOCK_PANEL_WIDTH_MAX, Math.max(DOCK_PANEL_WIDTH_MIN, numericValue)));
+}
+
 export interface AppSettings {
     fontFamily: string;
     fontMono: string;
     fontSize: number;
     contentWidthProgress: number;
     showDocumentOutline: boolean;
+    editorSidebarTab: EditorSidebarTab;
+    dockPanelWidth: number;
+    /** 聊天面板使用的模型；空 = 跟随全局 AI 配置 */
+    aiChatModel: string;
     accentColor: string;
     customAccentColors: CustomColor[];
     minimizeToTray: boolean;
@@ -96,6 +114,9 @@ const DEFAULTS: AppSettings = {
     fontSize: isMobile() ? 14 : 15,
     contentWidthProgress: 0,
     showDocumentOutline: true,
+    editorSidebarTab: "outline",
+    dockPanelWidth: DOCK_PANEL_WIDTH_DEFAULT,
+    aiChatModel: "",
     accentColor: "#386c5f",
     customAccentColors: [],
     minimizeToTray: true,
@@ -138,6 +159,13 @@ export function normalizeSettings(settings: AppSettings): AppSettings {
         showDocumentOutline: typeof settings.showDocumentOutline === "boolean"
             ? settings.showDocumentOutline
             : DEFAULTS.showDocumentOutline,
+        editorSidebarTab: EDITOR_SIDEBAR_TABS.has(settings.editorSidebarTab)
+            ? settings.editorSidebarTab
+            : DEFAULTS.editorSidebarTab,
+        dockPanelWidth: clampDockPanelWidth(settings.dockPanelWidth),
+        aiChatModel: typeof settings.aiChatModel === "string"
+            ? settings.aiChatModel.trim().slice(0, 200)
+            : DEFAULTS.aiChatModel,
         accentColor: settings.accentColor,
         customAccentColors: Array.isArray(settings.customAccentColors)
             ? settings.customAccentColors

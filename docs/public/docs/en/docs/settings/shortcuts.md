@@ -26,9 +26,9 @@ QuantaNote handles the shortcuts below. They do not take over text entry while a
 
 ## Command Palette
 
-Press `Mod + K` to open the Command Palette. It combines note search with commands available on the current page:
+Press `Mod + K` to open the Command Palette. The top-bar entry and this shortcut open the command palette; the search field below Library remains the dedicated note-search entry. The palette combines note search with common commands:
 
-- Create a note and open Settings.
+- Create a note, open the Workspace, open the Library, open Settings, and open today's note.
 - In the Document Editor, save the note, insert an image, manage attachments, and open version history.
 - In the Document Editor or Library, copy the current note.
 - Type to filter, use the arrow keys and `Enter` to choose, or press `Esc` to close.

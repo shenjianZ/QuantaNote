@@ -1,6 +1,6 @@
 ---
 title: Command Palette
-description: Search notes and run page-aware actions with Ctrl+K in QuantaNote.
+description: Search notes and run common actions with Ctrl+K in QuantaNote.
 author: QuantaNote Team
 createdAt: 2026-05-03
 lastUpdated: 2026-08-30
@@ -25,7 +25,7 @@ Commands are page-aware:
 
 | Page | Available actions |
 |---|---|
-| Every page | New note, Open Settings |
+| Every page | New note, Open workspace, Open library, Open settings, Open today's note |
 | Document Editor | Save current note, Insert image, Manage attachments, Open version history, Copy note |
 | Library (when a note is selected) | Manage attachments, Copy note |
 
@@ -37,7 +37,7 @@ Insert image reuses the editor's image-attachment flow and inserts the image at 
 Ctrl + K → type a command or note query → arrow keys → Enter
 ```
 
-Commands and search results share the same arrow-key selection model. Commands match their label and description while note results continue to use full-text search, so both kinds of entries can appear for one query.
+Commands and search results share the same arrow-key selection model. Commands match their label and description while note results continue to use full-text search, so both kinds of entries can appear for one query. The search field in Library remains the place for library filtering and advanced search.
 
 ## Changing Shortcuts
 

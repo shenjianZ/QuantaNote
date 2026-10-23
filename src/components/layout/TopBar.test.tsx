@@ -56,7 +56,7 @@ function renderTopBar() {
     <TopBar
       currentPage="workspace"
       onNavigate={vi.fn()}
-      onOpenSearch={vi.fn()}
+      onOpenCommandPalette={vi.fn()}
     />,
   );
 }
@@ -114,13 +114,13 @@ describe("TopBar window behavior", () => {
     expect(windowMock.minimize).not.toHaveBeenCalled();
   });
 
-  it("keeps the desktop search trigger at a compact fixed width", () => {
+  it("keeps the desktop command palette trigger at a compact fixed width", () => {
     setWindowSettings({ minimizeToTray: false, closeKeepRunning: false });
     renderTopBar();
 
-    const searchButton = screen.getByRole("button", { name: "搜索" });
-    expect(searchButton).toHaveClass("sm:w-44", "sm:flex-none");
-    expect(searchButton).not.toHaveClass("sm:flex-1");
+    const commandPaletteButton = screen.getByRole("button", { name: "命令面板" });
+    expect(commandPaletteButton).toHaveClass("sm:w-44", "sm:flex-none");
+    expect(commandPaletteButton).not.toHaveClass("sm:flex-1");
   });
 
   it("renders the overflow menu in a fixed portal layer", async () => {

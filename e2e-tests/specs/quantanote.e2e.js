@@ -56,10 +56,10 @@ describe("QuantaNote desktop smoke", () => {
 
   it("opens and closes the command palette with the keyboard", async () => {
     await browser.keys(["Control", "k"]);
-    await expect($("input[placeholder='搜索笔记']")).toBeDisplayed();
+    await expect($("input[placeholder='搜索命令或笔记']")).toBeDisplayed();
 
     await browser.keys("Escape");
-    await expect($("input[placeholder='搜索笔记']")).not.toBeDisplayed();
+    await expect($("input[placeholder='搜索命令或笔记']")).not.toBeDisplayed();
   });
 
   it("creates a note from the library action and shows the editor", async () => {
@@ -89,13 +89,13 @@ describe("QuantaNote desktop smoke", () => {
     await createNoteFromLibrary(title);
 
     await browser.keys(["Control", "k"]);
-    const input = await $("input[placeholder='搜索笔记']");
+    const input = await $("input[placeholder='搜索命令或笔记']");
     await input.setValue("E2E");
 
-    await expect($(`//section[.//input[@placeholder='搜索笔记']]//*[contains(., '${title}')]`)).toBeDisplayed();
+    await expect($(`//section[.//input[@placeholder='搜索命令或笔记']]//*[contains(., '${title}')]`)).toBeDisplayed();
 
     await browser.keys("Escape");
-    await expect($("input[placeholder='搜索笔记']")).not.toBeDisplayed();
+    await expect($("input[placeholder='搜索命令或笔记']")).not.toBeDisplayed();
   });
 
   it("opens settings and verifies all sections", async () => {

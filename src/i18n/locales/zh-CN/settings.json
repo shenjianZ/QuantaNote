@@ -66,8 +66,9 @@
   },
   "documentOutline": {
     "title": "文档侧栏",
-    "description": "控制文档编辑器右侧描述和目录是否显示",
-    "enabled": "显示描述和目录"
+    "description": "控制文档编辑器右侧笔记侧栏是否显示",
+    "enabled": "显示编辑器侧栏",
+    "panelWidth": "侧栏面板宽度"
   },
   "shortcuts": {
     "title": "快捷键",

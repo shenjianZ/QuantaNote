@@ -18,7 +18,14 @@ import { useTranslation } from "react-i18next";
 import { open } from "@tauri-apps/plugin-dialog";
 import { MarkdownPreviewWithOutline } from "../components/common/MarkdownPreviewWithOutline";
 import { NoteLinksPanel } from "../components/links/NoteLinksPanel";
-import { DocumentOutlineToggle } from "../components/editor/DocumentOutline";
+import { DocumentOutline, DocumentOutlineToggle } from "../components/editor/DocumentOutline";
+import { NotePropertiesPanel } from "../components/editor/NotePropertiesPanel";
+import { TagsSection } from "../components/editor/TagsSection";
+import { SummarySection } from "../components/editor/SummarySection";
+import { EditorDock } from "../components/dock/EditorDock";
+import { AiChatPanel } from "../components/dock/AiChatPanel";
+import { parseNoteProperties } from "../utils/frontmatter";
+import { parseMarkdownOutline } from "../utils/markdownOutline";
 import { ContentWidthControl } from "../components/common/ContentWidthControl";
 import { Select } from "../components/common/Select";
 import { SkeletonList } from "../components/common/Skeleton";
@@ -37,8 +44,8 @@ import { useSearchStore } from "../stores/searchStore";
 import { useTagStore } from "../stores/tagStore";
 import { useToastStore } from "../stores/toastStore";
 import { useSettingsStore } from "../stores/settingsStore";
-import { useResponsiveContentWidth } from "../hooks/useResponsiveContentWidth";
-import { CONTENT_WIDTH_OUTLINE_LAYOUT, CONTENT_WIDTH_PREVIEW_BASE } from "../utils/contentWidth";
+import { useViewportContentWidth } from "../hooks/useResponsiveContentWidth";
+import { CONTENT_WIDTH_PREVIEW_BASE, getDockReservedWidth } from "../utils/contentWidth";
 import { MOBILE_BACK_EVENT } from "../utils/platform";
 import { nativeLog } from "../utils/nativeLog";
 import { getVditorLang } from "../utils/vditorConfig";
@@ -106,6 +113,7 @@ export function LibraryPage({
   const { t } = useTranslation(["library", "common"]);
   const contentWidthProgress = useSettingsStore((s) => s.settings.contentWidthProgress);
   const showDocumentOutline = useSettingsStore((s) => s.settings.showDocumentOutline);
+  const dockPanelWidth = useSettingsStore((s) => s.settings.dockPanelWidth);
   const savedSearches = useSettingsStore((s) => s.settings.savedSearches);
   const updateSetting = useSettingsStore((s) => s.updateSetting);
 
@@ -568,14 +576,59 @@ export function LibraryPage({
   }
 
   const hasSelection = readerOpen && Boolean(selectedItem.id);
-  const readerWidth = useResponsiveContentWidth<HTMLElement>({
-    baseWidth: CONTENT_WIDTH_PREVIEW_BASE + (showDocumentOutline ? CONTENT_WIDTH_OUTLINE_LAYOUT : 0),
-    progress: contentWidthProgress,
-    horizontalGutter: 24,
-    enabled: hasSelection,
-  });
+  // 抽屉是 fixed 定位，宽度基准必须取视口（DOM 父元素是列表的 max-w-2xl 容器，会误判可用宽度）。
+  // 抽屉 maxWidth = 内容宽 + dock 预留：dock 是抽屉子元素，抽屉要同时容纳正文与 dock，
+  // 正文实际可用宽（滚动容器已 pr 避让）与编辑器同基准插值，两页宽度一致。
+  const dockReserved = showDocumentOutline ? getDockReservedWidth(dockPanelWidth) : 0;
+  const readerContent = useViewportContentWidth(CONTENT_WIDTH_PREVIEW_BASE, contentWidthProgress, 24, dockReserved);
+  const dockReservedLg = typeof window !== "undefined" && window.innerWidth >= 1024 ? dockReserved : 0;
+  const readerDrawerStyle = { maxWidth: `${readerContent.width + dockReservedLg}px` };
   const previewContent =
     selectedItemDto?.id === selectedItem.id ? selectedItemDto.content : "";
+
+  // 预览态 dock 的目录面板：解析正文标题并跟踪滚动高亮。
+  const readerScrollRef = useRef<HTMLDivElement>(null);
+  const [readerActiveHeading, setReaderActiveHeading] = useState(-1);
+  const readerOutlineHeadings = useMemo(
+    () => (hasSelection ? parseMarkdownOutline(previewContent) : []),
+    [hasSelection, previewContent],
+  );
+
+  useEffect(() => {
+    if (!hasSelection || !showDocumentOutline) return;
+    const container = readerScrollRef.current;
+    if (!container) return;
+
+    const updateActive = () => {
+      const headings = Array.from(container.querySelectorAll<HTMLElement>(".markdown-heading"));
+      if (headings.length === 0) {
+        setReaderActiveHeading((current) => (current === -1 ? current : -1));
+        return;
+      }
+      const threshold = Math.min(window.innerHeight * 0.28, 220);
+      let nextIndex = 0;
+      headings.forEach((heading, index) => {
+        if (heading.getBoundingClientRect().top <= threshold) nextIndex = index;
+      });
+      setReaderActiveHeading((current) => (current === nextIndex ? current : nextIndex));
+    };
+
+    const timer = window.setTimeout(updateActive, 80);
+    container.addEventListener("scroll", updateActive, { passive: true });
+    window.addEventListener("resize", updateActive);
+    return () => {
+      window.clearTimeout(timer);
+      container.removeEventListener("scroll", updateActive);
+      window.removeEventListener("resize", updateActive);
+    };
+  }, [hasSelection, showDocumentOutline, previewContent]);
+
+  const handleReaderOutlineSelect = useCallback((index: number) => {
+    setReaderActiveHeading(index);
+    const container = readerScrollRef.current;
+    const heading = container?.querySelectorAll<HTMLElement>(".markdown-heading")[index];
+    heading?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--app-bg)] px-3 py-3 sm:px-[clamp(1rem,4vw,4rem)] sm:py-4">
@@ -640,121 +693,125 @@ export function LibraryPage({
               <summary className="grid h-10 w-10 cursor-pointer list-none place-items-center rounded-full border border-[var(--line)] text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)] [&::-webkit-details-marker]:hidden" data-testid="library-filter-btn" aria-label={t("library:filter.title")}>
                 <ListFilter className="h-4 w-4" />
               </summary>
-              <div className="absolute right-0 top-12 z-20 max-h-[min(70vh,42rem)] w-72 overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--popover)] p-4 shadow-2xl" data-testid="library-filter-panel">
+              <div className="absolute right-0 top-12 z-20 max-h-[min(70vh,42rem)] w-80 overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--popover)] p-4 shadow-2xl" data-testid="library-filter-panel">
                 <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">{t("library:filter.title")}</div>
-                <label className="mb-4 block">
-                  <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.searchMode")}</span>
-                  <Select
-                    value={searchMode}
-                    onChange={(value) => setSearchMode(value as SearchMode)}
-                    options={[
-                      { value: "normal", label: t("library:filter.normalMode") },
-                      { value: "advanced", label: t("library:filter.advancedMode") },
-                    ]}
-                  />
-                </label>
-                <label className="mb-4 block">
-                  <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.sort")}</span>
-                  <Select
-                    value={sortOrder}
-                    onChange={(v) => setSortOrder(v as SortOption)}
-                    options={[
-                      { value: "updated", label: t("library:filter.sortUpdated") },
-                      { value: "created", label: t("library:filter.sortCreated") },
-                      { value: "title", label: t("library:filter.sortTitle") },
-                      { value: "priority", label: t("library:filter.sortPriority") },
-                      { value: "due", label: t("library:filter.sortDue") },
-                    ]}
-                  />
-                </label>
-                <label className="mb-4 block">
-                  <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.status")}</span>
-                  <span data-testid="library-property-status">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-3">
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.searchMode")}</span>
                     <Select
-                      value={propertyStatus}
-                      onChange={setPropertyStatus}
-                      options={propertyStatusOptions}
-                    />
-                  </span>
-                </label>
-                <label className="mb-4 block">
-                  <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.priority")}</span>
-                  <span data-testid="library-property-priority">
-                    <Select
-                      value={propertyPriority}
-                      onChange={setPropertyPriority}
-                      options={propertyPriorityOptions}
-                    />
-                  </span>
-                </label>
-                <label className="mb-4 block">
-                  <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.type")}</span>
-                  <span data-testid="library-item-type-filter">
-                    <Select
-                      value={itemTypeFilter}
-                      onChange={(value) => setItemTypeFilter(value as SavedSearchItemType)}
+                      value={searchMode}
+                      onChange={(value) => setSearchMode(value as SearchMode)}
                       options={[
-                        { value: "all", label: t("library:filter.allTypes") },
-                        ...(["note", "link", "file", "image", "code", "task"] as ItemType[]).map((type) => ({
-                          value: type,
-                          label: t(`library:filter.types.${type}`),
-                        })),
+                        { value: "normal", label: t("library:filter.normalMode") },
+                        { value: "advanced", label: t("library:filter.advancedMode") },
                       ]}
                     />
-                  </span>
-                </label>
-                <label className="mb-4 block">
-                  <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.timeRange")}</span>
-                  <span data-testid="library-time-range-filter">
+                  </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.sort")}</span>
                     <Select
-                      value={timeRange}
-                      onChange={(value) => setTimeRange(value as SavedSearchTimeRange)}
+                      value={sortOrder}
+                      onChange={(v) => setSortOrder(v as SortOption)}
                       options={[
-                        { value: "all", label: t("library:filter.allTime") },
-                        { value: "today", label: t("library:filter.today") },
-                        { value: "7d", label: t("library:filter.last7Days") },
-                        { value: "30d", label: t("library:filter.last30Days") },
+                        { value: "updated", label: t("library:filter.sortUpdated") },
+                        { value: "created", label: t("library:filter.sortCreated") },
+                        { value: "title", label: t("library:filter.sortTitle") },
+                        { value: "priority", label: t("library:filter.sortPriority") },
+                        { value: "due", label: t("library:filter.sortDue") },
                       ]}
                     />
-                  </span>
-                </label>
-                <label className="block">
-                  <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.tag")}</span>
-                  <Select
-                    value={activeTag}
-                    onChange={setActiveTag}
-                    options={[
-                      { value: "all", label: t("library:filter.allTags") },
-                      ...allTags.map((tag) => ({ value: tag.name, label: tag.name })),
-                    ]}
-                  />
-                </label>
+                  </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.status")}</span>
+                    <span data-testid="library-property-status">
+                      <Select
+                        value={propertyStatus}
+                        onChange={setPropertyStatus}
+                        options={propertyStatusOptions}
+                      />
+                    </span>
+                  </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.priority")}</span>
+                    <span data-testid="library-property-priority">
+                      <Select
+                        value={propertyPriority}
+                        onChange={setPropertyPriority}
+                        options={propertyPriorityOptions}
+                      />
+                    </span>
+                  </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.type")}</span>
+                    <span data-testid="library-item-type-filter">
+                      <Select
+                        value={itemTypeFilter}
+                        onChange={(value) => setItemTypeFilter(value as SavedSearchItemType)}
+                        options={[
+                          { value: "all", label: t("library:filter.allTypes") },
+                          ...(["note", "link", "file", "image", "code", "task"] as ItemType[]).map((type) => ({
+                            value: type,
+                            label: t(`library:filter.types.${type}`),
+                          })),
+                        ]}
+                      />
+                    </span>
+                  </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.timeRange")}</span>
+                    <span data-testid="library-time-range-filter">
+                      <Select
+                        value={timeRange}
+                        onChange={(value) => setTimeRange(value as SavedSearchTimeRange)}
+                        options={[
+                          { value: "all", label: t("library:filter.allTime") },
+                          { value: "today", label: t("library:filter.today") },
+                          { value: "7d", label: t("library:filter.last7Days") },
+                          { value: "30d", label: t("library:filter.last30Days") },
+                        ]}
+                      />
+                    </span>
+                  </label>
+                  <label className="col-span-2 block">
+                    <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.tag")}</span>
+                    <Select
+                      value={activeTag}
+                      onChange={setActiveTag}
+                      options={[
+                        { value: "all", label: t("library:filter.allTags") },
+                        ...allTags.map((tag) => ({ value: tag.name, label: tag.name })),
+                      ]}
+                    />
+                  </label>
+                </div>
                 <fieldset className="mt-4 space-y-2 border-0 border-t border-[var(--line)] p-0 pt-4">
                   <legend className="mb-2 text-xs font-medium text-[var(--muted)]">{t("library:filter.flags")}</legend>
-                  <label className="flex items-center gap-2 text-sm text-[var(--text)]">
-                    <input
-                      type="checkbox"
-                      checked={untaggedOnly}
-                      onChange={(event) => setUntaggedOnly(event.currentTarget.checked)}
-                      data-testid="library-untagged-filter"
-                      className="accent-[var(--accent)]"
-                    />
-                    {t("library:filter.untagged")}
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-[var(--text)]">
-                    <input
-                      type="checkbox"
-                      checked={hasAttachmentsOnly}
-                      onChange={(event) => setHasAttachmentsOnly(event.currentTarget.checked)}
-                      data-testid="library-has-attachments-filter"
-                      className="accent-[var(--accent)]"
-                    />
-                    {t("library:filter.hasAttachments")}
-                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="flex items-center gap-2 text-sm text-[var(--text)]">
+                      <input
+                        type="checkbox"
+                        checked={untaggedOnly}
+                        onChange={(event) => setUntaggedOnly(event.currentTarget.checked)}
+                        data-testid="library-untagged-filter"
+                        className="accent-[var(--accent)]"
+                      />
+                      {t("library:filter.untagged")}
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-[var(--text)]">
+                      <input
+                        type="checkbox"
+                        checked={hasAttachmentsOnly}
+                        onChange={(event) => setHasAttachmentsOnly(event.currentTarget.checked)}
+                        data-testid="library-has-attachments-filter"
+                        className="accent-[var(--accent)]"
+                      />
+                      {t("library:filter.hasAttachments")}
+                    </label>
+                  </div>
                 </fieldset>
                 <fieldset className="border-0 p-0">
                   <legend className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t("library:filter.searchScope")}</legend>
-                  <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-2">
                     {(["content", "tags", "attachments", "versions"] as SearchScope[]).map((scope) => (
                       <label key={scope} className="flex items-center gap-2 text-sm text-[var(--text)]">
                         <input
@@ -958,7 +1015,7 @@ export function LibraryPage({
       </section>
 
       {hasSelection && (
-        <section ref={readerWidth.ref} style={readerWidth.style} className="fixed inset-0 z-[60] overflow-hidden bg-[var(--paper)] sm:inset-x-3 sm:bottom-8 sm:top-14 sm:mx-auto sm:rounded-3xl sm:border sm:border-[var(--line)] sm:shadow-2xl" data-testid="reader-drawer" data-content-width-target="reader">
+        <section style={readerDrawerStyle} className="fixed inset-0 z-[60] overflow-hidden bg-[var(--paper)] sm:inset-x-3 sm:bottom-8 sm:top-14 sm:mx-auto sm:rounded-3xl sm:border sm:border-[var(--line)] sm:shadow-2xl" data-testid="reader-drawer" data-content-width-target="reader">
           <div className="flex h-full min-h-0 flex-col">
             <header className="flex shrink-0 items-start gap-2 border-b border-[var(--line)] px-3 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:gap-3 sm:px-4 sm:py-3 sm:pt-3">
               <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--field)] text-[var(--muted)]">
@@ -971,123 +1028,197 @@ export function LibraryPage({
                 <h2 className="truncate text-base font-semibold text-[var(--text)]">{selectedItem.title}</h2>
                 <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-[var(--muted)]">
                   <span>{selectedItem.time}</span>
-                  {itemTags.map((tag) => (
-                    <span key={tag.name} className="rounded-full bg-[var(--field)] px-2 py-0.5">
-                      #{tag.name}
-                    </span>
-                  ))}
                 </div>
               </div>
-              <ContentWidthControl compact testId="reader-content-width-control" />
-              <DocumentOutlineToggle
-                visible={showDocumentOutline}
-                onToggle={() => updateSetting("showDocumentOutline", !showDocumentOutline)}
-                testId="reader-document-outline-toggle"
-              />
-              <details ref={menuDetailsRef} className="relative shrink-0">
-                <summary className="grid h-8 w-8 cursor-pointer list-none place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)] [&::-webkit-details-marker]:hidden" data-testid="reader-menu-btn" aria-label={t("library:reader.moreActions")}>
-                  <MoreHorizontal className="h-4 w-4" />
-                </summary>
-                <div className="absolute right-0 top-10 z-40 w-48 overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--popover)] p-1 shadow-xl">
-                  <button className="menu-item" type="button" onClick={() => { handleTogglePin(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Star className="h-4 w-4" />{selectedItem.pinned ? t("library:reader.unpin") : t("library:reader.pin")}</button>
-                  <button className="menu-item" type="button" onClick={() => { handleToggleFavorite(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Star className="h-4 w-4" />{selectedItem.favorite ? t("library:reader.unfavorite") : t("library:reader.favorite")}</button>
-                  <button className="menu-item" type="button" onClick={() => { handleCopy(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Copy className="h-4 w-4" />{t("library:reader.copy")}</button>
-                  <button className="menu-item" type="button" onClick={() => { handleAddAttachment(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Paperclip className="h-4 w-4" />{t("library:reader.addAttachment")}</button>
-                  <button className="menu-item" type="button" onClick={() => { onOpenDocument(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Edit3 className="h-4 w-4" />{t("library:reader.fullEdit")}</button>
+              <div className="group flex shrink-0 items-start gap-1 pt-0.5 sm:pt-1">
+                {/* 笔记属性组：标签 / 附件（默认弱化，悬停顶栏时浮现） */}
+                <div className="flex shrink-0 items-center gap-1 opacity-45 transition-opacity duration-200 group-hover:opacity-100">
                   <button
-                    className={`menu-item ${deleteConfirming ? "bg-red-500/10 text-red-500 hover:bg-red-500/15" : "text-red-400"}`}
+                    className="grid h-8 w-8 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
                     type="button"
-                    data-testid="reader-delete-btn"
-                    onClick={() => {
-                      if (!deleteConfirming) {
-                        setDeleteConfirming(true);
-                        return;
-                      }
-                      handleDelete().then(() => {
-                        setDeleteConfirming(false);
-                        if (menuDetailsRef.current) menuDetailsRef.current.open = false;
-                      });
-                    }}
+                    data-testid="reader-tags-btn"
+                    aria-label={t("library:reader.tags")}
+                    title={t("library:reader.tags")}
+                    onClick={() => setTagModalOpen(true)}
                   >
-                    <Trash2 className="h-4 w-4" />
-                    {deleteConfirming ? t("library:reader.confirmDelete") : t("library:reader.delete")}
+                    <Tag className="h-4 w-4" />
+                  </button>
+                  <button
+                    className="relative grid h-8 w-8 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
+                    type="button"
+                    data-testid="reader-attachments-btn"
+                    aria-label={t("library:reader.attachments")}
+                    title={t("library:reader.attachments")}
+                    onClick={() => setAttachmentModalOpen(true)}
+                  >
+                    <Paperclip className="h-4 w-4" />
+                    {attachments.length > 0 && <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-[var(--accent)] px-1 text-[9px] leading-4 text-white">{attachments.length}</span>}
+                  </button>
+                  <span className="mx-1 h-4 w-px bg-[var(--line)]" aria-hidden="true" />
+                </div>
+                {/* 视图组：内容宽度 / 目录（默认弱化，悬停顶栏时浮现） */}
+                <div className="flex shrink-0 items-center gap-1 opacity-45 transition-opacity duration-200 group-hover:opacity-100">
+                  <ContentWidthControl compact size="sm" testId="reader-content-width-control" />
+                  <DocumentOutlineToggle
+                    visible={showDocumentOutline}
+                    onToggle={() => updateSetting("showDocumentOutline", !showDocumentOutline)}
+                    testId="reader-document-outline-toggle"
+                    ariaLabel={t(showDocumentOutline ? "document:sidebar.hide" : "document:sidebar.show")}
+                  />
+                  <span className="mx-1 h-4 w-px bg-[var(--line)]" aria-hidden="true" />
+                </div>
+                {/* 动作组：编辑 / 更多 / 关闭 */}
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-[var(--accent-soft)] px-3 text-xs font-medium text-[var(--accent)] transition-opacity hover:opacity-80"
+                    type="button"
+                    data-testid="reader-edit-btn"
+                    aria-label={t("library:reader.editCurrent")}
+                    title={t("library:reader.editCurrent")}
+                    onClick={onOpenDocument}
+                  >
+                    <Edit3 className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">{t("library:reader.edit")}</span>
+                  </button>
+                  <details ref={menuDetailsRef} className="relative shrink-0">
+                    <summary className="grid h-8 w-8 cursor-pointer list-none place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)] [&::-webkit-details-marker]:hidden" data-testid="reader-menu-btn" aria-label={t("library:reader.moreActions")}>
+                      <MoreHorizontal className="h-4 w-4" />
+                    </summary>
+                    <div className="absolute right-0 top-10 z-[45] w-48 overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--popover)] p-1 shadow-xl">
+                      <button className="menu-item" type="button" onClick={() => { handleTogglePin(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Star className="h-4 w-4" />{selectedItem.pinned ? t("library:reader.unpin") : t("library:reader.pin")}</button>
+                      <button className="menu-item" type="button" onClick={() => { handleToggleFavorite(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Star className="h-4 w-4" />{selectedItem.favorite ? t("library:reader.unfavorite") : t("library:reader.favorite")}</button>
+                      <button className="menu-item" type="button" onClick={() => { handleCopy(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Copy className="h-4 w-4" />{t("library:reader.copy")}</button>
+                      <button className="menu-item" type="button" onClick={() => { handleAddAttachment(); menuDetailsRef.current && (menuDetailsRef.current.open = false); }}><Paperclip className="h-4 w-4" />{t("library:reader.addAttachment")}</button>
+                      <button
+                        className={`menu-item ${deleteConfirming ? "bg-red-500/10 text-red-500 hover:bg-red-500/15" : "text-red-400"}`}
+                        type="button"
+                        data-testid="reader-delete-btn"
+                        onClick={() => {
+                          if (!deleteConfirming) {
+                            setDeleteConfirming(true);
+                            return;
+                          }
+                          handleDelete().then(() => {
+                            setDeleteConfirming(false);
+                            if (menuDetailsRef.current) menuDetailsRef.current.open = false;
+                          });
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        {deleteConfirming ? t("library:reader.confirmDelete") : t("library:reader.delete")}
+                      </button>
+                    </div>
+                  </details>
+                  <button className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="reader-close-btn" aria-label={t("common:buttons.close")} onClick={handleCloseReader} title={t("common:buttons.close")}>
+                    <X className="h-4 w-4" />
                   </button>
                 </div>
-              </details>
-              <button className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="reader-edit-btn" aria-label={t("library:reader.editCurrent")} onClick={onOpenDocument} title={t("library:reader.editCurrent")}>
-                <Edit3 className="h-4 w-4" />
-              </button>
-              <button className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]" type="button" data-testid="reader-close-btn" aria-label={t("common:buttons.close")} onClick={handleCloseReader} title={t("common:buttons.close")}>
-                <X className="h-4 w-4" />
-              </button>
+              </div>
             </header>
 
-            <div className="min-h-0 flex-1 overflow-auto px-4 py-4 sm:px-6" onCopy={() => useToastStore.getState().addToast("success", t("common:toast.copySuccess"))}>
+            <div
+              ref={readerScrollRef}
+              className={`min-h-0 flex-1 overflow-auto px-4 py-4 sm:px-6 ${showDocumentOutline ? "lg:pr-[var(--dock-reserved)]" : ""}`}
+              style={showDocumentOutline ? ({ "--dock-reserved": `${getDockReservedWidth(dockPanelWidth)}px` } as React.CSSProperties) : undefined}
+              onCopy={() => useToastStore.getState().addToast("success", t("common:toast.copySuccess"))}
+            >
               <MarkdownPreviewWithOutline
-                content={previewContent || selectedItem.summary || ""}
+                content={previewContent}
                 theme={theme === "light" ? "light" : "dark"}
                 lang={getVditorLang()}
                 testId="reader-preview-layout"
                 attachments={attachments}
                 onNoteLinkClick={handleMarkdownNoteLink}
+                tags={itemTags}
+                summary={selectedItem.summary || ""}
+                outlineEnabled={false}
               />
               <NoteLinksPanel itemId={selectedItem.id} onOpenNote={onOpenLinkedNote} />
             </div>
 
-            <footer className="shrink-0 border-t border-[var(--line)] bg-[var(--paper)] px-3 py-3 safe-area-inset-bottom sm:px-4">
-              <div className="flex flex-wrap items-center gap-2">
-                {itemTags.map((tag) => (
-                  <span key={tag.name} className="rounded-full bg-[var(--field)] px-2 py-0.5 text-xs text-[var(--muted)]">
-                    #{tag.name}
-                  </span>
-                ))}
-                <button
-                  className="inline-flex items-center gap-1 rounded-full bg-[var(--field)] px-2.5 py-1 text-xs text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
-                  type="button"
-                  data-testid="reader-tags-btn"
-                  onClick={() => setTagModalOpen(true)}
-                >
-                  <Tag className="h-3.5 w-3.5" />
-                  {t("library:reader.tags")}
-                </button>
-                <button
-                  className="inline-flex items-center gap-1 rounded-full bg-[var(--field)] px-2.5 py-1 text-xs text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)]"
-                  type="button"
-                  data-testid="reader-attachments-btn"
-                  onClick={() => setAttachmentModalOpen(true)}
-                >
-                  <Paperclip className="h-3.5 w-3.5" />
-                  {t("library:reader.attachments")}{attachments.length > 0 ? ` (${attachments.length})` : ""}
-                </button>
-              </div>
+            {/* 预览态 dock：属性/描述只读，标签可管理，目录与 AI 问答可用 */}
+            <EditorDock
+              variant="drawer"
+              panels={{
+                properties: (
+                  <NotePropertiesPanel
+                    properties={parseNoteProperties(previewContent)}
+                    onChange={() => {}}
+                    readOnly
+                  />
+                ),
+                tags: (
+                  <TagsSection
+                    tags={itemTags}
+                    aiGenerating={false}
+                    canGenerate={false}
+                    showAiSuggest={false}
+                    onGenerate={() => {}}
+                    onManageTags={() => setTagModalOpen(true)}
+                    onRemoveTag={(name) => { void handleTagChange(itemTags.filter((tag) => tag.name !== name).map((tag) => tag.name)); }}
+                  />
+                ),
+                summary: (
+                  <SummarySection
+                    summary={selectedItem.summary || ""}
+                    onSummaryChange={() => {}}
+                    summaryMode={selectedItemDto?.summary_mode === "manual" ? "manual" : "auto"}
+                    onSummaryModeChange={() => {}}
+                    aiGenerating={false}
+                    canGenerate={false}
+                    onRegenerate={() => {}}
+                    onGenerateAi={() => {}}
+                    readOnly
+                  />
+                ),
+                outline: (
+                  <DocumentOutline
+                    headings={readerOutlineHeadings}
+                    visible
+                    onToggle={() => updateSetting("showDocumentOutline", false)}
+                    activeIndex={readerActiveHeading}
+                    onSelect={handleReaderOutlineSelect}
+                    showToggle={false}
+                    className="min-h-0 flex-1"
+                  />
+                ),
+                chat: (
+                  <AiChatPanel
+                    itemId={selectedItem.id}
+                    title={selectedItem.title}
+                    content={previewContent}
+                    onOpenNote={handleOpenItem}
+                  />
+                ),
+              }}
+            />
 
-              <TagPickerModal
-                open={tagModalOpen}
-                onClose={() => setTagModalOpen(false)}
-                selectedTags={itemTags.map((t) => t.name)}
-                onChange={handleTagChange}
-                onOpenManager={() => {
-                  setTagModalOpen(false);
-                  setTagManagerOpen(true);
-                }}
-              />
-              <TagManagerModal
-                open={tagManagerOpen}
-                onClose={() => {
-                  setTagManagerOpen(false);
-                  loadLibraryData();
-                  if (selectedItem.id) {
-                    fetchItemTags(selectedItem.id);
-                  }
-                }}
-              />
-              <AttachmentManagerModal
-                open={attachmentModalOpen}
-                onClose={() => setAttachmentModalOpen(false)}
-                itemId={selectedItem.id}
-                onDeleteAttachment={handleDeleteAttachment}
-              />
-            </footer>
+            <TagPickerModal
+              open={tagModalOpen}
+              onClose={() => setTagModalOpen(false)}
+              selectedTags={itemTags.map((t) => t.name)}
+              onChange={handleTagChange}
+              onOpenManager={() => {
+                setTagModalOpen(false);
+                setTagManagerOpen(true);
+              }}
+            />
+            <TagManagerModal
+              open={tagManagerOpen}
+              onClose={() => {
+                setTagManagerOpen(false);
+                loadLibraryData();
+                if (selectedItem.id) {
+                  fetchItemTags(selectedItem.id);
+                }
+              }}
+            />
+            <AttachmentManagerModal
+              open={attachmentModalOpen}
+              onClose={() => setAttachmentModalOpen(false)}
+              itemId={selectedItem.id}
+              onDeleteAttachment={handleDeleteAttachment}
+            />
           </div>
         </section>
       )}

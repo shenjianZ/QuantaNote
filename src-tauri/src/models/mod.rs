@@ -1,3 +1,4 @@
+pub mod ai_chat;
 pub mod attachment;
 pub mod item;
 pub mod note_link;

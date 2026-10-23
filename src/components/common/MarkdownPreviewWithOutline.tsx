@@ -12,6 +12,10 @@ interface MarkdownPreviewWithOutlineProps {
   testId?: string;
   attachments?: readonly MarkdownAttachment[];
   onNoteLinkClick?: (targetTitle: string) => void;
+  tags?: { name: string; color: string }[];
+  summary?: string;
+  /** false 时不渲染内置目录（阅读抽屉由 EditorDock 的目录面板接管）；默认 true */
+  outlineEnabled?: boolean;
 }
 
 export function MarkdownPreviewWithOutline({
@@ -21,6 +25,9 @@ export function MarkdownPreviewWithOutline({
   testId = "markdown-preview-layout",
   attachments = [],
   onNoteLinkClick,
+  tags,
+  summary,
+  outlineEnabled = true,
 }: MarkdownPreviewWithOutlineProps) {
   const markdownRef = useRef<HTMLDivElement>(null);
   const showDocumentOutline = useSettingsStore((s) => s.settings.showDocumentOutline);
@@ -109,17 +116,19 @@ export function MarkdownPreviewWithOutline({
 
   return (
     <div
-      className={showDocumentOutline ? "grid min-h-0 min-w-0 items-stretch gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]" : "min-w-0"}
+      className={outlineEnabled && showDocumentOutline
+        ? "grid min-h-0 min-w-0 items-stretch gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]"
+        : "min-w-0"}
       data-testid={testId}
     >
       <div
         ref={markdownRef}
-        className="min-w-0 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4 sm:rounded-3xl sm:p-5"
+        className="min-w-0 px-4 pb-4 pt-3 sm:px-5 sm:pb-5 sm:pt-4"
         data-testid={`${testId}-markdown`}
       >
-        <MarkdownRenderer content={content} theme={theme} lang={lang} attachments={attachments} onNoteLinkClick={onNoteLinkClick} />
+        <MarkdownRenderer content={content} theme={theme} lang={lang} attachments={attachments} onNoteLinkClick={onNoteLinkClick} tags={tags} summary={summary} />
       </div>
-      {showDocumentOutline && (
+      {outlineEnabled && showDocumentOutline && (
         <DocumentOutline
           headings={headings}
           visible

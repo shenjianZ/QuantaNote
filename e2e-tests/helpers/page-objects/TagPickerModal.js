@@ -50,7 +50,8 @@ class TagPickerModal {
   }
 
   async close() {
-    const btn = await $("//button[contains(., '完成')]");
+    // 不能用 contains(., '完成') —— 会误匹配智能集合的"未完成"按钮
+    const btn = await $("[data-testid='tag-picker-done-btn']");
     await btn.click();
     await observePause();
   }

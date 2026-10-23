@@ -140,6 +140,11 @@
     "due": "截止日期",
     "aliases": "别名",
     "aliasesPlaceholder": "用逗号分隔多个别名",
+    "tags": "标签",
+    "summary": "描述",
+    "overdue": "已逾期",
+    "showMore": "展开",
+    "showLess": "收起",
     "statuses": {
       "inbox": "收件箱",
       "inProgress": "进行中",

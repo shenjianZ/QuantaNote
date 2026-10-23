@@ -261,86 +261,88 @@ export function SyncSettingsPanel({ showAccount = true }: SyncSettingsPanelProps
                         <label className="text-sm font-medium text-[var(--text)]">
                             {t("syncStrategy")}
                         </label>
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs text-[var(--muted)]">
-                                {t("autoSync")}
-                            </span>
-                            <label className="relative inline-flex cursor-pointer items-center">
-                                <input
-                                    data-testid="sync-auto-sync-toggle"
-                                    type="checkbox"
-                                    checked={config.auto_sync}
-                                    onChange={(e) =>
-                                        updateConfig({
-                                            auto_sync: e.target.checked,
-                                        })
-                                    }
-                                    className="peer sr-only"
-                                />
-                                <div className="h-5 w-9 rounded-full bg-[var(--field)] after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-[var(--muted)] after:transition-all peer-checked:bg-[var(--accent)] peer-checked:after:translate-x-full peer-checked:after:bg-white" />
-                            </label>
-                        </div>
-                        {config.auto_sync && (
+                        <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
                             <div className="flex items-center justify-between">
                                 <span className="text-xs text-[var(--muted)]">
-                                    {t("syncInterval")}
+                                    {t("autoSync")}
                                 </span>
-                                <input
-                                    data-testid="sync-interval-input"
-                                    type="number"
-                                    min={5}
-                                    max={1440}
-                                    value={config.sync_interval_minutes}
-                                    onChange={(e) =>
+                                <label className="relative inline-flex cursor-pointer items-center">
+                                    <input
+                                        data-testid="sync-auto-sync-toggle"
+                                        type="checkbox"
+                                        checked={config.auto_sync}
+                                        onChange={(e) =>
+                                            updateConfig({
+                                                auto_sync: e.target.checked,
+                                            })
+                                        }
+                                        className="peer sr-only"
+                                    />
+                                    <div className="h-5 w-9 rounded-full bg-[var(--field)] after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-[var(--muted)] after:transition-all peer-checked:bg-[var(--accent)] peer-checked:after:translate-x-full peer-checked:after:bg-white" />
+                                </label>
+                            </div>
+                            {config.auto_sync && (
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-[var(--muted)]">
+                                        {t("syncInterval")}
+                                    </span>
+                                    <input
+                                        data-testid="sync-interval-input"
+                                        type="number"
+                                        min={5}
+                                        max={1440}
+                                        value={config.sync_interval_minutes}
+                                        onChange={(e) =>
+                                            updateConfig({
+                                                sync_interval_minutes: Math.max(
+                                                    5,
+                                                    parseInt(e.target.value) || 15,
+                                                ),
+                                            })
+                                        }
+                                        className="w-20 rounded-lg border border-[var(--line)] bg-[var(--field)] px-2.5 py-1.5 text-right text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                                    />
+                                </div>
+                            )}
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs text-[var(--muted)]">
+                                    {t("syncAttachments")}
+                                </span>
+                                <label className="relative inline-flex cursor-pointer items-center">
+                                    <input
+                                        data-testid="sync-attachments-toggle"
+                                        type="checkbox"
+                                        checked={config.sync_attachments}
+                                        onChange={(e) =>
+                                            updateConfig({
+                                                sync_attachments: e.target.checked,
+                                            })
+                                        }
+                                        className="peer sr-only"
+                                    />
+                                    <div className="h-5 w-9 rounded-full bg-[var(--field)] after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-[var(--muted)] after:transition-all peer-checked:bg-[var(--accent)] peer-checked:after:translate-x-full peer-checked:after:bg-white" />
+                                </label>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs text-[var(--muted)]">
+                                    {t("conflictResolution")}
+                                </span>
+                                <Select
+                                    className="w-32"
+                                    value={config.conflict_resolution}
+                                    onChange={(v) =>
                                         updateConfig({
-                                            sync_interval_minutes: Math.max(
-                                                5,
-                                                parseInt(e.target.value) || 15,
-                                            ),
+                                            conflict_resolution: v,
                                         })
                                     }
-                                    className="w-20 rounded-lg border border-[var(--line)] bg-[var(--field)] px-2.5 py-1.5 text-right text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                                    options={[
+                                        { value: "auto", label: t("conflictAuto") },
+                                        { value: "local-wins", label: t("conflictLocal") },
+                                        { value: "remote-wins", label: t("conflictRemote") },
+                                        { value: "manual", label: t("conflictManual") },
+                                    ]}
                                 />
                             </div>
-                        )}
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs text-[var(--muted)]">
-                                {t("syncAttachments")}
-                            </span>
-                            <label className="relative inline-flex cursor-pointer items-center">
-                                <input
-                                    data-testid="sync-attachments-toggle"
-                                    type="checkbox"
-                                    checked={config.sync_attachments}
-                                    onChange={(e) =>
-                                        updateConfig({
-                                            sync_attachments: e.target.checked,
-                                        })
-                                    }
-                                    className="peer sr-only"
-                                />
-                                <div className="h-5 w-9 rounded-full bg-[var(--field)] after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-[var(--muted)] after:transition-all peer-checked:bg-[var(--accent)] peer-checked:after:translate-x-full peer-checked:after:bg-white" />
-                            </label>
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs text-[var(--muted)]">
-                                {t("conflictResolution")}
-                            </span>
-                            <Select
-                                className="w-32"
-                                value={config.conflict_resolution}
-                                onChange={(v) =>
-                                    updateConfig({
-                                        conflict_resolution: v,
-                                    })
-                                }
-                                options={[
-                                    { value: "auto", label: t("conflictAuto") },
-                                    { value: "local-wins", label: t("conflictLocal") },
-                                    { value: "remote-wins", label: t("conflictRemote") },
-                                    { value: "manual", label: t("conflictManual") },
-                                ]}
-                            />
                         </div>
                     </div>
 
@@ -458,6 +460,8 @@ export function SyncSettingsPanel({ showAccount = true }: SyncSettingsPanelProps
                         </div>
                     </div>
 
+                    {/* 设备会话与同步历史并排两栏 */}
+                    <div className="grid gap-4 lg:grid-cols-2">
                     {/* 设备会话 */}
                     <div data-testid="sync-devices" className="space-y-2">
                         <div className="flex items-center justify-between">
@@ -573,6 +577,7 @@ export function SyncSettingsPanel({ showAccount = true }: SyncSettingsPanelProps
                             )}
                         </div>
                     )}
+                    </div>
                 </>
             )}
 

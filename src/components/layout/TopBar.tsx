@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Archive, Copy, Home, Minus, MoreHorizontal, Pin, Search, Settings, Square, User, X } from "lucide-react";
+import { Archive, Command, Copy, Home, Minus, MoreHorizontal, Pin, Settings, Square, User, X } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useTranslation } from "react-i18next";
 import type { AppPage } from "../../types";
@@ -22,7 +22,7 @@ try {
 interface TopBarProps {
   currentPage: AppPage;
   onNavigate: (page: AppPage) => void;
-  onOpenSearch: () => void;
+  onOpenCommandPalette: () => void;
 }
 
 interface MenuPosition {
@@ -30,7 +30,7 @@ interface MenuPosition {
   right: number;
 }
 
-export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
+export function TopBar({ currentPage, onNavigate, onOpenCommandPalette }: TopBarProps) {
   const { t } = useTranslation(["topbar", "common"]);
   const settings = useSettingsStore((s) => s.settings);
   const alwaysOnTop = useAppStore((s) => s.alwaysOnTop);
@@ -172,15 +172,16 @@ export function TopBar({ currentPage, onNavigate, onOpenSearch }: TopBarProps) {
         <SyncStatusIndicator />
       </div>
 
-      {/* 搜索按钮 — 移动端只显示图标，无底色 */}
+      {/* 命令面板入口 — 移动端只显示图标，无底色 */}
       <button
         className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--muted)] transition hover:text-[var(--text)] sm:w-44 sm:max-w-none sm:flex-none sm:justify-start sm:gap-2 sm:border sm:border-[var(--line)] sm:bg-[var(--field)] sm:px-3 sm:[-webkit-app-region:no-drag] sm:hover:border-[var(--accent)]"
-        onClick={onOpenSearch}
+        onClick={onOpenCommandPalette}
         type="button"
-        aria-label={t("topbar:search")}
+        aria-label={t("topbar:commandPalette")}
+        title={t("topbar:commandPalette")}
       >
-        <Search className="h-4 w-4 shrink-0" />
-        <span className="hidden min-w-0 flex-1 truncate text-left sm:block">{t("topbar:search")}</span>
+        <Command className="h-4 w-4 shrink-0" />
+        <span className="hidden min-w-0 flex-1 truncate text-left sm:block">{t("topbar:commandPalette")}</span>
         <span className="hidden items-center gap-1 sm:flex">
           <Kbd>⌘</Kbd>
           <Kbd>K</Kbd>

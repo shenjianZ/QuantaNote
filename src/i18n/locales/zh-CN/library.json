@@ -120,11 +120,11 @@
     "unfavorite": "取消收藏",
     "copy": "复制内容",
     "addAttachment": "添加附件",
-    "fullEdit": "完整编辑",
     "delete": "删除",
     "confirmDelete": "确认删除",
     "tags": "标签",
     "attachments": "附件",
+    "edit": "编辑",
     "editCurrent": "编辑当前笔记",
     "moreActions": "更多操作"
   },

@@ -3,6 +3,7 @@
   "library": "Library",
   "settings": "Settings",
   "search": "Search",
+  "commandPalette": "Command palette",
   "menu": "Menu",
   "pin": "Pin Window",
   "unpin": "Window Pinned, Click to Unpin",

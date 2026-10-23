@@ -53,7 +53,7 @@ describe("CommandPalette", () => {
       />,
     );
 
-    fireEvent.keyDown(screen.getByPlaceholderText("搜索笔记"), { key: "Enter" });
+    fireEvent.keyDown(screen.getByPlaceholderText("搜索命令或笔记"), { key: "Enter" });
 
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onSelectItem).toHaveBeenCalledWith("item-1");
@@ -87,7 +87,7 @@ describe("CommandPalette", () => {
       />,
     );
 
-    fireEvent.keyDown(screen.getByPlaceholderText("搜索笔记"), { key: "Escape" });
+    fireEvent.keyDown(screen.getByPlaceholderText("搜索命令或笔记"), { key: "Escape" });
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -105,7 +105,7 @@ describe("CommandPalette", () => {
     expect(screen.getByTestId("command-palette-overlay")).toHaveClass("pt-[env(safe-area-inset-top)]");
   });
 
-  it("renders commands and invokes the selected command", () => {
+  it("renders commands before note results and invokes the selected command", () => {
     const onClose = vi.fn();
     const onSelect = vi.fn();
 
@@ -116,17 +116,17 @@ describe("CommandPalette", () => {
         onSelectItem={vi.fn()}
         items={items}
         commands={[{
-          id: "save-note",
-          label: "保存当前笔记",
-          description: "立即保存",
-          shortcut: "Ctrl+S",
+          id: "open-settings",
+          label: "打开设置",
+          description: "管理应用设置",
+          shortcut: "Ctrl+,",
           onSelect,
         }]}
       />,
     );
 
-    expect(screen.getByTestId("palette-command")).toHaveTextContent("保存当前笔记");
-    fireEvent.keyDown(screen.getByPlaceholderText("搜索笔记"), { key: "Enter" });
+    expect(screen.getByTestId("palette-command")).toHaveTextContent("打开设置");
+    fireEvent.keyDown(screen.getByPlaceholderText("搜索命令或笔记"), { key: "Enter" });
 
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onSelect).toHaveBeenCalledTimes(1);

@@ -1,30 +1,33 @@
 import { lazy, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, Clock, Loader2, MessageCircle, Paperclip, RefreshCw, Save, Sparkles, Star, Tags } from "lucide-react";
+import { ArrowLeft, Clock, Loader2, Paperclip, Save, Star } from "lucide-react";
 import { useAppStore } from "../stores/appStore";
 import { useItemStore } from "../stores/itemStore";
 import { getVditorLang } from "../utils/vditorConfig";
 import { useToastStore } from "../stores/toastStore";
 import { VersionPanel, type VersionDto } from "../components/editor/VersionPanel";
 import { DocumentOutline, DocumentOutlineToggle } from "../components/editor/DocumentOutline";
+import { EditorDock } from "../components/dock/EditorDock";
+import { AiChatPanel } from "../components/dock/AiChatPanel";
 import type { VditorEditorHandle } from "../components/editor/VditorEditor";
 import { ContentWidthControl } from "../components/common/ContentWidthControl";
-import { answerAiQuestion, generateAiSummary, generateAiTagSuggestions, getVersions, createVersion, updateVersion, restoreVersion, deleteVersion, searchItems, setItemTags, type ItemDto, type SearchResultDto, type SummaryMode } from "../services/tauriCommands";
+import { generateAiSummary, generateAiTagSuggestions, getVersions, createVersion, updateVersion, restoreVersion, deleteVersion, setItemTags, type ItemDto, type SummaryMode } from "../services/tauriCommands";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useResponsiveContentWidth } from "../hooks/useResponsiveContentWidth";
-import { CONTENT_WIDTH_EDITOR_BASE, CONTENT_WIDTH_OUTLINE_LAYOUT } from "../utils/contentWidth";
+import { CONTENT_WIDTH_EDITOR_BASE, getDockReservedWidth } from "../utils/contentWidth";
 import { parseMarkdownOutline } from "../utils/markdownOutline";
 import { useAttachmentStore, type AttachmentDto } from "../stores/attachmentStore";
 import { AttachmentManagerModal } from "../components/common/AttachmentManagerModal";
 import { isImageAttachment, removeAttachmentReferences } from "../utils/markdownAttachments";
-import { Select } from "../components/common/Select";
 import { getAppCommandId, APP_COMMAND_EVENT } from "../utils/appCommands";
 import { copyTextToSystemClipboard } from "../utils/clipboard";
 import { NotePropertiesPanel } from "../components/editor/NotePropertiesPanel";
+import { TagsSection } from "../components/editor/TagsSection";
+import { SummarySection } from "../components/editor/SummarySection";
 import { AiTagSuggestionsModal } from "../components/editor/AiTagSuggestionsModal";
-import { AiKnowledgeModal } from "../components/editor/AiKnowledgeModal";
+import { TagPickerModal } from "../components/common/TagPickerModal";
+import { TagManagerModal } from "../components/common/TagManagerModal";
 import { parseNoteProperties, updateNoteProperties, type NotePropertyUpdates } from "../utils/frontmatter";
-import { TagPill } from "../components/common/TagPill";
 import { useTagStore } from "../stores/tagStore";
 
 const VditorEditor = lazy(() => import("../components/editor/VditorEditor").then((m) => ({ default: m.VditorEditor })));
@@ -44,23 +47,6 @@ function normalizeForVersionCompare(value: string | undefined) {
   return (value ?? "").trimEnd();
 }
 
-function getRelatedQueries(title: string, content: string): string[] {
-  const source = `${title}\n${content}`
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/https?:\/\/\S+/g, " ");
-  const tokens = source.match(/[\p{L}\p{N}_-]{2,}/gu) ?? [];
-  const seen = new Set<string>();
-  return tokens
-    .map((token) => token.trim())
-    .filter((token) => {
-      const key = token.toLowerCase();
-      if (!key || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .slice(0, 3);
-}
-
 interface DocumentEditorPageProps {
   onBackToPreview: () => void | Promise<void>;
   onModalStateChange?: (modalOpen: boolean) => void;
@@ -77,9 +63,10 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
   const theme = useAppStore((s) => s.theme);
   const contentWidthProgress = useSettingsStore((s) => s.settings.contentWidthProgress);
   const showDocumentOutline = useSettingsStore((s) => s.settings.showDocumentOutline);
+  const dockPanelWidth = useSettingsStore((s) => s.settings.dockPanelWidth);
   const updateSetting = useSettingsStore((s) => s.updateSetting);
   const editorWidth = useResponsiveContentWidth<HTMLDivElement>({
-    baseWidth: CONTENT_WIDTH_EDITOR_BASE + (showDocumentOutline ? CONTENT_WIDTH_OUTLINE_LAYOUT : 0),
+    baseWidth: CONTENT_WIDTH_EDITOR_BASE,
     progress: contentWidthProgress,
   });
   const selectedItem = useItemStore((s) => s.selectedItem);
@@ -93,6 +80,8 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
   const deleteAttachment = useAttachmentStore((s) => s.deleteAttachment);
   const itemTags = useTagStore((s) => s.itemTags);
   const fetchItemTags = useTagStore((s) => s.fetchItemTags);
+  const fetchItemTagsRef = useRef(fetchItemTags);
+  fetchItemTagsRef.current = fetchItemTags;
 
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
@@ -110,13 +99,8 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
   const [aiTagSuggestions, setAiTagSuggestions] = useState<string[]>([]);
   const [selectedAiTags, setSelectedAiTags] = useState<string[]>([]);
   const [aiTagModalOpen, setAiTagModalOpen] = useState(false);
-  const [aiKnowledgeModalOpen, setAiKnowledgeModalOpen] = useState(false);
-  const [aiQuestion, setAiQuestion] = useState("");
-  const [aiAnswer, setAiAnswer] = useState("");
-  const [aiAnswering, setAiAnswering] = useState(false);
-  const [relatedNotes, setRelatedNotes] = useState<SearchResultDto[]>([]);
-  const [relatedLoading, setRelatedLoading] = useState(false);
-  const [relatedSearched, setRelatedSearched] = useState(false);
+  const [tagPickerOpen, setTagPickerOpen] = useState(false);
+  const [tagManagerOpen, setTagManagerOpen] = useState(false);
   const [activeHeadingIndex, setActiveHeadingIndex] = useState(-1);
   const editorRef = useRef<VditorEditorHandle>(null);
   const editorViewportRef = useRef<HTMLDivElement>(null);
@@ -202,9 +186,9 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
 
   // 通知父组件版本面板状态变化
   useEffect(() => {
-    onModalStateChange?.(versionPanelOpen || attachmentModalOpen || aiTagModalOpen || aiKnowledgeModalOpen);
+    onModalStateChange?.(versionPanelOpen || attachmentModalOpen || aiTagModalOpen || tagPickerOpen || tagManagerOpen);
     return () => { onModalStateChange?.(false); };
-  }, [versionPanelOpen, attachmentModalOpen, aiTagModalOpen, aiKnowledgeModalOpen, onModalStateChange]);
+  }, [versionPanelOpen, attachmentModalOpen, aiTagModalOpen, tagPickerOpen, tagManagerOpen, onModalStateChange]);
 
   // 组件卸载时清理防抖定时器
   useEffect(() => {
@@ -231,16 +215,15 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
 
   useEffect(() => {
     if (!selectedItemId) return;
-    fetchItemTags(selectedItemId).catch(() => {});
+    fetchItemTagsRef.current(selectedItemId).catch(() => {});
     setAiTagModalOpen(false);
+    setTagPickerOpen(false);
+    setTagManagerOpen(false);
     setAiTagSuggestions([]);
     setSelectedAiTags([]);
-    setAiKnowledgeModalOpen(false);
-    setAiQuestion("");
-    setAiAnswer("");
-    setRelatedNotes([]);
-    setRelatedSearched(false);
-  }, [selectedItemId, fetchItemTags]);
+    // fetchItemTags 经 ref 调用而非入依赖：避免其引用抖动把本 effect 误判为
+    // "切换笔记"，从而清空用户正在输入的 AI 问答内容。
+  }, [selectedItemId]);
 
   useEffect(() => {
     if (!selectedItem) return;
@@ -478,79 +461,19 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
     }
   }
 
-  async function handleAskAiQuestion() {
-    if (aiAnswering || !selectedItemId) return;
-    const question = aiQuestion.trim();
-    if (!question) {
-      useToastStore.getState().addToast("error", t("document:aiQuestionEmpty"));
-      return;
-    }
-    if (!latestTitle.current.trim() && !latestContent.current.trim()) {
-      useToastStore.getState().addToast("error", t("document:aiQuestionNoContent"));
-      return;
-    }
-    if (!(await flushSave())) return;
-
-    setAiAnswering(true);
-    try {
-      const answer = await answerAiQuestion(latestTitle.current, latestContent.current, question);
-      setAiAnswer(answer);
-    } catch (error) {
-      console.error("AI question answering failed:", error);
-      useToastStore.getState().addToast("error", t("common:toast.aiQuestionFailed"));
-    } finally {
-      setAiAnswering(false);
-    }
-  }
-
-  async function handleFindRelatedNotes() {
-    if (relatedLoading || !selectedItemId) return;
-    const queries = getRelatedQueries(latestTitle.current, latestContent.current);
-    if (queries.length === 0) {
-      setRelatedNotes([]);
-      setRelatedSearched(true);
-      useToastStore.getState().addToast("info", t("document:relatedNotesEmpty"));
-      return;
-    }
-
-    setRelatedLoading(true);
-    setRelatedSearched(false);
-    try {
-      const pages = await Promise.all(
-        queries.map((query) => searchItems(query, undefined, {
-          scopes: ["content"],
-          limit: 8,
-          offset: 0,
-        })),
-      );
-      const ranked = new Map<string, { result: SearchResultDto; score: number }>();
-      pages.forEach((page) => {
-        page.results.forEach((result) => {
-          if (result.id === selectedItemId) return;
-          const current = ranked.get(result.id);
-          ranked.set(result.id, {
-            result,
-            score: (current?.score ?? 0) + 1,
-          });
-        });
+  async function handleTagChange(tagNames: string[]) {
+    if (!selectedItemId) return;
+    const seen = new Set<string>();
+    const nextTags = tagNames
+      .map((tag) => tag.trim())
+      .filter((tag) => {
+        const key = tag.toLowerCase();
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
       });
-      const notes = [...ranked.values()]
-        .sort((left, right) => right.score - left.score || left.result.title.localeCompare(right.result.title))
-        .slice(0, 6)
-        .map(({ result }) => result);
-      setRelatedNotes(notes);
-      setRelatedSearched(true);
-      if (notes.length === 0) {
-        useToastStore.getState().addToast("info", t("document:relatedNotesEmpty"));
-      }
-    } catch (error) {
-      console.error("Finding related notes failed:", error);
-      setRelatedNotes([]);
-      setRelatedSearched(true);
-      useToastStore.getState().addToast("error", t("common:toast.relatedNotesFailed"));
-    } finally {
-      setRelatedLoading(false);
-    }
+    await setItemTags(selectedItemId, nextTags);
+    await fetchItemTags(selectedItemId);
   }
 
   async function handleBack() {
@@ -712,6 +635,60 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
       || normalizeForVersionCompare(content) !== normalizeForVersionCompare(latestVersionContent));
 
   return (
+    <div
+      className={`flex h-full min-h-0 flex-col ${showDocumentOutline ? "lg:pr-[var(--dock-reserved)]" : ""}`}
+      style={showDocumentOutline ? ({ "--dock-reserved": `${getDockReservedWidth(dockPanelWidth)}px` } as React.CSSProperties) : undefined}
+    >
+      {/* 应用级右侧 dock：面板 + 贴右缘图标列（AI 问答为独立入口） */}
+      <EditorDock
+        variant="page"
+        panels={{
+          properties: <NotePropertiesPanel properties={properties} onChange={handlePropertiesChange} />,
+          tags: (
+            <TagsSection
+              tags={itemTags}
+              aiGenerating={aiTagGenerating}
+              canGenerate={Boolean(title.trim() || content.trim())}
+              onGenerate={() => { void handleGenerateAiTagSuggestions(); }}
+              onManageTags={() => setTagPickerOpen(true)}
+              onRemoveTag={(name) => { void handleTagChange(itemTags.filter((tag) => tag.name !== name).map((tag) => tag.name)); }}
+            />
+          ),
+          summary: (
+            <SummarySection
+              summary={summary}
+              onSummaryChange={handleSummaryChange}
+              summaryMode={summaryMode}
+              onSummaryModeChange={handleSummaryModeChange}
+              aiGenerating={aiGenerating}
+              canGenerate={Boolean(title.trim() || content.trim())}
+              onRegenerate={() => { void handleRegenerateSummary(); }}
+              onGenerateAi={() => { void handleGenerateAiSummary(); }}
+            />
+          ),
+          outline: (
+            <DocumentOutline
+              headings={outline}
+              visible
+              onToggle={() => updateSetting("showDocumentOutline", false)}
+              activeIndex={activeHeadingIndex}
+              onSelect={(index) => {
+                setActiveHeadingIndex(index);
+                editorRef.current?.scrollToHeading(index);
+              }}
+              showToggle={false}
+              className="min-h-0 flex-1"
+            />
+          ),
+          chat: (
+            <AiChatPanel
+              itemId={selectedItemId ?? ""}
+              title={title}
+              content={content}
+            />
+          ),
+        }}
+      />
     <div ref={editorWidth.ref} style={editorWidth.style} className="mx-auto flex h-full min-h-0 w-full max-w-4xl flex-col bg-[var(--app-bg)] p-2 sm:p-4" data-testid="document-editor-content">
       {/* Top toolbar: preview + title + actions */}
       <div className="mb-2 flex shrink-0 items-center gap-2 sm:mb-3" data-testid="document-editor-toolbar">
@@ -767,7 +744,7 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto lg:h-full lg:flex-row lg:overflow-hidden" data-testid="document-editor-main">
         {/* Editor */}
-        <article className="flex min-h-[24rem] min-w-0 flex-col rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3 sm:rounded-3xl sm:p-4 lg:h-full lg:min-h-0 lg:flex-1" data-testid="document-editor-article">
+        <article className="flex min-h-[24rem] min-w-0 flex-col px-4 pb-4 pt-3 sm:px-5 sm:pb-5 sm:pt-4 lg:h-full lg:min-h-0 lg:flex-1" data-testid="document-editor-article">
           <div ref={editorViewportRef} className="h-full min-h-0 flex-1 overflow-hidden">
             <Suspense fallback={<div className="flex h-full items-center justify-center text-[var(--muted)]"><Loader2 className="mr-2 h-4 w-4" />{t("document:loadingEditor")}</div>}>
               <VditorEditor
@@ -784,117 +761,6 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
             </Suspense>
           </div>
         </article>
-
-        {/* Note properties, summary and outline */}
-        <aside className="flex min-h-0 min-w-0 flex-col gap-3 lg:sticky lg:top-0 lg:h-full lg:overflow-y-auto lg:w-[18rem] lg:shrink-0" data-testid="document-editor-sidebar">
-          <NotePropertiesPanel properties={properties} onChange={handlePropertiesChange} />
-          {showDocumentOutline && <>
-            <section className="shrink-0 rounded-2xl border border-[var(--line)] bg-transparent p-3" data-testid="doc-tags-section">
-              <div className="mb-2 flex items-center gap-2">
-                <Tags className="h-4 w-4 text-[var(--muted)]" />
-                <h2 className="text-sm font-semibold text-[var(--text)]">{t("document:aiTagsLabel")}</h2>
-              </div>
-              <div className="mb-3 flex min-h-6 flex-wrap gap-1.5">
-                {itemTags.length > 0
-                  ? itemTags.map((tag) => <TagPill key={tag.name} tag={tag} />)
-                  : <span className="text-xs text-[var(--muted)]">{t("document:aiTagsNone")}</span>}
-              </div>
-              <button
-                className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-xl border border-[var(--line)] px-3 text-xs text-[var(--muted)] transition-colors hover:border-[var(--accent)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-50"
-                type="button"
-                data-testid="doc-ai-tags-btn"
-                disabled={aiTagGenerating || (!title.trim() && !content.trim())}
-                onClick={() => { void handleGenerateAiTagSuggestions(); }}
-              >
-                {aiTagGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                {t(aiTagGenerating ? "document:aiTagsGenerating" : "document:aiTagsSuggest")}
-              </button>
-              <button
-                className="mt-2 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-xl border border-[var(--line)] px-3 text-xs text-[var(--muted)] transition-colors hover:border-[var(--accent)] hover:text-[var(--text)]"
-                type="button"
-                data-testid="doc-ai-knowledge-btn"
-                onClick={() => setAiKnowledgeModalOpen(true)}
-              >
-                <MessageCircle className="h-3.5 w-3.5" />
-                {t("document:aiKnowledge")}
-              </button>
-              <p className="mt-2 text-[11px] leading-relaxed text-[var(--muted)]">{t("document:aiTagsPrivacyHint")}</p>
-            </section>
-            <section className="shrink-0 rounded-2xl border border-[var(--line)] bg-transparent p-3">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <label className="block text-sm font-semibold text-[var(--text)]" htmlFor="doc-summary-input">
-                {t("document:summaryLabel")}
-              </label>
-              <span className="rounded-full bg-[var(--field)] px-2 py-0.5 text-[10px] text-[var(--muted)]" data-testid="doc-summary-mode-badge">
-                {t(summaryMode === "auto" ? "document:summaryAuto" : "document:summaryManual")}
-              </span>
-            </div>
-            <textarea
-              id="doc-summary-input"
-              className="h-24 min-h-24 max-h-24 w-full resize-none overflow-y-auto rounded-xl border border-transparent bg-transparent px-3 py-2 text-sm leading-relaxed text-[var(--text)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent)]"
-              data-testid="doc-summary-input"
-              value={summary}
-              onChange={(e) => handleSummaryChange(e.currentTarget.value)}
-              placeholder={t("document:summaryPlaceholder")}
-              rows={4}
-            />
-            <div className="mt-2 space-y-2">
-              <label className="block text-xs text-[var(--muted)]">
-                <span className="mb-1 block">{t("document:summaryModeLabel")}</span>
-                <span data-testid="doc-summary-mode-select">
-                  <Select
-                    value={summaryMode}
-                    onChange={handleSummaryModeChange}
-                    options={[
-                      { value: "auto", label: t("document:summaryAuto") },
-                      { value: "manual", label: t("document:summaryManual") },
-                    ]}
-                  />
-                </span>
-              </label>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <button
-                  className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-xl border border-[var(--line)] px-3 text-xs text-[var(--muted)] transition-colors hover:border-[var(--accent)] hover:text-[var(--text)]"
-                  type="button"
-                  data-testid="doc-summary-regenerate-btn"
-                  onClick={() => { void handleRegenerateSummary(); }}
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  {t("document:summaryRegenerate")}
-                </button>
-                <button
-                  className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-xl border border-[var(--line)] px-3 text-xs text-[var(--muted)] transition-colors hover:border-[var(--accent)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-50"
-                  type="button"
-                  data-testid="doc-ai-summary-btn"
-                  disabled={aiGenerating || (!title.trim() && !content.trim())}
-                  onClick={() => { void handleGenerateAiSummary(); }}
-                >
-                  {aiGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                  {t(aiGenerating ? "document:aiSummaryGenerating" : "document:aiSummary")}
-                </button>
-              </div>
-              <p className="text-[11px] leading-relaxed text-[var(--muted)]">
-                {t("document:aiSummaryHint")}
-              </p>
-              <p className="text-[11px] leading-relaxed text-[var(--muted)]">
-                {t(summaryMode === "auto" ? "document:summaryAutoHint" : "document:summaryManualHint")}
-              </p>
-            </div>
-            </section>
-            <DocumentOutline
-            headings={outline}
-            visible
-            onToggle={() => updateSetting("showDocumentOutline", false)}
-            activeIndex={activeHeadingIndex}
-            onSelect={(index) => {
-              setActiveHeadingIndex(index);
-              editorRef.current?.scrollToHeading(index);
-            }}
-            showToggle={false}
-            className="lg:min-h-32 lg:flex-none"
-            />
-          </>}
-        </aside>
       </div>
 
       {/* Bottom status bar */}
@@ -959,19 +825,24 @@ export function DocumentEditorPage({ onBackToPreview, onModalStateChange }: Docu
         onToggle={toggleAiTag}
         onApply={() => { void handleApplyAiTags(); }}
       />
-      <AiKnowledgeModal
-        open={aiKnowledgeModalOpen}
-        question={aiQuestion}
-        answer={aiAnswer}
-        answering={aiAnswering}
-        relatedNotes={relatedNotes}
-        relatedLoading={relatedLoading}
-        relatedSearched={relatedSearched}
-        onClose={() => setAiKnowledgeModalOpen(false)}
-        onQuestionChange={setAiQuestion}
-        onAsk={() => { void handleAskAiQuestion(); }}
-        onFindRelated={() => { void handleFindRelatedNotes(); }}
+      <TagPickerModal
+        open={tagPickerOpen}
+        onClose={() => setTagPickerOpen(false)}
+        selectedTags={itemTags.map((tag) => tag.name)}
+        onChange={(tags) => { void handleTagChange(tags); }}
+        onOpenManager={() => {
+          setTagPickerOpen(false);
+          setTagManagerOpen(true);
+        }}
       />
+      <TagManagerModal
+        open={tagManagerOpen}
+        onClose={() => {
+          setTagManagerOpen(false);
+          if (selectedItemId) fetchItemTags(selectedItemId).catch(() => {});
+        }}
+      />
+    </div>
     </div>
   );
 }

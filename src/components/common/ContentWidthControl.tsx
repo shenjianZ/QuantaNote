@@ -15,6 +15,8 @@ import {
 
 interface ContentWidthControlProps {
   compact?: boolean;
+  /** sm = h-8 w-8，与阅读抽屉顶栏按钮对齐；默认 h-9 w-9 */
+  size?: "sm" | "md";
   testId?: string;
 }
 
@@ -49,7 +51,7 @@ function getCompactPanelPosition(trigger: HTMLElement): PopoverPosition {
   };
 }
 
-export function ContentWidthControl({ compact = false, testId = "content-width-control" }: ContentWidthControlProps) {
+export function ContentWidthControl({ compact = false, size = "md", testId = "content-width-control" }: ContentWidthControlProps) {
   const { t } = useTranslation(["settings"]);
   const value = clampContentWidthProgress(useSettingsStore((s) => s.settings.contentWidthProgress));
   const controlValue = toContentWidthControlProgress(value);
@@ -158,7 +160,7 @@ export function ContentWidthControl({ compact = false, testId = "content-width-c
       <div className="relative shrink-0" data-testid={testId}>
         <button
           ref={triggerRef}
-          className="grid h-9 w-9 cursor-pointer list-none place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)] [&::-webkit-details-marker]:hidden"
+          className={`grid ${size === "sm" ? "h-8 w-8" : "h-9 w-9"} cursor-pointer list-none place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--text)] [&::-webkit-details-marker]:hidden`}
           type="button"
           aria-label={t("settings:contentWidth.open")}
           aria-expanded={compactOpen}

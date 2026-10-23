@@ -18,17 +18,18 @@ describe("Empty and error states", () => {
     await LibraryPage.expectEmptyState();
   });
 
-  it("command palette shows empty prompt with no query", async () => {
+  it("command palette shows commands with no query", async () => {
     await CommandPalette.open();
-    const msg = await $("//*[contains(., '输入关键词搜索笔记')]");
-    await expect(msg).toBeDisplayed();
+    await expect($("[data-testid='palette-command']")).toBeDisplayed();
+    const commands = await CommandPalette.getCommandTexts();
+    expect(commands.some((text) => text.includes("新建笔记"))).toBe(true);
     await CommandPalette.close();
   });
 
   it("command palette shows no match message", async () => {
     await CommandPalette.open();
     await CommandPalette.search("xyznonexistent123");
-    const msg = await $("//*[contains(., '没有匹配的笔记')]");
+    const msg = await $("//*[contains(., '没有匹配的命令或笔记')]");
     await expect(msg).toBeDisplayed();
     await CommandPalette.close();
   });

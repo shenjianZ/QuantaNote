@@ -114,7 +114,7 @@ describe("Document editor", () => {
     expect(await DocumentEditorPage.hasAiTagsButton()).toBe(true);
   });
 
-  it("shows the explicitly triggered AI knowledge control", async () => {
+  it("shows the AI chat dock panel as a dedicated entry", async () => {
     expect(await DocumentEditorPage.hasAiKnowledgeButton()).toBe(true);
   });
 
@@ -850,16 +850,17 @@ describe("Document editor", () => {
     );
   });
 
-  it("keeps the summary textarea fixed-size", async () => {
+  it("keeps the summary textarea elastic with a fixed minimum in its tab", async () => {
+    await DocumentEditorPage.activateSidebarTab("summary");
     const style = await browser.execute(() => {
       const input = document.querySelector("[data-testid='doc-summary-input']");
       if (!input) throw new Error("Summary input not found");
       const computed = window.getComputedStyle(input);
-      return { height: computed.height, minHeight: computed.minHeight, maxHeight: computed.maxHeight, resize: computed.resize };
+      return { minHeight: computed.minHeight, maxHeight: computed.maxHeight, resize: computed.resize };
     });
 
-    expect(style.height).toBe(style.minHeight);
-    expect(style.height).toBe(style.maxHeight);
+    expect(style.minHeight).toBe("96px");
+    expect(style.maxHeight).toBe("none");
     expect(style.resize).toBe("none");
   });
 
@@ -1141,6 +1142,8 @@ describe("Document editor", () => {
     await DocumentEditorPage.clickBack();
     await expect($("[data-testid='reader-drawer']")).toBeDisplayed();
     await expect($("[data-testid='reader-preview-layout']")).toBeDisplayed();
+    // 预览态 dock 的目录面板（与编辑器共享 EditorDock）
+    await DocumentEditorPage.activateSidebarTab("outline");
     await expect($("[data-testid='document-outline']")).toBeDisplayed();
     expect(await LibraryPage.getContentWidth()).toBe("37");
     expect(await LibraryPage.getContentAreaWidth()).toBeGreaterThan(0);

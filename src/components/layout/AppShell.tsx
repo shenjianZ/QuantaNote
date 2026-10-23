@@ -8,7 +8,7 @@ interface AppShellProps {
   children: ReactNode;
   currentPage: AppPage;
   onNavigate: (page: AppPage) => void;
-  onOpenSearch: () => void;
+  onOpenCommandPalette: () => void;
   onNewNote?: () => void;
   itemCount?: number;
 }
@@ -17,7 +17,7 @@ export function AppShell({
   children,
   currentPage,
   onNavigate,
-  onOpenSearch,
+  onOpenCommandPalette,
   onNewNote,
   itemCount,
 }: AppShellProps) {
@@ -29,7 +29,7 @@ export function AppShell({
         <TopBar
           currentPage={currentPage}
           onNavigate={onNavigate}
-          onOpenSearch={onOpenSearch}
+          onOpenCommandPalette={onOpenCommandPalette}
         />
         <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
         {/* 桌面端显示 StatusBar，移动端显示 BottomTabBar */}

@@ -5,7 +5,7 @@ import { listen } from "@tauri-apps/api/event";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { availableMonitors, getCurrentWindow, primaryMonitor } from "@tauri-apps/api/window";
 import { PhysicalPosition } from "@tauri-apps/api/dpi";
-import { Copy, FileImage, FileText, History, Paperclip, Plus, Save, Settings2 } from "lucide-react";
+import { Archive, CalendarDays, Copy, FileImage, FileText, History, Home, Paperclip, Plus, Save, Settings2 } from "lucide-react";
 import { AppShell } from "../components/layout/AppShell";
 import { CommandPalette, type CommandPaletteCommand } from "../components/search/CommandPalette";
 import { ToastContainer } from "../components/common/ToastContainer";
@@ -37,7 +37,7 @@ import { getBuiltInTemplates, materializeTemplateContent } from "../templates/bu
 import { getDailyNote } from "../services/tauriCommands";
 import type { TemplateDto } from "../services/tauriCommands";
 import type { AppPage, Item } from "../types";
-import { parseDateKey } from "../utils/dailyNotes";
+import { formatDateKey, parseDateKey } from "../utils/dailyNotes";
 import i18n from "../i18n";
 import { DEFAULT_NOTE_PROPERTIES } from "../utils/frontmatter";
 import "../styles/themes.css";
@@ -429,6 +429,20 @@ export function QuantaNoteApp() {
                 onSelect: handleCreateNote,
             },
             {
+                id: "open-workspace",
+                label: i18n.t("command-palette:commands.openWorkspace"),
+                description: i18n.t("command-palette:commands.openWorkspaceDesc"),
+                icon: Home,
+                onSelect: () => navigate("workspace"),
+            },
+            {
+                id: "open-library",
+                label: i18n.t("command-palette:commands.openLibrary"),
+                description: i18n.t("command-palette:commands.openLibraryDesc"),
+                icon: Archive,
+                onSelect: () => navigate("library"),
+            },
+            {
                 id: "open-settings",
                 label: i18n.t("command-palette:commands.openSettings"),
                 description: i18n.t("command-palette:commands.openSettingsDesc"),
@@ -439,9 +453,20 @@ export function QuantaNoteApp() {
                     navigate("settings");
                 },
             },
+            {
+                id: "open-today-note",
+                label: i18n.t("command-palette:commands.openTodayNote"),
+                description: i18n.t("command-palette:commands.openTodayNoteDesc"),
+                icon: CalendarDays,
+                onSelect: () => handleOpenDailyNote(formatDateKey(new Date())),
+            },
         ];
 
-        if (currentPage === "document") {
+        const hasActiveNote = Boolean(selectedItemId) && (
+            currentPage === "document" || (currentPage === "library" && readerOpen)
+        );
+
+        if (hasActiveNote && currentPage === "document") {
             commands.unshift(
                 {
                     id: "save-note",
@@ -475,7 +500,7 @@ export function QuantaNoteApp() {
             );
         }
 
-        if (selectedItemId && (currentPage === "document" || currentPage === "library")) {
+        if (hasActiveNote) {
             commands.push({
                 id: "copy-note",
                 label: i18n.t("command-palette:commands.copyNote"),
@@ -494,7 +519,7 @@ export function QuantaNoteApp() {
             }
         }
         return commands;
-    }, [currentPage, handleCopyCurrentNote, handleCreateNote, navigate, selectedItemId, setSettingsSection, shortcutBindings]);
+    }, [currentPage, handleCopyCurrentNote, handleCreateNote, handleOpenDailyNote, navigate, readerOpen, selectedItemId, setSettingsSection, shortcutBindings]);
 
     const handleQuickCreate = useCallback(
         async (content: string) => {
@@ -976,7 +1001,7 @@ export function QuantaNoteApp() {
         <AppShell
             currentPage={currentPage as AppPage}
             onNavigate={navigate}
-            onOpenSearch={openPalette}
+            onOpenCommandPalette={openPalette}
             onNewNote={handleCreateNote}
             itemCount={dbItems.length}
         >

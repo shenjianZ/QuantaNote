@@ -61,7 +61,6 @@ describe("DocumentEditorPage", () => {
   };
   let setItemTagsArgs: unknown = null;
   let aiTagSuggestionCalls = 0;
-  let aiAnswerCalls = 0;
   let relatedSearchCalls = 0;
 
   beforeEach(() => {
@@ -83,7 +82,6 @@ describe("DocumentEditorPage", () => {
     };
     setItemTagsArgs = null;
     aiTagSuggestionCalls = 0;
-    aiAnswerCalls = 0;
     relatedSearchCalls = 0;
 
     useAppStore.setState({ selectedItemId: "item-1", theme: "light" });
@@ -106,7 +104,12 @@ describe("DocumentEditorPage", () => {
       regenerateSummary: regenerateSummaryMock,
     });
     useSettingsStore.setState((state) => ({
-      settings: { ...state.settings, contentWidthProgress: 0 },
+      settings: {
+        ...state.settings,
+        contentWidthProgress: 0,
+        showDocumentOutline: true,
+        editorSidebarTab: "outline",
+      },
     }));
     useAttachmentStore.setState({ attachments: [], loading: false, error: null });
     useTagStore.setState({ itemTags: [], fetchItemTags: vi.fn(async () => {}) });
@@ -121,9 +124,19 @@ describe("DocumentEditorPage", () => {
         aiTagSuggestionCalls += 1;
         return ["rust", "tauri"];
       }
-      if (cmd === "answer_ai_question") {
-        aiAnswerCalls += 1;
-        return "这是基于笔记的回答";
+      if (cmd === "list_ai_chat_sessions") {
+        return [
+          { id: "sess-1", itemId: args?.itemId ?? "item-1", title: "测试会话", model: "", systemPrompt: "", temperature: null, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" },
+        ];
+      }
+      if (cmd === "get_ai_chat_messages") {
+        return [
+          { id: "chat-1", itemId: "item-1", sessionId: String(args?.sessionId ?? ""), role: "user", content: "已有问题", createdAt: "2026-01-01T00:00:00Z" },
+          { id: "chat-2", itemId: "item-1", sessionId: String(args?.sessionId ?? ""), role: "assistant", content: "已有回答", createdAt: "2026-01-01T00:00:01Z" },
+        ];
+      }
+      if (cmd === "get_ai_chat_summary") {
+        return { sessionId: String(args?.sessionId ?? ""), summary: "", summarizedUntil: "" };
       }
       if (cmd === "search_items") {
         relatedSearchCalls += 1;
@@ -151,17 +164,19 @@ describe("DocumentEditorPage", () => {
     expect(input.value).toBe("测试文档");
   });
 
-  it("loads summary from selectedItem", () => {
-    setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
+  it("loads summary from selectedItem", async () => {
+    const { user } = setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
+    await user.click(screen.getByTestId("editor-sidebar-tab-summary"));
     const input = screen.getByPlaceholderText("摘要") as HTMLTextAreaElement;
     expect(input.value).toBe("初始摘要");
   });
 
-  it("keeps the summary input at a fixed height", () => {
-    setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
+  it("keeps the summary textarea elastic inside its sidebar tab", async () => {
+    const { user } = setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
+    await user.click(screen.getByTestId("editor-sidebar-tab-summary"));
     const input = screen.getByPlaceholderText("摘要");
 
-    expect(input).toHaveClass("h-24", "min-h-24", "max-h-24", "resize-none");
+    expect(input).toHaveClass("min-h-24", "flex-1", "resize-none");
   });
 
   it("refreshes same-id selectedItem updates", async () => {
@@ -213,19 +228,24 @@ describe("DocumentEditorPage", () => {
     const toolbar = screen.getByTestId("document-editor-toolbar");
     expect(toolbar).toContainElement(screen.getByTestId("doc-title-input"));
     expect(toolbar).not.toHaveTextContent("字");
-    expect(screen.getByTestId("document-editor-sidebar")).toBeInTheDocument();
-    expect(screen.getByText("描述")).toBeInTheDocument();
+    expect(screen.getByTestId("editor-dock")).toBeInTheDocument();
+    expect(screen.getByTestId("editor-sidebar-tab-outline")).toHaveAttribute("aria-selected", "true");
     expect(await screen.findByTestId("document-outline-item-1")).toHaveTextContent("二级标题");
 
     await user.click(screen.getByTestId("document-outline-item-1"));
     expect(scrollToHeadingMock).toHaveBeenCalledWith(1);
 
-    await user.click(screen.getByTestId("document-outline-toggle"));
+    await user.click(screen.getByTestId("editor-sidebar-tab-summary"));
+    expect(screen.getByPlaceholderText("摘要")).toBeInTheDocument();
+    expect(useSettingsStore.getState().settings.editorSidebarTab).toBe("summary");
     expect(screen.queryByTestId("document-outline-item-1")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("document-outline-toggle"));
+    expect(screen.queryByTestId("editor-dock")).not.toBeInTheDocument();
     expect(useSettingsStore.getState().settings.showDocumentOutline).toBe(false);
 
     await user.click(screen.getByTestId("document-outline-toggle"));
-    expect(await screen.findByTestId("document-outline-item-1")).toBeInTheDocument();
+    expect(await screen.findByTestId("editor-dock")).toBeInTheDocument();
   });
 
   it("shows saving status after edit", async () => {
@@ -264,6 +284,7 @@ describe("DocumentEditorPage", () => {
 
   it("auto-saves summary edits", async () => {
     const { user } = setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
+    await user.click(screen.getByTestId("editor-sidebar-tab-summary"));
     const input = screen.getByPlaceholderText("摘要");
 
     await user.clear(input);
@@ -288,6 +309,7 @@ describe("DocumentEditorPage", () => {
       summary_mode: "auto",
     });
     const { user } = setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
+    await user.click(screen.getByTestId("editor-sidebar-tab-summary"));
     const modeSelect = screen.getByTestId("doc-summary-mode-select");
 
     await user.click(within(modeSelect).getByRole("button"));
@@ -308,6 +330,7 @@ describe("DocumentEditorPage", () => {
 
   it("generates an AI summary only after an explicit click and saves it manually", async () => {
     const { user } = setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
+    await user.click(screen.getByTestId("editor-sidebar-tab-summary"));
 
     await user.click(screen.getByTestId("doc-ai-summary-btn"));
     await waitFor(() => expect(screen.getByTestId("doc-summary-input")).toHaveValue("AI 生成的摘要"));
@@ -323,6 +346,7 @@ describe("DocumentEditorPage", () => {
 
   it("previews AI tag suggestions and applies only the selected additions", async () => {
     const { user } = setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
+    await user.click(screen.getByTestId("editor-sidebar-tab-tags"));
 
     expect(aiTagSuggestionCalls).toBe(0);
     await user.click(screen.getByTestId("doc-ai-tags-btn"));
@@ -338,21 +362,18 @@ describe("DocumentEditorPage", () => {
     expect(setItemTagsArgs).toEqual({ itemId: "item-1", tagNames: ["rust"] });
   });
 
-  it("answers an explicit question and finds related notes locally", async () => {
+  it("shows the AI chat dock panel with persisted history and finds related notes locally", async () => {
     const { user } = setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
+    await user.click(screen.getByTestId("editor-sidebar-tab-chat"));
 
-    expect(aiAnswerCalls).toBe(0);
+    // 历史消息从数据库加载（get_ai_chat_messages）
+    expect(await screen.findByTestId("doc-ai-chat-user-message")).toHaveTextContent("已有问题");
+    expect(screen.getAllByTestId("doc-ai-chat-assistant-message").length).toBeGreaterThan(0);
+
+    // 相关笔记为本地检索，不触发 AI
     expect(relatedSearchCalls).toBe(0);
-    await user.click(screen.getByTestId("doc-ai-knowledge-btn"));
-    await user.type(screen.getByTestId("ai-question-input"), "关键结论是什么？");
-    await user.click(screen.getByTestId("ai-ask-btn"));
-
-    await waitFor(() => expect(screen.getByTestId("ai-answer")).toHaveTextContent("这是基于笔记的回答"));
-    expect(aiAnswerCalls).toBe(1);
-    expect(relatedSearchCalls).toBe(0);
-
-    await user.click(screen.getByTestId("related-notes-btn"));
-    await waitFor(() => expect(screen.getByTestId("related-note-0")).toHaveTextContent("相关笔记"));
+    await user.click(screen.getByTestId("doc-ai-chat-related-btn"));
+    await waitFor(() => expect(screen.getAllByTestId("doc-ai-chat-related-note").length).toBeGreaterThan(0));
     expect(relatedSearchCalls).toBeGreaterThan(0);
   });
 
@@ -382,6 +403,7 @@ describe("DocumentEditorPage", () => {
     };
 
     const { user } = setup(<DocumentEditorPage onBackToPreview={onBackToPreview} />);
+    await user.click(screen.getByTestId("editor-sidebar-tab-summary"));
     await user.click(screen.getByTestId("doc-version-toggle"));
     await user.click(await screen.findByTestId("version-panel-view-btn"));
     await user.click(screen.getByTestId("version-restore-btn"));

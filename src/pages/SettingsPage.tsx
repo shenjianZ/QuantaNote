@@ -29,7 +29,7 @@ import { ImportModal } from "../components/common/ImportModal";
 import { Select } from "../components/common/Select";
 import { SyncSettingsPanel } from "../components/sync/SyncSettingsPanel";
 import { ContentWidthControl } from "../components/common/ContentWidthControl";
-import { useSettingsStore } from "../stores/settingsStore";
+import { useSettingsStore, clampDockPanelWidth, DOCK_PANEL_WIDTH_MIN, DOCK_PANEL_WIDTH_MAX } from "../stores/settingsStore";
 import { useAppStore } from "../stores/appStore";
 import { useToastStore } from "../stores/toastStore";
 import { useUpdaterStore } from "../stores/updaterStore";
@@ -412,6 +412,30 @@ export function SettingsPage({
                                 t("settings:documentOutline.enabled"),
                             )}
                         </div>
+                        <div className="mt-3">
+                            <div className={rowClass}>
+                                <span className="text-sm text-[var(--text)]">
+                                    {t("settings:documentOutline.panelWidth")}
+                                </span>
+                                <span className="text-xs tabular-nums text-[var(--muted)]">
+                                    {settings.dockPanelWidth} px
+                                </span>
+                            </div>
+                            <input
+                                className="mt-1 w-full accent-[var(--accent)]"
+                                type="range"
+                                min={DOCK_PANEL_WIDTH_MIN}
+                                max={DOCK_PANEL_WIDTH_MAX}
+                                step={8}
+                                value={settings.dockPanelWidth}
+                                data-testid="settings-dock-panel-width-slider"
+                                aria-label={t("settings:documentOutline.panelWidth")}
+                                onChange={(event) => updateSetting(
+                                    "dockPanelWidth",
+                                    clampDockPanelWidth(event.currentTarget.value),
+                                )}
+                            />
+                        </div>
                     </section>
                     <section className="mb-6">
                         <h2 className="mb-1 text-sm font-semibold text-[var(--text)]">
@@ -761,14 +785,11 @@ export function SettingsPage({
                             })}
                         </div>
                         {autoBackupConfig?.enabled && (
-                            <>
-                                <div className={rowClass}>
-                                    <span className="text-sm text-[var(--text)]">
-                                        {t("settings:data.backupInterval")}
-                                    </span>
-                                    <div className="flex items-center gap-2">
+                            <div className="grid grid-cols-3 gap-3 border-b border-[var(--line)] py-3">
+                                <label className="block text-xs text-[var(--muted)]">
+                                    <span className="mb-1 block">{t("settings:data.backupInterval")}</span>
+                                    <span className="flex items-center gap-1.5">
                                         <Select
-                                            className="w-20"
                                             options={Array.from({ length: 30 }, (_, i) => ({
                                                 value: String(i + 1),
                                                 label: String(i + 1),
@@ -781,16 +802,13 @@ export function SettingsPage({
                                                 })
                                             }
                                         />
-                                        <span className="text-sm text-[var(--muted)]">{t("settings:data.days")}</span>
-                                    </div>
-                                </div>
-                                <div className={rowClass}>
-                                    <span className="text-sm text-[var(--text)]">
-                                        {t("settings:data.maxBackups")}
+                                        <span className="shrink-0 text-sm text-[var(--muted)]">{t("settings:data.days")}</span>
                                     </span>
-                                    <div className="flex items-center gap-2">
+                                </label>
+                                <label className="block text-xs text-[var(--muted)]">
+                                    <span className="mb-1 block">{t("settings:data.maxBackups")}</span>
+                                    <span className="flex items-center gap-1.5">
                                         <Select
-                                            className="w-20"
                                             options={[5, 10, 20, 50, 100].map((n) => ({
                                                 value: String(n),
                                                 label: String(n),
@@ -803,16 +821,13 @@ export function SettingsPage({
                                                 })
                                             }
                                         />
-                                        <span className="text-sm text-[var(--muted)]">{t("settings:data.backupsUnit")}</span>
-                                    </div>
-                                </div>
-                                <div className={rowClass}>
-                                    <span className="text-sm text-[var(--text)]">
-                                        {t("settings:data.expireDays")}
+                                        <span className="shrink-0 text-sm text-[var(--muted)]">{t("settings:data.backupsUnit")}</span>
                                     </span>
-                                    <div className="flex items-center gap-2">
+                                </label>
+                                <label className="block text-xs text-[var(--muted)]">
+                                    <span className="mb-1 block">{t("settings:data.expireDays")}</span>
+                                    <span className="flex items-center gap-1.5">
                                         <Select
-                                            className="w-20"
                                             options={[30, 60, 90, 180, 365].map((n) => ({
                                                 value: String(n),
                                                 label: String(n),
@@ -825,10 +840,10 @@ export function SettingsPage({
                                                 })
                                             }
                                         />
-                                        <span className="text-sm text-[var(--muted)]">{t("settings:data.days")}</span>
-                                    </div>
-                                </div>
-                            </>
+                                        <span className="shrink-0 text-sm text-[var(--muted)]">{t("settings:data.days")}</span>
+                                    </span>
+                                </label>
+                            </div>
                         )}
                         <div className={rowClass}>
                             <span className="text-sm text-[var(--text)]">
@@ -911,8 +926,8 @@ export function SettingsPage({
                             )}
                         </div>
                         {remoteDraft.enabled && (
-                            <div className="mt-3 space-y-3 rounded-2xl border border-[var(--line)] bg-[var(--field)] p-4">
-                                <label className="block text-xs text-[var(--muted)]">
+                            <div className="mt-3 grid grid-cols-2 gap-3 rounded-2xl border border-[var(--line)] bg-[var(--field)] p-4">
+                                <label className="col-span-2 block text-xs text-[var(--muted)]">
                                     {t("settings:data.webdavEndpoint")}
                                     <input
                                         className={`${inputClass} mt-1`}
@@ -942,7 +957,7 @@ export function SettingsPage({
                                         onChange={(event) => updateRemoteDraft("username", event.target.value)}
                                     />
                                 </label>
-                                <label className="block text-xs text-[var(--muted)]">
+                                <label className="col-span-2 block text-xs text-[var(--muted)]">
                                     {t("settings:data.webdavPassword")}
                                     <input
                                         className={`${inputClass} mt-1`}
@@ -953,7 +968,7 @@ export function SettingsPage({
                                         placeholder={t("settings:data.webdavPasswordPlaceholder")}
                                     />
                                 </label>
-                                <div className="flex flex-wrap items-center gap-2">
+                                <div className="col-span-2 flex flex-wrap items-center gap-2">
                                     <button
                                         className="rounded-full bg-[var(--accent)] px-3 py-2 text-xs text-white hover:opacity-90"
                                         data-testid="remote-backup-save-config-btn"
@@ -991,12 +1006,12 @@ export function SettingsPage({
                                         </button>
                                     )}
                                 </div>
-                                <div className="text-xs text-[var(--muted)]">
+                                <div className="col-span-2 text-xs text-[var(--muted)]">
                                     {remoteDraft.password_configured
                                         ? t("settings:data.webdavPasswordConfigured")
                                         : t("settings:data.webdavPasswordPlaceholder")}
                                 </div>
-                                <div className="border-t border-[var(--line)] pt-3 text-xs text-[var(--muted)]">
+                                <div className="col-span-2 border-t border-[var(--line)] pt-3 text-xs text-[var(--muted)]">
                                     <span className="text-[var(--text)]">
                                         {t("settings:data.remoteBackupLastUpload")}：
                                     </span>{" "}
@@ -1009,7 +1024,7 @@ export function SettingsPage({
                                 </div>
                                 {remoteDraft.last_upload_error && (
                                     <div
-                                        className="rounded-xl border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-xs text-amber-300"
+                                        className="col-span-2 rounded-xl border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-xs text-amber-300"
                                         data-testid="remote-backup-last-error"
                                     >
                                         <div className="font-medium">{t("settings:data.remoteBackupLastError")}</div>
@@ -1037,8 +1052,8 @@ export function SettingsPage({
                             )}
                         </div>
                         {aiDraft.enabled && (
-                            <div className="mt-3 space-y-3 rounded-2xl border border-[var(--line)] bg-[var(--field)] p-4">
-                                <label className="block text-xs text-[var(--muted)]">
+                            <div className="mt-3 grid grid-cols-2 gap-3 rounded-2xl border border-[var(--line)] bg-[var(--field)] p-4">
+                                <label className="col-span-2 block text-xs text-[var(--muted)]">
                                     {t("settings:data.aiEndpoint")}
                                     <input
                                         className={`${inputClass} mt-1`}
@@ -1070,7 +1085,7 @@ export function SettingsPage({
                                         placeholder={t("settings:data.aiApiKeyPlaceholder")}
                                     />
                                 </label>
-                                <div className="flex flex-wrap items-center gap-2">
+                                <div className="col-span-2 flex flex-wrap items-center gap-2">
                                     <button
                                         className="rounded-full bg-[var(--accent)] px-3 py-2 text-xs text-white hover:opacity-90"
                                         data-testid="ai-summary-save-config-btn"
@@ -1099,7 +1114,7 @@ export function SettingsPage({
                                         </button>
                                     )}
                                 </div>
-                                <div className="text-xs text-[var(--muted)]">
+                                <div className="col-span-2 text-xs text-[var(--muted)]">
                                     {aiDraft.api_key_configured
                                         ? t("settings:data.aiApiKeyConfigured")
                                         : t("settings:data.aiApiKeyNotConfigured")}

@@ -72,6 +72,8 @@ interface MarkdownRendererProps {
   emptyText?: string;
   attachments?: readonly MarkdownAttachment[];
   onNoteLinkClick?: (targetTitle: string) => void;
+  tags?: { name: string; color: string }[];
+  summary?: string;
 }
 
 type MarkdownNode = {
@@ -364,7 +366,7 @@ function CalloutIcon({ kind }: { kind: CalloutKind }) {
   return <Icon className="markdown-callout-icon" aria-hidden="true" />;
 }
 
-export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme = "dark", lang, emptyText, attachments = [], onNoteLinkClick }: MarkdownRendererProps) {
+export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme = "dark", lang, emptyText, attachments = [], onNoteLinkClick, tags, summary }: MarkdownRendererProps) {
   const { t } = useTranslation();
   const resolvedEmptyText = emptyText ?? t("common:emptyItem.noContent");
   const properties = parseNoteProperties(content);
@@ -416,7 +418,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme 
     }
   }, [attachments, onNoteLinkClick, t]);
 
-  if (!bodyContent.trim() && !hasNoteProperties(properties)) {
+  if (!bodyContent.trim() && !hasNoteProperties(properties) && !(tags?.length) && !summary?.trim()) {
     return <div className="markdown-empty">{resolvedEmptyText}</div>;
   }
 
@@ -549,7 +551,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme 
       data-testid="markdown-preview"
       onClick={handleClick}
     >
-      <NotePropertiesBadges properties={properties} testId="markdown-properties" />
+      <NotePropertiesBadges properties={properties} tags={tags} summary={summary} testId="markdown-properties" />
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks, remarkMath, remarkDefinitionList, remarkWikiLinks]}
         remarkRehypeOptions={{ handlers: defListHastHandlers }}
