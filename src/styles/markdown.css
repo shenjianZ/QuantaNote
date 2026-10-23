@@ -133,6 +133,12 @@
     margin-top: 0 !important;
 }
 
+/* 紧凑模式：内嵌场景（聊天气泡）去除正文级留白，字号跟随容器 */
+.markdown-preview--compact {
+    padding: 0;
+    font-size: inherit;
+}
+
 .markdown-preview > :last-child {
     margin-bottom: 0 !important;
 }

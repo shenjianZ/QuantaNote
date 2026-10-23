@@ -74,6 +74,8 @@ interface MarkdownRendererProps {
   onNoteLinkClick?: (targetTitle: string) => void;
   tags?: { name: string; color: string }[];
   summary?: string;
+  /** 紧凑模式：去除正文级大内边距、字号跟随容器（聊天气泡等内嵌场景） */
+  compact?: boolean;
 }
 
 type MarkdownNode = {
@@ -366,7 +368,7 @@ function CalloutIcon({ kind }: { kind: CalloutKind }) {
   return <Icon className="markdown-callout-icon" aria-hidden="true" />;
 }
 
-export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme = "dark", lang, emptyText, attachments = [], onNoteLinkClick, tags, summary }: MarkdownRendererProps) {
+export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme = "dark", lang, emptyText, attachments = [], onNoteLinkClick, tags, summary, compact = false }: MarkdownRendererProps) {
   const { t } = useTranslation();
   const resolvedEmptyText = emptyText ?? t("common:emptyItem.noContent");
   const properties = parseNoteProperties(content);
@@ -546,7 +548,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, theme 
 
   return (
     <article
-      className="markdown-preview"
+      className={compact ? "markdown-preview markdown-preview--compact" : "markdown-preview"}
       data-theme={theme}
       data-testid="markdown-preview"
       onClick={handleClick}

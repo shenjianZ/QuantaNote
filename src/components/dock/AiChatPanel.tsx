@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { MarkdownRenderer } from "../common/MarkdownRenderer";
 import { useAiChatStore } from "../../stores/aiChatStore";
+import { useAppStore } from "../../stores/appStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useToastStore } from "../../stores/toastStore";
 import { copyTextToSystemClipboard } from "../../utils/clipboard";
@@ -71,6 +72,11 @@ function useDismiss(onClose: () => void) {
 
 export function AiChatPanel({ itemId, title, content, onOpenNote }: AiChatPanelProps) {
   const { t } = useTranslation(["document", "common"]);
+  const appTheme = useAppStore((s) => s.theme);
+  // Markdown 文字配色跟随应用主题（含 system 回退），否则浅色模式下是深色文字配色不可见
+  const markdownTheme = appTheme === "light" || appTheme === "dark"
+    ? appTheme
+    : (typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
   const messages = useAiChatStore((s) => s.messages);
   const sessions = useAiChatStore((s) => s.sessions);
   const currentSession = useAiChatStore((s) => s.sessions.find((session) => session.id === s.sessionId) ?? null);
@@ -545,8 +551,8 @@ export function AiChatPanel({ itemId, title, content, onOpenNote }: AiChatPanelP
               </div>
             ) : (
               <div key={message.id} className="group/message" data-testid="doc-ai-chat-assistant-message">
-                <div className="rounded-2xl rounded-bl-md bg-[var(--field)] px-3 py-2 text-sm">
-                  <MarkdownRenderer content={message.content} />
+                <div className="rounded-2xl rounded-bl-md px-0.5 py-1 text-sm">
+                  <MarkdownRenderer content={message.content} theme={markdownTheme} compact />
                 </div>
                 <div className="mt-1 flex justify-start gap-1 opacity-0 transition-opacity group-hover/message:opacity-100">
                   <button
@@ -588,8 +594,8 @@ export function AiChatPanel({ itemId, title, content, onOpenNote }: AiChatPanelP
           {(generating || streamingDraft) && (
             <div data-testid="doc-ai-chat-streaming">
               {streamingDraft ? (
-                <div className="rounded-2xl rounded-bl-md bg-[var(--field)] px-3 py-2 text-sm">
-                  <MarkdownRenderer content={streamingDraft} />
+                <div className="rounded-2xl rounded-bl-md px-0.5 py-1 text-sm">
+                  <MarkdownRenderer content={streamingDraft} theme={markdownTheme} compact />
                   {!stopped && <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse rounded-sm bg-[var(--accent)] align-[-2px]" />}
                   {stopped && <p className="mt-1 text-[10px] text-[var(--muted)]">{t("document:chat.stoppedHint")}</p>}
                 </div>
