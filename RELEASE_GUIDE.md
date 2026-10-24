@@ -1,11 +1,11 @@
 ---
 
-## 📥 Download Links
+## 📥 下载链接
 
-QuantaNote __TAG__ assets are produced by the release workflow after version, signature, and platform checks pass. The workflow publishes the Draft Release automatically; users should select the asset matching their platform and architecture.
+QuantaNote __TAG__ 的安装包由发布工作流在通过版本、签名与平台校验后自动产出并发布。请根据你的平台与架构选择对应文件下载安装。
 
-| Platform | Architecture | File | Size |
-|----------|--------------|------|------|
+| 平台 | 架构 | 文件 | 大小 |
+|------|------|------|------|
 | **Windows** | x64 | [QuantaNote-__TAG__-windows-x64.exe](https://github.com/shenjianZ/QuantaNote/releases/latest/download/QuantaNote-__TAG__-windows-x64.exe) | ~10 MB |
 | **Windows** | x64 | [QuantaNote-__TAG__-windows-x64.msi](https://github.com/shenjianZ/QuantaNote/releases/latest/download/QuantaNote-__TAG__-windows-x64.msi) | ~12 MB |
 | **macOS** | Apple Silicon (M1/M2/M3/M4) | [QuantaNote-__TAG__-macos-aarch64.dmg](https://github.com/shenjianZ/QuantaNote/releases/latest/download/QuantaNote-__TAG__-macos-aarch64.dmg) | ~15 MB |
@@ -122,17 +122,16 @@ adb install QuantaNote-__TAG__-android-arm64-v8a.apk
 - **系统要求**：Android 7.0（API 24）及以上
 - **首次安装**：Android 可能会要求授予文件访问权限，请允许以确保笔记数据正常存储
 - **签名变更**：如果之前安装了不同签名的版本，需要先卸载旧版本
+- **升级说明**：Android 安装包仅提供 ARM64 架构；已安装用户升级时必须使用同一签名的安装包，否则需先卸载旧版本
 
-Android release assets are ARM64-only. Existing installations must keep using the same signing key for in-place upgrades.
+## 🔄 自动更新
 
-## 🔄 Automatic Updates
-
-Desktop packages use the signed `latest.json` manifest. If signature verification fails, download the matching package from the official Release instead of deleting the local data directory.
+桌面版通过签名的 `latest.json` 更新清单完成自动更新。如果更新时签名校验失败，请直接从官方 Release 下载对应安装包重新安装，本地笔记数据目录不会被删除。
 
 ---
 
-## 🔗 Resources
+## 🔗 相关资源
 
-- 📖 [Documentation](https://quantanote-docs.shenjianl.cn)
-- 🐛 [Report Issues](https://github.com/shenjianZ/QuantaNote/issues)
-- 💬 [Discussions](https://github.com/shenjianZ/QuantaNote/discussions)
+- 📖 [使用文档](https://quantanote-docs.shenjianl.cn)
+- 🐛 [反馈问题](https://github.com/shenjianZ/QuantaNote/issues)
+- 💬 [社区讨论](https://github.com/shenjianZ/QuantaNote/discussions)

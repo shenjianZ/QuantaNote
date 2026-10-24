@@ -143,7 +143,7 @@ jobs:
           # 提取对应版本的 changelog 内容
           BODY=$(sed -n "/^## \[${TAG#v}\]/,/^## \[/p" CHANGELOG.md | sed '$d' | tail -n +2)
           if [ -z "$BODY" ]; then
-            BODY="Release ${TAG}"
+            BODY="QuantaNote ${TAG} 版本发布"
           fi
           # 读取安装指南文件并替换版本号
           if [ -f "RELEASE_GUIDE.md" ]; then
@@ -313,7 +313,7 @@ jobs:
           $version = $tag.TrimStart("v")
           $manifest = @{
             version = $version
-            notes = "See GitHub release notes."
+            notes = "请查看 GitHub 发布说明获取更新详情。"
             pub_date = (Get-Date).ToUniversalTime().ToString("o")
             platforms = @{
               $platformKey = @{
